@@ -8,7 +8,8 @@
     "crypto": ">=0.0.3",
     "request": ">=2.81.0",
     "cids": ">=0.5.1",
-    "promisify-es6": "^1.0.3"
+    "promisify-es6": "^1.0.3",
+    "ipfs-iiif-db":"^2.4.0"
   },
   "keywords": [],
   "license": "MIT",
