@@ -44,7 +44,7 @@ let acl;
      */
     .then(() => console.log("delaying 10 secs"))
     .then(() => delay(10000))
-    .then(()=>console.log("Completed test"))
+    .then(()=>console.log("Completed test - running IPFS in background, hit Ctrl-C to exit"))
     .catch((err) => console.log("Test failed", err));
 
 
