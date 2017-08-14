@@ -1,13 +1,5 @@
 # dweb-transport
 
-
-## Extending the library
-### Coding conventions
-
-* routines starting with p_ return a Promise 
-* verbose is passed down as a parameter triggering some kind of debugging.
-
-
 # Installing a compilable version
 This will be made simpler ! 
 
@@ -25,7 +17,7 @@ I find the first run generates a lot of warnings and a second, virtually clean r
 Now compile the javascript library for the browser
 > npm run bundle_transport_ipfs
 
-# Testing
+# Testing in node
 Run the Node specific test
 > node js/test.js
 
@@ -35,6 +27,7 @@ It should start a IPFS instance, and generate some messages ending in
 
 Usually it will need a Ctrl-C to exit
 
+# Testing in browser
 * In your browser, open the file:  examples/example_block.html
 * Type some text into the editor and hit Save
 * A hash should appear below.
