@@ -9,7 +9,8 @@
     "request": ">=2.81.0",
     "cids": ">=0.5.1",
     "promisify-es6": "^1.0.3",
-    "ipfs-iiif-db":"^2.4.0"
+    "ipfs-iiif-db":"^2.4.0",
+    "jsdom":"^11.1.0"
   },
   "keywords": [],
   "license": "MIT",
