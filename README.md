@@ -36,7 +36,7 @@ virtually clean run gives more confidence that the install worked.
 
 Now compile the javascript library for the browser: ```> npm run bundle_transport_ipfs```
 
-If this worked without errors, try the node specific test. ```> node js/test.js```
+If this worked without errors, try the node specific test. ```> npm run test```
 
 This should start a IPFS instance, and generate some messages ending in "delaying 10 secs" and "Completed test".
 It will leave the IPFS instance running and usually will need a Ctrl-C to exit.

@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title>DWEB SmartDict example</title>
+    <title>DWEB CommonList example</title>
     <script src="https://unpkg.com/ipfs-iiif-db/dist/browser.js"></script><!--or browser.min.js-->
     <!--<script src="https://unpkg.com/ipfs-iiif-db@2.4.0/dist/browser.min.js"></script><!--or browser.min.js-->
     <!--<script src="cached/browser.min.js"></script><!-- cached version of ipfs/iiif so can test offline-->
@@ -32,13 +32,15 @@
         verbose = true;
         let el_form = document.forms.namedItem("myform");
         dict = form2dict(el_form);
-        let sd = new Dweb.SmartDict(null, dict, verbose )
-        console.log("SD=",sd);
+        <!--CommonList(hash, data, master, keypair, keygen, mnemonic, verbose, options)-->
+        let obj = new Dweb.CommonList(null, dict, true, {keygen: true}, verbose, {_allowunsafestore: true} );
+        // _allowunsafestore set to true since AccessControlList not set yet, and storing.
+        console.log("Created=",obj);
         // Now display link
-        sd.p_store(verbose)
+        obj.p_store(verbose)
             .then(() => {
                 el = document.getElementById("retrievalarea");
-                el.value = sd._hash; // Use as default on input
+                el.value = obj._hash; // Use as default on input
             });
         return false;
     }
@@ -46,19 +48,20 @@
     function fetchit() {
         verbose=true;
         console.log("Fetching")
+        // Get the string from the form
         el = document.getElementById("retrievalarea");
         destn = document.getElementById("retrievaldestn");
         hash = el.value;
-        destn.innerHTML = ""; // Clear it first
         console.log("Fetching hash=",hash);
+        // Fetch it, and display
+        destn.innerHTML = ""; // Clear it first
         Dweb.SmartDict.p_unknown_fetch(hash, verbose)
-            .then((sd) => {
-                console.log("Fetched=",sd);
-                destn.innerHTML = "My name is: "+sd.name;
-                destn.style.color = sd.favcolor;
-                return sd;
+            .then((cl) => {
+                console.log("Fetched=",cl);
+                destn.innerHTML = "List name: "+cl.name;
+                return cl;
             })
-            .then((sd) => sd.objbrowser(sd._hash, null, "ObjBrowser", verbose))
+            .then((obj) => obj.objbrowser(obj._hash, null, "ObjBrowser", verbose))
     }
 
 
@@ -80,9 +83,8 @@
 <h4>Create something here, and when its saved its link will appear below</h4>
 <form method="post" name="myform" onsubmit="sendit(); return false;">
     <ul>
-    <li class="prop"><span class="propname">Name</span><input class="propval" type="text" name="name" size="150"></input></li>
-    <li class="prop"><span class="propname">Favorite Color</span><input class="propval" type="text" name="favcolor" size="150"></input></li>
-        <li><input type="submit" value="Store"></input></li>
+    <li class="prop"><span class="propname">List Name</span><input class="propval" type="text" name="name" size="150"></input></li>
+    <li><input type="submit" value="Create List"></input></li>
     </ul>
 </form>
 <h4>Enter a link here and it will be retrieved.</h4>

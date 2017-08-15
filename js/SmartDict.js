@@ -5,6 +5,7 @@ const Dweb = require("./Dweb");
 
 //TODO-SEPERATE - move these to Dweb
 const table2class = { // Each of these needs a constructor that takes hash, data and is ok with no other parameters, (otherwise define a set of these methods as factories)
+    "cl": "CommonList",
     "sb": "StructuredBlock",
     "kc": "KeyChain",
     "kp": "KeyPair",
@@ -185,9 +186,8 @@ class SmartDict extends Transportable {
                     spanname.className='propname';
                     //TODO - handle Links by nested list
                     li2.appendChild(spanname);
-                    //if ((prop == "links") || (prop == "_list")) {  //StructuredBlock
                     //noinspection JSUnfilteredForInLoop
-                    if ( ["links", "_list", "_signatures", "_current"].includes(prop) ) { //<span>...</span><ul proplinks>**</ul>
+                    if ( ["links", "_list", "_signatures", "_current", "keypair"].includes(prop) ) { //<span>...</span><ul proplinks>**</ul>
                         let spanval;
                         spanval = document.createElement('span');
                         spanval.appendChild(document.createTextNode("..."));
@@ -219,11 +219,25 @@ class SmartDict extends Transportable {
                         }
                     } else {    // Any other field
                         let spanval;
-                        if (prop === "hash") {
+                        if (["hash","_publichash"].includes(prop)) {
                             //noinspection ES6ConvertVarToLetConst
-                            spanval = document.createElement('a');
+                            spanval = document.createElement('span');
                             //noinspection JSUnfilteredForInLoop
-                            spanval.setAttribute('href','/file/b/'+this[prop]+"?contenttype="+this["Content-type"]);
+                            spanval.source = this[prop];
+                            li2.setAttribute('onclick', 'Dweb.SmartDict.p_objbrowserfetch(this.childNodes[1]);');
+                            //TODO next line wont actually work on IPFS, need way to retrieve from link here
+                            //spanval.setAttribute('href', '/file/b/' + this[prop] + "?contenttype=" + this["Content-type"]);
+                        /* TODO this doesnt work to display Objects that aren't SmartDict
+                        } else if (typeof this[prop] === "object" ) {
+                            let p1 = this[prop];
+                            spanval = document.createTextNode("{");
+                            for (let subprop in p1) {
+                                spanval.appendChild(document.createTextNode(subprop));
+                                spanval.appendChild(document.createTextNode(": "));
+                                spanval.appendChild(document.createTextNode(p1[subprop]));
+                            }
+                            spanval.appendChild(document.createTextNode("}"));
+                        */
                         } else {
                             // Group of fields where display then add behavior or something
                             //noinspection ES6ConvertVarToLetConst
@@ -260,8 +274,13 @@ class SmartDict extends Transportable {
         let source = el.source;
         let parent = el.parentNode;
         parent.removeChild(el); //Remove elem from parent
-        return source.p_fetch(verbose)
-            .then((msg) => source.objbrowser(source._hash, null, parent, false ));
+        if (typeof source === "string") {
+            return SmartDict.p_unknown_fetch(source, verbose)
+                .then((obj) => obj.objbrowser(obj._hash, null, parent, false));
+        } else {
+            return source.p_fetch(verbose)
+                .then((msg) => source.objbrowser(source._hash, null, parent, false));
+        }
     }
 
 }

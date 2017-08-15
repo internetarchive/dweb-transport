@@ -1,15 +1,15 @@
 //exports.TransportHTTP = require('./TransportHTTP');   //TODO-IPFS breaks
 exports.Block = require('./Block');
 exports.SmartDict = require("./SmartDict");
+exports.KeyPair = require("./KeyPair");
+exports.Signature = require("./Signature");
+exports.CommonList = require("./CommonList");
 /* Later libraries
 exports.StructuredBlock = require('./StructuredBlock');
 exports.MutableBlock = require('./MutableBlock');
 exports.CryptoLib = require('./CryptoLib');
 exports.KeyChain = require('./KeyChain');
-exports.CommonList = require("./CommonList");
 exports.MutableBlock = require("./MutableBlock");
-exports.KeyPair = require("./KeyPair");
-exports.Signature = require("./Signature");
 exports.AccessControlList = require("./AccessControlList");
 */
 

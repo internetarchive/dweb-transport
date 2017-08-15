@@ -25,7 +25,7 @@
   },
   "scripts": {
     "bundle_transport_ipfs": "cd js; browserify ./browser_transport_ipfs.js > ../examples/dweb_transport_ipfs_bundled.js",
-    "watch": "watchify js/browser_transport.js > examples/dweb_transport_bundled.js",
+    "watch": "watchify js/browser_transport_ipfs.js -o examples/dweb_transport_ipfs_bundled.js --verbose",
     "test": "cd js; node ./test.js"
   }
 }

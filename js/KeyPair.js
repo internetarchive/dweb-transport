@@ -32,29 +32,6 @@ class KeyPair extends SmartDict {
         this.table = "kp";
     }
 
-    static keygen(keytype, mnemonic, seed, verbose) {
-        /*
-        Generate a new key.
-
-        :param keytype: one of KeyPair.KEYTYPExyz, specifies Signing or Encrypting key or both
-        :param mnemonic: BIP39 mnemonic to use (not implemented yet - generates a fixed key for testing)
-        :param seed: urlsafebase64 or binary string (not urlsafebase64) to generate key from.
-        :returns: new KeyPair with _key initialized
-         */
-        // keyclass parameter (from Python) not supported as only support Libsodium=NACL keys
-        if (verbose) { console.log("Generating keypair"); }
-        if (mnemonic) {
-            //TODO Mnemonic libraries are either non-BIP39 or have node dependencies - need to rewrite one of them
-            if (mnemonic === "coral maze mimic half fat breeze thought champion couple muscle snack heavy gloom orchard tooth alert cram often ask hockey inform broken school cotton") { // 32 byte
-                seed = "01234567890123456789012345678901";
-                console.log("Faking mnemonic encoding for now")
-            } else {
-                console.log("MNEMONIC STILL TO BE IMPLEMENTED");    //TODO-mnemonic
-            }
-        }
-        let key = KeyPair._keyfromseed(seed || sodium.randombytes_buf(sodium.crypto_box_SEEDBYTES), keytype, verbose);
-        return new KeyPair(null, {"key": key}, verbose);
-    }
     __setattr__(name, value) {
         /*
          Subclasses SmartDict.__setattr__ to import "key"
@@ -80,9 +57,27 @@ class KeyPair extends SmartDict {
 
         value:  Dictionary in local format, or Uint8Array or urlsafebase64 string
          */
+        let verbose = false;
         if (typeof value === "string" || Array.isArray(value)) {
             this._importkey(value);
-        } else {
+        } else {    // Should be object, or maybe undefined ?
+            if (typeof value === "object") {
+                if (value.mnemonic) {
+                    if (value.mnemonic === "coral maze mimic half fat breeze thought champion couple muscle snack heavy gloom orchard tooth alert cram often ask hockey inform broken school cotton") { // 32 byte
+                        value.seed = "01234567890123456789012345678901";  // Note this is seed from mnemonic above
+                        console.log("Faking mnemonic encoding for now")
+                    } else {
+                        console.assert(false, "MNEMONIC STILL TO BE IMPLEMENTED");    //TODO-mnemonic
+                    }
+                }
+                if (value.keygen) {
+                    value.seed = sodium.randombytes_buf(sodium.crypto_box_SEEDBYTES);
+                    delete value.keygen;
+                }
+                if (value.seed) {
+                    value = KeyPair._keyfromseed(value.seed, Dweb.KeyPair.KEYTYPESIGNANDENCRYPT, verbose);
+                }
+            }
             this._key = value;
         }
     }
