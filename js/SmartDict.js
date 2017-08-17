@@ -227,17 +227,6 @@ class SmartDict extends Transportable {
                             li2.setAttribute('onclick', 'Dweb.SmartDict.p_objbrowserfetch(this.childNodes[1]);');
                             //TODO next line wont actually work on IPFS, need way to retrieve from link here
                             //spanval.setAttribute('href', '/file/b/' + this[prop] + "?contenttype=" + this["Content-type"]);
-                        /* TODO this doesnt work to display Objects that aren't SmartDict
-                        } else if (typeof this[prop] === "object" ) {
-                            let p1 = this[prop];
-                            spanval = document.createTextNode("{");
-                            for (let subprop in p1) {
-                                spanval.appendChild(document.createTextNode(subprop));
-                                spanval.appendChild(document.createTextNode(": "));
-                                spanval.appendChild(document.createTextNode(p1[subprop]));
-                            }
-                            spanval.appendChild(document.createTextNode("}"));
-                        */
                         } else {
                             // Group of fields where display then add behavior or something
                             //noinspection ES6ConvertVarToLetConst
@@ -247,7 +236,9 @@ class SmartDict extends Transportable {
                             }
                         }
                         //noinspection JSUnfilteredForInLoop
-                        spanval.appendChild(document.createTextNode(this[prop]));
+                        let val = (typeof this[prop] === "object") ? JSON.stringify(this[prop],null,'\t ') : this[prop]
+                        spanval.appendChild(document.createTextNode(val));
+                        console.log(val); //reports line breaks
                         spanval.className='propval';
                         li2.appendChild(spanval);
                     }
