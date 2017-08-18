@@ -155,13 +155,21 @@ class TransportIPFS extends Transport {
 
     static link2cid(link) {
         let arr = link.split('/');
-        console.assert(arr.length===3 && arr[1]==="ipfs","TransportIPFS.link2cid bad format for hash should be link",link);
+        if (!(arr.length===3 && arr[1]==="ipfs"))
+                throw new Dweb.errors.TransportError("TransportIPFS.link2cid bad format for hash should be /ipfs/...: "+link);
         return new CID(arr[2])
     }
 
     p_rawfetch(hash, verbose) {
+        /*
+        Fetch hash from IPFS (implements Transport.p_rawfetch)
+
+        :param hash:    Valid ipfs hash "/ipfs/*"
+        :resolves:      Opaque bytes retrieved from IPFS
+        :throws:        TransportError if hash invalid - note this happens immediately, not as a catch in the promise
+         */
         console.assert(hash, "TransportIPFS.p_rawfetch: requires hash");
-        let cid = (hash instanceof CID) ? hash : TransportIPFS.link2cid(hash);
+        let cid = (hash instanceof CID) ? hash : TransportIPFS.link2cid(hash);  // Throws TransportError if hash bad
         return this.promisified.ipfs.block.get(cid)
             .then((result)=> result.data.toString())
             .catch((err) => {

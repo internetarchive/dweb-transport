@@ -251,14 +251,13 @@ class KeyPair extends SmartDict {
         */
         console.assert(date && hash);
         let signable = date.toISOString() + hash;   // Signable string
-        if (this._key.sign.privateKey) {
-            let sig = sodium.crypto_sign_detached(signable, this._key.sign.privateKey, "urlsafebase64");    //TODO may need to be crypto_sign_detached to match verify (better anyway)
-            //Can implement and uncomment next line if seeing problems verifying things that should verify ok - tests immediate verification
-            this.verify(signable, sig);
-            return sig;
-        } else {
-            throw new Dweb.errors.ToBeImplementedError("signature for key ="+this._key);
+        if (! this._key.sign.privateKey) {
+            throw new Dweb.errors.EncryptionError("Can't sign with out private key. Key =" + JSON.stringify(this._key));
         }
+        let sig = sodium.crypto_sign_detached(signable, this._key.sign.privateKey, "urlsafebase64");    //TODO may need to be crypto_sign_detached to match verify (better anyway)
+        //Can implement and uncomment next line if seeing problems verifying things that should verify ok - tests immediate verification
+        this.verify(signable, sig);
+        return sig;
     }
 
     verify(signable, urlb64sig) {

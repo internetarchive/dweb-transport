@@ -9,8 +9,9 @@ class Signature extends SmartDict {
 
     Fields:
     date:       Date stamp (according to browser) when item signed
+    signed:     Hash of signature signed    TODO-doc-api
     signature:  Signature of the date and hash
-    signedby:   Public key of signer
+    signedby:   Hash of list signing it     TODO-doc-api
      */
     constructor(hash, dic, verbose) {
         /*
@@ -24,7 +25,7 @@ class Signature extends SmartDict {
         //TODO-DATE turn s.date into java date
         //if isinstance(s.date, basestring):
         //    s.date = dateutil.parser.parse(s.date)
-        this.table = "sig";
+        this.table = "sig"; //TODO- consider passing as options to super, need to do across all classes
     }
 
     static sign(commonlist, hash, verbose) {
@@ -39,7 +40,7 @@ class Signature extends SmartDict {
         let signature = commonlist.keypair.sign(date, hash);
         if (!commonlist._publichash) commonlist.p_store(verbose); // Sets _publichash sync, while storing async
         console.assert(commonlist._publichash, "Signature.sign should be a publichash by here");
-        return new Signature(null, {"date": date, "signature": signature, "signedby": commonlist._publichash})
+        return new Signature(null, {"date": date, "hash": hash, "signature": signature, "signedby": commonlist._publichash})
     }
 
     verify() { console.assert(false, "XXX Undefined function Signature.verify, available in CommonList and KeyPair"); }

@@ -185,6 +185,7 @@ class CommonList extends SmartDict {
 
          :param obj: Should be subclass of SmartDict, (Block is not supported)
          :resolves: sig created in process - for adding to lists etc.
+         :throws:   ForbiddenError if not master;
          */
         let self = this;
         let sig;
@@ -192,7 +193,7 @@ class CommonList extends SmartDict {
             .then(() => this.p_store()) // Make sure stored - fetch might be a Noop if created locally
             .then(() => obj.p_store())
             .then(() => {
-                console.assert(self._master && self.keypair, "ForbiddenException: Signing a new entry when not a master list");
+                if (!(self._master && self.keypair)) throw new Dweb.errors.ForbiddenError("Signing a new entry when not a master list");
                 sig = this._makesig(obj._hash, verbose);
                 self._list.push(sig);   // Keep copy locally on _list
             })
@@ -206,9 +207,9 @@ class CommonList extends SmartDict {
         :param hash:    Hash of object to sign
         :returns:       Signature
          */
-        console.assert(hash, "Empty string or undefined or null would be an error");
-        console.assert(this._master, "Must be master to sign something");
-        let sig = Dweb.Signature.sign(this, hash, verbose);
+        if (!hash) throw new Dweb.errors.CodingError("Empty hash is a coding error");
+        if (!this._master) throw new Dweb.errors.ForbiddenError("Must be master to sign something");
+        let sig = Dweb.Signature.sign(this, hash, verbose); //returns a new Signature
         console.assert(sig.signature, "Must be a signature");
         return sig
     }
@@ -222,5 +223,13 @@ class CommonList extends SmartDict {
         return Dweb.transport.p_rawadd(hash, sig.date, sig.signature, sig.signedby, verbose);
     }
 
+    listmonitor(callback, verbose) {    //TODO-REL2 document API
+        Dweb.transport.listmonitor(this._publichash, (obj) => {
+            if (verbose) console.log("CL.listmonitor",this._publichash,"Added",obj);
+            let sig = new Dweb.Signature(null, obj, verbose);
+            this._list.push(sig);
+            callback(sig);
+        })
+    }
 }
 exports = module.exports = CommonList;

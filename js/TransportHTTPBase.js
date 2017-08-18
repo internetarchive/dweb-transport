@@ -41,8 +41,8 @@ class TransportHTTPBase extends Transport {
                 console.log("TransportHTTP.async_post unable to post url: ",url, "data:", data, "errno: ", errorres.errno,"at:",errorres.address+":"+errorres.port);
                 if (error) {
                     error(undefined, undefined, undefined)
-                } else {
-                    throw new TransportError("TransportHTTP.async_post unable to post url: "+url+" data: "+data+"errno: "+errorres.errno+"at"+errorres.address+":"+errorres.port)
+                } else { //TODO Should be TransportError but that is not in scope here.
+                    throw new Error("TransportHTTP.async_post unable to post url: "+url+" data: "+data+"errno: "+errorres.errno+"at"+errorres.address+":"+errorres.port)
                 }
             } else {
                 if (response["statusCode"] === 200) {
@@ -104,8 +104,8 @@ class TransportHTTPBase extends Transport {
                 console.log("TransportHTTP.async_post unable to post url: ",url, "data:", data, "errno: ", errorres.errno,"at:",errorres.address+":"+errorres.port);
                 if (error) {
                     error(undefined, undefined, undefined)
-                } else {
-                    throw new TransportError("TransportHTTP.async_post unable to post url: "+url+" data: "+data+"errno: "+errorres.errno+"at"+errorres.address+":"+errorres.port)
+                } else { //TODO Should be TransportError but that is not in scope here.
+                    throw new Error("TransportHTTP.async_post unable to post url: "+url+" data: "+data+"errno: "+errorres.errno+"at"+errorres.address+":"+errorres.port)
                 }
             } else {
                 if (response["headers"]['content-type'] === "application/json") {

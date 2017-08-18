@@ -33,7 +33,7 @@ exports.keychains = [];
 
 exports.utils.SecurityWarning = function(msg, self) {
     console.log("Security Warning:", msg, self);
-    alert("Security Warning"+ msg);
+    alert("Security Warning: "+ msg);
 };
 
 exports.utils.consolearr  = (arr) => ((arr && arr.length >0) ? [arr.length+" items inc:", arr[arr.length-1]] : arr );
@@ -46,6 +46,7 @@ class ToBeImplementedError extends Error {
 }
 exports.errors.ToBeImplementedError = ToBeImplementedError;
 
+//TODO TransportError is wanted in TransportHTTP but its out of scope there. Think about moving to Transport class
 class TransportError extends Error {
     constructor(message) {
         super(message || "Transport failure");
@@ -53,6 +54,26 @@ class TransportError extends Error {
     }
 }
 exports.errors.TransportError = TransportError;
+
+// Use this when the code logic has been broken - e.g. something is called with an undefined parameter, its preferable to console.assert
+// Typically this is an error, that should have been caught higher up.
+class CodingError extends Error {
+    constructor(message) {
+        super(message || "Coding Error");
+        this.name = "CodingError"
+    }
+}
+exports.errors.CodingError = CodingError;
+
+// Use this when the logic of encryption wont let you do something, typically something higher should have stopped you trying.
+// Examples include signing something when you only have a public key.
+class EncryptionError extends Error {
+    constructor(message) {
+        super(message || "Encryption Error");
+        this.name = "EncryptionError"
+    }
+}
+exports.errors.EncryptionError = EncryptionError;
 
 class ForbiddenError extends Error {
     constructor(message) {

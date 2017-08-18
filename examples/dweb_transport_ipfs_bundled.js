@@ -221,6 +221,7 @@ class CommonList extends SmartDict {
 
          :param obj: Should be subclass of SmartDict, (Block is not supported)
          :resolves: sig created in process - for adding to lists etc.
+         :throws:   ForbiddenError if not master;
          */
         let self = this;
         let sig;
@@ -228,7 +229,7 @@ class CommonList extends SmartDict {
             .then(() => this.p_store()) // Make sure stored - fetch might be a Noop if created locally
             .then(() => obj.p_store())
             .then(() => {
-                console.assert(self._master && self.keypair, "ForbiddenException: Signing a new entry when not a master list");
+                if (!(self._master && self.keypair)) throw new Dweb.errors.ForbiddenError("Signing a new entry when not a master list");
                 sig = this._makesig(obj._hash, verbose);
                 self._list.push(sig);   // Keep copy locally on _list
             })
@@ -242,9 +243,9 @@ class CommonList extends SmartDict {
         :param hash:    Hash of object to sign
         :returns:       Signature
          */
-        console.assert(hash, "Empty string or undefined or null would be an error");
-        console.assert(this._master, "Must be master to sign something");
-        let sig = Dweb.Signature.sign(this, hash, verbose);
+        if (!hash) throw new Dweb.errors.CodingError("Empty hash is a coding error");
+        if (!this._master) throw new Dweb.errors.ForbiddenError("Must be master to sign something");
+        let sig = Dweb.Signature.sign(this, hash, verbose); //returns a new Signature
         console.assert(sig.signature, "Must be a signature");
         return sig
     }
@@ -258,6 +259,14 @@ class CommonList extends SmartDict {
         return Dweb.transport.p_rawadd(hash, sig.date, sig.signature, sig.signedby, verbose);
     }
 
+    listmonitor(callback, verbose) {    //TODO-REL2 document API
+        Dweb.transport.listmonitor(this._publichash, (obj) => {
+            if (verbose) console.log("CL.listmonitor",this._publichash,"Added",obj);
+            let sig = new Dweb.Signature(null, obj, verbose);
+            this._list.push(sig);
+            callback(sig);
+        })
+    }
 }
 exports = module.exports = CommonList;
 
@@ -297,7 +306,7 @@ exports.keychains = [];
 
 exports.utils.SecurityWarning = function(msg, self) {
     console.log("Security Warning:", msg, self);
-    alert("Security Warning"+ msg);
+    alert("Security Warning: "+ msg);
 };
 
 exports.utils.consolearr  = (arr) => ((arr && arr.length >0) ? [arr.length+" items inc:", arr[arr.length-1]] : arr );
@@ -310,6 +319,7 @@ class ToBeImplementedError extends Error {
 }
 exports.errors.ToBeImplementedError = ToBeImplementedError;
 
+//TODO TransportError is wanted in TransportHTTP but its out of scope there. Think about moving to Transport class
 class TransportError extends Error {
     constructor(message) {
         super(message || "Transport failure");
@@ -317,6 +327,26 @@ class TransportError extends Error {
     }
 }
 exports.errors.TransportError = TransportError;
+
+// Use this when the code logic has been broken - e.g. something is called with an undefined parameter, its preferable to console.assert
+// Typically this is an error, that should have been caught higher up.
+class CodingError extends Error {
+    constructor(message) {
+        super(message || "Coding Error");
+        this.name = "CodingError"
+    }
+}
+exports.errors.CodingError = CodingError;
+
+// Use this when the logic of encryption wont let you do something, typically something higher should have stopped you trying.
+// Examples include signing something when you only have a public key.
+class EncryptionError extends Error {
+    constructor(message) {
+        super(message || "Encryption Error");
+        this.name = "EncryptionError"
+    }
+}
+exports.errors.EncryptionError = EncryptionError;
 
 class ForbiddenError extends Error {
     constructor(message) {
@@ -665,14 +695,13 @@ class KeyPair extends SmartDict {
         */
         console.assert(date && hash);
         let signable = date.toISOString() + hash;   // Signable string
-        if (this._key.sign.privateKey) {
-            let sig = sodium.crypto_sign_detached(signable, this._key.sign.privateKey, "urlsafebase64");    //TODO may need to be crypto_sign_detached to match verify (better anyway)
-            //Can implement and uncomment next line if seeing problems verifying things that should verify ok - tests immediate verification
-            this.verify(signable, sig);
-            return sig;
-        } else {
-            throw new Dweb.errors.ToBeImplementedError("signature for key ="+this._key);
+        if (! this._key.sign.privateKey) {
+            throw new Dweb.errors.EncryptionError("Can't sign with out private key. Key =" + JSON.stringify(this._key));
         }
+        let sig = sodium.crypto_sign_detached(signable, this._key.sign.privateKey, "urlsafebase64");    //TODO may need to be crypto_sign_detached to match verify (better anyway)
+        //Can implement and uncomment next line if seeing problems verifying things that should verify ok - tests immediate verification
+        this.verify(signable, sig);
+        return sig;
     }
 
     verify(signable, urlb64sig) {
@@ -709,8 +738,9 @@ class Signature extends SmartDict {
 
     Fields:
     date:       Date stamp (according to browser) when item signed
+    signed:     Hash of signature signed    TODO-doc-api
     signature:  Signature of the date and hash
-    signedby:   Public key of signer
+    signedby:   Hash of list signing it     TODO-doc-api
      */
     constructor(hash, dic, verbose) {
         /*
@@ -724,7 +754,7 @@ class Signature extends SmartDict {
         //TODO-DATE turn s.date into java date
         //if isinstance(s.date, basestring):
         //    s.date = dateutil.parser.parse(s.date)
-        this.table = "sig";
+        this.table = "sig"; //TODO- consider passing as options to super, need to do across all classes
     }
 
     static sign(commonlist, hash, verbose) {
@@ -739,7 +769,7 @@ class Signature extends SmartDict {
         let signature = commonlist.keypair.sign(date, hash);
         if (!commonlist._publichash) commonlist.p_store(verbose); // Sets _publichash sync, while storing async
         console.assert(commonlist._publichash, "Signature.sign should be a publichash by here");
-        return new Signature(null, {"date": date, "signature": signature, "signedby": commonlist._publichash})
+        return new Signature(null, {"date": date, "hash": hash, "signature": signature, "signedby": commonlist._publichash})
     }
 
     verify() { console.assert(false, "XXX Undefined function Signature.verify, available in CommonList and KeyPair"); }
@@ -883,17 +913,19 @@ class SmartDict extends Transportable {
         /*
             Fetch a block which initially we don't know which type
             :resolves: New object - e.g. StructuredBlock or MutableBlock
+            :catch: TransportError - can probably, or should throw TransportError if transport fails
+            :throws: TransportError if hash invalid
             Errors: Doesn't find class should be handled seperately from can't encrypt
          */
         if (verbose) console.log("SmartDict.p_unknown_fetch", hash);
         let cls;
-        return Dweb.transport.p_rawfetch(hash, verbose) // Fetch the data
+        return Dweb.transport.p_rawfetch(hash, verbose) // Fetch the data Throws TransportError immediately if hash invalid, expect it to catch if Transport fails
             .then((data) => {
                 data = Dweb.transport.loads(data);      // Parse JSON
                 let table = data["table"];              // Find the class it belongs to
                 cls = Dweb[table2class[table]];         // Gets class name, then looks up in Dweb - avoids dependency
                 console.assert(cls, "SmartDict.p_unknown_fetch:",table,"isnt implemented in table2class"); //TODO Should probably raise a specific subclass of Error
-                console.log(cls);
+                //console.log(cls);
                 console.assert((table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict), "Avoid data driven hacks to other classes")
                 return data;
             })
@@ -915,6 +947,7 @@ class SmartDict extends Transportable {
             ul = document.getElementById(ul);
             console.assert(ul,"Couldnt find ul:",ul)
         }
+        //while (ul.firstChild) { ul.removeChild(ul.firstChild); }
         let li = document.createElement("li");
         li.source = this;
         li.className = "propobj";
@@ -981,7 +1014,7 @@ class SmartDict extends Transportable {
                         }
                     } else {    // Any other field
                         let spanval;
-                        if (["hash","_publichash"].includes(prop)) {
+                        if (["hash","_publichash","signedby"].includes(prop)) {
                             //noinspection ES6ConvertVarToLetConst
                             spanval = document.createElement('span');
                             //noinspection JSUnfilteredForInLoop
@@ -1000,7 +1033,7 @@ class SmartDict extends Transportable {
                         //noinspection JSUnfilteredForInLoop
                         let val = (typeof this[prop] === "object") ? JSON.stringify(this[prop],null,'\t ') : this[prop]
                         spanval.appendChild(document.createTextNode(val));
-                        console.log(val); //reports line breaks
+                        //console.log(val);
                         spanval.className='propval';
                         li2.appendChild(spanval);
                     }
@@ -1316,13 +1349,21 @@ class TransportIPFS extends Transport {
 
     static link2cid(link) {
         let arr = link.split('/');
-        console.assert(arr.length===3 && arr[1]==="ipfs","TransportIPFS.link2cid bad format for hash should be link",link);
+        if (!(arr.length===3 && arr[1]==="ipfs"))
+                throw new Dweb.errors.TransportError("TransportIPFS.link2cid bad format for hash should be /ipfs/...: "+link);
         return new CID(arr[2])
     }
 
     p_rawfetch(hash, verbose) {
+        /*
+        Fetch hash from IPFS (implements Transport.p_rawfetch)
+
+        :param hash:    Valid ipfs hash "/ipfs/*"
+        :resolves:      Opaque bytes retrieved from IPFS
+        :throws:        TransportError if hash invalid - note this happens immediately, not as a catch in the promise
+         */
         console.assert(hash, "TransportIPFS.p_rawfetch: requires hash");
-        let cid = (hash instanceof CID) ? hash : TransportIPFS.link2cid(hash);
+        let cid = (hash instanceof CID) ? hash : TransportIPFS.link2cid(hash);  // Throws TransportError if hash bad
         return this.promisified.ipfs.block.get(cid)
             .then((result)=> result.data.toString())
             .catch((err) => {
@@ -1483,8 +1524,10 @@ class Transportable {
     }
 
     p_store(verbose) {    // Python has a "data" parameter to override this._data but probably not needed
+        if (this._hash)
+            return new Promise((resolve, reject)=> resolve(this));  // Noop if already stored, use dirty() if change after retrieved
         let data = this._getdata();
-        if (verbose) console.log("Transportable.p_store data=", data);
+        if (verbose) console.log("Transportable.p_store data=", data, "hash=", this._hash);
         this._hash = Dweb.transport.link(data); //store the hash since the HTTP is async (has form "/ipfs/xyz123" or "BLAKE2.xyz123"
         if (verbose) console.log("Transportable.p_store hash=", this._hash);
         let self = this;

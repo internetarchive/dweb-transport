@@ -121,17 +121,19 @@ class SmartDict extends Transportable {
         /*
             Fetch a block which initially we don't know which type
             :resolves: New object - e.g. StructuredBlock or MutableBlock
+            :catch: TransportError - can probably, or should throw TransportError if transport fails
+            :throws: TransportError if hash invalid
             Errors: Doesn't find class should be handled seperately from can't encrypt
          */
         if (verbose) console.log("SmartDict.p_unknown_fetch", hash);
         let cls;
-        return Dweb.transport.p_rawfetch(hash, verbose) // Fetch the data
+        return Dweb.transport.p_rawfetch(hash, verbose) // Fetch the data Throws TransportError immediately if hash invalid, expect it to catch if Transport fails
             .then((data) => {
                 data = Dweb.transport.loads(data);      // Parse JSON
                 let table = data["table"];              // Find the class it belongs to
                 cls = Dweb[table2class[table]];         // Gets class name, then looks up in Dweb - avoids dependency
                 console.assert(cls, "SmartDict.p_unknown_fetch:",table,"isnt implemented in table2class"); //TODO Should probably raise a specific subclass of Error
-                console.log(cls);
+                //console.log(cls);
                 console.assert((table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict), "Avoid data driven hacks to other classes")
                 return data;
             })
@@ -153,6 +155,7 @@ class SmartDict extends Transportable {
             ul = document.getElementById(ul);
             console.assert(ul,"Couldnt find ul:",ul)
         }
+        //while (ul.firstChild) { ul.removeChild(ul.firstChild); }
         let li = document.createElement("li");
         li.source = this;
         li.className = "propobj";
@@ -219,7 +222,7 @@ class SmartDict extends Transportable {
                         }
                     } else {    // Any other field
                         let spanval;
-                        if (["hash","_publichash"].includes(prop)) {
+                        if (["hash","_publichash","signedby"].includes(prop)) {
                             //noinspection ES6ConvertVarToLetConst
                             spanval = document.createElement('span');
                             //noinspection JSUnfilteredForInLoop
@@ -238,7 +241,7 @@ class SmartDict extends Transportable {
                         //noinspection JSUnfilteredForInLoop
                         let val = (typeof this[prop] === "object") ? JSON.stringify(this[prop],null,'\t ') : this[prop]
                         spanval.appendChild(document.createTextNode(val));
-                        console.log(val); //reports line breaks
+                        //console.log(val);
                         spanval.className='propval';
                         li2.appendChild(spanval);
                     }
