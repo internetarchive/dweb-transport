@@ -14,6 +14,8 @@
     <!--<script src='/file/mb/BLAKE2.dfMoOqTdXvqKhoZo7HPvD5raBXfgH7chXsN2PElizs8=/tinymce.min.js'></script><!-- TinyMCE via relative URL-->
     <script type="text/javascript">
 
+    var cl; // Will hold the list after fetching
+
     function form2dict(el_form) { // Convert a form into a dictionary - mindblowing that Javascript doesnt have this !
         console.log("form2dict ---",el_form);
         let res = {};
@@ -29,7 +31,8 @@
     }
     function sendit() {     // Send form data to Dweb, and display the hash
         console.log("sendit ---");
-        verbose = true;
+        let verbose = true;
+        // Get the data from the form
         let el_form = document.forms.namedItem("myform");
         dict = form2dict(el_form);
         <!--CommonList(hash, data, master, keypair, keygen, mnemonic, verbose, options)-->
@@ -42,8 +45,34 @@
                 el = document.getElementById("retrievalarea");
                 el.value = obj._hash; // Use as default on input
             });
-        return false;
+        return false; // Stop form submission and page reloading reloading
     }
+
+
+    function sendentry() {     // Send form data to Dweb, and display the hash
+        console.log("sendit ---");
+        let verbose = true; // Copious output on
+        // Get the data from the form
+        let el_form = document.forms.namedItem("entryform");
+        dict = form2dict(el_form);
+        // Create a new object and add to the list
+        let obj = new Dweb.SmartDict(null, dict, verbose )
+        cl.p_signandstore(obj, verbose)
+            .then(() => console.log("Added:",obj))  // Show on the Javascript console
+            .then(() => cl.objbrowser(cl._hash, null, "ObjBrowser", verbose))   // Redisplay in objbrowser
+
+        /*
+        // Now display link on READ ONLY VERSION
+        obj.p_store(verbose)
+            .then(() => {
+            el = document.getElementById("retrievalarea");
+        el.value = obj._hash; // Use as default on input
+    });
+        */
+        return false; // Stop form submission and page reloading reloading
+    }
+
+
 
     function fetchit() {
         verbose=true;
@@ -56,10 +85,11 @@
         // Fetch it, and display
         destn.innerHTML = ""; // Clear it first
         Dweb.SmartDict.p_unknown_fetch(hash, verbose)
-            .then((cl) => {
-                console.log("Fetched=",cl);
-                destn.innerHTML = "List name: "+cl.name;
-                return cl;
+            .then((obj) => {
+                cl = obj;  // Save it for adding to in sendentry
+                console.log("Fetched=",obj);
+                destn.innerHTML = "List name: "+obj.name;
+                return obj;
             })
             .then((obj) => obj.objbrowser(obj._hash, null, "ObjBrowser", verbose))
     }
@@ -76,23 +106,48 @@
         .proplinks {padding-left: 0.5em;} /*List of sub-objects inside propval*/
         .propobj {border-color: black; border-top: 2px solid; padding-bottom:0.3em; padding-top:0.3em; }
         .classname {font-weight: bold;} /* Used for class name in browser */
+        /* Styles for appearing/disappearing parts based on hover or active */
+        .container form.hoveronly, .container div.hoveronly, .container span.hoveronly,.container i.hoveronly{display: none}
+        .container:active span.hoveronly,.container:active span.hoveronly,.container:hover span.hoveronly{display: inline}
+        .container:active i.hoveronly,.container:focus i.hoveronly,.container:hover i.hoveronly{display: inline-block}
+        .container:active form.hoveronly,.container:focus form.hoveronly,.container:hover form.hoveronly{display: block}
+        .container:active div.hoveronly,.container:focus div.hoveronly,.container:hover div.hoveronly{display: block}
+        .container span.hoverclue{display: inline}/* Text in headline to disappear when main part open*/
+        .container:active .hoverclue,.container:focus .hoverclue,.container:hover .hoverclue{display: none}
     </style>
 
 </head>
 <body>
-<h4>Create something here, and when its saved its link will appear below</h4>
-<form method="post" name="myform" onsubmit="sendit(); return false;">
-    <ul>
-    <li class="prop"><span class="propname">List Name</span><input class="propval" type="text" name="name" size="150"></input></li>
-    <li><input type="submit" value="Create List"></input></li>
-    </ul>
-</form>
+
 <h4>Enter a link here and it will be retrieved.</h4>
 <form><!--TODO see if it needs the form-->
     <span class="button" onclick="fetchit()">FETCHIT</span>
     <input type="text" id="retrievalarea" size="150"></input>
 </form>
 <div id="retrievaldestn">retrieved data will go here</div>
+
+<!-- Form to add an entry -->
+<div class="container">
+    <h4>New <i class="hoverclue">Add to list</i></h4>
+    <form class="hoveronly" method="post" name="entryform" onsubmit="sendentry(); return false;">
+        <ul>
+            <li class="prop"><span class="propname">Say something</span><input class="propval" type="text" name="say" size="150"></input></li>
+            <li><input type="submit" value="Send"></input></li>
+        </ul>
+    </form>
+</div>
+
+<!-- Form to create a new List -->
+<div class="container">
+    <h4>New <i class="hoverclue">create a new list</i></h4>
+    <form class="hoveronly" method="post" name="myform" onsubmit="sendit(); return false;">
+        <ul>
+            <li class="prop"><span class="propname">List Name</span><input class="propval" type="text" name="name" size="150"></input></li>
+            <li><input type="submit" value="Create List"></input></li>
+        </ul>
+    </form>
+</div>
+<hr>
 <h4>Object browser opens here</h4>
 <ul id="ObjBrowser"></ul>
 
