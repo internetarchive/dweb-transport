@@ -105,7 +105,6 @@ class CommonList extends SmartDict {
         let publichash = dd._publichash; // Save before preflight
         let master = dd._master;
         dd = super.preflight(dd);  // Edits dd in place
-        //TODO next line looks odd, _master should have been stripped by super.preflight ?
         if (master) { // Only store on Master, on !Master will be None and override storing hash as _publichash
             dd._publichash = publichash;   // May be None, have to do this AFTER the super call as super filters out "_*"
         }

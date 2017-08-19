@@ -23,7 +23,7 @@
         console.log("createit ---");
         let verbose = false;
         // Get the data from the form
-        dict = form2dict("myform");
+        dict = form2dict("newform");
         <!--CommonList(hash, data, master, keypair, keygen, mnemonic, verbose, options)-->
         let obj = new Dweb.CommonList(null, dict, true, {keygen: true}, verbose, {_allowunsafestore: true} );
         // _allowunsafestore is set to true since AccessControlList not set yet, so storing unencrypted.
@@ -53,7 +53,7 @@
     function fetchit() {
         console.log("fetchit ---")
         // Get the string from the form, its just one element this time
-        dict = form2dict("newform")
+        dict = form2dict("fetchform")
         // Fetch it, and display
         fetchanddisplay(dict.hash);
     }
@@ -120,9 +120,6 @@
         document.getElementById("privatelink").href=privateurl.href;
     }
 
-    function setstatus(msg) {  // Display the message in a Status DIV (top right corner)
-        document.getElementById("status").innerHTML=msg;
-    }
     </script>
 
 </head>
@@ -141,13 +138,13 @@
 <div><!-- Group with first toggling visibility of other two-->
     <span class="button" onclick="togglevis(['el1','el2'],"inline");">New</span>
     <span id="el1">
-        <form style="display:inline" name="newform" onsubmit="fetchit(); return false;">
+        <form style="display:inline" name="fetchform" onsubmit="fetchit(); return false;">
             <input class="propval" type="text" name="hash" size="70" placeholder="/ipfs/12ab34cd"/>
             <input class="button" type="submit" value="Fetch"/>
         </form>
         </span>
     <span id="el2" style="display:none;"><!-- will be displayed by the New button-->
-        <form method="post" style="display:inline" name="myform" onsubmit="createit(); return false;">
+        <form method="post" style="display:inline" name="newform" onsubmit="createit(); return false;">
             <input class="propval" type="text" name="name" placeholder="Name of new list" size="70"/>
             <input class="button" type="submit" value="Create"/>
         </form>
@@ -203,9 +200,6 @@
         })
         .then(() => { if(hash) fetchanddisplay(hash)})
         .catch((err) => { console.log("ERROR:",err); alert(err.message); });
-    //TODO-REL2 back port from here to example_block and example_smartdict
-    //browser();
-    //cryptotest();
 </script>
 </body>
 </html>

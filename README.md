@@ -6,6 +6,7 @@ Welcome to the Internet Archive's Decentralized Wed (Dweb) libraries.
 Once the source is checked out, you should be able to open any of the files:
 [example_block.html](examples/example_block.html);
 [example_smartdict.html](examples/example_smartdict.html); 
+[example_list.html](examples/example_list.html); 
 or [objbrowser.html](examples/objbrowser.html); 
 directly in your browser.
 
@@ -21,7 +22,23 @@ In your browser, open the file:  examples/example_smartdict.html
 Type some text into the name, and a HTML color nmae into the color (e.g. "red") and hit Save  
 A hash should appear below.  
 If it doesn't then open the browser console (e.g. Firefox/tools/Web Developer/Web Console)  
-Click "FetchIt" and the data should be returned and its structure show up in the Object Browser.
+Click "FetchIt" and the data should be returned and displayed.  
+Hover over "Object Browser" to see the structure of the object.
+
+###COMMON LIST example
+In your browser, open the file:  examples/example_smartdict.html  
+Click New and enter a name for your list  
+A blank list should appear along with the name and hashes (retrieved from Dweb)  
+Enter something in the text field and hit Send  
+The item should be announced to the list and appear in the text field above.
+
+The link icons next to the private hash can be opened on another machine and gives 
+the user ability to also write to the list.
+
+The link icon next to the public hash will only give them the ability to display the list.
+
+Hover over "Object Browser" to see the structure of the object.
+
 
 ## Installing a compilable version
 If you haven't already, then install npm from [https://nodejs.org/en/download]  

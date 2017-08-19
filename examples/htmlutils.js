@@ -33,3 +33,7 @@ function togglevis(el, displayvis) {
     el.style.display = (el.style.display === "none" ? displayvis : "none");
 }
 
+function setstatus(msg) {
+    // Display the message in a Status DIV (usually top right corner, but could be anywhere example wants it)
+    document.getElementById("status").innerHTML=msg;
+}

@@ -141,7 +141,6 @@ class CommonList extends SmartDict {
         let publichash = dd._publichash; // Save before preflight
         let master = dd._master;
         dd = super.preflight(dd);  // Edits dd in place
-        //TODO next line looks odd, _master should have been stripped by super.preflight ?
         if (master) { // Only store on Master, on !Master will be None and override storing hash as _publichash
             dd._publichash = publichash;   // May be None, have to do this AFTER the super call as super filters out "_*"
         }
@@ -181,7 +180,7 @@ class CommonList extends SmartDict {
         let self=this;
         return this.p_fetch_then_list(verbose)
             .then(() => Promise.all(Dweb.Signature.filterduplicates(self._list) // Dont load multiple copies of items on list (might need to be an option?)
-                .map((sig) => Dweb.SmartDict.p_unknown_fetch(sig.hash, verbose)))) // Return is array result of p_fetch which is array of new objs (suitable for storing in keys etc)
+                .map((sig) => sig.p_unknown_fetch(verbose)))) // Return is array result of p_fetch which is array of new objs (suitable for storing in keys etc)
         }
 
     _p_storepublic(verbose) {
@@ -203,7 +202,6 @@ class CommonList extends SmartDict {
          */
         if (this._master && ! this._publichash) {
             this._p_storepublic(verbose); //Stores asynchronously, but _publichash set immediately
-            console.log("XXX@p_store",this._hash,this._publichash);
         }
         if ( ! (this._master && this.dontstoremaster)) {
             return super.p_store(verbose);    // Transportable.store(verbose)
@@ -259,7 +257,7 @@ class CommonList extends SmartDict {
         return Dweb.transport.p_rawadd(hash, sig.date, sig.signature, sig.signedby, verbose);
     }
 
-    listmonitor(callback, verbose) {    //TODO-REL2 document API
+    listmonitor(callback, verbose) {
         Dweb.transport.listmonitor(this._publichash, (obj) => {
             if (verbose) console.log("CL.listmonitor",this._publichash,"Added",obj);
             let sig = new Dweb.Signature(null, obj, verbose);
@@ -738,9 +736,9 @@ class Signature extends SmartDict {
 
     Fields:
     date:       Date stamp (according to browser) when item signed
-    signed:     Hash of signature signed    TODO-doc-api
+    hash:       Hash of object signed
     signature:  Signature of the date and hash
-    signedby:   Hash of list signing it     TODO-doc-api
+    signedby:   Public Hash of list signing this (list should have a public key)
      */
     constructor(hash, dic, verbose) {
         /*
@@ -784,6 +782,16 @@ class Signature extends SmartDict {
         let res = {};
         // Remove duplicate signatures
         return arr.filter((x) => (!res[x.hash] && (res[x.hash] = true)))
+    }
+
+    p_unknown_fetch(verbose) {
+        let self = this;
+        if (!this.data) {
+            return Dweb.SmartDict.p_unknown_fetch(this.hash, verbose)
+                .then((obj) => self.data = obj); // Reslves to new obj
+        } else {
+            return new Promise((resolve, reject) => resolve(self.data));
+        }
     }
 
 }
@@ -937,136 +945,6 @@ class SmartDict extends Transportable {
     static p_decrypt(data, verbose) {
         // This is a hook to an upper layer for decrypting data, if the layer isn't there then the data wont be decrypted.
         return (Dweb.CryptoLib && Dweb.CryptoLib.p_decryptdata) ?  Dweb.CryptoLib.p_decryptdata(data, verbose) : data
-    }
-
-    objbrowser(hash, path, ul, verbose) {
-        if (verbose) { console.log("objbrowser hash=",hash,"path=",path,"ul=",ul,"verbose=",verbose) }
-        let hashpath = path ? [hash, path].join("/") : hash;
-        // ul is either the id of the element, or the element itself.
-        if (typeof ul === 'string') {
-            ul = document.getElementById(ul);
-            console.assert(ul,"Couldnt find ul:",ul)
-        }
-        //while (ul.firstChild) { ul.removeChild(ul.firstChild); }
-        let li = document.createElement("li");
-        li.source = this;
-        li.className = "propobj";
-        ul.appendChild(li);
-        //li.innerHTML = "<B>SmartDict:</B>" + hashpath;
-        let t1 = document.createTextNode(this.constructor.name+": "+hashpath);
-        let sp1 = document.createElement('span');
-        sp1.className = "classname"; // Confusing!, sets the className of the span to "classname" as it holds a className
-        sp1.appendChild(t1);
-        li.appendChild(sp1);
-
-        //Loop over dict fields
-        let ul2 = document.createElement("ul");
-        ul2.className="props";
-        li.appendChild(ul2);
-        //noinspection JSUnfilteredForInLoop
-        for (let prop in this) {
-            //noinspection JSUnfilteredForInLoop
-            if (this[prop]) {
-                //noinspection JSUnfilteredForInLoop
-                let text = this[prop].toString();
-                if (text !== "" && prop !== "_hash") {    // Skip empty values; _hash (as shown above);
-                    let li2 = document.createElement("li");
-                    li2.className='prop';
-                    ul2.appendChild(li2);
-                    //li2.innerHTML = "Field1"+prop;
-                    //noinspection JSUnfilteredForInLoop
-                    let fieldname = document.createTextNode(prop);
-                    let spanname = document.createElement('span');
-                    spanname.appendChild(fieldname);
-                    spanname.className='propname';
-                    //TODO - handle Links by nested list
-                    li2.appendChild(spanname);
-                    //noinspection JSUnfilteredForInLoop
-                    if ( ["links", "_list", "_signatures", "_current", "keypair"].includes(prop) ) { //<span>...</span><ul proplinks>**</ul>
-                        let spanval;
-                        spanval = document.createElement('span');
-                        spanval.appendChild(document.createTextNode("..."));
-                        li2.appendChild(spanval);
-                        let ul3 = document.createElement("ul");
-                        ul3.className = "proplinks";
-                        ul3.style.display = 'none';
-                        spanname.setAttribute('onclick',"Dweb.SmartDict.objbrowsertogglevisnext(this);");
-                        //spanname.setAttribute('onclick',"console.log(this.nextSibling)");
-
-                        li2.appendChild(ul3);
-                        //TODO make this a loop
-                        //noinspection JSUnfilteredForInLoop
-                        if (Array.isArray(this[prop])) {
-                            //noinspection JSUnfilteredForInLoop
-                            for (let l1 in this[prop]) {
-                                //noinspection JSUnfilteredForInLoop,JSUnfilteredForInLoop,JSUnfilteredForInLoop,JSUnfilteredForInLoop
-                                this[prop][l1].objbrowser(hash, (path ? path + "/":"")+this[prop][l1].name, ul3, verbose);
-                            }
-                        } else {
-                            //noinspection JSUnfilteredForInLoop
-                            if (this[prop]._hash) {
-                                //noinspection JSUnfilteredForInLoop,JSUnfilteredForInLoop
-                                this[prop].objbrowser(this[prop]._hash, null, ul3, verbose)
-                            } else {
-                                //noinspection JSUnfilteredForInLoop
-                                this[prop].objbrowser(hash, path, ul3, verbose);
-                            }
-                        }
-                    } else {    // Any other field
-                        let spanval;
-                        if (["hash","_publichash","signedby"].includes(prop)) {
-                            //noinspection ES6ConvertVarToLetConst
-                            spanval = document.createElement('span');
-                            //noinspection JSUnfilteredForInLoop
-                            spanval.source = this[prop];
-                            li2.setAttribute('onclick', 'Dweb.SmartDict.p_objbrowserfetch(this.childNodes[1]);');
-                            //TODO next line wont actually work on IPFS, need way to retrieve from link here
-                            //spanval.setAttribute('href', '/file/b/' + this[prop] + "?contenttype=" + this["Content-type"]);
-                        } else {
-                            // Group of fields where display then add behavior or something
-                            //noinspection ES6ConvertVarToLetConst
-                            spanval = document.createElement('span');
-                            if (prop === "_needsfetch") {
-                                li2.setAttribute('onclick','Dweb.SmartDict.p_objbrowserfetch(this.parentNode.parentNode);');
-                            }
-                        }
-                        //noinspection JSUnfilteredForInLoop
-                        let val = (typeof this[prop] === "object") ? JSON.stringify(this[prop],null,'\t ') : this[prop]
-                        spanval.appendChild(document.createTextNode(val));
-                        //console.log(val);
-                        spanval.className='propval';
-                        li2.appendChild(spanval);
-                    }
-                    //this.__setattr__(prop, dict[prop]);
-                }
-            }
-        }
-
-    }
-    static objbrowsertogglevisnext(elem) {   // Hide the next sibling object and show the one after, or vica-versa,
-        let el1 = elem.nextSibling;
-        let el2 = el1.nextSibling;
-        if (el1.style.display === "none") {
-            el1.style.display = "";
-            el2.style.display = "none";
-        } else {
-            el1.style.display = "none";
-            el2.style.display = "";
-        }
-    }
-    static p_objbrowserfetch(el) {
-        // This attached as an onclick method of something so that when clicked it will replace itself with a expanded objbrowser version
-        let verbose = false;
-        let source = el.source;
-        let parent = el.parentNode;
-        parent.removeChild(el); //Remove elem from parent
-        if (typeof source === "string") {
-            return SmartDict.p_unknown_fetch(source, verbose)
-                .then((obj) => obj.objbrowser(obj._hash, null, parent, false));
-        } else {
-            return source.p_fetch(verbose)
-                .then((msg) => source.objbrowser(source._hash, null, parent, false));
-        }
     }
 
 }

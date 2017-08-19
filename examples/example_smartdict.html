@@ -4,6 +4,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>DWEB SmartDict example</title>
+    <link rel='stylesheet' href='example_styles.css'>
     <script src="https://unpkg.com/ipfs-iiif-db/dist/browser.js"></script><!--or browser.min.js-->
     <!--<script src="https://unpkg.com/ipfs-iiif-db@2.4.0/dist/browser.min.js"></script><!--or browser.min.js-->
     <!--<script src="cached/browser.min.js"></script><!-- cached version of ipfs/iiif so can test offline-->
@@ -13,48 +14,35 @@
     <!--<script src='http://cloud.tinymce.com/stable/tinymce.min.js'></script><!-- TinyMCE -->
     <!--<script src='/file/mb/BLAKE2.dfMoOqTdXvqKhoZo7HPvD5raBXfgH7chXsN2PElizs8=/tinymce.min.js'></script><!-- TinyMCE via relative URL-->
     <script type="text/javascript" src="objbrowser.js"></script><!--objectbrowser functionality for debugging-->
+    <script type="text/javascript" src="htmlutils.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript">
 
-    function form2dict(el_form) { // Convert a form into a dictionary - mindblowing that Javascript doesnt have this !
-        console.log("form2dict ---",el_form);
-        let res = {};
-        console.log("els=",el_form.elements)
-        let el;
-        for (let el of el_form.elements) {
-            //el = el_form.elements[i];
-            if (el.type !== "submit") {
-                res[el.name] = el.value;
-            }
-        }
-        return res;
-    }
     function sendit() {     // Send form data to Dweb, and display the hash
-        console.log("sendit ---");
         verbose = true;
-        let el_form = document.forms.namedItem("myform");
-        dict = form2dict(el_form);
+        if (verbose) console.log("sendit ---");
+        dict = form2dict("myform");
         let sd = new Dweb.SmartDict(null, dict, verbose )
-        console.log("SD=",sd);
+        if (verbose) console.log("SD=",sd);
         // Now display link
-        sd.p_store(verbose)
-            .then(() => {
-                el = document.getElementById("retrievalarea");
-                el.value = sd._hash; // Use as default on input
-            });
+        sd.p_store(verbose) // Store the edited dictionary
+        .then(() => document.getElementById("retrievalarea").value = sd._hash); // Use hash default on input
         return false;
     }
 
     function fetchit() {
-        verbose=true;
-        console.log("Fetching")
         el = document.getElementById("retrievalarea");
-        destn = document.getElementById("retrievaldestn");
         hash = el.value;
+        fetchanddisplay(hash);
+    }
+
+    function fetchanddisplay(hash) {
+        verbose = true;
+        if (verbose) console.log("Fetching hash=", hash);
+        destn = document.getElementById("retrievaldestn");
         destn.innerHTML = ""; // Clear it first
-        console.log("Fetching hash=",hash);
         Dweb.SmartDict.p_unknown_fetch(hash, verbose)
             .then((sd) => {
-                console.log("Fetched=",sd);
+                if (verbose) console.log("Fetched=",sd);
                 destn.innerHTML = "My name is: "+sd.name;
                 destn.style.color = sd.favcolor;
                 return sd;
@@ -64,48 +52,50 @@
 
 
     </script>
-    <style type="text/css">
-        .button { border: 1px black solid; background-color:#dddddd;  padding-bottom:0.1em; padding-top:0.1em;}
-        .props { /*noinspection CssRedundantUnit*/
-            padding-left: 0px; } /*Move back directly under type name*/
-        .prop {display:table-row; border: 1px dotted grey; } /*ignoring border*/
-        .propname {display:table-cell; font-weight:bold;background-color:#cccccc;border: 1px dotted grey; padding-left:0.3em; padding-right:0.3em} /*width:15em */
-        .propval {white-space: pre; display:table-cell; background-color:#dddddd;border: 1px dotted grey; padding-left: 0.3em; padding-right: 0.3em;} /*width:15em;*/
-        .proplinks {padding-left: 0.5em;} /*List of sub-objects inside propval*/
-        .propobj {border-color: black; border-top: 2px solid; padding-bottom:0.3em; padding-top:0.3em; }
-        .classname {font-weight: bold;} /* Used for class name in browser */
-    </style>
-
 </head>
 <body>
+<div id="status" class="status"></div>
+<h1>Dweb - SmartDict Example</h1>
 <h4>Create something here, and when its saved its link will appear below</h4>
 <form method="post" name="myform" onsubmit="sendit(); return false;">
     <ul>
     <li class="prop"><span class="propname">Name</span><input class="propval" type="text" name="name" size="150"></input></li>
-    <li class="prop"><span class="propname">Favorite Color</span><input class="propval" type="text" name="favcolor" size="150"></input></li>
+    <li class="prop"><span class="propname">Color</span><input class="propval" type="text" name="favcolor" size="150"></input></li>
         <li><input type="submit" value="Store"></input></li>
     </ul>
 </form>
 <h4>Enter a link here and it will be retrieved.</h4>
-<form><!--TODO see if it needs the form-->
-    <span class="button" onclick="fetchit()">FETCHIT</span>
-    <input type="text" id="retrievalarea" size="150"></input>
+<form style="display:inline" onsubmit="fetchit(); return false;">
+    <input type="text" class="propval" id="retrievalarea" placeholder="/ipfs/12ab34cd" size="70"/>
+    <input type="submit" value="Fetch"/>
 </form>
 <div id="retrievaldestn">retrieved data will go here</div>
-<h4>Object browser opens here</h4>
-<ul id="ObjBrowser"></ul>
+
+<hr>
+<div class="container">
+    <h4>Object browser <span class="hoverclue">....</span></h4>
+    <div class="hoveronly">
+        <ul class="hoveronly" id="ObjBrowser"></ul>
+    </div>
+</div>
 
 <script type="text/javascript">
+    /* Pull hash out of URL search string.*/
+    var hash = new URL(window.location.href).searchParams.get("hash")
+    console.log("Loaded with hash=", hash);
+
     let verbose = false;
     let transportclass = TransportIPFS;
+    setstatus("IPFS Starting");
     //let transportclass = TransportHTTP    // Uncomment this to choose HTTP, but note p_setup below needs fixing
     transportclass.p_setup({iiif: {store: "indexeddb"}}, verbose, {})
         .then((t) => {
-            if (verbose) console.log("setup returned and transport set - including annotationList");
-            Dweb.transport = t;
-        });
-    //browser();
-    //cryptotest();
+        setstatus(t.ipfs.isOnline() ? "IPFS Online" : "IPFS Not online");
+    if (verbose) console.log("setup returned and transport set - including annotationList");
+    Dweb.transport = t;
+    })
+    .then(() => { if(hash) fetchanddisplay(hash)})
+    .catch((err) => { console.log("ERROR:",err); alert(err.message); });
 </script>
 </body>
 </html>

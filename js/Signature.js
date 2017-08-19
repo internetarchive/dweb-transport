@@ -9,9 +9,9 @@ class Signature extends SmartDict {
 
     Fields:
     date:       Date stamp (according to browser) when item signed
-    signed:     Hash of signature signed    TODO-doc-api
+    hash:       Hash of object signed
     signature:  Signature of the date and hash
-    signedby:   Hash of list signing it     TODO-doc-api
+    signedby:   Public Hash of list signing this (list should have a public key)
      */
     constructor(hash, dic, verbose) {
         /*
