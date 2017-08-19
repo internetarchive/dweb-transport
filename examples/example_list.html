@@ -4,6 +4,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>DWEB CommonList example</title>
+    <link rel='stylesheet' href='example_styles.css'>
     <script src="https://unpkg.com/ipfs-iiif-db/dist/browser.js"></script><!--or browser.min.js-->
     <!--<script src="https://unpkg.com/ipfs-iiif-db@2.4.0/dist/browser.min.js"></script><!--or browser.min.js-->
     <!--<script src="cached/browser.min.js"></script><!-- cached version of ipfs/iiif so can test offline-->
@@ -12,29 +13,20 @@
     <!--<script src='/dweb/tinymce/tinymce.min.js'></script><!-- TinyMCE -->
     <!--<script src='http://cloud.tinymce.com/stable/tinymce.min.js'></script><!-- TinyMCE -->
     <!--<script src='/file/mb/BLAKE2.dfMoOqTdXvqKhoZo7HPvD5raBXfgH7chXsN2PElizs8=/tinymce.min.js'></script><!-- TinyMCE via relative URL-->
+    <script type="text/javascript" src="htmlutils.js"></script><!--objectbrowser functionality for debugging-->
+    <script type="text/javascript" src="objbrowser.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript">
 
     var cl; // Will hold the list after fetching
 
-    function form2dict(el_form) { // Convert a form into a dictionary - mindblowing that Javascript doesnt have this !
-        let res = {};
-        let el;
-        for (let el of el_form.elements) {
-            if (el.type !== "submit") {
-                res[el.name] = el.value;
-            }
-        }
-        return res;
-    }
     function createit() {     // Send form data to Dweb, and display the hash
         console.log("createit ---");
         let verbose = false;
         // Get the data from the form
-        let el_form = document.forms.namedItem("myform");
-        dict = form2dict(el_form);
+        dict = form2dict("myform");
         <!--CommonList(hash, data, master, keypair, keygen, mnemonic, verbose, options)-->
         let obj = new Dweb.CommonList(null, dict, true, {keygen: true}, verbose, {_allowunsafestore: true} );
-        // _allowunsafestore set to true since AccessControlList not set yet, so storing unencrypted.
+        // _allowunsafestore is set to true since AccessControlList not set yet, so storing unencrypted.
         console.log("Created=",obj);
         obj.p_store(verbose)
             // Now re fetch it from Dweb and display the object
@@ -47,13 +39,12 @@
         console.log("sendit ---");
         let verbose = false; // Copious output on
         // Get the data from the form
-        let el_form = document.forms.namedItem("entryform");
-        dict = form2dict(el_form);
+        dict = form2dict("entryform");
         // Create a new object and add to the list
         let obj = new Dweb.SmartDict(null, dict, verbose )
         cl.p_signandstore(obj, verbose)
             .then(() => console.log("Added:",obj))  // Show on the Javascript console
-            .then(() => cl.objbrowser(cl._hash, null, "ObjBrowser", false))   // Redisplay in objbrowser
+            .then(() => objbrowser(cl, cl._hash, null, "ObjBrowser", false))   // Redisplay in objbrowser
             .catch((err) => { console.log("ERROR:",err); alert(err.message); });
         return false; // Stop form submission and page reloading reloading
     }
@@ -61,14 +52,15 @@
 
     function fetchit() {
         console.log("fetchit ---")
-        // Get the string from the form
-        hash = document.getElementById("retrievalarea").value;
+        // Get the string from the form, its just one element this time
+        dict = form2dict("newform")
         // Fetch it, and display
-        fetchanddisplay(hash);
+        fetchanddisplay(dict.hash);
     }
 
-    function addtoelement(el, sd) { //Add the element from the list (subclass of SmartDict) to the HTML element
-        console.log("XXX@71 sd=",sd);
+    function addtoelement(el, sd) {
+        //Add the element from the list (subclass of SmartDict) to the HTML element
+        //This adds a span element to a div, but it could really do anything
         let tx = document.createTextNode(sd.say);
         let sp = document.createElement('span');
         sp.className="said";
@@ -100,10 +92,10 @@
                 .then((objs) => { console.log("objs=",JSON.stringify(objs)); return objs;})
                 .then((objs) => objs.map((obj) => addtoelement(listdestn, obj)))
                 .then(() => cl.listmonitor(
-                    (sig) => Dweb.SmartDict.p_unknown_fetch(sig.hash, verbose)
-                            .then((obj) => addtoelement(listdestn, obj)),    //TODO-REL2 move this to method sig.p_unknown_fetch
+                    (sig) => sig.p_unknown_fetch(verbose)
+                            .then((obj) => addtoelement(listdestn, obj)),
                     true))
-                .then(() => cl.objbrowser(cl._hash, null, "ObjBrowser", verbose))
+                .then(() => objbrowser(cl, cl._hash, null, "ObjBrowser", verbose))
                 .catch((err) => { console.log("ERROR:",err); alert(err.message); });
         } catch(err) {
             console.log("ERROR:", err);
@@ -111,45 +103,27 @@
         }
     }
     function displayobj(el, obj) { /* Display an obj, under an element in appropriately named fields */
-        for (let prop in Object.assign(obj, { _privatehash: (obj._master ? obj._hash : "")})) {
+        oo = Object.assign(obj, { _privatehash: (obj._master ? obj._hash : "")})
+        for (let prop in oo ) {
             let val = obj[prop];
             let dests = el.querySelectorAll("[name="+ prop + "]");
             for (i in dests) {
                 dests[i].innerHTML = val;
             }
         }
+        // Now set up links to the urls for sharing
+        let publicurl, privateurl;
+        publicurl = privateurl = new URL(window.location.href);
+        publicurl.search=oo._publichash ? "hash="+oo._publichash : "";
+        document.getElementById("publiclink").href=publicurl.href
+        privateurl.search=oo._privatehash ? "hash="+oo._privatehash : "";
+        document.getElementById("privatelink").href=privateurl.href;
     }
 
-    function togglevis(el) {
-        el = (typeof(el) === "string") ? document.getElementById(el) : el;
-        el.style.display = (el.style.display === "none" ? "inline" : "none");
-    }
-
-    function setstatus(msg) {
+    function setstatus(msg) {  // Display the message in a Status DIV (top right corner)
         document.getElementById("status").innerHTML=msg;
     }
     </script>
-    <style type="text/css">
-        .button { border: 1px black solid; background-color:#dddddd;  padding-bottom:0.1em; padding-top:0.1em; display:inline;}
-        .props { /*noinspection CssRedundantUnit*/
-            padding-left: 0px; } /*Move back directly under type name*/
-        .prop {display:table-row; border: 1px dotted grey; } /*ignoring border*/
-        .propname {display:table-cell; font-weight:bold;background-color:#cccccc;border: 1px dotted grey; padding-left:0.3em; padding-right:0.3em} /*width:15em */
-        .propval {white-space: pre; display:table-cell; background-color:#dddddd;border: 1px dotted grey; padding-left: 0.3em; padding-right: 0.3em;} /*width:15em;*/
-        .proplinks {padding-left: 0.5em;} /*List of sub-objects inside propval*/
-        .propobj {border-color: black; border-top: 2px solid; padding-bottom:0.3em; padding-top:0.3em; }
-        .classname {font-weight: bold;} /* Used for class name in browser */
-        /* Styles for appearing/disappearing parts based on hover or active */
-        .container form.hoveronly, .container div.hoveronly, .container span.hoveronly,.container i.hoveronly{display: none}
-        .container:active span.hoveronly,.container:active span.hoveronly,.container:hover span.hoveronly{display: inline}
-        .container:active i.hoveronly,.container:focus i.hoveronly,.container:hover i.hoveronly{display: inline-block}
-        .container:active form.hoveronly,.container:focus form.hoveronly,.container:hover form.hoveronly{display: block}
-        .container:active div.hoveronly,.container:focus div.hoveronly,.container:hover div.hoveronly{display: block}
-        .container span.hoverclue{display: inline}/* Text in headline to disappear when main part open*/
-        .container:active .hoverclue,.container:focus .hoverclue,.container:hover .hoverclue{display: none}
-        .said {display: block; border-bottom: 1px black solid;}
-        .status {float: right; margin 0 0 10px 10px;}
-    </style>
 
 </head>
 <body>
@@ -164,11 +138,11 @@
 <div id="status" class="status"></div>
 <h1>Dweb - CommonList Example</h1>
 <!-- Form to create a new List -->
-<div><!-- Group with fist toggling visibility of other two-->
-    <span class="button" onclick="togglevis('el1'); togglevis('el2');">New</span>
+<div><!-- Group with first toggling visibility of other two-->
+    <span class="button" onclick="togglevis(['el1','el2'],"inline");">New</span>
     <span id="el1">
-        <form style="display:inline" onsubmit="fetchit(); return false;">
-            <input class="propval" type="text" id="retrievalarea" size="70" placeholder="/ipfs/12ab34cd"/>
+        <form style="display:inline" name="newform" onsubmit="fetchit(); return false;">
+            <input class="propval" type="text" name="hash" size="70" placeholder="/ipfs/12ab34cd"/>
             <input class="button" type="submit" value="Fetch"/>
         </form>
         </span>
@@ -186,8 +160,8 @@
 <!-- Object will be displayed here in fields with names that match-->
 <ul class="props" id="retrievaldestn">
     <li class="prop"><span class="propname">Name:</span><span class="propval" name="name"></span></li>
-    <li class="prop"><span class="propname">Private Hash:</span><span class="propval" name="_privatehash"></span></li>
-    <li class="prop"><span class="propname">Public Hash:</span><span class="propval" name="_publichash"></span></li>
+    <li class="prop"><span class="propname">Private Hash:</span><span class="propval" name="_privatehash"></span><a id="privatelink"> <img alt="link" src="link.png"/></a></li>
+    <li class="prop"><span class="propname">Public Hash:</span><span class="propval" name="_publichash"></span><a id="publiclink"> <img alt="link" src="link.png"/></a></li>
 </ul>
 
 <table>
@@ -213,6 +187,10 @@
 </div>
 
 <script type="text/javascript">
+
+    var hash = new URL(window.location.href).searchParams.get("hash")
+    console.log("Loaded with hash=", hash);
+
     let verbose = false;
     let transportclass = TransportIPFS;
     setstatus("IPFS Starting");
@@ -223,10 +201,9 @@
             if (verbose) console.log("setup returned and transport set - including annotationList");
             Dweb.transport = t;
         })
+        .then(() => { if(hash) fetchanddisplay(hash)})
         .catch((err) => { console.log("ERROR:",err); alert(err.message); });
-    //TODO-REL2 back port from here to example_block and example_list
-    //TODO-REL2+ move objectbrowser to own file
-    //TODO-REL2 recognize arguments in URL
+    //TODO-REL2 back port from here to example_block and example_smartdict
     //browser();
     //cryptotest();
 </script>

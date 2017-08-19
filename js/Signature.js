@@ -57,5 +57,15 @@ class Signature extends SmartDict {
         return arr.filter((x) => (!res[x.hash] && (res[x.hash] = true)))
     }
 
+    p_unknown_fetch(verbose) {
+        let self = this;
+        if (!this.data) {
+            return Dweb.SmartDict.p_unknown_fetch(this.hash, verbose)
+                .then((obj) => self.data = obj); // Reslves to new obj
+        } else {
+            return new Promise((resolve, reject) => resolve(self.data));
+        }
+    }
+
 }
 exports = module.exports = Signature;

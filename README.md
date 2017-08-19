@@ -6,7 +6,7 @@ Welcome to the Internet Archive's Decentralized Wed (Dweb) libraries.
 Once the source is checked out, you should be able to open any of the files:
 [example_block.html](examples/example_block.html);
 [example_smartdict.html](examples/example_smartdict.html); 
-or [objbrowser.html](examples/]objbrowser.html); 
+or [objbrowser.html](examples/objbrowser.html); 
 directly in your browser.
 
 ###BLOCK example

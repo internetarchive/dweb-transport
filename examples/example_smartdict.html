@@ -12,6 +12,7 @@
     <!--<script src='/dweb/tinymce/tinymce.min.js'></script><!-- TinyMCE -->
     <!--<script src='http://cloud.tinymce.com/stable/tinymce.min.js'></script><!-- TinyMCE -->
     <!--<script src='/file/mb/BLAKE2.dfMoOqTdXvqKhoZo7HPvD5raBXfgH7chXsN2PElizs8=/tinymce.min.js'></script><!-- TinyMCE via relative URL-->
+    <script type="text/javascript" src="objbrowser.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript">
 
     function form2dict(el_form) { // Convert a form into a dictionary - mindblowing that Javascript doesnt have this !
@@ -58,7 +59,7 @@
                 destn.style.color = sd.favcolor;
                 return sd;
             })
-            .then((sd) => sd.objbrowser(sd._hash, null, "ObjBrowser", verbose))
+            .then((sd) => objbrowser(sd, sd._hash, null, "ObjBrowser", verbose))
     }
 
 

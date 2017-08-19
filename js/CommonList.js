@@ -145,7 +145,7 @@ class CommonList extends SmartDict {
         let self=this;
         return this.p_fetch_then_list(verbose)
             .then(() => Promise.all(Dweb.Signature.filterduplicates(self._list) // Dont load multiple copies of items on list (might need to be an option?)
-                .map((sig) => Dweb.SmartDict.p_unknown_fetch(sig.hash, verbose)))) // Return is array result of p_fetch which is array of new objs (suitable for storing in keys etc)
+                .map((sig) => sig.p_unknown_fetch(verbose)))) // Return is array result of p_fetch which is array of new objs (suitable for storing in keys etc)
         }
 
     _p_storepublic(verbose) {
@@ -167,7 +167,6 @@ class CommonList extends SmartDict {
          */
         if (this._master && ! this._publichash) {
             this._p_storepublic(verbose); //Stores asynchronously, but _publichash set immediately
-            console.log("XXX@p_store",this._hash,this._publichash);
         }
         if ( ! (this._master && this.dontstoremaster)) {
             return super.p_store(verbose);    // Transportable.store(verbose)
@@ -223,7 +222,7 @@ class CommonList extends SmartDict {
         return Dweb.transport.p_rawadd(hash, sig.date, sig.signature, sig.signedby, verbose);
     }
 
-    listmonitor(callback, verbose) {    //TODO-REL2 document API
+    listmonitor(callback, verbose) {
         Dweb.transport.listmonitor(this._publichash, (obj) => {
             if (verbose) console.log("CL.listmonitor",this._publichash,"Added",obj);
             let sig = new Dweb.Signature(null, obj, verbose);

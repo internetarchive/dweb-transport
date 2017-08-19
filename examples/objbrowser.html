@@ -25,7 +25,7 @@
                     console.log("Fetched=",sd);
                     return sd;
                 })
-                .then((sd) => sd.objbrowser(sd._hash, null, "ObjBrowser", verbose))
+                .then((sd) => objbrowser(sd, sd._hash, null, "ObjBrowser", verbose))
         }
 
 
