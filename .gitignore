@@ -1,1 +1,4 @@
 node_modules
+.sync
+Icon?
+npm-debug.log

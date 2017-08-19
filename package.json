@@ -3,14 +3,14 @@
   "version": "0.0.1",
   "description": "Javascript library for Internet Archive Decentralized Web project: Transport",
   "dependencies": {
-    "ipfs": ">=0.25.1",
-    "libsodium-wrappers": "git+https://git@github.com/mitra42/libsodium.js",
-    "crypto": ">=0.0.3",
-    "request": ">=2.81.0",
     "cids": ">=0.5.1",
+    "crypto": ">=0.0.3",
+    "ipfs": ">=0.25.1",
+    "ipfs-iiif-db": "^2.4.0",
+    "jsdom": "^11.1.0",
+    "libsodium-wrappers": "git+https://git@github.com/mitra42/libsodium.js.git",
     "promisify-es6": "^1.0.3",
-    "ipfs-iiif-db":"^2.4.0",
-    "jsdom":"^11.1.0"
+    "request": ">=2.81.0"
   },
   "keywords": [],
   "license": "MIT",
@@ -25,7 +25,7 @@
   },
   "scripts": {
     "bundle_transport_ipfs": "cd js; browserify ./browser_transport_ipfs.js > ../examples/dweb_transport_ipfs_bundled.js",
-    "watch": "watchify js/browser_transport.js > examples/dweb_transport_bundled.js",
+    "watch": "watchify js/browser_transport_ipfs.js -o examples/dweb_transport_ipfs_bundled.js --verbose",
     "test": "cd js; node ./test.js"
   }
 }

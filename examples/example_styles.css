@@ -1,0 +1,30 @@
+/* Styles used for all the examples */
+
+/* Sty;es used for tables of properties, especially by objbrowser.js*/
+.props { padding-left: 0px; } /*Move back directly under type name*/
+.prop {display:table-row; border: 1px dotted grey; } /*ignoring border*/
+.propname {display:table-cell; font-weight:bold;background-color:#cccccc;border: 1px dotted grey; padding-left:0.3em; padding-right:0.3em} /*width:15em */
+.propval {white-space: pre; display:table-cell; background-color:#dddddd;border: 1px dotted grey; padding-left: 0.3em; padding-right: 0.3em;} /*width:15em;*/
+.proplinks {padding-left: 0.5em;} /*List of sub-objects inside propval*/
+.propobj {border-color: black; border-top: 2px solid; padding-bottom:0.3em; padding-top:0.3em; }
+.classname {font-weight: bold;} /* Used for class name in objbrowser */
+
+/*
+    Styles for appearing/disappearing parts based on hover or active
+    hoveronly appear only when they are active, hoverclue only when not active
+    the :active :hover :focus are to ensure it works on mobile devices as well
+*/
+.container form.hoveronly, .container div.hoveronly, .container span.hoveronly,.container i.hoveronly{display: none}
+.container:active span.hoveronly,.container:active span.hoveronly,.container:hover span.hoveronly{display: inline}
+.container:active i.hoveronly,.container:focus i.hoveronly,.container:hover i.hoveronly{display: inline-block}
+.container:active form.hoveronly,.container:focus form.hoveronly,.container:hover form.hoveronly{display: block}
+.container:active div.hoveronly,.container:focus div.hoveronly,.container:hover div.hoveronly{display: block}
+.container span.hoverclue{display: inline}/* Text in headline to disappear when main part open*/
+.container:active .hoverclue,.container:focus .hoverclue,.container:hover .hoverclue{display: none}
+
+/*
+    Some specific styles used by difference examples
+ */
+.said {display: block; border-bottom: 1px black solid;} /* Each item added to list in example_list */
+.status {float: right; margin 0 0 10px 10px;}           /* Status in top right corner */
+.button { border: 1px black solid; background-color:#dddddd;  padding-bottom:0.1em; padding-top:0.1em; display:inline;} /* Buttons */

@@ -1,0 +1,205 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!--suppress HtmlUnknownTarget -->
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>DWEB CommonList example</title>
+    <link rel='stylesheet' href='example_styles.css'>
+    <script src="https://unpkg.com/ipfs-iiif-db/dist/browser.js"></script><!--or browser.min.js-->
+    <!--<script src="https://unpkg.com/ipfs-iiif-db@2.4.0/dist/browser.min.js"></script><!--or browser.min.js-->
+    <!--<script src="cached/browser.min.js"></script><!-- cached version of ipfs/iiif so can test offline-->
+    <!--<script type="text/javascript" src="/file/mb/BLAKE2.iYiNlcLOfxRU-coIq2foYgTN9V1J4DzPV2yTXqHUN2I="></script><!-- Dweb bundled via Dweb-->
+    <script type="text/javascript" src="dweb_transport_ipfs_bundled.js"></script><!-- Dwebbundle via local filesystem when testing without Dweb-->
+    <!--<script src='/dweb/tinymce/tinymce.min.js'></script><!-- TinyMCE -->
+    <!--<script src='http://cloud.tinymce.com/stable/tinymce.min.js'></script><!-- TinyMCE -->
+    <!--<script src='/file/mb/BLAKE2.dfMoOqTdXvqKhoZo7HPvD5raBXfgH7chXsN2PElizs8=/tinymce.min.js'></script><!-- TinyMCE via relative URL-->
+    <script type="text/javascript" src="htmlutils.js"></script><!--objectbrowser functionality for debugging-->
+    <script type="text/javascript" src="objbrowser.js"></script><!--objectbrowser functionality for debugging-->
+    <script type="text/javascript">
+
+    var cl; // Will hold the list after fetching
+
+    function createit() {     // Send form data to Dweb, and display the hash
+        console.log("createit ---");
+        let verbose = false;
+        // Get the data from the form
+        dict = form2dict("newform");
+        <!--CommonList(hash, data, master, keypair, keygen, mnemonic, verbose, options)-->
+        let obj = new Dweb.CommonList(null, dict, true, {keygen: true}, verbose, {_allowunsafestore: true} );
+        // _allowunsafestore is set to true since AccessControlList not set yet, so storing unencrypted.
+        console.log("Created=",obj);
+        obj.p_store(verbose)
+            // Now re fetch it from Dweb and display the object
+            .then(() => fetchanddisplay(obj._hash))
+            .catch((err) => { console.log("ERROR:",err); alert(err.message); });
+        return false; // Stop form submission and page reloading reloading
+    }
+
+    function sendentry() {     // Send form data to Dweb, and display the hash
+        console.log("sendit ---");
+        let verbose = false; // Copious output on
+        // Get the data from the form
+        dict = form2dict("entryform");
+        // Create a new object and add to the list
+        let obj = new Dweb.SmartDict(null, dict, verbose )
+        cl.p_signandstore(obj, verbose)
+            .then(() => console.log("Added:",obj))  // Show on the Javascript console
+            .then(() => objbrowser(cl, cl._hash, null, "ObjBrowser", false))   // Redisplay in objbrowser
+            .catch((err) => { console.log("ERROR:",err); alert(err.message); });
+        return false; // Stop form submission and page reloading reloading
+    }
+
+
+    function fetchit() {
+        console.log("fetchit ---")
+        // Get the string from the form, its just one element this time
+        dict = form2dict("fetchform")
+        // Fetch it, and display
+        fetchanddisplay(dict.hash);
+    }
+
+    function addtoelement(el, sd) {
+        //Add the element from the list (subclass of SmartDict) to the HTML element
+        //This adds a span element to a div, but it could really do anything
+        let tx = document.createTextNode(sd.say);
+        let sp = document.createElement('span');
+        sp.className="said";
+        sp.appendChild(tx);
+        el.appendChild(sp);
+    }
+
+    function fetchanddisplay(hash) {
+        verbose=false;
+        console.log("fetchanddisplay",hash);
+        destn = document.getElementById("retrievaldestn");
+        let listdestn = document.getElementById("listresults");
+        try {
+            Dweb.SmartDict.p_unknown_fetch(hash, verbose)   // Throws TransportError immediately if hash invalid
+                .then((obj) => cl = obj) // Save it for adding to in sendentry
+                .then(() => {
+                    console.log("Fetched=", cl);
+                    // Only display the input prompt if its a master list.
+                    document.getElementById("entryrow").style.display = (cl._master ? "" : "none")
+                    // Display the name and hashes of the list
+                    displayobj(destn, cl);
+                    // Fetch the current elements from the list if any
+                    while (listdestn.firstChild) {
+                        listdestn.removeChild(listdestn.firstChild);
+                    } // Clear old text
+                })
+                .then(() => cl.p_fetch_then_list_then_elements(verbose))
+                //The elements in the list
+                .then((objs) => { console.log("objs=",JSON.stringify(objs)); return objs;})
+                .then((objs) => objs.map((obj) => addtoelement(listdestn, obj)))
+                .then(() => cl.listmonitor(
+                    (sig) => sig.p_unknown_fetch(verbose)
+                            .then((obj) => addtoelement(listdestn, obj)),
+                    true))
+                .then(() => objbrowser(cl, cl._hash, null, "ObjBrowser", verbose))
+                .catch((err) => { console.log("ERROR:",err); alert(err.message); });
+        } catch(err) {
+            console.log("ERROR:", err);
+            alert(err.message); // bad hash generates TransportError
+        }
+    }
+    function displayobj(el, obj) { /* Display an obj, under an element in appropriately named fields */
+        oo = Object.assign(obj, { _privatehash: (obj._master ? obj._hash : "")})
+        for (let prop in oo ) {
+            let val = obj[prop];
+            let dests = el.querySelectorAll("[name="+ prop + "]");
+            for (i in dests) {
+                dests[i].innerHTML = val;
+            }
+        }
+        // Now set up links to the urls for sharing
+        let publicurl, privateurl;
+        publicurl = privateurl = new URL(window.location.href);
+        publicurl.search=oo._publichash ? "hash="+oo._publichash : "";
+        document.getElementById("publiclink").href=publicurl.href
+        privateurl.search=oo._privatehash ? "hash="+oo._privatehash : "";
+        document.getElementById("privatelink").href=privateurl.href;
+    }
+
+    </script>
+
+</head>
+<body>
+
+<!-- General design
+    - list selection at top, enter by key, or hit New
+    - - New opens out to request the name.
+    - Name; private and public hash of the list.
+    - Text area for content of list - new entries appended at bottom
+    - Area to enter if the list is writable.
+-->
+<div id="status" class="status"></div>
+<h1>Dweb - CommonList Example</h1>
+<!-- Form to create a new List -->
+<div><!-- Group with first toggling visibility of other two-->
+    <span class="button" onclick="togglevis(['el1','el2'],"inline");">New</span>
+    <span id="el1">
+        <form style="display:inline" name="fetchform" onsubmit="fetchit(); return false;">
+            <input class="propval" type="text" name="hash" size="70" placeholder="/ipfs/12ab34cd"/>
+            <input class="button" type="submit" value="Fetch"/>
+        </form>
+        </span>
+    <span id="el2" style="display:none;"><!-- will be displayed by the New button-->
+        <form method="post" style="display:inline" name="newform" onsubmit="createit(); return false;">
+            <input class="propval" type="text" name="name" placeholder="Name of new list" size="70"/>
+            <input class="button" type="submit" value="Create"/>
+        </form>
+    </span>
+</div>
+
+<hr>
+
+
+<!-- Object will be displayed here in fields with names that match-->
+<ul class="props" id="retrievaldestn">
+    <li class="prop"><span class="propname">Name:</span><span class="propval" name="name"></span></li>
+    <li class="prop"><span class="propname">Private Hash:</span><span class="propval" name="_privatehash"></span><a id="privatelink"> <img alt="link" src="link.png"/></a></li>
+    <li class="prop"><span class="propname">Public Hash:</span><span class="propval" name="_publichash"></span><a id="publiclink"> <img alt="link" src="link.png"/></a></li>
+</ul>
+
+<table>
+    <tr><td colspan="2" id="listresults" style="min-height:200px; border: 1px black solid; background-color:#f0f0f0;"></td></tr>
+    <tr id="entryrow">
+        <td style="width:3em;"><b>&gt;</b></td>
+        <td>
+            <form style="display:inline" name="entryform" onsubmit="sendentry(); return false;">
+                <input class="propval" type="text" name="say"/>
+                    <input type="submit" value="Send"/>
+                </ul>
+            </form>
+        </td>
+    </tr>
+</table>
+
+<hr>
+<div class="container">
+    <h4>Object browser <span class="hoverclue">....</span></h4>
+    <div class="hoveronly">
+        <ul class="hoveronly" id="ObjBrowser"></ul>
+    </div>
+</div>
+
+<script type="text/javascript">
+
+    var hash = new URL(window.location.href).searchParams.get("hash")
+    console.log("Loaded with hash=", hash);
+
+    let verbose = false;
+    let transportclass = TransportIPFS;
+    setstatus("IPFS Starting");
+    //let transportclass = TransportHTTP    // Uncomment this to choose HTTP, but note p_setup below needs fixing
+    transportclass.p_setup({iiif: {store: "indexeddb"}}, verbose, {})
+        .then((t) => {
+            setstatus(t.ipfs.isOnline() ? "IPFS Online" : "IPFS Not online");
+            if (verbose) console.log("setup returned and transport set - including annotationList");
+            Dweb.transport = t;
+        })
+        .then(() => { if(hash) fetchanddisplay(hash)})
+        .catch((err) => { console.log("ERROR:",err); alert(err.message); });
+</script>
+</body>
+</html>

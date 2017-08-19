@@ -3,7 +3,8 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title>DWEB Transport example page</title>
+    <title>DWEB Block example page</title>
+    <link rel='stylesheet' href='example_styles.css'>
     <script src="https://unpkg.com/ipfs-iiif-db/dist/browser.js"></script><!--or browser.min.js-->
     <!--<script src="https://unpkg.com/ipfs-iiif-db@2.4.0/dist/browser.min.js"></script><!--or browser.min.js-->
     <!--<script src="cached/browser.min.js"></script><!-- cached version of ipfs/iiif so can test offline-->
@@ -11,7 +12,7 @@
     <script type="text/javascript" src="dweb_transport_ipfs_bundled.js"></script><!-- Dwebbundle via local filesystem when testing without Dweb-->
     <!--<script src='/dweb/tinymce/tinymce.min.js'></script><!-- TinyMCE -->
     <script src='http://cloud.tinymce.com/stable/tinymce.min.js'></script><!-- TinyMCE -->
-    <!--<script src='/file/mb/BLAKE2.dfMoOqTdXvqKhoZo7HPvD5raBXfgH7chXsN2PElizs8=/tinymce.min.js'></script><!-- TinyMCE via relative URL-->
+    <script type="text/javascript" src="htmlutils.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript">
 
     tinymce.init({
@@ -28,22 +29,21 @@
                     el = document.getElementById("retrievalarea");
                     el.value = blk._hash; // Use as default on input
                 });
-                //.then(() => alert(blk._hash))
-            //hash = "BLAKE2.pOutfp-rmccZaPlx3vF-PjC0o8Mpz38khpwjn79WEJI="; // The privatehash of the "snippet.html editable - should be a parameter
-            //type = "text%2Fhtml";
-            //Dweb.p_dwebupdate(hash, type, content, ["p_elem","myDiv", verbose, null]); // Post to Dweb and store URL at myDiv
         }
     });
 
     function fetchit() {
-        verbose=true;
-        console.log("Fetching")
         el = document.getElementById("retrievalarea");
-        destn = document.getElementById("retrievaldestn");
         hash = el.value;
+        fetchanddisplay(hash);
+    }
+
+    function fetchanddisplay(hash) {
+        verbose = true;
+        console.log("Fetching hash=", hash);
+        destn = document.getElementById("retrievaldestn");
         destn.innerHTML = ""; // Clear it first
-        console.log("Fetching hash=",hash);
-        blk = new Dweb.Block(hash, null);
+        let blk = new Dweb.Block(hash, null);
         blk.p_fetch(verbose)
             .then(() => {console.log("content=",blk.content()) ; })
             .then(() => destn.innerHTML = blk.content())
@@ -55,34 +55,48 @@
     </script>
 </head>
 <body>
+<div id="status" class="status"></div>
+<h1>Dweb - Block Example</h1>
 <h4>Create something here, and when its saved its link will appear below</h4>
 <form method="post"><!--TODO see if it needs the form-->
     <textarea id="mytextarea" width="60%">Testing</textarea>
 </form>
+
 <h4>Enter a link here and it will be retrieved.</h4>
-<form><!--TODO see if it needs the form-->
-    <span class="button" onclick="fetchit()">FETCHIT</span>
-    <input type="text" id="retrievalarea" size="150"></input>
+<form style="display:inline" onsubmit="fetchit(); return false;">
+    <input type="text" class="propval" id="retrievalarea" placeholder="/ipfs/12ab34cd" size="70"/>
+    <input type="submit" value="Fetch"/>
 </form>
+
 <div id="retrievaldestn">retrieved data will go here</div>
-<h4>Object browser opens here</h4>
-<ul id="ObjBrowser"></ul>
+
+
+<hr>
+<div class="container">
+    <h4>Object browser <span class="hoverclue">....</span></h4>
+    <div class="hoveronly">
+        <ul class="hoveronly" id="ObjBrowser"></ul>
+    </div>
+</div>
 
 <script type="text/javascript">
+
+    /* Pull hash out of URL search string.*/
+    var hash = new URL(window.location.href).searchParams.get("hash")
+    console.log("Loaded with hash=", hash);
+
     let verbose = false;
     let transportclass = TransportIPFS;
+    setstatus("IPFS Starting");
     //let transportclass = TransportHTTP    // Uncomment this to choose HTTP, but note p_setup below needs fixing
     transportclass.p_setup({iiif: {store: "indexeddb"}}, verbose, {})
         .then((t) => {
+            setstatus(t.ipfs.isOnline() ? "IPFS Online" : "IPFS Not online");
             if (verbose) console.log("setup returned and transport set - including annotationList");
             Dweb.transport = t;
         })
-        .then(() => console.log("STARTING TEST"))
-        .then(() => transportclass.test(Dweb.transport, verbose))   //TODO do we need this
-        .then(() => console.log("Main end in sandbox.html"))
-
-    //browser();
-    //cryptotest();
+    .then(() => { if(hash) fetchanddisplay(hash)})
+    .catch((err) => { console.log("ERROR:",err); alert(err.message); });
 </script>
 </body>
 </html>
