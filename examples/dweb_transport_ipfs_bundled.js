@@ -265,6 +265,7 @@ class CommonList extends SmartDict {
             callback(sig);
         })
     }
+    //TODO add many of the methods of Array to CommonList see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array
 }
 exports = module.exports = CommonList;
 
