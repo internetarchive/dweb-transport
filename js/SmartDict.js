@@ -19,9 +19,9 @@ const table2class = { // Each of these needs a constructor that takes hash, data
 // See CommonBlock.py for Python version
 
 class SmartDict extends Transportable {
-    constructor(hash, data, verbose, options) {
+    constructor(data, verbose, options) {
         // data = json string or dict
-        super(hash, data); // _hash is _hash of SmartDict, not of data - will call _setdata (which usually set fields), -note does not fetch the has, but sets _needsfetch
+        super(data); // _hash is _hash of SmartDict, not of data - will call _setdata (which usually set fields), -note does not fetch the has, but sets _needsfetch
         this._setproperties(options);   // Note this will override any properties set with data
         if (!this.table) { this.table = "sd"; } // Set it if the data doesnt set it, should be overridden by subclasses
     }
@@ -82,55 +82,48 @@ class SmartDict extends Transportable {
         // Call chain is ...  or constructor > _setdata > _setproperties > __setattr__
         // COPIED FROM PYTHON 2017-5-27
         value = typeof(value) === "string" ? Dweb.transport.loads(value) : value; // If its a string, interpret as JSON
-        console.assert(!( value && value.encrypted), "Should have been decrypted in p_fetch");
+        if (value && value.encrypted)
+            throw new Dweb.errors.EncryptionError("Should have been decrypted in p_fetch");
         this._setproperties(value); // Note value should not contain a "_data" field, so wont recurse even if catch "_data" at __setattr__()
     }
 
-    p_fetch(verbose) {
-        // See also p_fetch_then_list, p_fetch_then_list_then_current, p_fetch_then_list_then_elements
-        // as in CL etc need to fetch body and only then fetchlist since for a list the body might include the publickey whose hash is needed for the list
-        // :errors: Authentication Error
-        let self = this;
-        if (this._needsfetch) { // Only load if need to
-            if (verbose) { console.log("SmartDict.p_fetch:",this._hash)}
-            this._needsfetch = false;
-            return Dweb.transport.p_rawfetch(this._hash, verbose)   //TODO-IPFS change to use dag storage
-                .then((data) => self.constructor.p_decrypt(Dweb.transport.loads(data), verbose))
-                .then((data) => { self._setdata(data); return self;})
-                .catch((err) => { console.log("Unable to fetch",this._hash,err); throw(err); })
-        } else {
-            return new Promise((resolve, reject)=> resolve(self));  // I think this should be a noop - fetched already
-        }
-    }
-
-    static p_unknown_fetch(hash, verbose) {
+    static p_fetch(hash, verbose) {
         /*
             Fetch a block which initially we don't know which type
+            See also p_fetchlist, p_list_then_current, p_list_then_elements
+
             :resolves: New object - e.g. StructuredBlock or MutableBlock
             :catch: TransportError - can probably, or should throw TransportError if transport fails
             :throws: TransportError if hash invalid
-            Errors: Doesn't find class should be handled seperately from can't encrypt
+            :errors: Authentication Error
+
          */
-        if (verbose) console.log("SmartDict.p_unknown_fetch", hash);
+        if (verbose) console.log("SmartDict.p_fetch", hash);
         let cls;
         return Dweb.transport.p_rawfetch(hash, verbose) // Fetch the data Throws TransportError immediately if hash invalid, expect it to catch if Transport fails
             .then((data) => {
-                data = Dweb.transport.loads(data);      // Parse JSON
+                data = Dweb.transport.loads(data);      // Parse JSON //TODO-REL3 maybe function in Transportable
                 let table = data["table"];              // Find the class it belongs to
                 cls = Dweb[table2class[table]];         // Gets class name, then looks up in Dweb - avoids dependency
-                console.assert(cls, "SmartDict.p_unknown_fetch:",table,"isnt implemented in table2class"); //TODO Should probably raise a specific subclass of Error
+                console.assert(cls, "SmartDict.p_fetch:",table,"isnt implemented in table2class"); //TODO Should probably raise a specific subclass of Error
                 //console.log(cls);
                 console.assert((table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict), "Avoid data driven hacks to other classes")
                 return data;
             })
             .then((data) => cls.p_decrypt(data, verbose))    // decrypt - may return string or obj , note it can be suclassed for different encryption
-            .then((data) => { return new cls(hash, data)})                // Returns new block that should be a subclass of SmartDict
+            .then((data) => { let obj = new cls(data); obj._hash = hash; return obj})                // Returns new block that should be a subclass of SmartDict
             .catch((err) => {console.log("cant fetch and decrypt unknown"); throw(err)});
     }
 
     static p_decrypt(data, verbose) {
-        // This is a hook to an upper layer for decrypting data, if the layer isn't there then the data wont be decrypted.
-        return (Dweb.CryptoLib && Dweb.CryptoLib.p_decryptdata) ?  Dweb.CryptoLib.p_decryptdata(data, verbose) : data
+        /*
+         This is a hook to an upper layer for decrypting data, if the layer isn't there then the data wont be decrypted.
+         Chain is SD.p_fetch > SD.p_decryptdata > ACL|KC.decrypt, then SD.setdata
+
+         :param data: possibly encrypted object produced from json stored on Dweb
+         :return: same object if not encrypted, or decrypted version
+         */
+        return (Dweb.AccessControlList && Dweb.AccessControlList.p_decryptdata) ?  Dweb.AccessControlList.p_decryptdata(data, verbose) : data
     }
 
 }

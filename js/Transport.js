@@ -33,7 +33,12 @@ class Transport {
         /*
          Inverse of dumps - so if string encoded in transport specific way, should undo that.
          */
-       return JSON.parse(str);
+        try {
+            return JSON.parse(str);
+        } catch(err) {
+            console.log("Bad JSON:",str);
+            throw err;
+        }
     };
 
     p_rawstore(data, verbose) {

@@ -40,7 +40,7 @@
         if (verbose) console.log("Fetching hash=", hash);
         destn = document.getElementById("retrievaldestn");
         destn.innerHTML = ""; // Clear it first
-        Dweb.SmartDict.p_unknown_fetch(hash, verbose)
+        Dweb.SmartDict.p_fetch(hash, verbose)
             .then((sd) => {
                 if (verbose) console.log("Fetched=",sd);
                 destn.innerHTML = "My name is: "+sd.name;

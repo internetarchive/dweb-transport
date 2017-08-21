@@ -43,10 +43,11 @@
         console.log("Fetching hash=", hash);
         destn = document.getElementById("retrievaldestn");
         destn.innerHTML = ""; // Clear it first
-        let blk = new Dweb.Block(hash, null);
-        blk.p_fetch(verbose)
-            .then(() => {console.log("content=",blk.content()) ; })
-            .then(() => destn.innerHTML = blk.content())
+        Dweb.Block.p_fetch(hash, verbose)
+            .then((blk) => {
+                console.log("content=",blk.content());
+                destn.innerHTML = blk.content()
+            })
     }
 
     </script>

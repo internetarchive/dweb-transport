@@ -42,7 +42,7 @@
         dict = form2dict("entryform");
         // Create a new object and add to the list
         let obj = new Dweb.SmartDict(null, dict, verbose )
-        cl.p_signandstore(obj, verbose)
+        cl.p_push(obj, verbose)
             .then(() => console.log("Added:",obj))  // Show on the Javascript console
             .then(() => objbrowser(cl, cl._hash, null, "ObjBrowser", false))   // Redisplay in objbrowser
             .catch((err) => { console.log("ERROR:",err); alert(err.message); });
@@ -74,7 +74,7 @@
         destn = document.getElementById("retrievaldestn");
         let listdestn = document.getElementById("listresults");
         try {
-            Dweb.SmartDict.p_unknown_fetch(hash, verbose)   // Throws TransportError immediately if hash invalid
+            Dweb.SmartDict.p_fetch(hash, verbose)   // Throws TransportError immediately if hash invalid
                 .then((obj) => cl = obj) // Save it for adding to in sendentry
                 .then(() => {
                     console.log("Fetched=", cl);
@@ -87,12 +87,12 @@
                         listdestn.removeChild(listdestn.firstChild);
                     } // Clear old text
                 })
-                .then(() => cl.p_fetch_then_list_then_elements(verbose))
+                .then(() => cl.p_list_then_elements(verbose))
                 //The elements in the list
                 .then((objs) => { console.log("objs=",JSON.stringify(objs)); return objs;})
                 .then((objs) => objs.map((obj) => addtoelement(listdestn, obj)))
                 .then(() => cl.listmonitor(
-                    (sig) => sig.p_unknown_fetch(verbose)
+                    (sig) => sig.p_fetchdata(verbose)
                             .then((obj) => addtoelement(listdestn, obj)),
                     true))
                 .then(() => objbrowser(cl, cl._hash, null, "ObjBrowser", verbose))

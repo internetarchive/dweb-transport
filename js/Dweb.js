@@ -4,13 +4,11 @@ exports.SmartDict = require("./SmartDict");
 exports.KeyPair = require("./KeyPair");
 exports.Signature = require("./Signature");
 exports.CommonList = require("./CommonList");
+exports.AccessControlList = require("./AccessControlList");
+exports.KeyChain = require('./KeyChain');
 /* Later libraries
 exports.StructuredBlock = require('./StructuredBlock');
-exports.MutableBlock = require('./MutableBlock');
-exports.CryptoLib = require('./CryptoLib');
-exports.KeyChain = require('./KeyChain');
 exports.MutableBlock = require("./MutableBlock");
-exports.AccessControlList = require("./AccessControlList");
 */
 
 // Javascript library for dweb
@@ -115,8 +113,8 @@ exports.p_dwebfile = function(table, hash, path, successmethod) {
     }
     if (verbose) { console.log("Dweb.p_dwebfile",table,hash,path,successmethod);}
     if (table === "mb") {
-        //(hash, data, master, keypair, keygen, mnemonic, contenthash, contentacl, verbose)
-        const mb = new exports.MutableBlock(hash, null, false, null, false, null, null, null, verbose, null);
+        //(data, master, keypair, keygen, mnemonic,verbose)
+        const mb = new exports.MutableBlock(null, false, null, false, null, verbose, null);
         // for dwebfile:mb, we want to apply the success function to the file - which is in the content after fetchlist
         return mb.p_fetch_then_list_then_current(verbose)
             .then(() => mb.p_path(path, verbose, successmethod))
@@ -135,8 +133,8 @@ exports.p_dwebfile = function(table, hash, path, successmethod) {
 /*TODO: NOT PORTED OR TESTED WITH PROMISES
 exports.p_dwebupdate = function(hash, type, data, successmethod) {
     let verbose = false;
-    //(hash, data, master, keypair, keygen, mnemonic, contenthash, contentacl, verbose)
-    let mbm = new exports.MutableBlock(hash, null, true, null, false, null, null, null, verbose, null);
+    //(data, master, keypair, keygen, mnemonic,  verbose)
+    let mbm = new exports.MutableBlock(null, true, null, false, null, verbose, null);
     mbm.async_update( type, data, verbose,
         function(msg){
             if (successmethod) {
@@ -159,9 +157,9 @@ exports.p_dweblist = function(div, hash, verbose, success, successmethodeach) {
     //TODO-LISTS this should probably be a different lsit from MB where multiple is assumed.
     //TODO-LISTS success isnt used, presume something in chain runs success
     verbose = false;
-    //(hash, data, master, keypair, keygen, mnemonic, contenthash, contentacl, verbose)
-    const mb = new exports.MutableBlock(hash, null, false, null, false, null, null, null, verbose, null);
-    return mb.p_fetch_then_list_then_elements(verbose)
+    //(data, master, keypair, keygen, mnemonic, contenthash, contentacl, verbose)
+    const mb = SD.p_fetch(hash,verbose)
+    return mb.p_list_then_elements(verbose)
         .then(()=> mb.p_elem(div, verbose, successmethodeach)) // p_elem loads the block
 };
 */

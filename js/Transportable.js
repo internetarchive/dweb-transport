@@ -14,10 +14,8 @@ class Transportable {
 
 
 
-    constructor(hash, data) {
-        this._hash = hash;  // Hash of the _data
+    constructor(data) {
         this._setdata(data); // The data being stored - note _setdata usually subclassed
-        if (hash && !data) { this._needsfetch = true; }
     }
 
     _setdata(value) {
@@ -49,21 +47,6 @@ class Transportable {
         this._hash = null;
     }
 
-    p_fetch(verbose) {
-        // Promise equiv of PY:fetch and async_load
-        // Resolves whether needs to load or not as will often load and then do something.
-        if (verbose) { console.log("Transportable.p_fetch hash=",this._hash,this._needsfetch); }
-        let self = this;
-        if (this._needsfetch) { // Only load if need to
-            this._needsfetch = false;    // Set false before return so not multiply fetched
-            return Dweb.transport.p_rawfetch(this._hash, verbose)
-                .then((data) => { if (data) self._setdata(data); return self});
-        } else {
-            return new Promise((resolve, reject)=> resolve(self));  // I think this should be a noop - fetched already
-        }
-        // Block fetched in the background - dont assume loaded here - see success for actions post-load
-
-    }
 
     file() { console.assert(false, "XXX Undefined function Transportable.file"); }
     url() { console.assert(false, "XXX Undefined function Transportable.url"); }
@@ -77,33 +60,27 @@ class Transportable {
         // TODO-IPFS may want to get rid of successmethodeach and use a Promise.all in the caller.
         // Called from success methods
         //successeach is function to apply to each element, will be passed "this" for the object being stored at the element.
-        if (this._needsfetch) {
-            let self = this;
-            this.p_load(verbose)
-                .then((msg) => self.p_elem(el, verbose, successmethodeach));
+        if (typeof el === 'string') {
+            el = document.getElementById(el);
+        }
+        let data = this.content(verbose);
+        if (typeof data === 'string') {
+            if (verbose) {
+                console.log("elem:Storing data to element", el, encodeURI(data.substring(0, 20)));
+            }
+            el.innerHTML = data;
+            if (successmethodeach) {
+                let methodname = successmethodeach.shift();
+                //if (verbose) console.log("p_elem",methodname, successmethodeach);
+                this[methodname](...successmethodeach); // Spreads successmethod into args, like *args in python
+            }
+        } else if (Array.isArray(data)) {
+            if (verbose) {
+                console.log("elem:Storing list of len", data.length, "to element", el);
+            }
+            this.p_updatelist(el, verbose, successmethodeach);  //Note cant do success on updatelist as multi-thread //TODO using updatelist not replacing
         } else {
-            if (typeof el === 'string') {
-                el = document.getElementById(el);
-            }
-            let data = this.content(verbose);
-            if (typeof data === 'string') {
-                if (verbose) {
-                    console.log("elem:Storing data to element", el, encodeURI(data.substring(0, 20)));
-                }
-                el.innerHTML = data;
-                if (successmethodeach) {
-                    let methodname = successmethodeach.shift();
-                    //if (verbose) console.log("p_elem",methodname, successmethodeach);
-                    this[methodname](...successmethodeach); // Spreads successmethod into args, like *args in python
-                }
-            } else if (Array.isArray(data)) {
-                if (verbose) {
-                    console.log("elem:Storing list of len", data.length, "to element", el);
-                }
-                this.p_updatelist(el, verbose, successmethodeach);  //Note cant do success on updatelist as multi-thread //TODO using updatelist not replacing
-            } else {
-                console.log("ERROR: unknown type of data to elem", typeof data, data);
-            }
+            console.log("ERROR: unknown type of data to elem", typeof data, data);
         }
         if (verbose) console.log("EL set to", el.textContent);
     }

@@ -20,7 +20,7 @@
             el = document.getElementById("retrievalarea");
             hash = el.value;
             console.log("Fetching hash=",hash);
-            Dweb.SmartDict.p_unknown_fetch(hash, verbose)
+            Dweb.SmartDict.p_fetch(hash, verbose)
                 .then((sd) => {
                     console.log("Fetched=",sd);
                     return sd;

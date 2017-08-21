@@ -15,7 +15,7 @@ class CommonList extends SmartDict {
     dontstoremaster True if should not store master key
     */
 
-    constructor(hash, data, master, key, verbose, options) {
+    constructor(data, master, key, verbose, options) {
         /*
             Create a new instance of CommonList
 
@@ -28,7 +28,7 @@ class CommonList extends SmartDict {
                 seed: Seed to key generation algorithm
             :param options: dict that overrides any fields of data
          */
-        super(hash, data, verbose, options);
+        super(data, verbose, options);
         this._list = [];   // Array of members of the list
         if (key) {
             this._setkeypair(key, verbose);
@@ -38,7 +38,6 @@ class CommonList extends SmartDict {
         } else {
             this._master = master;  // Note this must be AFTER _setkeypair since that sets based on keypair found and _p_storepublic for example wants to force !master
         }
-        if (!this._master) { this._publichash = hash; } // For non master lists, publichash is same as hash
         this.table = "cl";
     }
 
@@ -79,7 +78,7 @@ class CommonList extends SmartDict {
         :param value: KeyPair, or Dict like _key field of KeyPair
          */
         if (value && ! (value instanceof Dweb.KeyPair)) {
-            value = new Dweb.KeyPair(null, { key: value }, verbose) // Note ignoring keytype for now
+            value = new Dweb.KeyPair({ key: value }, verbose) // Note ignoring keytype for now
         }
         this.keypair = value;
         this._master = value && value.has_private();
@@ -114,7 +113,7 @@ class CommonList extends SmartDict {
     p_fetchlist(verbose) {
         /*
         Load the list from the Dweb,
-        Use p_fetch_then_list_then_elements instead if wish to load the individual items in the list
+        Use p_list_then_elements instead if wish to load the individual items in the list
         */
         let self = this;
         if (!this._master && !this._publichash)  this._publichash = this._hash;  // We aren't master, so publichash is same as hash
@@ -122,29 +121,20 @@ class CommonList extends SmartDict {
         return Dweb.transport.p_rawlist(this._publichash, verbose)  //TODO modify to allow listmonitor
             .then((lines) => { // lines should be an array
                 if (verbose) console.log("CommonList:p_fetchlist.success", self._hash, "len=", lines.length);
-                self._list = lines.map((l) => new Dweb.Signature(null, l, verbose));    // Turn each line into a Signature
+                self._list = lines.map((l) => new Dweb.Signature(l, verbose));    // Turn each line into a Signature
             })
     }
 
-    p_fetch_then_list(verbose) {
-        /*
-         Utility function to simplify nested functions, fetches body and then the list (need sync as body might inc publickey).
-          */
-        let self=this;
-        return this.p_fetch(verbose)
-            .then(()=>self.p_fetchlist(verbose))
-    }
-
-    p_fetch_then_list_then_elements(verbose) {
+    p_list_then_elements(verbose) {
         /*
          Utility function to simplify nested functions, fetches body, list and each element in the list.
 
          :resolves: list of objects signed and added to the list
         */
         let self=this;
-        return this.p_fetch_then_list(verbose)
+        return this.p_fetchlist(verbose)
             .then(() => Promise.all(Dweb.Signature.filterduplicates(self._list) // Dont load multiple copies of items on list (might need to be an option?)
-                .map((sig) => sig.p_unknown_fetch(verbose)))) // Return is array result of p_fetch which is array of new objs (suitable for storing in keys etc)
+                .map((sig) => sig.p_fetchdata(verbose)))) // Return is array result of p_fetch which is array of new objs (suitable for storing in keys etc)
         }
 
     _p_storepublic(verbose) {
@@ -154,7 +144,7 @@ class CommonList extends SmartDict {
          Note that this returns immediately after setting hash, so caller may not need to wait for success
          */
         //CL(hash, data, master, key, verbose, options)
-        let cl = new CommonList(null, null, false, this.keypair, verbose, {"name": this.name});
+        let cl = new CommonList(null, false, this.keypair, verbose, {"name": this.name});
         let prom = cl.p_store(verbose);    // Returns immediately but sets _hash first
         this._publichash = cl._hash;
     }
@@ -186,10 +176,10 @@ class CommonList extends SmartDict {
          :resolves: sig created in process - for adding to lists etc.
          :throws:   ForbiddenError if not master;
          */
+        if (!obj) throw new Dweb.errors.CodingError("CL.p_push obj should never be non-empty");
         let self = this;
         let sig;
-        return this.p_fetch(verbose)
-            .then(() => this.p_store()) // Make sure stored - fetch might be a Noop if created locally
+        return this.p_store() // Make sure stored - fetch might be a Noop if created locally
             .then(() => obj.p_store())
             .then(() => {
                 if (!(self._master && self.keypair)) throw new Dweb.errors.ForbiddenError("Signing a new entry when not a master list");
@@ -212,7 +202,7 @@ class CommonList extends SmartDict {
         console.assert(sig.signature, "Must be a signature");
         return sig
     }
-    p_add(sig, verbose) { //TODO-REL3-API
+    p_add(sig, verbose) {
         /*
         Add a signature to the Dweb for this list
 
@@ -226,7 +216,7 @@ class CommonList extends SmartDict {
     listmonitor(callback, verbose) {
         Dweb.transport.listmonitor(this._publichash, (obj) => {
             if (verbose) console.log("CL.listmonitor",this._publichash,"Added",obj);
-            let sig = new Dweb.Signature(null, obj, verbose);
+            let sig = new Dweb.Signature(obj, verbose);
             this._list.push(sig);
             callback(sig);
         })

@@ -121,10 +121,9 @@ function p_objbrowserfetch(el) {
     let parent = el.parentNode;
     parent.removeChild(el); //Remove elem from parent
     if (typeof source === "string") {
-        return Dweb.SmartDict.p_unknown_fetch(source, verbose)
+        return Dweb.SmartDict.p_fetch(source, verbose)
             .then((obj) => objbrowser(obj, obj._hash, null, parent, false));
     } else {
-        return source.p_fetch(verbose)
-            .then((msg) => objbrowser(source, source._hash, null, parent, false));
+        return objbrowser(source, source._hash, null, parent, false)); //TODO its possible this needs to be a promise
     }
 }

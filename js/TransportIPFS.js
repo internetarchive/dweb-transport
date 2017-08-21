@@ -42,7 +42,7 @@ const Dweb = require('./Dweb');
 //Debugging only
 
 let defaultipfsoptions = {
-    repo: '/tmp/ipfs_dweb20170804', //TODO-IPFS think through where, esp for browser
+    repo: '/tmp/ipfs_dweb20170820', //TODO-IPFS think through where, esp for browser
     //init: false,
     //start: false,
     //TODO-IPFS-Q how is this decentralized - can it run offline? Does it depend on star-signal.cloud.ipfs.team
@@ -56,7 +56,7 @@ let defaultipfsoptions = {
 };
 
 // See https://github.com/pgte/ipfs-iiif-db for options
-let defaultiiifoptions = { ipfs: defaultipfsoptions, store: "leveldb", partition: "dweb20170804" }; //TODO-IIIF try making parition a variable and connecting to multiple
+let defaultiiifoptions = { ipfs: defaultipfsoptions, store: "leveldb", partition: "dweb20170820" }; //TODO-IIIF try making parition a variable and connecting to multiple
 
 const annotationlistexample = { //TODO-IPFS update this to better example
     "@id": "foobar",    // Only required field is @id
@@ -104,8 +104,7 @@ class TransportIPFS extends Transport {
     static p_setup(ipfsiiifoptions, verbose, options) {
         let combinedipfsoptions = Object.assign(defaultipfsoptions, ipfsiiifoptions.ipfs);
         let combinediiifoptions = Object.assign(defaultiiifoptions, ipfsiiifoptions.iiif,{ipfs:defaultipfsoptions});   // Top level in this case
-        console.log("IPFS options",combinediiifoptions);
-        console.log("IPFS.ipfs = ",combinediiifoptions.ipfs);
+        console.log("IPFS options", JSON.stringify(combinediiifoptions));
         let t = new TransportIPFS(combinedipfsoptions, verbose, options);
         return new Promise((resolve, reject) => {
             TransportIPFS.ipfsstart(combinediiifoptions, verbose)

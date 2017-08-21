@@ -13,14 +13,14 @@ class Signature extends SmartDict {
     signature:  Signature of the date and hash
     signedby:   Public Hash of list signing this (list should have a public key)
      */
-    constructor(hash, dic, verbose) {
+    constructor(dic, verbose) {
         /*
         Create a new instance of Signature
 
         :param hash: Hash to read from - usually this is null
         :param data: data to initialize - see Fields above
          */
-        super(hash, dic, verbose);
+        super(dic, verbose);
         //console.log("Signature created",this.hash);
         //TODO-DATE turn s.date into java date
         //if isinstance(s.date, basestring):
@@ -40,7 +40,7 @@ class Signature extends SmartDict {
         let signature = commonlist.keypair.sign(date, hash);
         if (!commonlist._publichash) commonlist.p_store(verbose); // Sets _publichash sync, while storing async
         console.assert(commonlist._publichash, "Signature.sign should be a publichash by here");
-        return new Signature(null, {"date": date, "hash": hash, "signature": signature, "signedby": commonlist._publichash})
+        return new Signature({"date": date, "hash": hash, "signature": signature, "signedby": commonlist._publichash})
     }
 
     verify() { console.assert(false, "XXX Undefined function Signature.verify, available in CommonList and KeyPair"); }
@@ -57,12 +57,12 @@ class Signature extends SmartDict {
         return arr.filter((x) => (!res[x.hash] && (res[x.hash] = true)))
     }
 
-    p_unknown_fetch(verbose) {
+    p_fetchdata(verbose) {
         let self = this;
         if (!this.data) {
-            return Dweb.SmartDict.p_unknown_fetch(this.hash, verbose)
+            return Dweb.SmartDict.p_fetch(this.hash, verbose)
                 .then((obj) => self.data = obj); // Reslves to new obj
-        } else {
+        } else { // Return data if we've aleady fetched it
             return new Promise((resolve, reject) => resolve(self.data));
         }
     }
