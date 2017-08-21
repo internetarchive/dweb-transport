@@ -177,8 +177,9 @@ class CommonList extends SmartDict {
     publicurl() { console.assert(false, "XXX Undefined function CommonList.publicurl"); }   // For access via web
     privateurl() { console.assert(false, "XXX Undefined function CommonList.privateurl"); }   // For access via web
 
-    p_signandstore(obj, verbose ) {
+    p_push(obj, verbose ) {
         /*
+         Equivalent to Array.push but returns a promise because asynchronous
          Sign and store a object on a list, stores both locally on _list and sends to Dweb
 
          :param obj: Should be subclass of SmartDict, (Block is not supported)
@@ -195,13 +196,13 @@ class CommonList extends SmartDict {
                 sig = this._makesig(obj._hash, verbose);
                 self._list.push(sig);   // Keep copy locally on _list
             })
-            .then(() => self.p_add(obj._hash, sig, verbose))    // Add to list in dweb
+            .then(() => self.p_add(sig, verbose))    // Add to list in dweb
             .then(() => sig);
     }
 
     _makesig(hash, verbose) {
         /*
-        Utility function to create a signature - used by p_signandstore and in KeyChain.p_addobj
+        Utility function to create a signature - used by p_push and in KeyChain.p_push
         :param hash:    Hash of object to sign
         :returns:       Signature
          */
@@ -211,14 +212,15 @@ class CommonList extends SmartDict {
         console.assert(sig.signature, "Must be a signature");
         return sig
     }
-    p_add(hash, sig, verbose) {
+    p_add(sig, verbose) { //TODO-REL3-API
         /*
         Add a signature to the Dweb for this list
 
         :param sig: Signature
+        :resolves:  undefined
          */
-        console.assert(sig,"CommonList.p_add is meaningless without a sig");
-        return Dweb.transport.p_rawadd(hash, sig.date, sig.signature, sig.signedby, verbose);
+        if (!sig) throw new Dweb.errors.CodingError("CommonList.p_add is meaningless without a sig");
+        return Dweb.transport.p_rawadd(sig.hash, sig.date, sig.signature, sig.signedby, verbose);
     }
 
     listmonitor(callback, verbose) {

@@ -86,20 +86,6 @@ class SmartDict extends Transportable {
         this._setproperties(value); // Note value should not contain a "_data" field, so wont recurse even if catch "_data" at __setattr__()
     }
 
-    /*OBS moved into CL.p_signandstore
-    sign(commonlist, verbose) {
-        /-*
-         Sign, subclasses will probably add to a list.
-         Note if this object has a _acl field it will be encrypted first, then the hash of the encrypted block used for signing.
-         :param CommonList commonlist:   List its going on - has a ACL with a private key
-         :return: sig so that CommonList can add to _list
-         *-/
-        console.assert(this._hash, "Items should be stored before signing")
-        console.assert(commonlist._publichash, "List should be stored before signing", commonlist)
-        return Dweb.Signature.sign(commonlist, this._hash, verbose); // Typically, but not necessarily added to commonlist
-    }
-    */
-
     p_fetch(verbose) {
         // See also p_fetch_then_list, p_fetch_then_list_then_current, p_fetch_then_list_then_elements
         // as in CL etc need to fetch body and only then fetchlist since for a list the body might include the publickey whose hash is needed for the list

@@ -189,9 +189,6 @@ class KeyPair extends SmartDict {
         console.log("_key_hash_private doesnt recognize",key);
     }
 
-    _naclprivate() { return this._key.encrypt.privateKey; }
-    _naclpublic() { return this._key.encrypt.publicKey; }
-
     has_private() {
         /*
         :return: true if key has a private version (or sign or encrypt or seed)
@@ -209,36 +206,37 @@ class KeyPair extends SmartDict {
          */
         // Assumes nacl.public.PrivateKey or nacl.signing.SigningKey
         console.assert(signer, "Until PyNaCl bindings have secretbox we require a signer and have to add authentication");
-        //box = nacl.public.Box(signer.keypair._naclprivate, self._naclpublic)
+        //box = nacl.public.Box(signer.keypair._key.encrypt.privateKey, self._key.encrypt.publicKey)
         //return box.encrypt(data, encoder=(nacl.encoding.URLSafeBase64Encoder if b64 else nacl.encoding.RawEncoder))
         const nonce = sodium.randombytes_buf(sodium.crypto_box_NONCEBYTES);
-        const ciphertext = sodium.crypto_box_easy(data, nonce, this._naclpublic(), signer.keypair._naclprivate(), "uint8array"); //(message, nonce, publicKey, secretKey, outputFormat)
+        const ciphertext = sodium.crypto_box_easy(data, nonce, this._key.encrypt.publicKey, signer.keypair._key.encrypt.privateKey, "uint8array"); //(message, nonce, publicKey, secretKey, outputFormat)
 
         const combined = Dweb.utils.mergeTypedArraysUnsafe(nonce, ciphertext);
         return b64 ? sodium.to_urlsafebase64(combined) : sodium.to_string(combined);
     }
-    decrypt(data, signer, outputformat) {
+    decrypt(data, signer, outputformat) { //TODO-REL3-API throws
         /*
          Decrypt date encrypted with encrypt (above)
 
          :param data:  urlsafebase64 or Uint8array, starting with nonce
-         :signer AccessControlList: If result was signed (currently ignored for RSA, reqd for NACL)
-         :outputformat: Compatible with LibSodium, typicall "text" to return a string
+         :param signer AccessControlList: If result was signed (currently ignored for RSA, reqd for NACL)
+         :param outputformat: Compatible with LibSodium, typicall "text" to return a string
          :return: Data decrypted to outputformat
+         :throws: EnryptionError if no encrypt.privateKey, CodingError if !data||!signer
         */
-        console.assert(data, "KeyPair.decrypt: meaningless to decrypt undefined, null or empty strings");
-        if (this._key.encrypt.privateKey) {
-            console.assert(signer, "Until PyNaCl bindings have secretbox we require a signer and have to add authentication");
-             // Note may need to convert data from unicode to str
-             if (typeof(data) === "string") {   // If its a string turn into a Uint8Array
-                data = sodium.from_urlsafebase64(data);
-             }
-             let nonce = data.slice(0,sodium.crypto_box_NONCEBYTES);
-             data = data.slice(sodium.crypto_box_NONCEBYTES);
-             return sodium.crypto_box_open_easy(data, nonce, signer.keypair._naclpublic(), this._naclprivate(), outputformat);
-         } else {
-            throw new Dweb.errors.ToBeImplementedError("KeyPair.decrypt for " + this._key);
+        if (!data)
+            throw new Dweb.errors.CodingError("KeyPair.decrypt: meaningless to decrypt undefined, null or empty strings");
+        if (!signer)
+            throw new Dweb.errors.CodingError("Until libsodium-wrappers has secretbox we require a signer and have to add authentication");
+        if (! this._key.encrypt.privateKey)
+            throw new Dweb.errors.EncryptionError("No private encryption key in" + JSON.stringify(_key));
+         // Note may need to convert data from unicode to str
+         if (typeof(data) === "string") {   // If its a string turn into a Uint8Array
+            data = sodium.from_urlsafebase64(data);
          }
+         let nonce = data.slice(0,sodium.crypto_box_NONCEBYTES);
+         data = data.slice(sodium.crypto_box_NONCEBYTES);
+         return sodium.crypto_box_open_easy(data, nonce, signer.keypair._key.encrypt.publicKey, this._key.encrypt.privateKey, outputformat);
     }
     sign(date, hash, verbose) {
         /*

@@ -24,8 +24,8 @@
     "watchify": "^3.9.0"
   },
   "scripts": {
-    "bundle_transport_ipfs": "cd js; browserify ./browser_transport_ipfs.js > ../examples/dweb_transport_ipfs_bundled.js",
-    "watch": "watchify js/browser_transport_ipfs.js -o examples/dweb_transport_ipfs_bundled.js --verbose",
+    "bundle_transport_ipfs": "cd js; browserify ./browser.js > ../examples/dweb_transport_ipfs_bundled.js",
+    "watch": "watchify js/browser.js -o examples/dweb_transport_ipfs_bundled.js --verbose",
     "test": "cd js; node ./test.js"
   }
 }
