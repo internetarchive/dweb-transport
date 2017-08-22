@@ -104,14 +104,14 @@ exports.utils.mergeTypedArraysUnsafe = function(a, b) { // Take care of inabilit
 // ==== NON OBJECT ORIENTED FUNCTIONS ==============
 
 /*TODO: NOT PORTED OR TESTED WITH PROMISES
-exports.p_dwebfile = function(table, hash, path, successmethod) {
-    // Simple utility function to load into a hash without dealing with individual objects
+exports.p_dwebfile = function(table, url, path, successmethod) {
+    // Simple utility function to load into a url without dealing with individual objects
     // successmethod - see "path()" for definition.
     let verbose = false;
     if (path && (path.length > 0)) {
         path = path.split('/');
     }
-    if (verbose) { console.log("Dweb.p_dwebfile",table,hash,path,successmethod);}
+    if (verbose) { console.log("Dweb.p_dwebfile",table,url,path,successmethod);}
     if (table === "mb") {
         //(data, master, keypair, keygen, mnemonic,verbose)
         const mb = new exports.MutableBlock(null, false, null, false, null, verbose, null);
@@ -120,7 +120,7 @@ exports.p_dwebfile = function(table, hash, path, successmethod) {
             .then(() => mb.p_path(path, verbose, successmethod))
         // Note success is applied once after list is fetched, content isn't loaded before that.
     } else if (table === "sb") {
-        const sb = new exports.StructuredBlock(hash, null, verbose);
+        const sb = new exports.StructuredBlock(url, null, verbose);
         sb.p_fetch(verbose)
             .then((msg) => sb.p_path(path, verbose, successmethod))
     } else {
@@ -131,7 +131,7 @@ exports.p_dwebfile = function(table, hash, path, successmethod) {
 
 
 /*TODO: NOT PORTED OR TESTED WITH PROMISES
-exports.p_dwebupdate = function(hash, type, data, successmethod) {
+exports.p_dwebupdate = function(url, type, data, successmethod) {
     let verbose = false;
     //(data, master, keypair, keygen, mnemonic,  verbose)
     let mbm = new exports.MutableBlock(null, true, null, false, null, verbose, null);
@@ -149,7 +149,7 @@ exports.p_dwebupdate = function(hash, type, data, successmethod) {
 
 
 /*TODO: NOT PORTED OR TESTED WITH PROMISES
-exports.p_dweblist = function(div, hash, verbose, success, successmethodeach) {
+exports.p_dweblist = function(div, url, verbose, success, successmethodeach) {
     //TODO-UNUSED doesnt appear to be used, though should have been in example.html
     //Retrieve a list, and create <li> elements of div to hold it.
     //success, if present, is run after list retrieved, asynchronous with elements retrieved
@@ -157,8 +157,8 @@ exports.p_dweblist = function(div, hash, verbose, success, successmethodeach) {
     //TODO-LISTS this should probably be a different lsit from MB where multiple is assumed.
     //TODO-LISTS success isnt used, presume something in chain runs success
     verbose = false;
-    //(data, master, keypair, keygen, mnemonic, contenthash, contentacl, verbose)
-    const mb = SD.p_fetch(hash,verbose)
+    //(data, master, keypair, keygen, mnemonic, contenturl, contentacl, verbose)
+    const mb = SD.p_fetch(url,verbose)
     return mb.p_list_then_elements(verbose)
         .then(()=> mb.p_elem(div, verbose, successmethodeach)) // p_elem loads the block
 };

@@ -4,7 +4,7 @@ const Dweb = require("./Dweb");
 //TODO-IPFS change to go direct to Dag rather than Block - maybe by making Transport.p_store decide ?
 
 //TODO-SEPERATE - move these to Dweb
-const table2class = { // Each of these needs a constructor that takes hash, data and is ok with no other parameters, (otherwise define a set of these methods as factories)
+const table2class = { // Each of these needs a constructor that takes data and is ok with no other parameters, (otherwise define a set of these methods as factories)
     "cl": "CommonList",
     "sb": "StructuredBlock",
     "kc": "KeyChain",
@@ -21,7 +21,7 @@ const table2class = { // Each of these needs a constructor that takes hash, data
 class SmartDict extends Transportable {
     constructor(data, verbose, options) {
         // data = json string or dict
-        super(data); // _hash is _hash of SmartDict, not of data - will call _setdata (which usually set fields), -note does not fetch the has, but sets _needsfetch
+        super(data); // _url is _url of SmartDict, not of data - will call _setdata (which usually set fields), -note does not fetch the has, but sets _needsfetch
         this._setproperties(options);   // Note this will override any properties set with data
         if (!this.table) { this.table = "sd"; } // Set it if the data doesnt set it, should be overridden by subclasses
     }
@@ -51,8 +51,8 @@ class SmartDict extends Transportable {
         for (let i in dd) {
             if (i.indexOf('_') !== 0) { // Ignore any attributes starting _
                 if (dd[i] instanceof Transportable) {
-                    dd[i].p_store(false);  // Stores async, but sets hash first if you need it stored first then do so before calling p_store
-                    res[i] = dd[i]._hash
+                    dd[i].p_store(false);  // Stores async, but sets url first if you need it stored first then do so before calling p_store
+                    res[i] = dd[i]._url
                 } else {
                     res[i] = dd[i];
                 }
@@ -71,7 +71,7 @@ class SmartDict extends Transportable {
         let res = Dweb.transport.dumps(this.preflight(dd));
         if (this._acl) { //Need to encrypt
             let encdata = this._acl.encrypt(res, true);  // data, b64
-            let dic = { "encrypted": encdata, "acl": this._acl._publichash, "table": this.table};
+            let dic = { "encrypted": encdata, "acl": this._acl._publicurl, "table": this.table};
             res = Dweb.transport.dumps(dic);
         }
         return res
@@ -87,23 +87,23 @@ class SmartDict extends Transportable {
         this._setproperties(value); // Note value should not contain a "_data" field, so wont recurse even if catch "_data" at __setattr__()
     }
 
-    static p_fetch(hash, verbose) {
+    static p_fetch(url, verbose) {
         /*
             Fetch a block which initially we don't know which type
             See also p_fetchlist, p_list_then_current, p_list_then_elements
 
             :resolves: New object - e.g. StructuredBlock or MutableBlock
             :catch: TransportError - can probably, or should throw TransportError if transport fails
-            :throws: TransportError if hash invalid
+            :throws: TransportError if url invalid
             :errors: Authentication Error
 
          */
-        if (verbose) console.log("SmartDict.p_fetch", hash);
+        if (verbose) console.log("SmartDict.p_fetch", url);
         let cls;
-        return super.p_fetch(hash, verbose) // Fetch the data Throws TransportError immediately if hash invalid, expect it to catch if Transport fails
+        return super.p_fetch(url, verbose) // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
             .then((data) => {
                 data = Dweb.transport.loads(data);      // Parse JSON //TODO-REL3 maybe function in Transportable
-                let table = data["table"];              // Find the class it belongs to
+                let table = data.table;              // Find the class it belongs to
                 cls = Dweb[table2class[table]];         // Gets class name, then looks up in Dweb - avoids dependency
                 console.assert(cls, "SmartDict.p_fetch:",table,"isnt implemented in table2class"); //TODO Should probably raise a specific subclass of Error
                 //console.log(cls);
@@ -111,7 +111,11 @@ class SmartDict extends Transportable {
                 return data;
             })
             .then((data) => cls.p_decrypt(data, verbose))    // decrypt - may return string or obj , note it can be suclassed for different encryption
-            .then((data) => { let obj = new cls(data); obj._hash = hash; return obj})                // Returns new block that should be a subclass of SmartDict
+            .then((data) => {
+                    data._url = url;                         // Save where we got it - preempts a store - must do this afer decrypt
+                    let obj = new cls(data);
+                    return obj;
+            })                // Returns new block that should be a subclass of SmartDict
             .catch((err) => {console.log("cant fetch and decrypt unknown"); throw(err)});
     }
 

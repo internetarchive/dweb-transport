@@ -17,33 +17,37 @@
 
     tinymce.init({
         selector: '#mytextarea',
-        plugins: "save",
-        toolbar: "save",
+        menubar: "true",
+        plugins: [ "save",
+            'advlist autolink lists link image charmap print preview anchor',
+            'searchreplace visualblocks code fullscreen',
+            'insertdatetime media table contextmenu paste code' ],
+        toolbar: 'save | undo redo | insert | styleselect | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image',
         save_onsavecallback: function() {
-            verbose = false;
+            verbose = true; // See commentary in console.log
             content = tinyMCE.get('mytextarea').getContent();
             // alert(content);
-            blk = new Dweb.Block(null, content);
+            blk = new Dweb.Block(content);
             blk.p_store(verbose)
                 .then(() => {
                     el = document.getElementById("retrievalarea");
-                    el.value = blk._hash; // Use as default on input
+                    el.value = blk._url; // Use as default on input
                 });
         }
     });
 
     function fetchit() {
         el = document.getElementById("retrievalarea");
-        hash = el.value;
-        fetchanddisplay(hash);
+        url = el.value;
+        fetchanddisplay(url);
     }
 
-    function fetchanddisplay(hash) {
+    function fetchanddisplay(url) {
         verbose = true;
-        console.log("Fetching hash=", hash);
+        console.log("Fetching url=", url);
         destn = document.getElementById("retrievaldestn");
         destn.innerHTML = ""; // Clear it first
-        Dweb.Block.p_fetch(hash, verbose)
+        Dweb.Block.p_fetch(url, verbose)
             .then((blk) => {
                 console.log("content=",blk.content());
                 destn.innerHTML = blk.content()
@@ -69,7 +73,7 @@
     <input type="submit" value="Fetch"/>
 </form>
 
-<div id="retrievaldestn">retrieved data will go here</div>
+<div class="displayedblock" id="retrievaldestn">retrieved data will go here</div>
 
 
 <hr>
@@ -82,11 +86,11 @@
 
 <script type="text/javascript">
 
-    /* Pull hash out of URL search string.*/
-    var hash = new URL(window.location.href).searchParams.get("hash")
-    console.log("Loaded with hash=", hash);
+    /* Pull url out of URL search string.*/
+    var url = new URL(window.location.href).searchParams.get("url")
+    console.log("Loaded with url=", url);
 
-    let verbose = false;
+    let verbose = true;
     let transportclass = TransportIPFS;
     setstatus("IPFS Starting");
     //let transportclass = TransportHTTP    // Uncomment this to choose HTTP, but note p_setup below needs fixing
@@ -96,7 +100,7 @@
             if (verbose) console.log("setup returned and transport set - including annotationList");
             Dweb.transport = t;
         })
-    .then(() => { if(hash) fetchanddisplay(hash)})
+    .then(() => { if(url) fetchanddisplay(url)})
     .catch((err) => { console.log("ERROR:",err); alert(err.message); });
 </script>
 </body>

@@ -10,7 +10,7 @@ Lists have listeners,
 'mutation': triggered when changed
 
 TODO-IPFS-MULTILIST
-For now we use one list, and filter by hash, at some point we'll need lots of lists and its unclear where to split
+For now we use one list, and filter by url, at some point we'll need lots of lists and its unclear where to split
 - at listener; partition or list within that (resources / hits) or have to filter on content
 
 TODO-IPFS ComeBackFor: TransportHTTP & TransportHTTPBase (make use promises)
@@ -60,7 +60,7 @@ let defaultiiifoptions = { ipfs: defaultipfsoptions, store: "leveldb", partition
 
 const annotationlistexample = { //TODO-IPFS update this to better example
     "@id": "foobar",    // Only required field is @id
-    "hash": "/ipfs/A1B2C3D4E5",
+    "url": "ipfs:/ipfs/A1B2C3D4E5",
     "date": "20170104T1234",
     "signature": "123456ABC",
     "signedby": "123456ABC"
@@ -132,43 +132,43 @@ class TransportIPFS extends Transport {
         })
     }
 
-    link(data) {
+    url(data) {
         /*
-         Return an identifier for the data without storing
+         Return an identifier for the data without storing typically ipfs:/ipfs/a1b2c3d4...
 
          :param string|Buffer data   arbitrary data
-         :return string              valid id to retrieve data via p_rawfetch
+         :return string              valid url to retrieve data via p_rawfetch
          */
         let b2 = (data instanceof Buffer) ? data : new Buffer(data);
         let b3 = crypto.createHash('sha256').update(b2).digest();   // Note this is the only dependence on crypto and exists only because IPFS makes it ridiculously hard to get the hash synchronously without storing
         let hash = multihashes.toB58String(multihashes.encode(b3, 'sha2-256'));  //TODO-IPFS-Q unclear how to make generic
-        return "/ipfs/" + hash
+        return "ipfs:/ipfs/" + hash
     }
 
     // Everything else - unless documented here - should be opaque to the actual structure of a CID
-    // or a Link. This code may change as its not clear (from IPFS docs) if this is the right mapping.
-    static cid2link(cid) {
+    // or a url. This code may change as its not clear (from IPFS docs) if this is the right mapping.
+    static cid2url(cid) {
         //console.log(cid.multihash[0],cid.multihash[1],cid.multihash[2]);
-        return "/ipfs/"+cid.toBaseEncodedString()
-    }  //TODO-IPFS this might not be right, (TODO-IPFS-Q-CID)
+        return "ipfs:/ipfs/"+cid.toBaseEncodedString()
+    }
 
-    static link2cid(link) {
-        let arr = link.split('/');
-        if (!(arr.length===3 && arr[1]==="ipfs"))
-                throw new Dweb.errors.TransportError("TransportIPFS.link2cid bad format for hash should be /ipfs/...: "+link);
+    static url2cid(url) {
+        let arr = url.split('/');
+        if (!(arr.length===3 && arr[0] == "ipfs:" && arr[1]==="ipfs"))
+                throw new Dweb.errors.TransportError("TransportIPFS.url2cid bad format for url should be ipfs:/ipfs/...: "+url);
         return new CID(arr[2])
     }
 
-    p_rawfetch(hash, verbose) {
+    p_rawfetch(url, verbose) {
         /*
-        Fetch hash from IPFS (implements Transport.p_rawfetch)
+        Fetch url from IPFS (implements Transport.p_rawfetch)
 
-        :param hash:    Valid ipfs hash "/ipfs/*"
+        :param url:    Valid ipfs url "ipfs:/ipfs/*"
         :resolves:      Opaque bytes retrieved from IPFS
-        :throws:        TransportError if hash invalid - note this happens immediately, not as a catch in the promise
+        :throws:        TransportError if url invalid - note this happens immediately, not as a catch in the promise
          */
-        console.assert(hash, "TransportIPFS.p_rawfetch: requires hash");
-        let cid = (hash instanceof CID) ? hash : TransportIPFS.link2cid(hash);  // Throws TransportError if hash bad
+        console.assert(url, "TransportIPFS.p_rawfetch: requires url");
+        let cid = (url instanceof CID) ? url : TransportIPFS.url2cid(url);  // Throws TransportError if url bad
         return this.promisified.ipfs.block.get(cid)
             .then((result)=> result.data.toString())
             .catch((err) => {
@@ -177,17 +177,17 @@ class TransportIPFS extends Transport {
             })
     }
 
-    p_rawlist(hash, verbose) { //TODO-IPFS-MULTILIST move initialization of annotation list here
+    p_rawlist(url, verbose) { //TODO-IPFS-MULTILIST move initialization of annotation list here
         // obj being loaded
-        // Locate and return a list, based on its multihash
+        // Locate and return a list, based on its url
         // This is coded as a p_rawlist (i.e. returning a Promise, even though it returns immediately, that is so that
         // it can be recoded for an architecture where we need to wait for the list.
         // notify is NOT part of the Python interface, needs implementing there.
-        console.assert(hash, "TransportHTTP.p_rawlist: requires hash");
+        console.assert(url, "TransportHTTP.p_rawlist: requires url");
         return new Promise((resolve, reject) => {  //XXXREJECT
             try {
                 let res = this.annotationList.getResources()
-                    .filter((obj) => (obj.signedby === hash));
+                    .filter((obj) => (obj.signedby === url));
                 if (verbose) console.log("p_rawlist found", ...Dweb.utils.consolearr(res));
                 resolve(res);
             } catch(err) {
@@ -196,7 +196,7 @@ class TransportIPFS extends Transport {
             }
         })
     }
-    listmonitor(hash, callback, verbose) {
+    listmonitor(url, callback, verbose) {
         // Typically called immediately after a p_rawlist to get notification of future items
         //TODO-IPFS-MULTILIST will want to make more efficient.
         this.annotationList.on('resource inserted', (event) => {
@@ -205,7 +205,7 @@ class TransportIPFS extends Transport {
             //obj["signature"] = obj["@id"];
             //delete obj["@id"];
             //console.log('resource after transform', obj);
-            if (callback && (obj.signedby === hash)) callback(obj);
+            if (callback && (obj.signedby === url)) callback(obj);
         })
     }
 
@@ -215,26 +215,26 @@ class TransportIPFS extends Transport {
         //PY-HTTP: res = self._sendGetPost(True, "rawstore", headers={"Content-Type": "application/octet-stream"}, urlargs=[], data=data, verbose=verbose)
         console.assert(data, "TransportIPFS.p_rawstore: requires data");
         let buf = (data instanceof Buffer) ? data : new Buffer(data);
-        return this.promisified.ipfs.block.put(buf).then((block) => TransportIPFS.cid2link(block.cid));
+        return this.promisified.ipfs.block.put(buf).then((block) => TransportIPFS.cid2url(block.cid));
     }
 
-    rawadd(hash, date, signature, signedby, verbose) {
-        console.assert(hash && signature && signedby, "p_rawadd args",hash,signature,signedby);
-        if (verbose) console.log("p_rawadd", hash, date, signature, signedby);
-        let value = {"@id": signature, "hash": hash, "date": date, "signature": signature, "signedby": signedby};
+    rawadd(url, date, signature, signedby, verbose) {
+        console.assert(url && signature && signedby, "p_rawadd args",url,signature,signedby);
+        if (verbose) console.log("p_rawadd", url, date, signature, signedby);
+        let value = {"@id": signature, "url": url, "date": date, "signature": signature, "signedby": signedby};
         this.annotationList.pushResource(value);
     }
-    p_rawadd(hash, date, signature, signedby, verbose) {
+    p_rawadd(url, date, signature, signedby, verbose) {
         return new Promise((resolve, reject)=> { try {
-            this.rawadd(hash, date, signature, signedby, verbose);
+            this.rawadd(url, date, signature, signedby, verbose);
             resolve(undefined);
         } catch(err) {
             reject(err);
         } })
     }
 
-    async_update(self, hash, type, data, verbose, success, error) { console.trace(); console.assert(false, "OBSOLETE"); //TODO-IPFS obsolete with p_*
-        this.async_post("update", hash, type, data, verbose, success, error);
+    async_update(self, url, type, data, verbose, success, error) { console.trace(); console.assert(false, "OBSOLETE"); //TODO-IPFS obsolete with p_*
+        this.async_post("update", url, type, data, verbose, success, error);
     }
 
 
@@ -242,44 +242,44 @@ class TransportIPFS extends Transport {
         if (verbose) {console.log("TransportIPFS.test")}
         return new Promise((resolve, reject) => {
             try {
-                let hashqbf;
+                let urlqbf;
                 let qbf = "The quick brown fox";
-                let testhash = "1114";  // Just a predictable number can work with
+                let testurl = "1114";  // Just a predictable number can work with
                 let listlen;    // Holds length of list run intermediate
                 let cidmultihash;   // Store cid from first block in form of multihash
                 transport.p_rawstore(qbf, verbose)
-                    .then((hash) => {
-                        if (verbose) console.log("rawstore returned", hash);
-                        let newcid = TransportIPFS.link2cid(hash);  // Its a CID which has a buffer in it
-                        console.assert(hash === transport.link(qbf),"link should match hash from rawstore");
-                        cidmultihash = hash.split('/')[2];
-                        let newhash = TransportIPFS.cid2link(newcid);
-                        console.assert(hash === newhash, "Should round trip");
-                        hashqbf = hash;
-                        //console.log("hashqbf=",hash);
+                    .then((url) => {
+                        if (verbose) console.log("rawstore returned", url);
+                        let newcid = TransportIPFS.url2cid(url);  // Its a CID which has a buffer in it
+                        console.assert(url === transport.url(qbf),"url should match url from rawstore");
+                        cidmultihash = url.split('/')[2];
+                        let newurl = TransportIPFS.cid2url(newcid);
+                        console.assert(url === newurl, "Should round trip");
+                        urlqbf = url;
+                        //console.log("urlqbf=",url);
                     })
                     /*
                     .then(() => transport.p_rawstore(null, rold, verbose))
-                    .then((hash) => {
-                            if (verbose) console.log("p_rawstore got", hash);
-                            hashrold = hash;
+                    .then((url) => {
+                            if (verbose) console.log("p_rawstore got", url);
+                            urlold = url;
                         })
                     */
                     // Note above returns immediately and runs async, we don't wait for it before below
-                    .then(() => transport.p_rawfetch(hashqbf, verbose))
+                    .then(() => transport.p_rawfetch(urlqbf, verbose))
                     .then((data) => console.assert(data === qbf, "Should fetch block stored above"))
-                    .then(() => transport.p_rawlist(testhash, verbose))
+                    .then(() => transport.p_rawlist(testurl, verbose))
                     .then((res) => {
                         listlen = res.length;
                         if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res))
                     })
-                    .then(() => transport.listmonitor(testhash, (obj) => console.log("Monitored", obj), verbose))
-                    .then((res) => transport.p_rawadd("123", "TODAY", "Joe Smith", testhash, verbose))
+                    .then(() => transport.listmonitor(testurl, (obj) => console.log("Monitored", obj), verbose))
+                    .then((res) => transport.p_rawadd("123", "TODAY", "Joe Smith", testurl, verbose))
                     .then(() => { if (verbose) console.log("p_rawadd returned ")  })
-                    .then(() => transport.p_rawlist(testhash, verbose))
+                    .then(() => transport.p_rawlist(testurl, verbose))
                     .then((res) => { if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res)) }) // Note not showing return
                     .then(() => delay(500))
-                    .then(() => transport.p_rawlist(testhash, verbose))
+                    .then(() => transport.p_rawlist(testurl, verbose))
                     .then((res) => console.assert(res.length === listlen + 1, "Should have added one item"))
                     //.then(() => console.log("TransportIPFS test complete"))
                     .then(() => resolve())

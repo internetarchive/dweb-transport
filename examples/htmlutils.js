@@ -30,7 +30,7 @@ function togglevis(el, displayvis) {
         el.map((e) => togglevis(e, displayvis))
     }
     el = (typeof(el) === "string") ? document.getElementById(el) : el;
-    el.style.display = (el.style.display === "none" ? displayvis : "none");
+    el.style.display = (el.style && el.style.display === "none" ? displayvis : "none");
 }
 
 function setstatus(msg) {

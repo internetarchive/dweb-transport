@@ -3,14 +3,14 @@ const Dweb = require("./Dweb");
 
 class CommonList extends SmartDict {
     /*
-    CommonList is a superclass for anything that manages a storable list of other hashes
+    CommonList is a superclass for anything that manages a storable list of other urls
     e.g. MutableBlock, KeyChain, AccessControlList
 
     Fields:
     keypair         Holds a KeyPair used to sign items
     _list           Holds an array of signatures of items put on the list
     _master         True if this is a master list, i.e. can add things
-    _publichash     Holds the hash of publicly available version of the list.
+    _publicurl     Holds the url of publicly available version of the list.
     _allowunsafestore True if should override protection against storing unencrypted private keys (usually only during testing)
     dontstoremaster True if should not store master key
     */
@@ -19,7 +19,7 @@ class CommonList extends SmartDict {
         /*
             Create a new instance of CommonList
 
-            :param hash: hash of list to fetch from Dweb
+            :param url: url of list to fetch from Dweb
             :param data: json string or dict to load fields from
             :param master: boolean, true if should create a master list with private key etc
             :param key: A KeyPair, or a dict of options for creating a key: valid = mnemonic, seed, keygen:true
@@ -29,14 +29,14 @@ class CommonList extends SmartDict {
             :param options: dict that overrides any fields of data
          */
         super(data, verbose, options);
+        //TODO-REL4 move next chunk to _setdata
         this._list = [];   // Array of members of the list
         if (key) {
             this._setkeypair(key, verbose);
         }
-        if (typeof master === "undefined") {
-            this._master = this.keypair.has_private();
-        } else {
-            this._master = master;  // Note this must be AFTER _setkeypair since that sets based on keypair found and _p_storepublic for example wants to force !master
+        this._master = (typeof master === "undefined")  ? this.keypair.has_private() : master;  // Note this must be AFTER _setkeypair since that sets based on keypair found and _p_storepublic for example wants to force !master
+        if (!this._master && !this._publicurl) {
+            this._publicurl = this._url;  // We aren't master, so publicurl is same as url - note URL will only have been set if constructor called from SmartDict.p_fetch
         }
         this.table = "cl";
     }
@@ -89,7 +89,7 @@ class CommonList extends SmartDict {
         Prepare a dictionary of data for storage,
         Subclasses SmartDict to:
             convert the keypair for export and check not unintentionally exporting a unencrypted public key
-            ensure that _publichash is stored (by default it would be removed)
+            ensure that _publicurl is stored (by default it would be removed)
         and subclassed by AccessControlList
 
         :param dd: dict of attributes of this, possibly changed by superclass
@@ -101,11 +101,11 @@ class CommonList extends SmartDict {
             }
             dd.keypair = dd._master ? dd.keypair.privateexport() : dd.keypair.publicexport();
         }
-        let publichash = dd._publichash; // Save before preflight
+        let publicurl = dd._publicurl; // Save before preflight
         let master = dd._master;
         dd = super.preflight(dd);  // Edits dd in place
-        if (master) { // Only store on Master, on !Master will be None and override storing hash as _publichash
-            dd._publichash = publichash;   // May be None, have to do this AFTER the super call as super filters out "_*"
+        if (master) { // Only store on Master, on !Master will be None and override storing url as _publicurl
+            dd._publicurl = publicurl;   // May be None, have to do this AFTER the super call as super filters out "_*"
         }
         return dd;
     }
@@ -116,11 +116,10 @@ class CommonList extends SmartDict {
         Use p_list_then_elements instead if wish to load the individual items in the list
         */
         let self = this;
-        if (!this._master && !this._publichash)  this._publichash = this._hash;  // We aren't master, so publichash is same as hash
-        if (!this._publichash) this._p_storepublic(verbose); // Async, but sets _publichash immediately
-        return Dweb.transport.p_rawlist(this._publichash, verbose)  //TODO modify to allow listmonitor
+        if (!this._publicurl) this._p_storepublic(verbose); // Async, but sets _publicurl immediately
+        return Dweb.transport.p_rawlist(this._publicurl, verbose)  //TODO modify to allow listmonitor
             .then((lines) => { // lines should be an array
-                if (verbose) console.log("CommonList:p_fetchlist.success", self._hash, "len=", lines.length);
+                if (verbose) console.log("CommonList:p_fetchlist.success", self._url, "len=", lines.length);
                 self._list = lines.map((l) => new Dweb.Signature(l, verbose));    // Turn each line into a Signature
             })
     }
@@ -141,21 +140,21 @@ class CommonList extends SmartDict {
         /*
          Store a public version of the object, just stores name field and public key
          Typically subclassed to save specific fields
-         Note that this returns immediately after setting hash, so caller may not need to wait for success
+         Note that this returns immediately after setting url, so caller may not need to wait for success
          */
-        //CL(hash, data, master, key, verbose, options)
+        //CL(url, data, master, key, verbose, options)
         let cl = new CommonList(null, false, this.keypair, verbose, {"name": this.name});
-        let prom = cl.p_store(verbose);    // Returns immediately but sets _hash first
-        this._publichash = cl._hash;
+        let prom = cl.p_store(verbose);    // Returns immediately but sets _url first
+        this._publicurl = cl._url;
     }
 
     p_store(verbose) {
         /*
-            Store on Dweb, if _master will ensure that stores a public version as well, and saves in _publichash
+            Store on Dweb, if _master will ensure that stores a public version as well, and saves in _publicurl
             Will store master unless dontstoremaster is set.
          */
-        if (this._master && ! this._publichash) {
-            this._p_storepublic(verbose); //Stores asynchronously, but _publichash set immediately
+        if (this._master && ! this._publicurl) {
+            this._p_storepublic(verbose); //Stores asynchronously, but _publicurl set immediately
         }
         if ( ! (this._master && this.dontstoremaster)) {
             return super.p_store(verbose);    // Transportable.store(verbose)
@@ -183,22 +182,22 @@ class CommonList extends SmartDict {
             .then(() => obj.p_store())
             .then(() => {
                 if (!(self._master && self.keypair)) throw new Dweb.errors.ForbiddenError("Signing a new entry when not a master list");
-                sig = this._makesig(obj._hash, verbose);
+                sig = this._makesig(obj._url, verbose);
                 self._list.push(sig);   // Keep copy locally on _list
             })
             .then(() => self.p_add(sig, verbose))    // Add to list in dweb
             .then(() => sig);
     }
 
-    _makesig(hash, verbose) {
+    _makesig(url, verbose) {
         /*
         Utility function to create a signature - used by p_push and in KeyChain.p_push
-        :param hash:    Hash of object to sign
+        :param url:    URL of object to sign
         :returns:       Signature
          */
-        if (!hash) throw new Dweb.errors.CodingError("Empty hash is a coding error");
+        if (!url) throw new Dweb.errors.CodingError("Empty url is a coding error");
         if (!this._master) throw new Dweb.errors.ForbiddenError("Must be master to sign something");
-        let sig = Dweb.Signature.sign(this, hash, verbose); //returns a new Signature
+        let sig = Dweb.Signature.sign(this, url, verbose); //returns a new Signature
         console.assert(sig.signature, "Must be a signature");
         return sig
     }
@@ -210,12 +209,12 @@ class CommonList extends SmartDict {
         :resolves:  undefined
          */
         if (!sig) throw new Dweb.errors.CodingError("CommonList.p_add is meaningless without a sig");
-        return Dweb.transport.p_rawadd(sig.hash, sig.date, sig.signature, sig.signedby, verbose);
+        return Dweb.transport.p_rawadd(sig.url, sig.date, sig.signature, sig.signedby, verbose);
     }
 
     listmonitor(callback, verbose) {
-        Dweb.transport.listmonitor(this._publichash, (obj) => {
-            if (verbose) console.log("CL.listmonitor",this._publichash,"Added",obj);
+        Dweb.transport.listmonitor(this._publicurl, (obj) => {
+            if (verbose) console.log("CL.listmonitor",this._publicurl,"Added",obj);
             let sig = new Dweb.Signature(obj, verbose);
             this._list.push(sig);
             callback(sig);

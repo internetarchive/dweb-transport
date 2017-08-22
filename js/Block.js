@@ -14,8 +14,8 @@ class Block extends Transportable {
     content() {
         return this._data;
     }
-    static p_fetch(hash, verbose) {
-        return super.p_fetch(hash, verbose) // Fetch the data Throws TransportError immediately if hash invalid, expect it to catch if Transport fails
+    static p_fetch(url, verbose) {
+        return super.p_fetch(url, verbose) // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
             .then((data) => new Block(data));
     }
     static test(verbose) {
@@ -25,7 +25,7 @@ class Block extends Transportable {
             let blk2;
             blk = new Block("The dirty old chicken");       // Create a block with some data
             blk.p_store(verbose)                            // Store it to transport
-            .then(() => Block.p_fetch(blk._hash, verbose))
+            .then(() => Block.p_fetch(blk._url, verbose))
             .then((blk2) => {
                 console.assert(blk2._data === blk._data, "Block should survive round trip");
                 resolve(blk2);

@@ -17,37 +17,37 @@
     <script type="text/javascript" src="htmlutils.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript">
 
-    function sendit() {     // Send form data to Dweb, and display the hash
+    function sendit() {     // Send form data to Dweb, and display the url
         verbose = true;
         if (verbose) console.log("sendit ---");
         dict = form2dict("myform");
-        let sd = new Dweb.SmartDict(null, dict, verbose )
+        let sd = new Dweb.SmartDict(dict, verbose )
         if (verbose) console.log("SD=",sd);
         // Now display link
         sd.p_store(verbose) // Store the edited dictionary
-        .then(() => document.getElementById("retrievalarea").value = sd._hash); // Use hash default on input
+        .then(() => document.getElementById("retrievalarea").value = sd._url); // Use url default on input
         return false;
     }
 
     function fetchit() {
         el = document.getElementById("retrievalarea");
-        hash = el.value;
-        fetchanddisplay(hash);
+        url = el.value;
+        fetchanddisplay(url);
     }
 
-    function fetchanddisplay(hash) {
+    function fetchanddisplay(url) {
         verbose = true;
-        if (verbose) console.log("Fetching hash=", hash);
+        if (verbose) console.log("Fetching url=", url);
         destn = document.getElementById("retrievaldestn");
         destn.innerHTML = ""; // Clear it first
-        Dweb.SmartDict.p_fetch(hash, verbose)
+        Dweb.SmartDict.p_fetch(url, verbose)
             .then((sd) => {
                 if (verbose) console.log("Fetched=",sd);
                 destn.innerHTML = "My name is: "+sd.name;
                 destn.style.color = sd.favcolor;
                 return sd;
             })
-            .then((sd) => objbrowser(sd, sd._hash, null, "ObjBrowser", verbose))
+            .then((sd) => objbrowser(sd, sd._url, null, "ObjBrowser", verbose))
     }
 
 
@@ -69,7 +69,7 @@
     <input type="text" class="propval" id="retrievalarea" placeholder="/ipfs/12ab34cd" size="70"/>
     <input type="submit" value="Fetch"/>
 </form>
-<div id="retrievaldestn">retrieved data will go here</div>
+<div class="displayedblock" id="retrievaldestn">retrieved data will go here</div>
 
 <hr>
 <div class="container">
@@ -80,9 +80,9 @@
 </div>
 
 <script type="text/javascript">
-    /* Pull hash out of URL search string.*/
-    var hash = new URL(window.location.href).searchParams.get("hash")
-    console.log("Loaded with hash=", hash);
+    /* Pull url out of URL search string.*/
+    var url = new URL(window.location.href).searchParams.get("url")
+    console.log("Loaded with url=", url);
 
     let verbose = false;
     let transportclass = TransportIPFS;
@@ -94,7 +94,7 @@
     if (verbose) console.log("setup returned and transport set - including annotationList");
     Dweb.transport = t;
     })
-    .then(() => { if(hash) fetchanddisplay(hash)})
+    .then(() => { if(url) fetchanddisplay(url)})
     .catch((err) => { console.log("ERROR:",err); alert(err.message); });
 </script>
 </body>

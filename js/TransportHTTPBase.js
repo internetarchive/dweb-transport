@@ -11,18 +11,18 @@ class TransportHTTPBase extends Transport {
         this.baseurl = "http://" + ipandport[0] + ":" + ipandport[1] + "/";
     }
     //TODO-ASYNC make this use promises and change calller in TransportHTTP
-    async_load(command, hash, verbose, success, error) {
-        // Locate and return a block, based on its multihash
+    async_load(command, url, verbose, success, error) {
+        // Locate and return a block, based on its url
         if (verbose) {
-            console.log("TransportHTTP async_load:",command, ":hash=", hash); }
-        let url = this.url(command, hash);
-        if (verbose) { console.log("TransportHTTP:async_load: url=",url); }
+            console.log("TransportHTTP async_load:",command, ":url=", url); }
+        let httpurl = this._url(command, url);
+        if (verbose) { console.log("TransportHTTP:async_load: url=",httpurl); }
         /*
         $.ajax({
             type: "GET",
-            url: url,
+            url: httpurl,
             success: function(data) {
-                if (verbose) { console.log("TransportHTTP:", command, hash, ": returning data len=", data.length); }
+                if (verbose) { console.log("TransportHTTP:", command, url, ": returning data len=", data.length); }
                 // Dont appear to need to parse JSON data, its decoded already
                 if (success) { success(data); }
             },
@@ -34,15 +34,15 @@ class TransportHTTPBase extends Transport {
         });
         */
         //See: https://github.com/request/request
-        myrequest(url, function(errorres, response, data) {
-                if (verbose) { console.log("TransportHTTP X:", command, hash, ": returning data len=", data && data.length ); }
+        myrequest(httpurl, function(errorres, response, data) {
+                if (verbose) { console.log("TransportHTTP X:", command, url, ": returning data len=", data && data.length ); }
             //TODO handle errors
             if (errorres) {
-                console.log("TransportHTTP.async_post unable to post url: ",url, "data:", data, "errno: ", errorres.errno,"at:",errorres.address+":"+errorres.port);
+                console.log("TransportHTTP.async_post unable to post url: ",httpurl, "data:", data, "errno: ", errorres.errno,"at:",errorres.address+":"+errorres.port);
                 if (error) {
                     error(undefined, undefined, undefined)
                 } else { //TODO Should be TransportError but that is not in scope here.
-                    throw new Error("TransportHTTP.async_post unable to post url: "+url+" data: "+data+"errno: "+errorres.errno+"at"+errorres.address+":"+errorres.port)
+                    throw new Error("TransportHTTP.async_post unable to post httpurl: "+url+" data: "+data+"errno: "+errorres.errno+"at"+errorres.address+":"+errorres.port)
                 }
             } else {
                 if (response["statusCode"] === 200) {
@@ -61,30 +61,30 @@ class TransportHTTPBase extends Transport {
     }
 
     //TODO-IPFS replace this and async_load with a more standard promised XHR
-    p_load(command, hash, verbose) {
+    p_load(command, url, verbose) {
         return new Promise((resolve, reject) => {
-            this.async_load(command, hash, verbose,
+            this.async_load(command, url, verbose,
                 (msg) => resolve(msg),
                 (xhr, status, error) => reject(undefined)
             )
         })
     }
 
-    async_post(command, hash, type, data, verbose, success, error) {
-        // Locate and return a block, based on its multihash
+    async_post(command, url, type, data, verbose, success, error) {
+        // Locate and return a block, based on its url
         //verbose=true;
-        if (verbose) console.log("TransportHTTP post:", command,":hash=", hash);
-        let url = this.url(command, hash);
+        if (verbose) console.log("TransportHTTP post:", command,":url=", url);
+        let httpurl = this._url(command, url);
         let self = this;
-        if (verbose) { console.log("TransportHTTP:post: url=",url); }
+        if (verbose) { console.log("TransportHTTP:post: url=",httpurl); }
         if (verbose) { console.log("TransportHTTP:post: data=",typeof data, data); }
         /*
         $.ajax({
             type: "POST",
-            url: url,
+            url: httpurl,
             data: { "data": data},
             success: function(msg) {
-                if (verbose) { console.log("TransportHTTP:", command, hash, ": returning data len=", msg.length); }
+                if (verbose) { console.log("TransportHTTP:", command, url, ": returning data len=", msg.length); }
                 // Dont appear to need to parse JSON data, its decoded already
                 if (success) { success(msg); }
             },
@@ -97,15 +97,15 @@ class TransportHTTPBase extends Transport {
         */
         //https://github.com/request/request
         //console.log("async_post{"url": url, "headers": {"Content-Type": type}, "body":data}, "bodytype=",typeof data);
-        myrequest.post({"url": url, "headers": {"Content-Type": type}, "body":data}, function(errorres, response, respdata) {
-            if (verbose) { console.log("TransportHTTP post:", command, hash, ": returning data len=", respdata && respdata.length ); }
+        myrequest.post({"url": httpurl, "headers": {"Content-Type": type}, "body":data}, function(errorres, response, respdata) {
+            if (verbose) { console.log("TransportHTTP post:", command, url, ": returning data len=", respdata && respdata.length ); }
             //TODO handle errors
             if (errorres) {
-                console.log("TransportHTTP.async_post unable to post url: ",url, "data:", data, "errno: ", errorres.errno,"at:",errorres.address+":"+errorres.port);
+                console.log("TransportHTTP.async_post unable to post url: ",httpurl, "data:", data, "errno: ", errorres.errno,"at:",errorres.address+":"+errorres.port);
                 if (error) {
                     error(undefined, undefined, undefined)
                 } else { //TODO Should be TransportError but that is not in scope here.
-                    throw new Error("TransportHTTP.async_post unable to post url: "+url+" data: "+data+"errno: "+errorres.errno+"at"+errorres.address+":"+errorres.port)
+                    throw new Error("TransportHTTP.async_post unable to post url: "+httpurl+" data: "+data+"errno: "+errorres.errno+"at"+errorres.address+":"+errorres.port)
                 }
             } else {
                 if (response["headers"]['content-type'] === "application/json") {
@@ -118,9 +118,9 @@ class TransportHTTPBase extends Transport {
     }
 
     //TODO-IPFS replace this and async_post with a more standard promised XHR
-    p_post(command, hash, type, data, verbose) {
+    p_post(command, url, type, data, verbose) {
         return new Promise((resolve, reject) => {
-            this.async_post(command, hash, type, data, verbose,
+            this.async_post(command, url, type, data, verbose,
                 (msg) => resolve(msg),
                 (xhr, status, error) => reject(undefined)
             )
@@ -128,12 +128,12 @@ class TransportHTTPBase extends Transport {
     }
     info() { console.assert(false, "XXX Undefined function Transport.info"); }
 
-    url(command, hash) {
-        let url = this.baseurl + command;
-        if (hash) {
-            url += "/" + hash;
+    _url(command, url) {
+        let httpurl = this.baseurl + command;
+        if (url) {
+            httpurl += "/" + url;
         }
-        return url;
+        return httpurl;
     }
 
 }

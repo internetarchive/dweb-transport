@@ -19,32 +19,32 @@
 
     var cl; // Will hold the list after fetching
 
-    function createit() {     // Send form data to Dweb, and display the hash
+    function createit() {     // Send form data to Dweb, and display the url
         console.log("createit ---");
         let verbose = false;
         // Get the data from the form
         dict = form2dict("newform");
-        <!--CommonList(hash, data, master, keypair, keygen, mnemonic, verbose, options)-->
-        let obj = new Dweb.CommonList(null, dict, true, {keygen: true}, verbose, {_allowunsafestore: true} );
+        <!--CommonList(data, master, keypair, keygen, mnemonic, verbose, options)-->
+        let obj = new Dweb.CommonList(dict, true, {keygen: true}, verbose, {_allowunsafestore: true} );
         // _allowunsafestore is set to true since AccessControlList not set yet, so storing unencrypted.
         console.log("Created=",obj);
         obj.p_store(verbose)
             // Now re fetch it from Dweb and display the object
-            .then(() => fetchanddisplay(obj._hash))
+            .then(() => fetchanddisplay(obj._url))
             .catch((err) => { console.log("ERROR:",err); alert(err.message); });
         return false; // Stop form submission and page reloading reloading
     }
 
-    function sendentry() {     // Send form data to Dweb, and display the hash
+    function sendentry() {     // Send form data to Dweb, and display the url
         console.log("sendit ---");
         let verbose = false; // Copious output on
         // Get the data from the form
         dict = form2dict("entryform");
         // Create a new object and add to the list
-        let obj = new Dweb.SmartDict(null, dict, verbose )
+        let obj = new Dweb.SmartDict(dict, verbose )
         cl.p_push(obj, verbose)
             .then(() => console.log("Added:",obj))  // Show on the Javascript console
-            .then(() => objbrowser(cl, cl._hash, null, "ObjBrowser", false))   // Redisplay in objbrowser
+            .then(() => objbrowser(cl, cl._url, null, "ObjBrowser", false))   // Redisplay in objbrowser
             .catch((err) => { console.log("ERROR:",err); alert(err.message); });
         return false; // Stop form submission and page reloading reloading
     }
@@ -55,7 +55,7 @@
         // Get the string from the form, its just one element this time
         dict = form2dict("fetchform")
         // Fetch it, and display
-        fetchanddisplay(dict.hash);
+        fetchanddisplay(dict.url);
     }
 
     function addtoelement(el, sd) {
@@ -68,19 +68,19 @@
         el.appendChild(sp);
     }
 
-    function fetchanddisplay(hash) {
-        verbose=false;
-        console.log("fetchanddisplay",hash);
+    function fetchanddisplay(url) {
+        verbose=true;
+        console.log("fetchanddisplay",url);
         destn = document.getElementById("retrievaldestn");
         let listdestn = document.getElementById("listresults");
         try {
-            Dweb.SmartDict.p_fetch(hash, verbose)   // Throws TransportError immediately if hash invalid
+            Dweb.SmartDict.p_fetch(url, verbose)   // Throws TransportError immediately if url invalid
                 .then((obj) => cl = obj) // Save it for adding to in sendentry
                 .then(() => {
                     console.log("Fetched=", cl);
                     // Only display the input prompt if its a master list.
                     document.getElementById("entryrow").style.display = (cl._master ? "" : "none")
-                    // Display the name and hashes of the list
+                    // Display the name and urls of the list
                     displayobj(destn, cl);
                     // Fetch the current elements from the list if any
                     while (listdestn.firstChild) {
@@ -95,17 +95,18 @@
                     (sig) => sig.p_fetchdata(verbose)
                             .then((obj) => addtoelement(listdestn, obj)),
                     true))
-                .then(() => objbrowser(cl, cl._hash, null, "ObjBrowser", verbose))
+                .then(() => objbrowser(cl, cl._url, null, "ObjBrowser", verbose))
                 .catch((err) => { console.log("ERROR:",err); alert(err.message); });
         } catch(err) {
             console.log("ERROR:", err);
-            alert(err.message); // bad hash generates TransportError
+            alert(err.message); // bad url generates TransportError
         }
     }
     function displayobj(el, obj) { /* Display an obj, under an element in appropriately named fields */
-        oo = Object.assign(obj, { _privatehash: (obj._master ? obj._hash : "")})
+        oo = Object.assign({}, obj, { _privateurl: (obj._master ? obj._url : "")})
+        console.log(JSON.stringify(oo))
         for (let prop in oo ) {
-            let val = obj[prop];
+            let val = oo[prop];
             let dests = el.querySelectorAll("[name="+ prop + "]");
             for (i in dests) {
                 dests[i].innerHTML = val;
@@ -113,10 +114,11 @@
         }
         // Now set up links to the urls for sharing
         let publicurl, privateurl;
-        publicurl = privateurl = new URL(window.location.href);
-        publicurl.search=oo._publichash ? "hash="+oo._publichash : "";
+        publicurl = new URL(window.location.href);
+        privateurl = new URL(window.location.href);
+        publicurl.search=(oo._publicurl ? "url="+oo._publicurl : "");
         document.getElementById("publiclink").href=publicurl.href
-        privateurl.search=oo._privatehash ? "hash="+oo._privatehash : "";
+        privateurl.search=oo._privateurl ? "url="+oo._privateurl : "";
         document.getElementById("privatelink").href=privateurl.href;
     }
 
@@ -128,7 +130,7 @@
 <!-- General design
     - list selection at top, enter by key, or hit New
     - - New opens out to request the name.
-    - Name; private and public hash of the list.
+    - Name; private and public url of the list.
     - Text area for content of list - new entries appended at bottom
     - Area to enter if the list is writable.
 -->
@@ -136,10 +138,10 @@
 <h1>Dweb - CommonList Example</h1>
 <!-- Form to create a new List -->
 <div><!-- Group with first toggling visibility of other two-->
-    <span class="button" onclick="togglevis(['el1','el2'],"inline");">New</span>
+    <span class="button" onclick="togglevis(['el1','el2'],'inline');">New</span>
     <span id="el1">
         <form style="display:inline" name="fetchform" onsubmit="fetchit(); return false;">
-            <input class="propval" type="text" name="hash" size="70" placeholder="/ipfs/12ab34cd"/>
+            <input class="propval" type="text" name="url" size="70" placeholder="/ipfs/12ab34cd"/>
             <input class="button" type="submit" value="Fetch"/>
         </form>
         </span>
@@ -157,11 +159,11 @@
 <!-- Object will be displayed here in fields with names that match-->
 <ul class="props" id="retrievaldestn">
     <li class="prop"><span class="propname">Name:</span><span class="propval" name="name"></span></li>
-    <li class="prop"><span class="propname">Private Hash:</span><span class="propval" name="_privatehash"></span><a id="privatelink"> <img alt="link" src="link.png"/></a></li>
-    <li class="prop"><span class="propname">Public Hash:</span><span class="propval" name="_publichash"></span><a id="publiclink"> <img alt="link" src="link.png"/></a></li>
+    <li class="prop"><span class="propname">Private url:</span><span class="propval" name="_privateurl"></span><a id="privatelink"> <img alt="link" src="link.png"/></a></li>
+    <li class="prop"><span class="propname">Public url:</span><span class="propval" name="_publicurl"></span><a id="publiclink"> <img alt="link" src="link.png"/></a></li>
 </ul>
 
-<table>
+<table class="displayedblock">
     <tr><td colspan="2" id="listresults" style="min-height:200px; border: 1px black solid; background-color:#f0f0f0;"></td></tr>
     <tr id="entryrow">
         <td style="width:3em;"><b>&gt;</b></td>
@@ -185,8 +187,8 @@
 
 <script type="text/javascript">
 
-    var hash = new URL(window.location.href).searchParams.get("hash")
-    console.log("Loaded with hash=", hash);
+    var url = new URL(window.location.href).searchParams.get("url")
+    console.log("Loaded with url=", url);
 
     let verbose = false;
     let transportclass = TransportIPFS;
@@ -198,7 +200,7 @@
             if (verbose) console.log("setup returned and transport set - including annotationList");
             Dweb.transport = t;
         })
-        .then(() => { if(hash) fetchanddisplay(hash)})
+        .then(() => { if(url) fetchanddisplay(url)})
         .catch((err) => { console.log("ERROR:",err); alert(err.message); });
 </script>
 </body>

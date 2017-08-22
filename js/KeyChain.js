@@ -43,10 +43,10 @@ class KeyChain extends CommonList {
          Add a obj (usually a MutableBlock or a ViewerKey) to the keychain. by signing with this key.
          Item should usually itself be encrypted (by setting its _acl field)
 
-         :param obj: Hash or a object to add (MutableBlock or ViewerKey)
+         :param obj: URL or a object to add (MutableBlock or ViewerKey)
          */
-        let hash = (typeof obj === "string") ? obj : obj._hash;
-        let sig = this._makesig(hash, verbose);
+        let url = (typeof obj === "string") ? obj : obj._url;
+        let sig = this._makesig(url, verbose);
         this._list.push(sig);                       // Add to local list
         return this.p_add(sig, verbose)             // Post to dweb, Resolves to undefined
     }
@@ -90,17 +90,17 @@ class KeyChain extends CommonList {
         }
     }
 
-    static find(publichash, verbose) {
+    static find(publicurl, verbose) {
         /*
-        Locate a needed ACL or KeyChain by its hash (both are on Dweb.keychains)
+        Locate a needed ACL or KeyChain by its url (both are on Dweb.keychains)
 
-        :param publichash:  Hash of ACL or KC needed
+        :param publicurl:  URL of ACL or KC needed
         :return: AccessControlList or KeyChain or null
         */
         for (let i in Dweb.keychains) {
             let kc = Dweb.keychains[i];
-            if (kc._publichash === publichash) {
-                if (verbose) console.log("KeyChain.find successful for",publichash);
+            if (kc._publicurl === publicurl) {
+                if (verbose) console.log("KeyChain.find successful for",publicurl);
                 return kc;
             }
         }
@@ -114,17 +114,17 @@ class KeyChain extends CommonList {
         */
         if (verbose) console.log("KeyChain._p_storepublic");
         let kc = new KeyChain({name: this.name}, false, this.keypair, verbose);
-        kc.p_store(verbose); // Async, but will set _hash immediately
-        this._publichash = kc._hash;  //returns immediately with precalculated hash
+        kc.p_store(verbose); // Async, but will set _url immediately
+        this._publicurl = kc._url;  //returns immediately with precalculated url
     }
 
     p_store(verbose) {
         /*
-        Unlike other p_store this ONLY stores the public version, and sets the _publichash,
+        Unlike other p_store this ONLY stores the public version, and sets the _publicurl,
         Private/master version should never be stored since the KeyChain is itself the encryption root.
         */
         this.dontstoremaster = true;    // Make sure p_store only stores public version
-        return super.p_store(verbose);  // Stores public version and sets _publichash
+        return super.p_store(verbose);  // Stores public version and sets _publicurl
     }
 
     static mykeys(clstarget) {
@@ -171,12 +171,12 @@ class KeyChain extends CommonList {
                         if (verbose) console.log("KEYCHAIN 2 - add viewerkeypair to it");
                         viewerkeypair = new Dweb.KeyPair({name: vkpname, key: keypairexport}, verbose);
                         viewerkeypair._acl = kc;
-                        viewerkeypair.p_store(verbose); // Defaults to store private=True (which we want)   // Sets hash, dont need to wait for it to store
+                        viewerkeypair.p_store(verbose); // Defaults to store private=True (which we want)   // Sets url, dont need to wait for it to store
                     })
                     .then(() =>  kc.p_push(viewerkeypair, verbose))
                     .then(() => {
-                        if (verbose) console.log("KEYCHAIN 3: Fetching mbm hash=", mbmaster._hash);
-                        return Dweb.SmartDict.p_fetch(mbmaster._hash, verbose); //Will be MutableBlock
+                        if (verbose) console.log("KEYCHAIN 3: Fetching mbm url=", mbmaster._url);
+                        return Dweb.SmartDict.p_fetch(mbmaster._url, verbose); //Will be MutableBlock
                     })
                     .then((mbm2) => console.assert(mbm2.name === mbmaster.name, "Names should survive round trip",mbm2.name,"!==",mbmaster.name))
                     .then(() => {
@@ -199,17 +199,17 @@ class KeyChain extends CommonList {
                         acl._allowunsafestore = true;
                     })
                     .then(() => verbose = true)
-                    .then(() => acl.p_add_acle(viewerkeypair._hash, verbose))   //Add us as viewer
+                    .then(() => acl.p_add_acle(viewerkeypair._url, verbose))   //Add us as viewer
                     .then(() => {
                         console.assert("acl._list.length === 1", "Should have added exactly 1 viewerkeypair",acl);
-                        sb = new Dweb.StructuredBlock({"name": "test_sb", "data": qbf, "_acl": acl}, verbose); //hash,data,verbose
+                        sb = new Dweb.StructuredBlock({"name": "test_sb", "data": qbf, "_acl": acl}, verbose); //url,data,verbose
                     })
                     .then(() => sb.p_store(verbose))
                     .then(() => {
                         let mvk = KeyChain.mykeys(Dweb.KeyPair)
                         console.assert(mvk[0].name === vkpname, "Should find viewerkeypair stored above");
                         if (verbose) console.log("KEYCHAIN 6: Check can fetch and decrypt - should use viewerkeypair stored above");
-                        return Dweb.SmartDict.p_fetch(sb._hash, verbose); // Will be StructuredBlock, fetched and decrypted
+                        return Dweb.SmartDict.p_fetch(sb._url, verbose); // Will be StructuredBlock, fetched and decrypted
                     })
                     .then((sb2) => {
                         console.assert(sb2.data === qbf, "Data should survive round trip");
@@ -219,8 +219,8 @@ class KeyChain extends CommonList {
                     .then(() => Dweb.MutableBlock.p_new(null, acl, "mblockm", true, qbf, true, verbose))
                     .then((newmblockm) => {
                         mblockm = newmblockm;
-                        //hash, data, master, key, contenthash, contentacl, verbose, options
-                        return Dweb.SmartDict.p_fetch(mblockm._publichash, verbose); // Will be MutableBlock
+                        //data, master, key, contenturl, contentacl, verbose, options
+                        return Dweb.SmartDict.p_fetch(mblockm._publicurl, verbose); // Will be MutableBlock
                     })
                     .then((newpublicmb) => mb = newpublicmb)
                     .then(() => mb.p_list_then_current(verbose))

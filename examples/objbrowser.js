@@ -1,7 +1,7 @@
 /* Script to enable debugging objects */
-function objbrowser(self, hash, path, ul, verbose) {
-    if (verbose) { console.log("objbrowser hash=",hash,"path=",path,"ul=",ul,"verbose=",verbose) }
-    let hashpath = path ? [hash, path].join("/") : hash;
+function objbrowser(self, url, path, ul, verbose) {
+    if (verbose) { console.log("objbrowser url=",url,"path=",path,"ul=",ul,"verbose=",verbose) }
+    let urlpath = path ? [url, path].join("/") : url;
     // ul is either the id of the element, or the element itself.
     if (typeof ul === 'string') {
         ul = document.getElementById(ul);
@@ -12,8 +12,8 @@ function objbrowser(self, hash, path, ul, verbose) {
     li.source = self;
     li.className = "propobj";
     ul.appendChild(li);
-    //li.innerHTML = "<B>SmartDict:</B>" + hashpath;
-    let t1 = document.createTextNode(self.constructor.name+": "+hashpath);
+    //li.innerHTML = "<B>SmartDict:</B>" + urlpath;
+    let t1 = document.createTextNode(self.constructor.name+": "+urlpath);
     let sp1 = document.createElement('span');
     sp1.className = "classname"; // Confusing!, sets the className of the span to "classname" as it holds a className
     sp1.appendChild(t1);
@@ -29,7 +29,7 @@ function objbrowser(self, hash, path, ul, verbose) {
         if (self[prop]) {
             //noinspection JSUnfilteredForInLoop
             let text = self[prop].toString();
-            if (text !== "" && prop !== "_hash") {    // Skip empty values; _hash (as shown above);
+            if (text !== "" && prop !== "_url") {    // Skip empty values; _url (as shown above);
                 let li2 = document.createElement("li");
                 li2.className='prop';
                 ul2.appendChild(li2);
@@ -60,21 +60,21 @@ function objbrowser(self, hash, path, ul, verbose) {
                         //noinspection JSUnfilteredForInLoop
                         for (let l1 in self[prop]) {
                             //noinspection JSUnfilteredForInLoop,JSUnfilteredForInLoop,JSUnfilteredForInLoop,JSUnfilteredForInLoop
-                            objbrowser(self[prop][l1], hash, (path ? path + "/":"")+self[prop][l1].name, ul3, verbose);
+                            objbrowser(self[prop][l1], url, (path ? path + "/":"")+self[prop][l1].name, ul3, verbose);
                         }
                     } else {
                         //noinspection JSUnfilteredForInLoop
-                        if (self[prop]._hash) {
+                        if (self[prop]._url) {
                             //noinspection JSUnfilteredForInLoop,JSUnfilteredForInLoop
-                            objbrowser(self[prop], self[prop]._hash, null, ul3, verbose)
+                            objbrowser(self[prop], self[prop]._url, null, ul3, verbose)
                         } else {
                             //noinspection JSUnfilteredForInLoop
-                            objbrowser(self[prop], hash, path, ul3, verbose);
+                            objbrowser(self[prop], url, path, ul3, verbose);
                         }
                     }
                 } else {    // Any other field
                     let spanval;
-                    if (["hash","_publichash","signedby"].includes(prop)) {
+                    if (["url","_publicurl","signedby"].includes(prop)) {
                         //noinspection ES6ConvertVarToLetConst
                         spanval = document.createElement('span');
                         //noinspection JSUnfilteredForInLoop
@@ -122,8 +122,8 @@ function p_objbrowserfetch(el) {
     parent.removeChild(el); //Remove elem from parent
     if (typeof source === "string") {
         return Dweb.SmartDict.p_fetch(source, verbose)
-            .then((obj) => objbrowser(obj, obj._hash, null, parent, false));
+            .then((obj) => objbrowser(obj, obj._url, null, parent, false));
     } else {
-        return objbrowser(source, source._hash, null, parent, false)); //TODO its possible this needs to be a promise
+        return objbrowser(source, source._url, null, parent, false); //TODO its possible this needs to be a promise
     }
 }

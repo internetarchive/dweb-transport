@@ -27,4 +27,5 @@
  */
 .said {display: block; border-bottom: 1px black solid;} /* Each item added to list in example_list */
 .status {float: right; margin 0 0 10px 10px;}           /* Status in top right corner */
-.button { border: 1px black solid; background-color:#dddddd;  padding-bottom:0.1em; padding-top:0.1em; display:inline;} /* Buttons */
+.button { border: 1px black solid; background-color:#dddddd;  padding-bottom:0.1em;  display:inline;} /* Buttons */
+.displayedblock {border: 1px #e0e0e0 solid; background-color:#f0f0f0; box-shadow: 1px 1px 2px #cccccc; padding-top:0.1em; padding-bottom: 0.1em; margin-top: 10px; margin-bottom: 5px;}

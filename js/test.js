@@ -51,9 +51,9 @@ let acl;
 /* path tests not done ... old ones
  console.log("Now test path using dwebfile and sb =======");
  verbose=false;
- Dweb.p_dwebfile("sb", sbhash, "langs/readme.md", ["p_elem", "myList.2", verbose, null]);
+ Dweb.p_dwebfile("sb", sburl, "langs/readme.md", ["p_elem", "myList.2", verbose, null]);
  console.log("Now test path using dwebfile and mb =======");
- Dweb.p_dwebfile("mb", mbhash, "langs/readme.md", ["p_elem", "myList.3", verbose, null]);
+ Dweb.p_dwebfile("mb", mburl, "langs/readme.md", ["p_elem", "myList.3", verbose, null]);
  console.log("END testing previouslyworking()");
 
  */

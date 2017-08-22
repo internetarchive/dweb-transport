@@ -4,43 +4,40 @@ const Dweb = require("./Dweb");
 class Signature extends SmartDict {
     /*
     The Signature class holds a signed entry that can be added to a CommonList.
-    Not the signature does NOT include the hash of the object being signed, typically its stored as a list of _signatures on that object.
-    The hash of the signed object is stored with the signature in CommonList.p_add()
+    The url of the signed object is stored with the signature in CommonList.p_add()
 
     Fields:
     date:       Date stamp (according to browser) when item signed
-    hash:       Hash of object signed
-    signature:  Signature of the date and hash
-    signedby:   Public Hash of list signing this (list should have a public key)
+    url:       URL of object signed
+    signature:  Signature of the date and url
+    signedby:   Public URL of list signing this (list should have a public key)
      */
     constructor(dic, verbose) {
         /*
         Create a new instance of Signature
 
-        :param hash: Hash to read from - usually this is null
         :param data: data to initialize - see Fields above
          */
         super(dic, verbose);
-        //console.log("Signature created",this.hash);
         //TODO-DATE turn s.date into java date
         //if isinstance(s.date, basestring):
         //    s.date = dateutil.parser.parse(s.date)
         this.table = "sig"; //TODO- consider passing as options to super, need to do across all classes
     }
 
-    static sign(commonlist, hash, verbose) {
+    static sign(commonlist, url, verbose) {
         /*
-        Sign and date a hash.
+        Sign and date a url.
 
         :param commonlist: Subclass of CommonList containing a private key to sign with.
-        :param hash: of item being signed
+        :param url: of item being signed
         :return: Signature (dated with current time on browser)
          */
         let date = new Date(Date.now());  //TODO-DATE
-        let signature = commonlist.keypair.sign(date, hash);
-        if (!commonlist._publichash) commonlist.p_store(verbose); // Sets _publichash sync, while storing async
-        console.assert(commonlist._publichash, "Signature.sign should be a publichash by here");
-        return new Signature({"date": date, "hash": hash, "signature": signature, "signedby": commonlist._publichash})
+        let signature = commonlist.keypair.sign(date, url);
+        if (!commonlist._publicurl) commonlist.p_store(verbose); // Sets _publicurl sync, while storing async
+        console.assert(commonlist._publicurl, "Signature.sign should be a publicurl by here");
+        return new Signature({"date": date, "url": url, "signature": signature, "signedby": commonlist._publicurl})
     }
 
     verify() { console.assert(false, "XXX Undefined function Signature.verify, available in CommonList and KeyPair"); }
@@ -54,13 +51,13 @@ class Signature extends SmartDict {
          */
         let res = {};
         // Remove duplicate signatures
-        return arr.filter((x) => (!res[x.hash] && (res[x.hash] = true)))
+        return arr.filter((x) => (!res[x.url] && (res[x.url] = true)))
     }
 
     p_fetchdata(verbose) {
         let self = this;
         if (!this.data) {
-            return Dweb.SmartDict.p_fetch(this.hash, verbose)
+            return Dweb.SmartDict.p_fetch(this.url, verbose)
                 .then((obj) => self.data = obj); // Reslves to new obj
         } else { // Return data if we've aleady fetched it
             return new Promise((resolve, reject) => resolve(self.data));

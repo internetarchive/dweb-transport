@@ -37,25 +37,25 @@ class AccessControlList extends CommonList {
         return super.preflight(dd);
     }
 
-    p_add_acle(viewerpublichash, verbose) {
+    p_add_acle(viewerpublicurl, verbose) {
         /*
         Add a new ACL entry - that gives a viewer the ability to see the accesskey
 
-        :param viewerpublichash: The hash of the viewers KeyPair object (contains a publickey)
+        :param viewerpublicurl: The url of the viewers KeyPair object (contains a publickey)
         :resolves to: this for chaining
         */
         let self = this;
-        if (verbose) console.log("AccessControlList.add viewerpublichash=",viewerpublichash);
+        if (verbose) console.log("AccessControlList.add viewerpublicurl=",viewerpublicurl);
         if (!this._master) {
             throw new Dweb.errors.ForbiddenError("Cant add viewers to a public copy of an ACL");
         }
-        return Dweb.SmartDict.p_fetch(viewerpublichash, verbose) // Fetch the public key will be KeyPair
+        return Dweb.SmartDict.p_fetch(viewerpublicurl, verbose) // Fetch the public key will be KeyPair
             // Create a new ACLE with access key, encrypted by publickey
             .then((viewerpublickeypair) => new SmartDict({
                     //Need to go B64->binary->encrypt->B64
                     "token": viewerpublickeypair.encrypt(Dweb.KeyPair.b64dec(self.accesskey), true, self),
-                    "viewer": viewerpublichash
-                }, verbose) //hash,data,verbose
+                    "viewer": viewerpublicurl
+                }, verbose) //data,verbose
             )
             .then((acle) => self.p_push(acle, verbose))
             .then(() => self);
@@ -75,10 +75,10 @@ class AccessControlList extends CommonList {
         */
 
         if (verbose) console.log("AccessControlList.tokens decrypt=",decrypt);
-        let viewerhash = viewerkeypair._hash;
+        let viewerurl = viewerkeypair._url;
         if (! this._list.length) { return []}
         let toks = this._list
-            .filter((sig) => sig.data.viewer === viewerhash)    // Find any sigs that match this viewerhash - should be decryptable
+            .filter((sig) => sig.data.viewer === viewerurl)    // Find any sigs that match this viewerurl - should be decryptable
             .map((sig) => sig.data.token);
         if (decrypt) {  // If requested, decrypt each of them
             toks = toks.map((tok) => viewerkeypair.decrypt(tok, this, "uint8array"));
@@ -130,10 +130,10 @@ class AccessControlList extends CommonList {
         Note - doesnt return a promise, the store is happening in the background
         */
         if (verbose) console.log("AccessControlList._p_storepublic");
-        //AC(hash, data, master, key, verbose, options) {
+        //AC(data, master, key, verbose, options) {
         let acl = new AccessControlList({"name": this.name}, false, this.keypair, verbose, {});
-        acl.p_store(verbose); // Async, but will set _hash immediately
-        this._publichash = acl._hash;  //returns immediately with precalculated hash
+        acl.p_store(verbose); // Async, but will set _url immediately
+        this._publicurl = acl._url;  //returns immediately with precalculated url
     }
 
     static p_test(verbose) {
@@ -146,7 +146,7 @@ class AccessControlList extends CommonList {
                 let accesskey = Dweb.KeyPair.randomkey();
                 let aclseed = "01234567890123456789012345678902";    // Note seed with 01 at end used in mnemonic faking
                 let keypair = new Dweb.KeyPair({key: {seed: aclseed}}, verbose);
-                //ACL(hash, data, master, keypair, keygen, mnemonic, verbose, options)
+                //ACL(data, master, keypair, keygen, mnemonic, verbose, options)
                 let acl = new Dweb.AccessControlList({
                     name: "test_acl.acl",
                     accesskey: Dweb.KeyPair.b64enc(accesskey)
@@ -155,7 +155,7 @@ class AccessControlList extends CommonList {
                 acl.p_store(verbose)
                 .then(() => {
                     acl._allowunsafestore = false;
-                    if (verbose) console.log("Creating AccessControlList hash=", acl._hash);
+                    if (verbose) console.log("Creating AccessControlList url=", acl._url);
                     resolve(acl);
                 })
                 .catch((err) => {
@@ -173,7 +173,7 @@ class AccessControlList extends CommonList {
         /*
          Takes a dict,
          checks if encrypted (by presence of "encrypted" field, and returns immediately if not
-         Otherwise if can find the ACL's hash in our keychains then decrypt with it.
+         Otherwise if can find the ACL's url in our keychains then decrypt with it.
          Else returns a promise that resolves to the data
          No assumption is made about what is in the decrypted data
 
@@ -186,15 +186,15 @@ class AccessControlList extends CommonList {
         if (! value.encrypted) {
             return value;
         } else {
-            let aclhash = value.acl;
-            let kc = Dweb.KeyChain.find(aclhash);  // Matching KeyChain or None
+            let aclurl = value.acl;
+            let kc = Dweb.KeyChain.find(aclurl);  // Matching KeyChain or None
             if (kc) {
-                return kc.decrypt(value.encrypted, verbose) // Exception: DecryptionFail - unlikely since publichash matches
+                return kc.decrypt(value.encrypted, verbose) // Exception: DecryptionFail - unlikely since publicurl matches
             } else {
-                //ACL(hash, data, master, key, verbose, options)
+                //ACL(url, data, master, key, verbose, options)
                 // TODO-AUTHENTICATION probably add person - to - person version
                 let acl;
-                return Dweb.SmartDict.p_fetch(aclhash, verbose) // Will be AccessControlList
+                return Dweb.SmartDict.p_fetch(aclurl, verbose) // Will be AccessControlList
                     .then((newacl) => acl = newacl)
                     .then(() => acl.p_list_then_elements(verbose)) // Will load blocks in sig as well
                     .then(() => acl.decrypt(value.encrypted, null, verbose))  // Resolves to data or throws AuthentictionError
