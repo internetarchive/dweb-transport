@@ -15,7 +15,7 @@ class Block extends Transportable {
         return this._data;
     }
     static p_fetch(hash, verbose) {
-        return Dweb.transport.p_rawfetch(hash, verbose) // Fetch the data Throws TransportError immediately if hash invalid, expect it to catch if Transport fails
+        return super.p_fetch(hash, verbose) // Fetch the data Throws TransportError immediately if hash invalid, expect it to catch if Transport fails
             .then((data) => new Block(data));
     }
     static test(verbose) {

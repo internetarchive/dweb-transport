@@ -18,7 +18,7 @@ class KeyChain extends CommonList {
         this.table = "kc";
     }
 
-    static p_new(key, name, verbose) {  //TODO-REL3-NEW refactor this - probably same args as constructor
+    static p_new(key, name, verbose) {
         let kc = new KeyChain({ name: name }, true, key, verbose);
         return kc.p_store(verbose) // Dont need to wait on store to load and fetchlist but will do so to avoid clashes
             .then(() => KeyChain.addkeychains(kc))

@@ -47,6 +47,9 @@ class Transportable {
         this._hash = null;
     }
 
+    static p_fetch(hash, verbose) {
+        return Dweb.transport.p_rawfetch(hash, verbose) // Fetch the data Throws TransportError immediately if hash invalid, expect it to catch if Transport fails
+    }
 
     file() { console.assert(false, "XXX Undefined function Transportable.file"); }
     url() { console.assert(false, "XXX Undefined function Transportable.url"); }

@@ -100,7 +100,7 @@ class SmartDict extends Transportable {
          */
         if (verbose) console.log("SmartDict.p_fetch", hash);
         let cls;
-        return Dweb.transport.p_rawfetch(hash, verbose) // Fetch the data Throws TransportError immediately if hash invalid, expect it to catch if Transport fails
+        return super.p_fetch(hash, verbose) // Fetch the data Throws TransportError immediately if hash invalid, expect it to catch if Transport fails
             .then((data) => {
                 data = Dweb.transport.loads(data);      // Parse JSON //TODO-REL3 maybe function in Transportable
                 let table = data["table"];              // Find the class it belongs to
