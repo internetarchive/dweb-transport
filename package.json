@@ -7,7 +7,7 @@
     "crypto": ">=0.0.3",
     "ipfs": ">=0.25.1",
     "ipfs-iiif-db": "^2.4.0",
-    "jsdom": "^11.1.0",
+    "jsdom": "^11.2.0",
     "libsodium-wrappers": "git+https://git@github.com/mitra42/libsodium.js.git",
     "promisify-es6": "^1.0.3",
     "request": ">=2.81.0"

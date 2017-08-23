@@ -29,6 +29,7 @@ const CID = require('cids');
 const multihashes = require('multihashes'); // TODO-IPFS only required because IPFS makes it hard to get this
 
 const crypto = require('crypto'); //TODO-IPFS only for testing - can remove
+//Buffer seems to be built in, require('Buffer') actually breaks things
 
 // Utility packages (ours) Aand one-loners
 const promisify = require('promisify-es6');

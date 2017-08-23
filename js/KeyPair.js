@@ -2,6 +2,8 @@ const sodium = require("libsodium-wrappers");
 //Uncomment to debug, check urlsafe occurs: console.log("XXX@keypair:2",sodium)
 const SmartDict = require("./SmartDict");
 const Dweb = require("./Dweb");
+const crypto = require('crypto'); // Needed to do a simple sha256 which doesnt appear to be in libsodium
+//Buffer seems to be built in, require('Buffer') actually breaks things
 
 class KeyPair extends SmartDict {
     /*
@@ -68,6 +70,13 @@ class KeyPair extends SmartDict {
                     } else {
                         console.assert(false, "MNEMONIC STILL TO BE IMPLEMENTED");    //TODO-mnemonic
                     }
+                }
+                if (value.passphrase) {
+                    let pp = value.passphrase;
+                    for (let i = 0; i<100; i++) {
+                        pp = KeyPair.sha256(pp); // Its write length for seed = i.e. 32 bytes
+                    }
+                    value.seed = pp;
                 }
                 if (value.keygen) {
                     value.seed = sodium.randombytes_buf(sodium.crypto_box_SEEDBYTES);
@@ -335,6 +344,12 @@ class KeyPair extends SmartDict {
         data = data.slice(sodium.crypto_box_NONCEBYTES);
         return sodium.crypto_secretbox_open_easy(data, nonce, sym_key, outputformat);
     };
+
+    static sha256(data) {
+        //TODO-REL4 document how many bytes returned - see passphrase above
+        let b2 = (data instanceof Buffer) ? data : new Buffer(data);
+        return crypto.createHash('sha256').update(b2).digest();
+    }
 
     static test(verbose) {
         // First test some of the lower level libsodium functionality - create key etc

@@ -38,25 +38,25 @@ class AccessControlList extends CommonList {
         return super.preflight(dd);
     }
 
-    p_add_acle(viewerpublichash, verbose) {
+    p_add_acle(viewerpublicurl, verbose) {
         /*
         Add a new ACL entry - that gives a viewer the ability to see the accesskey
 
-        :param viewerpublichash: The hash of the viewers KeyPair object (contains a publickey)
+        :param viewerpublicurl: The url of the viewers KeyPair object (contains a publickey)
         :resolves to: this for chaining
         */
         let self = this;
-        if (verbose) console.log("AccessControlList.add viewerpublichash=",viewerpublichash);
+        if (verbose) console.log("AccessControlList.add viewerpublicurl=",viewerpublicurl);
         if (!this._master) {
             throw new Dweb.errors.ForbiddenError("Cant add viewers to a public copy of an ACL");
         }
-        return Dweb.SmartDict.p_fetch(viewerpublichash, verbose) // Fetch the public key will be KeyPair
+        return Dweb.SmartDict.p_fetch(viewerpublicurl, verbose) // Fetch the public key will be KeyPair
             // Create a new ACLE with access key, encrypted by publickey
             .then((viewerpublickeypair) => new SmartDict({
                     //Need to go B64->binary->encrypt->B64
                     "token": viewerpublickeypair.encrypt(Dweb.KeyPair.b64dec(self.accesskey), true, self),
-                    "viewer": viewerpublichash
-                }, verbose) //hash,data,verbose
+                    "viewer": viewerpublicurl
+                }, verbose) //data,verbose
             )
             .then((acle) => self.p_push(acle, verbose))
             .then(() => self);
@@ -76,10 +76,10 @@ class AccessControlList extends CommonList {
         */
 
         if (verbose) console.log("AccessControlList.tokens decrypt=",decrypt);
-        let viewerhash = viewerkeypair._hash;
+        let viewerurl = viewerkeypair._url;
         if (! this._list.length) { return []}
         let toks = this._list
-            .filter((sig) => sig.data.viewer === viewerhash)    // Find any sigs that match this viewerhash - should be decryptable
+            .filter((sig) => sig.data.viewer === viewerurl)    // Find any sigs that match this viewerurl - should be decryptable
             .map((sig) => sig.data.token);
         if (decrypt) {  // If requested, decrypt each of them
             toks = toks.map((tok) => viewerkeypair.decrypt(tok, this, "uint8array"));
@@ -131,10 +131,10 @@ class AccessControlList extends CommonList {
         Note - doesnt return a promise, the store is happening in the background
         */
         if (verbose) console.log("AccessControlList._p_storepublic");
-        //AC(hash, data, master, key, verbose, options) {
+        //AC(data, master, key, verbose, options) {
         let acl = new AccessControlList({"name": this.name}, false, this.keypair, verbose, {});
-        acl.p_store(verbose); // Async, but will set _hash immediately
-        this._publichash = acl._hash;  //returns immediately with precalculated hash
+        acl.p_store(verbose); // Async, but will set _url immediately
+        this._publicurl = acl._url;  //returns immediately with precalculated url
     }
 
     static p_test(verbose) {
@@ -147,7 +147,7 @@ class AccessControlList extends CommonList {
                 let accesskey = Dweb.KeyPair.randomkey();
                 let aclseed = "01234567890123456789012345678902";    // Note seed with 01 at end used in mnemonic faking
                 let keypair = new Dweb.KeyPair({key: {seed: aclseed}}, verbose);
-                //ACL(hash, data, master, keypair, keygen, mnemonic, verbose, options)
+                //ACL(data, master, keypair, keygen, mnemonic, verbose, options)
                 let acl = new Dweb.AccessControlList({
                     name: "test_acl.acl",
                     accesskey: Dweb.KeyPair.b64enc(accesskey)
@@ -156,7 +156,7 @@ class AccessControlList extends CommonList {
                 acl.p_store(verbose)
                 .then(() => {
                     acl._allowunsafestore = false;
-                    if (verbose) console.log("Creating AccessControlList hash=", acl._hash);
+                    if (verbose) console.log("Creating AccessControlList url=", acl._url);
                     resolve(acl);
                 })
                 .catch((err) => {
@@ -174,7 +174,7 @@ class AccessControlList extends CommonList {
         /*
          Takes a dict,
          checks if encrypted (by presence of "encrypted" field, and returns immediately if not
-         Otherwise if can find the ACL's hash in our keychains then decrypt with it.
+         Otherwise if can find the ACL's url in our keychains then decrypt with it.
          Else returns a promise that resolves to the data
          No assumption is made about what is in the decrypted data
 
@@ -187,15 +187,15 @@ class AccessControlList extends CommonList {
         if (! value.encrypted) {
             return value;
         } else {
-            let aclhash = value.acl;
-            let kc = Dweb.KeyChain.find(aclhash);  // Matching KeyChain or None
+            let aclurl = value.acl;
+            let kc = Dweb.KeyChain.find(aclurl);  // Matching KeyChain or None
             if (kc) {
-                return kc.decrypt(value.encrypted, verbose) // Exception: DecryptionFail - unlikely since publichash matches
+                return kc.decrypt(value.encrypted, verbose) // Exception: DecryptionFail - unlikely since publicurl matches
             } else {
-                //ACL(hash, data, master, key, verbose, options)
+                //ACL(url, data, master, key, verbose, options)
                 // TODO-AUTHENTICATION probably add person - to - person version
                 let acl;
-                return Dweb.SmartDict.p_fetch(aclhash, verbose) // Will be AccessControlList
+                return Dweb.SmartDict.p_fetch(aclurl, verbose) // Will be AccessControlList
                     .then((newacl) => acl = newacl)
                     .then(() => acl.p_list_then_elements(verbose)) // Will load blocks in sig as well
                     .then(() => acl.decrypt(value.encrypted, null, verbose))  // Resolves to data or throws AuthentictionError
@@ -228,8 +228,8 @@ class Block extends Transportable {
     content() {
         return this._data;
     }
-    static p_fetch(hash, verbose) {
-        return Dweb.transport.p_rawfetch(hash, verbose) // Fetch the data Throws TransportError immediately if hash invalid, expect it to catch if Transport fails
+    static p_fetch(url, verbose) {
+        return super.p_fetch(url, verbose) // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
             .then((data) => new Block(data));
     }
     static test(verbose) {
@@ -239,7 +239,7 @@ class Block extends Transportable {
             let blk2;
             blk = new Block("The dirty old chicken");       // Create a block with some data
             blk.p_store(verbose)                            // Store it to transport
-            .then(() => Block.p_fetch(blk._hash, verbose))
+            .then(() => Block.p_fetch(blk._url, verbose))
             .then((blk2) => {
                 console.assert(blk2._data === blk._data, "Block should survive round trip");
                 resolve(blk2);
@@ -258,14 +258,14 @@ const Dweb = require("./Dweb");
 
 class CommonList extends SmartDict {
     /*
-    CommonList is a superclass for anything that manages a storable list of other hashes
+    CommonList is a superclass for anything that manages a storable list of other urls
     e.g. MutableBlock, KeyChain, AccessControlList
 
     Fields:
     keypair         Holds a KeyPair used to sign items
     _list           Holds an array of signatures of items put on the list
     _master         True if this is a master list, i.e. can add things
-    _publichash     Holds the hash of publicly available version of the list.
+    _publicurl     Holds the url of publicly available version of the list.
     _allowunsafestore True if should override protection against storing unencrypted private keys (usually only during testing)
     dontstoremaster True if should not store master key
     */
@@ -274,7 +274,7 @@ class CommonList extends SmartDict {
         /*
             Create a new instance of CommonList
 
-            :param hash: hash of list to fetch from Dweb
+            :param url: url of list to fetch from Dweb
             :param data: json string or dict to load fields from
             :param master: boolean, true if should create a master list with private key etc
             :param key: A KeyPair, or a dict of options for creating a key: valid = mnemonic, seed, keygen:true
@@ -284,14 +284,14 @@ class CommonList extends SmartDict {
             :param options: dict that overrides any fields of data
          */
         super(data, verbose, options);
+        //TODO-REL4 move next chunk to _setdata
         this._list = [];   // Array of members of the list
         if (key) {
             this._setkeypair(key, verbose);
         }
-        if (typeof master === "undefined") {
-            this._master = this.keypair.has_private();
-        } else {
-            this._master = master;  // Note this must be AFTER _setkeypair since that sets based on keypair found and _p_storepublic for example wants to force !master
+        this._master = (typeof master === "undefined")  ? this.keypair.has_private() : master;  // Note this must be AFTER _setkeypair since that sets based on keypair found and _p_storepublic for example wants to force !master
+        if (!this._master && !this._publicurl) {
+            this._publicurl = this._url;  // We aren't master, so publicurl is same as url - note URL will only have been set if constructor called from SmartDict.p_fetch
         }
         this.table = "cl";
     }
@@ -344,7 +344,7 @@ class CommonList extends SmartDict {
         Prepare a dictionary of data for storage,
         Subclasses SmartDict to:
             convert the keypair for export and check not unintentionally exporting a unencrypted public key
-            ensure that _publichash is stored (by default it would be removed)
+            ensure that _publicurl is stored (by default it would be removed)
         and subclassed by AccessControlList
 
         :param dd: dict of attributes of this, possibly changed by superclass
@@ -356,11 +356,11 @@ class CommonList extends SmartDict {
             }
             dd.keypair = dd._master ? dd.keypair.privateexport() : dd.keypair.publicexport();
         }
-        let publichash = dd._publichash; // Save before preflight
+        let publicurl = dd._publicurl; // Save before preflight
         let master = dd._master;
         dd = super.preflight(dd);  // Edits dd in place
-        if (master) { // Only store on Master, on !Master will be None and override storing hash as _publichash
-            dd._publichash = publichash;   // May be None, have to do this AFTER the super call as super filters out "_*"
+        if (master) { // Only store on Master, on !Master will be None and override storing url as _publicurl
+            dd._publicurl = publicurl;   // May be None, have to do this AFTER the super call as super filters out "_*"
         }
         return dd;
     }
@@ -371,11 +371,10 @@ class CommonList extends SmartDict {
         Use p_list_then_elements instead if wish to load the individual items in the list
         */
         let self = this;
-        if (!this._master && !this._publichash)  this._publichash = this._hash;  // We aren't master, so publichash is same as hash
-        if (!this._publichash) this._p_storepublic(verbose); // Async, but sets _publichash immediately
-        return Dweb.transport.p_rawlist(this._publichash, verbose)  //TODO modify to allow listmonitor
+        if (!this._publicurl) this._p_storepublic(verbose); // Async, but sets _publicurl immediately
+        return Dweb.transport.p_rawlist(this._publicurl, verbose)  //TODO modify to allow listmonitor
             .then((lines) => { // lines should be an array
-                if (verbose) console.log("CommonList:p_fetchlist.success", self._hash, "len=", lines.length);
+                if (verbose) console.log("CommonList:p_fetchlist.success", self._url, "len=", lines.length);
                 self._list = lines.map((l) => new Dweb.Signature(l, verbose));    // Turn each line into a Signature
             })
     }
@@ -396,21 +395,21 @@ class CommonList extends SmartDict {
         /*
          Store a public version of the object, just stores name field and public key
          Typically subclassed to save specific fields
-         Note that this returns immediately after setting hash, so caller may not need to wait for success
+         Note that this returns immediately after setting url, so caller may not need to wait for success
          */
-        //CL(hash, data, master, key, verbose, options)
+        //CL(url, data, master, key, verbose, options)
         let cl = new CommonList(null, false, this.keypair, verbose, {"name": this.name});
-        let prom = cl.p_store(verbose);    // Returns immediately but sets _hash first
-        this._publichash = cl._hash;
+        let prom = cl.p_store(verbose);    // Returns immediately but sets _url first
+        this._publicurl = cl._url;
     }
 
     p_store(verbose) {
         /*
-            Store on Dweb, if _master will ensure that stores a public version as well, and saves in _publichash
+            Store on Dweb, if _master will ensure that stores a public version as well, and saves in _publicurl
             Will store master unless dontstoremaster is set.
          */
-        if (this._master && ! this._publichash) {
-            this._p_storepublic(verbose); //Stores asynchronously, but _publichash set immediately
+        if (this._master && ! this._publicurl) {
+            this._p_storepublic(verbose); //Stores asynchronously, but _publicurl set immediately
         }
         if ( ! (this._master && this.dontstoremaster)) {
             return super.p_store(verbose);    // Transportable.store(verbose)
@@ -438,22 +437,22 @@ class CommonList extends SmartDict {
             .then(() => obj.p_store())
             .then(() => {
                 if (!(self._master && self.keypair)) throw new Dweb.errors.ForbiddenError("Signing a new entry when not a master list");
-                sig = this._makesig(obj._hash, verbose);
+                sig = this._makesig(obj._url, verbose);
                 self._list.push(sig);   // Keep copy locally on _list
             })
             .then(() => self.p_add(sig, verbose))    // Add to list in dweb
             .then(() => sig);
     }
 
-    _makesig(hash, verbose) {
+    _makesig(url, verbose) {
         /*
         Utility function to create a signature - used by p_push and in KeyChain.p_push
-        :param hash:    Hash of object to sign
+        :param url:    URL of object to sign
         :returns:       Signature
          */
-        if (!hash) throw new Dweb.errors.CodingError("Empty hash is a coding error");
+        if (!url) throw new Dweb.errors.CodingError("Empty url is a coding error");
         if (!this._master) throw new Dweb.errors.ForbiddenError("Must be master to sign something");
-        let sig = Dweb.Signature.sign(this, hash, verbose); //returns a new Signature
+        let sig = Dweb.Signature.sign(this, url, verbose); //returns a new Signature
         console.assert(sig.signature, "Must be a signature");
         return sig
     }
@@ -465,12 +464,12 @@ class CommonList extends SmartDict {
         :resolves:  undefined
          */
         if (!sig) throw new Dweb.errors.CodingError("CommonList.p_add is meaningless without a sig");
-        return Dweb.transport.p_rawadd(sig.hash, sig.date, sig.signature, sig.signedby, verbose);
+        return Dweb.transport.p_rawadd(sig.url, sig.date, sig.signature, sig.signedby, verbose);
     }
 
     listmonitor(callback, verbose) {
-        Dweb.transport.listmonitor(this._publichash, (obj) => {
-            if (verbose) console.log("CL.listmonitor",this._publichash,"Added",obj);
+        Dweb.transport.listmonitor(this._publicurl, (obj) => {
+            if (verbose) console.log("CL.listmonitor",this._publicurl,"Added",obj);
             let sig = new Dweb.Signature(obj, verbose);
             this._list.push(sig);
             callback(sig);
@@ -587,14 +586,14 @@ exports.utils.mergeTypedArraysUnsafe = function(a, b) { // Take care of inabilit
 // ==== NON OBJECT ORIENTED FUNCTIONS ==============
 
 /*TODO: NOT PORTED OR TESTED WITH PROMISES
-exports.p_dwebfile = function(table, hash, path, successmethod) {
-    // Simple utility function to load into a hash without dealing with individual objects
+exports.p_dwebfile = function(table, url, path, successmethod) {
+    // Simple utility function to load into a url without dealing with individual objects
     // successmethod - see "path()" for definition.
     let verbose = false;
     if (path && (path.length > 0)) {
         path = path.split('/');
     }
-    if (verbose) { console.log("Dweb.p_dwebfile",table,hash,path,successmethod);}
+    if (verbose) { console.log("Dweb.p_dwebfile",table,url,path,successmethod);}
     if (table === "mb") {
         //(data, master, keypair, keygen, mnemonic,verbose)
         const mb = new exports.MutableBlock(null, false, null, false, null, verbose, null);
@@ -603,7 +602,7 @@ exports.p_dwebfile = function(table, hash, path, successmethod) {
             .then(() => mb.p_path(path, verbose, successmethod))
         // Note success is applied once after list is fetched, content isn't loaded before that.
     } else if (table === "sb") {
-        const sb = new exports.StructuredBlock(hash, null, verbose);
+        const sb = new exports.StructuredBlock(url, null, verbose);
         sb.p_fetch(verbose)
             .then((msg) => sb.p_path(path, verbose, successmethod))
     } else {
@@ -614,7 +613,7 @@ exports.p_dwebfile = function(table, hash, path, successmethod) {
 
 
 /*TODO: NOT PORTED OR TESTED WITH PROMISES
-exports.p_dwebupdate = function(hash, type, data, successmethod) {
+exports.p_dwebupdate = function(url, type, data, successmethod) {
     let verbose = false;
     //(data, master, keypair, keygen, mnemonic,  verbose)
     let mbm = new exports.MutableBlock(null, true, null, false, null, verbose, null);
@@ -632,7 +631,7 @@ exports.p_dwebupdate = function(hash, type, data, successmethod) {
 
 
 /*TODO: NOT PORTED OR TESTED WITH PROMISES
-exports.p_dweblist = function(div, hash, verbose, success, successmethodeach) {
+exports.p_dweblist = function(div, url, verbose, success, successmethodeach) {
     //TODO-UNUSED doesnt appear to be used, though should have been in example.html
     //Retrieve a list, and create <li> elements of div to hold it.
     //success, if present, is run after list retrieved, asynchronous with elements retrieved
@@ -640,8 +639,8 @@ exports.p_dweblist = function(div, hash, verbose, success, successmethodeach) {
     //TODO-LISTS this should probably be a different lsit from MB where multiple is assumed.
     //TODO-LISTS success isnt used, presume something in chain runs success
     verbose = false;
-    //(data, master, keypair, keygen, mnemonic, contenthash, contentacl, verbose)
-    const mb = SD.p_fetch(hash,verbose)
+    //(data, master, keypair, keygen, mnemonic, contenturl, contentacl, verbose)
+    const mb = SD.p_fetch(url,verbose)
     return mb.p_list_then_elements(verbose)
         .then(()=> mb.p_elem(div, verbose, successmethodeach)) // p_elem loads the block
 };
@@ -670,8 +669,8 @@ class KeyChain extends CommonList {
         this.table = "kc";
     }
 
-    static p_new(key, name, verbose) {  //TODO-REL3-NEW refactor this - probably same args as constructor
-        let kc = new KeyChain({ name: name }, true, key, verbose);
+    static p_new(data, key, verbose) { //TODO-REL4-API
+        let kc = new KeyChain(data, true, key, verbose);
         return kc.p_store(verbose) // Dont need to wait on store to load and fetchlist but will do so to avoid clashes
             .then(() => KeyChain.addkeychains(kc))
             .then(() => kc.p_list_then_elements(verbose))
@@ -695,10 +694,10 @@ class KeyChain extends CommonList {
          Add a obj (usually a MutableBlock or a ViewerKey) to the keychain. by signing with this key.
          Item should usually itself be encrypted (by setting its _acl field)
 
-         :param obj: Hash or a object to add (MutableBlock or ViewerKey)
+         :param obj: URL or a object to add (MutableBlock or ViewerKey)
          */
-        let hash = (typeof obj === "string") ? obj : obj._hash;
-        let sig = this._makesig(hash, verbose);
+        let url = (typeof obj === "string") ? obj : obj._url;
+        let sig = this._makesig(url, verbose);
         this._list.push(sig);                       // Add to local list
         return this.p_add(sig, verbose)             // Post to dweb, Resolves to undefined
     }
@@ -742,17 +741,17 @@ class KeyChain extends CommonList {
         }
     }
 
-    static find(publichash, verbose) {
+    static find(publicurl, verbose) {
         /*
-        Locate a needed ACL or KeyChain by its hash (both are on Dweb.keychains)
+        Locate a needed ACL or KeyChain by its url (both are on Dweb.keychains)
 
-        :param publichash:  Hash of ACL or KC needed
+        :param publicurl:  URL of ACL or KC needed
         :return: AccessControlList or KeyChain or null
         */
         for (let i in Dweb.keychains) {
             let kc = Dweb.keychains[i];
-            if (kc._publichash === publichash) {
-                if (verbose) console.log("KeyChain.find successful for",publichash);
+            if (kc._publicurl === publicurl) {
+                if (verbose) console.log("KeyChain.find successful for",publicurl);
                 return kc;
             }
         }
@@ -766,17 +765,17 @@ class KeyChain extends CommonList {
         */
         if (verbose) console.log("KeyChain._p_storepublic");
         let kc = new KeyChain({name: this.name}, false, this.keypair, verbose);
-        kc.p_store(verbose); // Async, but will set _hash immediately
-        this._publichash = kc._hash;  //returns immediately with precalculated hash
+        kc.p_store(verbose); // Async, but will set _url immediately
+        this._publicurl = kc._url;  //returns immediately with precalculated url
     }
 
     p_store(verbose) {
         /*
-        Unlike other p_store this ONLY stores the public version, and sets the _publichash,
+        Unlike other p_store this ONLY stores the public version, and sets the _publicurl,
         Private/master version should never be stored since the KeyChain is itself the encryption root.
         */
         this.dontstoremaster = true;    // Make sure p_store only stores public version
-        return super.p_store(verbose);  // Stores public version and sets _publichash
+        return super.p_store(verbose);  // Stores public version and sets _publicurl
     }
 
     static mykeys(clstarget) {
@@ -812,7 +811,7 @@ class KeyChain extends CommonList {
                 if (verbose) {
                     console.log("Keychain.test 0 - create");
                 }
-                KeyChain.p_new({mnemonic: mnemonic}, "test_keychain kc", verbose)
+                KeyChain.p_new({name: "test_keychain kc"},{mnemonic: mnemonic}, verbose)
                     .then((kc1) => {
                         kc = kc1;
                         if (verbose) console.log("KEYCHAIN 1 - add MB to KC");
@@ -823,20 +822,20 @@ class KeyChain extends CommonList {
                         if (verbose) console.log("KEYCHAIN 2 - add viewerkeypair to it");
                         viewerkeypair = new Dweb.KeyPair({name: vkpname, key: keypairexport}, verbose);
                         viewerkeypair._acl = kc;
-                        viewerkeypair.p_store(verbose); // Defaults to store private=True (which we want)   // Sets hash, dont need to wait for it to store
+                        viewerkeypair.p_store(verbose); // Defaults to store private=True (which we want)   // Sets url, dont need to wait for it to store
                     })
                     .then(() =>  kc.p_push(viewerkeypair, verbose))
                     .then(() => {
-                        if (verbose) console.log("KEYCHAIN 3: Fetching mbm hash=", mbmaster._hash);
-                        return Dweb.SmartDict.p_fetch(mbmaster._hash, verbose); //Will be MutableBlock
+                        if (verbose) console.log("KEYCHAIN 3: Fetching mbm url=", mbmaster._url);
+                        return Dweb.SmartDict.p_fetch(mbmaster._url, verbose); //Will be MutableBlock
                     })
                     .then((mbm2) => console.assert(mbm2.name === mbmaster.name, "Names should survive round trip",mbm2.name,"!==",mbmaster.name))
                     .then(() => {
                         if (verbose) console.log("KEYCHAIN 4: reconstructing KeyChain and fetch");
                         Dweb.keychains = []; // Clear Key Chains
                     })
-                    //p_new(mnemonic, keygen, name, verbose)
-                    .then(() => kcs2 = KeyChain.p_new({ mnemonic: mnemonic}, "test_keychain kc", verbose))
+                    //p_new(data, key, verbose)
+                    .then(() => kcs2 = KeyChain.p_new({name: "test_keychain kc"},{mnemonic: mnemonic}. verbose))
                     // Note success is run AFTER all keys have been loaded
                     .then(() => {
                         mm = KeyChain.mykeys(Dweb.MutableBlock);
@@ -851,17 +850,17 @@ class KeyChain extends CommonList {
                         acl._allowunsafestore = true;
                     })
                     .then(() => verbose = true)
-                    .then(() => acl.p_add_acle(viewerkeypair._hash, verbose))   //Add us as viewer
+                    .then(() => acl.p_add_acle(viewerkeypair._url, verbose))   //Add us as viewer
                     .then(() => {
                         console.assert("acl._list.length === 1", "Should have added exactly 1 viewerkeypair",acl);
-                        sb = new Dweb.StructuredBlock({"name": "test_sb", "data": qbf, "_acl": acl}, verbose); //hash,data,verbose
+                        sb = new Dweb.StructuredBlock({"name": "test_sb", "data": qbf, "_acl": acl}, verbose); //url,data,verbose
                     })
                     .then(() => sb.p_store(verbose))
                     .then(() => {
                         let mvk = KeyChain.mykeys(Dweb.KeyPair)
                         console.assert(mvk[0].name === vkpname, "Should find viewerkeypair stored above");
                         if (verbose) console.log("KEYCHAIN 6: Check can fetch and decrypt - should use viewerkeypair stored above");
-                        return Dweb.SmartDict.p_fetch(sb._hash, verbose); // Will be StructuredBlock, fetched and decrypted
+                        return Dweb.SmartDict.p_fetch(sb._url, verbose); // Will be StructuredBlock, fetched and decrypted
                     })
                     .then((sb2) => {
                         console.assert(sb2.data === qbf, "Data should survive round trip");
@@ -871,8 +870,8 @@ class KeyChain extends CommonList {
                     .then(() => Dweb.MutableBlock.p_new(null, acl, "mblockm", true, qbf, true, verbose))
                     .then((newmblockm) => {
                         mblockm = newmblockm;
-                        //hash, data, master, key, contenthash, contentacl, verbose, options
-                        return Dweb.SmartDict.p_fetch(mblockm._publichash, verbose); // Will be MutableBlock
+                        //data, master, key, contenturl, contentacl, verbose, options
+                        return Dweb.SmartDict.p_fetch(mblockm._publicurl, verbose); // Will be MutableBlock
                     })
                     .then((newpublicmb) => mb = newpublicmb)
                     .then(() => mb.p_list_then_current(verbose))
@@ -902,10 +901,13 @@ class KeyChain extends CommonList {
 exports = module.exports = KeyChain;
 
 },{"./CommonList":3,"./Dweb":4}],6:[function(require,module,exports){
+(function (Buffer){
 const sodium = require("libsodium-wrappers");
 //Uncomment to debug, check urlsafe occurs: console.log("XXX@keypair:2",sodium)
 const SmartDict = require("./SmartDict");
 const Dweb = require("./Dweb");
+const crypto = require('crypto'); // Needed to do a simple sha256 which doesnt appear to be in libsodium
+//Buffer seems to be built in, require('Buffer') actually breaks things
 
 class KeyPair extends SmartDict {
     /*
@@ -929,7 +931,6 @@ class KeyPair extends SmartDict {
         /*
         Create a new KeyPair
 
-        :param hash: hash to read key from
         :param data: or data to initialize with (see Fields above)
          */
         super(data, verbose);    // SmartDict takes data=json or dict
@@ -973,6 +974,13 @@ class KeyPair extends SmartDict {
                     } else {
                         console.assert(false, "MNEMONIC STILL TO BE IMPLEMENTED");    //TODO-mnemonic
                     }
+                }
+                if (value.passphrase) {
+                    let pp = value.passphrase;
+                    for (let i = 0; i<100; i++) {
+                        pp = KeyPair.sha256(pp); // Its write length for seed = i.e. 32 bytes
+                    }
+                    value.seed = pp;
                 }
                 if (value.keygen) {
                     value.seed = sodium.randombytes_buf(sodium.crypto_box_SEEDBYTES);
@@ -1090,7 +1098,7 @@ class KeyPair extends SmartDict {
          */
         if ((key.encrypt && key.encrypt.privateKey) || (key.sign && key.sign.privateKey) || key.seed) { return true; }
         if ((key.encrypt && key.encrypt.publicKey) || (key.sign && key.sign.publicKey)) { return false; }
-        console.log("_key_hash_private doesnt recognize",key);
+        console.log("_key_url_private doesnt recognize",key);
     }
 
     has_private() {
@@ -1142,17 +1150,17 @@ class KeyPair extends SmartDict {
          data = data.slice(sodium.crypto_box_NONCEBYTES);
          return sodium.crypto_box_open_easy(data, nonce, signer.keypair._key.encrypt.publicKey, this._key.encrypt.privateKey, outputformat);
     }
-    sign(date, hash, verbose) {
+    sign(date, url, verbose) {
         /*
-        Sign and date a hash using public key function.
+        Sign and date a url using public key function.
         Pair of "verify()"
 
         :param date: Date that signing (usually now)
-        :param hash: Hash being signed, it could really be any data,
+        :param url: URL being signed, it could really be any data,
         :return: signature that can be verified with verify
         */
-        console.assert(date && hash);
-        let signable = date.toISOString() + hash;   // Signable string
+        console.assert(date && url);
+        let signable = date.toISOString() + url;   // Signable string
         if (! this._key.sign.privateKey) {
             throw new Dweb.errors.EncryptionError("Can't sign with out private key. Key =" + JSON.stringify(this._key));
         }
@@ -1167,7 +1175,7 @@ class KeyPair extends SmartDict {
         Verify a signature generated by sign()
         TODO - this is not yet incorporated - should be in CommonList and currently just generates an assertion fail if not verified.
 
-        :param signable: date and hash exactly as signed.
+        :param signable: date and url exactly as signed.
         :param urlb64sig: urlsafebase64 encoded signature
          */
         let sig = sodium.from_urlsafebase64(urlb64sig);
@@ -1241,6 +1249,12 @@ class KeyPair extends SmartDict {
         return sodium.crypto_secretbox_open_easy(data, nonce, sym_key, outputformat);
     };
 
+    static sha256(data) {
+        //TODO-REL4 document how many bytes returned - see passphrase above
+        let b2 = (data instanceof Buffer) ? data : new Buffer(data);
+        return crypto.createHash('sha256').update(b2).digest();
+    }
+
     static test(verbose) {
         // First test some of the lower level libsodium functionality - create key etc
         if (verbose) console.log("KeyPair.test starting");
@@ -1272,50 +1286,48 @@ KeyPair.KEYTYPESIGNANDENCRYPT = 3;  // Want both types of key - this is usually 
 exports = module.exports = KeyPair;
 
 
-},{"./Dweb":4,"./SmartDict":8,"libsodium-wrappers":467}],7:[function(require,module,exports){
+}).call(this,require("buffer").Buffer)
+},{"./Dweb":4,"./SmartDict":8,"buffer":126,"crypto":139,"libsodium-wrappers":467}],7:[function(require,module,exports){
 const SmartDict = require("./SmartDict");
 const Dweb = require("./Dweb");
 
 class Signature extends SmartDict {
     /*
     The Signature class holds a signed entry that can be added to a CommonList.
-    Not the signature does NOT include the hash of the object being signed, typically its stored as a list of _signatures on that object.
-    The hash of the signed object is stored with the signature in CommonList.p_add()
+    The url of the signed object is stored with the signature in CommonList.p_add()
 
     Fields:
     date:       Date stamp (according to browser) when item signed
-    hash:       Hash of object signed
-    signature:  Signature of the date and hash
-    signedby:   Public Hash of list signing this (list should have a public key)
+    url:       URL of object signed
+    signature:  Signature of the date and url
+    signedby:   Public URL of list signing this (list should have a public key)
      */
     constructor(dic, verbose) {
         /*
         Create a new instance of Signature
 
-        :param hash: Hash to read from - usually this is null
         :param data: data to initialize - see Fields above
          */
         super(dic, verbose);
-        //console.log("Signature created",this.hash);
         //TODO-DATE turn s.date into java date
         //if isinstance(s.date, basestring):
         //    s.date = dateutil.parser.parse(s.date)
         this.table = "sig"; //TODO- consider passing as options to super, need to do across all classes
     }
 
-    static sign(commonlist, hash, verbose) {
+    static sign(commonlist, url, verbose) {
         /*
-        Sign and date a hash.
+        Sign and date a url.
 
         :param commonlist: Subclass of CommonList containing a private key to sign with.
-        :param hash: of item being signed
+        :param url: of item being signed
         :return: Signature (dated with current time on browser)
          */
         let date = new Date(Date.now());  //TODO-DATE
-        let signature = commonlist.keypair.sign(date, hash);
-        if (!commonlist._publichash) commonlist.p_store(verbose); // Sets _publichash sync, while storing async
-        console.assert(commonlist._publichash, "Signature.sign should be a publichash by here");
-        return new Signature({"date": date, "hash": hash, "signature": signature, "signedby": commonlist._publichash})
+        let signature = commonlist.keypair.sign(date, url);
+        if (!commonlist._publicurl) commonlist.p_store(verbose); // Sets _publicurl sync, while storing async
+        console.assert(commonlist._publicurl, "Signature.sign should be a publicurl by here");
+        return new Signature({"date": date, "url": url, "signature": signature, "signedby": commonlist._publicurl})
     }
 
     verify() { console.assert(false, "XXX Undefined function Signature.verify, available in CommonList and KeyPair"); }
@@ -1329,13 +1341,13 @@ class Signature extends SmartDict {
          */
         let res = {};
         // Remove duplicate signatures
-        return arr.filter((x) => (!res[x.hash] && (res[x.hash] = true)))
+        return arr.filter((x) => (!res[x.url] && (res[x.url] = true)))
     }
 
     p_fetchdata(verbose) {
         let self = this;
         if (!this.data) {
-            return Dweb.SmartDict.p_fetch(this.hash, verbose)
+            return Dweb.SmartDict.p_fetch(this.url, verbose)
                 .then((obj) => self.data = obj); // Reslves to new obj
         } else { // Return data if we've aleady fetched it
             return new Promise((resolve, reject) => resolve(self.data));
@@ -1352,7 +1364,7 @@ const Dweb = require("./Dweb");
 //TODO-IPFS change to go direct to Dag rather than Block - maybe by making Transport.p_store decide ?
 
 //TODO-SEPERATE - move these to Dweb
-const table2class = { // Each of these needs a constructor that takes hash, data and is ok with no other parameters, (otherwise define a set of these methods as factories)
+const table2class = { // Each of these needs a constructor that takes data and is ok with no other parameters, (otherwise define a set of these methods as factories)
     "cl": "CommonList",
     "sb": "StructuredBlock",
     "kc": "KeyChain",
@@ -1369,7 +1381,7 @@ const table2class = { // Each of these needs a constructor that takes hash, data
 class SmartDict extends Transportable {
     constructor(data, verbose, options) {
         // data = json string or dict
-        super(data); // _hash is _hash of SmartDict, not of data - will call _setdata (which usually set fields), -note does not fetch the has, but sets _needsfetch
+        super(data); // _url is _url of SmartDict, not of data - will call _setdata (which usually set fields), -note does not fetch the has, but sets _needsfetch
         this._setproperties(options);   // Note this will override any properties set with data
         if (!this.table) { this.table = "sd"; } // Set it if the data doesnt set it, should be overridden by subclasses
     }
@@ -1399,8 +1411,8 @@ class SmartDict extends Transportable {
         for (let i in dd) {
             if (i.indexOf('_') !== 0) { // Ignore any attributes starting _
                 if (dd[i] instanceof Transportable) {
-                    dd[i].p_store(false);  // Stores async, but sets hash first if you need it stored first then do so before calling p_store
-                    res[i] = dd[i]._hash
+                    dd[i].p_store(false);  // Stores async, but sets url first if you need it stored first then do so before calling p_store
+                    res[i] = dd[i]._url
                 } else {
                     res[i] = dd[i];
                 }
@@ -1419,7 +1431,7 @@ class SmartDict extends Transportable {
         let res = Dweb.transport.dumps(this.preflight(dd));
         if (this._acl) { //Need to encrypt
             let encdata = this._acl.encrypt(res, true);  // data, b64
-            let dic = { "encrypted": encdata, "acl": this._acl._publichash, "table": this.table};
+            let dic = { "encrypted": encdata, "acl": this._acl._publicurl, "table": this.table};
             res = Dweb.transport.dumps(dic);
         }
         return res
@@ -1435,23 +1447,23 @@ class SmartDict extends Transportable {
         this._setproperties(value); // Note value should not contain a "_data" field, so wont recurse even if catch "_data" at __setattr__()
     }
 
-    static p_fetch(hash, verbose) {
+    static p_fetch(url, verbose) {
         /*
             Fetch a block which initially we don't know which type
             See also p_fetchlist, p_list_then_current, p_list_then_elements
 
             :resolves: New object - e.g. StructuredBlock or MutableBlock
             :catch: TransportError - can probably, or should throw TransportError if transport fails
-            :throws: TransportError if hash invalid
+            :throws: TransportError if url invalid
             :errors: Authentication Error
 
          */
-        if (verbose) console.log("SmartDict.p_fetch", hash);
+        if (verbose) console.log("SmartDict.p_fetch", url);
         let cls;
-        return Dweb.transport.p_rawfetch(hash, verbose) // Fetch the data Throws TransportError immediately if hash invalid, expect it to catch if Transport fails
+        return super.p_fetch(url, verbose) // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
             .then((data) => {
                 data = Dweb.transport.loads(data);      // Parse JSON //TODO-REL3 maybe function in Transportable
-                let table = data["table"];              // Find the class it belongs to
+                let table = data.table;              // Find the class it belongs to
                 cls = Dweb[table2class[table]];         // Gets class name, then looks up in Dweb - avoids dependency
                 console.assert(cls, "SmartDict.p_fetch:",table,"isnt implemented in table2class"); //TODO Should probably raise a specific subclass of Error
                 //console.log(cls);
@@ -1459,7 +1471,11 @@ class SmartDict extends Transportable {
                 return data;
             })
             .then((data) => cls.p_decrypt(data, verbose))    // decrypt - may return string or obj , note it can be suclassed for different encryption
-            .then((data) => { let obj = new cls(data); obj._hash = hash; return obj})                // Returns new block that should be a subclass of SmartDict
+            .then((data) => {
+                    data._url = url;                         // Save where we got it - preempts a store - must do this afer decrypt
+                    let obj = new cls(data);
+                    return obj;
+            })                // Returns new block that should be a subclass of SmartDict
             .catch((err) => {console.log("cant fetch and decrypt unknown"); throw(err)});
     }
 
@@ -1495,14 +1511,14 @@ class Transport {
          */
         console.assert(false, "Intentionally undefined function Transport.p_setup should have been subclassed");
     }
-    link(data) {
+    url(data) {
         /*
          Return an identifier for the data without storing
 
          :param string|Buffer data   arbitrary data
          :return string              valid id to retrieve data via p_rawfetch
          */
-        console.assert(false, "Intentionally undefined function Transport.link should have been subclassed");
+        console.assert(false, "Intentionally undefined function Transport.url should have been subclassed");
     }
     dumps(obj) {
         /*
@@ -1525,55 +1541,55 @@ class Transport {
     p_rawstore(data, verbose) {
         /*
         Store a blob of data onto the decentralised transport.
-        Returns a promise that resolves to the hash of the data, but also see xxx
+        Returns a promise that resolves to the url of the data, but also see xxx
 
         :param string|Buffer data: Data to store - no assumptions made to size or content
         :param boolean verbose: True for debugging output
-        :resolve string: hash of data stored
+        :resolve string: url of data stored
          */
         console.assert(false, "Intentionally undefined function Transport.p_rawstore should have been subclassed");
     }
     p_store() { console.assert(false, "Undefined function Transport.p_store - may define higher level semantics here (see Python)"); }
     //noinspection JSUnusedLocalSymbols
 
-    p_rawfetch(hash, verbose) {
+    p_rawfetch(url, verbose) {
         /*
-        Fetch some bytes based on a hash, no assumption is made about the data in terms of size or structure.
+        Fetch some bytes based on a url, no assumption is made about the data in terms of size or structure.
         Where required by the underlying transport it should retrieve a number if its "blocks" and concatenate them.
         Returns a new Promise that resolves currently to a string.
         There may also be need for a streaming version of this call, at this point undefined.
 
-        :param string hash: Hash of object being retrieved
+        :param string url: URL of object being retrieved
         :param boolean verbose: True for debugging output
         :resolve string: Return the object being fetched, (note currently returned as a string, may refactor to return Buffer)
          */
         console.assert(false, "Intentionally undefined  function Transport.p_rawfetch should have been subclassed");
     }
     p_fetch() { console.assert(false, "Intentionally Undefined function Transport.p_fetch - may define higher level semantics here (see Python)"); }
-    p_rawadd(hash, date, signature, signedby, verbose) {
+    p_rawadd(url, date, signature, signedby, verbose) {
         /*
         Store a new list item, it should be stored so that it can be retrieved either by "signedby" (using p_rawlist) or
-        by "hash" (with p_rawreverse). The underlying transport does not need to guarrantee the signature,
+        by "url" (with p_rawreverse). The underlying transport does not need to guarrantee the signature,
         an invalid item on a list should be rejected on higher layers.
 
-        :param string hash: String identifying an object being added to the list.
+        :param string url: String identifying an object being added to the list.
         :param string date: Date (as returned by new Data.now() )
-        :param string signature: Signature of hash+date
-        :param string signedby: hash of the public key used for the signature.
+        :param string signature: Signature of url+date
+        :param string signedby: url of the public key used for the signature.
         :param boolean verbose: True for debugging output
         :resolve undefined:
          */
         console.assert(false, "XXX Undefined function Transport.p_rawadd");
     }
-    p_rawlist(hash, verbose) {
+    p_rawlist(url, verbose) {
         /*
-        Fetch all the objects in a list, these are identified by the hash of the public key used for signing.
-        (Note this is the 'signedby' parameter of the p_rawadd call, not the 'hash' parameter
+        Fetch all the objects in a list, these are identified by the url of the public key used for signing.
+        (Note this is the 'signedby' parameter of the p_rawadd call, not the 'url' parameter
         Returns a promise that resolves to the list.
-        Each item of the list is a dict: {"hash": hash, "date": date, "signature": signature, "signedby": signedby}
+        Each item of the list is a dict: {"url": url, "date": date, "signature": signature, "signedby": signedby}
         List items may have other data (e.g. reference ids of underlying transport)
 
-        :param string hash: String with the hash that identifies the list.
+        :param string url: String with the url that identifies the list.
         :param boolean verbose: True for debugging output
         :resolve array: An array of objects as stored on the list.
          */
@@ -1581,21 +1597,21 @@ class Transport {
     }
     p_list() { console.assert(false, "XXX Undefined function Transport.p_list"); }
     //noinspection JSUnusedGlobalSymbols
-    p_rawreverse(hash, verbose) {
+    p_rawreverse(url, verbose) {
         /*
-        Similar to p_rawlist, but return the list item of all the places where the object hash has been listed.
-        The hash here corresponds to the "hash" parameter of p_rawadd
+        Similar to p_rawlist, but return the list item of all the places where the object url has been listed.
+        The url here corresponds to the "url" parameter of p_rawadd
         Returns a promise that resolves to the list.
 
-        :param string hash: String with the hash that identifies the object put on a list.
+        :param string url: String with the url that identifies the object put on a list.
         :param boolean verbose: True for debugging output
         :resolve array: An array of objects as stored on the list.
          */
         console.assert(false, "XXX Undefined function Transport.p_rawreverse");
     }
 
-    static _add_value(hash, date, signature, signedby, verbose) {
-        let store = {"hash": hash, "date": date, "signature": signature, "signedby": signedby};
+    static _add_value(url, date, signature, signedby, verbose) {
+        let store = {"url": url, "date": date, "signature": signature, "signedby": signedby};
         return Dweb.transport.dumps(store);
     }
 }
@@ -1614,7 +1630,7 @@ Lists have listeners,
 'mutation': triggered when changed
 
 TODO-IPFS-MULTILIST
-For now we use one list, and filter by hash, at some point we'll need lots of lists and its unclear where to split
+For now we use one list, and filter by url, at some point we'll need lots of lists and its unclear where to split
 - at listener; partition or list within that (resources / hits) or have to filter on content
 
 TODO-IPFS ComeBackFor: TransportHTTP & TransportHTTPBase (make use promises)
@@ -1633,6 +1649,7 @@ const CID = require('cids');
 const multihashes = require('multihashes'); // TODO-IPFS only required because IPFS makes it hard to get this
 
 const crypto = require('crypto'); //TODO-IPFS only for testing - can remove
+//Buffer seems to be built in, require('Buffer') actually breaks things
 
 // Utility packages (ours) Aand one-loners
 const promisify = require('promisify-es6');
@@ -1664,7 +1681,7 @@ let defaultiiifoptions = { ipfs: defaultipfsoptions, store: "leveldb", partition
 
 const annotationlistexample = { //TODO-IPFS update this to better example
     "@id": "foobar",    // Only required field is @id
-    "hash": "/ipfs/A1B2C3D4E5",
+    "url": "ipfs:/ipfs/A1B2C3D4E5",
     "date": "20170104T1234",
     "signature": "123456ABC",
     "signedby": "123456ABC"
@@ -1736,43 +1753,43 @@ class TransportIPFS extends Transport {
         })
     }
 
-    link(data) {
+    url(data) {
         /*
-         Return an identifier for the data without storing
+         Return an identifier for the data without storing typically ipfs:/ipfs/a1b2c3d4...
 
          :param string|Buffer data   arbitrary data
-         :return string              valid id to retrieve data via p_rawfetch
+         :return string              valid url to retrieve data via p_rawfetch
          */
         let b2 = (data instanceof Buffer) ? data : new Buffer(data);
         let b3 = crypto.createHash('sha256').update(b2).digest();   // Note this is the only dependence on crypto and exists only because IPFS makes it ridiculously hard to get the hash synchronously without storing
         let hash = multihashes.toB58String(multihashes.encode(b3, 'sha2-256'));  //TODO-IPFS-Q unclear how to make generic
-        return "/ipfs/" + hash
+        return "ipfs:/ipfs/" + hash
     }
 
     // Everything else - unless documented here - should be opaque to the actual structure of a CID
-    // or a Link. This code may change as its not clear (from IPFS docs) if this is the right mapping.
-    static cid2link(cid) {
+    // or a url. This code may change as its not clear (from IPFS docs) if this is the right mapping.
+    static cid2url(cid) {
         //console.log(cid.multihash[0],cid.multihash[1],cid.multihash[2]);
-        return "/ipfs/"+cid.toBaseEncodedString()
-    }  //TODO-IPFS this might not be right, (TODO-IPFS-Q-CID)
+        return "ipfs:/ipfs/"+cid.toBaseEncodedString()
+    }
 
-    static link2cid(link) {
-        let arr = link.split('/');
-        if (!(arr.length===3 && arr[1]==="ipfs"))
-                throw new Dweb.errors.TransportError("TransportIPFS.link2cid bad format for hash should be /ipfs/...: "+link);
+    static url2cid(url) {
+        let arr = url.split('/');
+        if (!(arr.length===3 && arr[0] == "ipfs:" && arr[1]==="ipfs"))
+                throw new Dweb.errors.TransportError("TransportIPFS.url2cid bad format for url should be ipfs:/ipfs/...: "+url);
         return new CID(arr[2])
     }
 
-    p_rawfetch(hash, verbose) {
+    p_rawfetch(url, verbose) {
         /*
-        Fetch hash from IPFS (implements Transport.p_rawfetch)
+        Fetch url from IPFS (implements Transport.p_rawfetch)
 
-        :param hash:    Valid ipfs hash "/ipfs/*"
+        :param url:    Valid ipfs url "ipfs:/ipfs/*"
         :resolves:      Opaque bytes retrieved from IPFS
-        :throws:        TransportError if hash invalid - note this happens immediately, not as a catch in the promise
+        :throws:        TransportError if url invalid - note this happens immediately, not as a catch in the promise
          */
-        console.assert(hash, "TransportIPFS.p_rawfetch: requires hash");
-        let cid = (hash instanceof CID) ? hash : TransportIPFS.link2cid(hash);  // Throws TransportError if hash bad
+        console.assert(url, "TransportIPFS.p_rawfetch: requires url");
+        let cid = (url instanceof CID) ? url : TransportIPFS.url2cid(url);  // Throws TransportError if url bad
         return this.promisified.ipfs.block.get(cid)
             .then((result)=> result.data.toString())
             .catch((err) => {
@@ -1781,17 +1798,17 @@ class TransportIPFS extends Transport {
             })
     }
 
-    p_rawlist(hash, verbose) { //TODO-IPFS-MULTILIST move initialization of annotation list here
+    p_rawlist(url, verbose) { //TODO-IPFS-MULTILIST move initialization of annotation list here
         // obj being loaded
-        // Locate and return a list, based on its multihash
+        // Locate and return a list, based on its url
         // This is coded as a p_rawlist (i.e. returning a Promise, even though it returns immediately, that is so that
         // it can be recoded for an architecture where we need to wait for the list.
         // notify is NOT part of the Python interface, needs implementing there.
-        console.assert(hash, "TransportHTTP.p_rawlist: requires hash");
+        console.assert(url, "TransportHTTP.p_rawlist: requires url");
         return new Promise((resolve, reject) => {  //XXXREJECT
             try {
                 let res = this.annotationList.getResources()
-                    .filter((obj) => (obj.signedby === hash));
+                    .filter((obj) => (obj.signedby === url));
                 if (verbose) console.log("p_rawlist found", ...Dweb.utils.consolearr(res));
                 resolve(res);
             } catch(err) {
@@ -1800,7 +1817,7 @@ class TransportIPFS extends Transport {
             }
         })
     }
-    listmonitor(hash, callback, verbose) {
+    listmonitor(url, callback, verbose) {
         // Typically called immediately after a p_rawlist to get notification of future items
         //TODO-IPFS-MULTILIST will want to make more efficient.
         this.annotationList.on('resource inserted', (event) => {
@@ -1809,7 +1826,7 @@ class TransportIPFS extends Transport {
             //obj["signature"] = obj["@id"];
             //delete obj["@id"];
             //console.log('resource after transform', obj);
-            if (callback && (obj.signedby === hash)) callback(obj);
+            if (callback && (obj.signedby === url)) callback(obj);
         })
     }
 
@@ -1819,26 +1836,26 @@ class TransportIPFS extends Transport {
         //PY-HTTP: res = self._sendGetPost(True, "rawstore", headers={"Content-Type": "application/octet-stream"}, urlargs=[], data=data, verbose=verbose)
         console.assert(data, "TransportIPFS.p_rawstore: requires data");
         let buf = (data instanceof Buffer) ? data : new Buffer(data);
-        return this.promisified.ipfs.block.put(buf).then((block) => TransportIPFS.cid2link(block.cid));
+        return this.promisified.ipfs.block.put(buf).then((block) => TransportIPFS.cid2url(block.cid));
     }
 
-    rawadd(hash, date, signature, signedby, verbose) {
-        console.assert(hash && signature && signedby, "p_rawadd args",hash,signature,signedby);
-        if (verbose) console.log("p_rawadd", hash, date, signature, signedby);
-        let value = {"@id": signature, "hash": hash, "date": date, "signature": signature, "signedby": signedby};
+    rawadd(url, date, signature, signedby, verbose) {
+        console.assert(url && signature && signedby, "p_rawadd args",url,signature,signedby);
+        if (verbose) console.log("p_rawadd", url, date, signature, signedby);
+        let value = {"@id": signature, "url": url, "date": date, "signature": signature, "signedby": signedby};
         this.annotationList.pushResource(value);
     }
-    p_rawadd(hash, date, signature, signedby, verbose) {
+    p_rawadd(url, date, signature, signedby, verbose) {
         return new Promise((resolve, reject)=> { try {
-            this.rawadd(hash, date, signature, signedby, verbose);
+            this.rawadd(url, date, signature, signedby, verbose);
             resolve(undefined);
         } catch(err) {
             reject(err);
         } })
     }
 
-    async_update(self, hash, type, data, verbose, success, error) { console.trace(); console.assert(false, "OBSOLETE"); //TODO-IPFS obsolete with p_*
-        this.async_post("update", hash, type, data, verbose, success, error);
+    async_update(self, url, type, data, verbose, success, error) { console.trace(); console.assert(false, "OBSOLETE"); //TODO-IPFS obsolete with p_*
+        this.async_post("update", url, type, data, verbose, success, error);
     }
 
 
@@ -1846,44 +1863,44 @@ class TransportIPFS extends Transport {
         if (verbose) {console.log("TransportIPFS.test")}
         return new Promise((resolve, reject) => {
             try {
-                let hashqbf;
+                let urlqbf;
                 let qbf = "The quick brown fox";
-                let testhash = "1114";  // Just a predictable number can work with
+                let testurl = "1114";  // Just a predictable number can work with
                 let listlen;    // Holds length of list run intermediate
                 let cidmultihash;   // Store cid from first block in form of multihash
                 transport.p_rawstore(qbf, verbose)
-                    .then((hash) => {
-                        if (verbose) console.log("rawstore returned", hash);
-                        let newcid = TransportIPFS.link2cid(hash);  // Its a CID which has a buffer in it
-                        console.assert(hash === transport.link(qbf),"link should match hash from rawstore");
-                        cidmultihash = hash.split('/')[2];
-                        let newhash = TransportIPFS.cid2link(newcid);
-                        console.assert(hash === newhash, "Should round trip");
-                        hashqbf = hash;
-                        //console.log("hashqbf=",hash);
+                    .then((url) => {
+                        if (verbose) console.log("rawstore returned", url);
+                        let newcid = TransportIPFS.url2cid(url);  // Its a CID which has a buffer in it
+                        console.assert(url === transport.url(qbf),"url should match url from rawstore");
+                        cidmultihash = url.split('/')[2];
+                        let newurl = TransportIPFS.cid2url(newcid);
+                        console.assert(url === newurl, "Should round trip");
+                        urlqbf = url;
+                        //console.log("urlqbf=",url);
                     })
                     /*
                     .then(() => transport.p_rawstore(null, rold, verbose))
-                    .then((hash) => {
-                            if (verbose) console.log("p_rawstore got", hash);
-                            hashrold = hash;
+                    .then((url) => {
+                            if (verbose) console.log("p_rawstore got", url);
+                            urlold = url;
                         })
                     */
                     // Note above returns immediately and runs async, we don't wait for it before below
-                    .then(() => transport.p_rawfetch(hashqbf, verbose))
+                    .then(() => transport.p_rawfetch(urlqbf, verbose))
                     .then((data) => console.assert(data === qbf, "Should fetch block stored above"))
-                    .then(() => transport.p_rawlist(testhash, verbose))
+                    .then(() => transport.p_rawlist(testurl, verbose))
                     .then((res) => {
                         listlen = res.length;
                         if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res))
                     })
-                    .then(() => transport.listmonitor(testhash, (obj) => console.log("Monitored", obj), verbose))
-                    .then((res) => transport.p_rawadd("123", "TODAY", "Joe Smith", testhash, verbose))
+                    .then(() => transport.listmonitor(testurl, (obj) => console.log("Monitored", obj), verbose))
+                    .then((res) => transport.p_rawadd("123", "TODAY", "Joe Smith", testurl, verbose))
                     .then(() => { if (verbose) console.log("p_rawadd returned ")  })
-                    .then(() => transport.p_rawlist(testhash, verbose))
+                    .then(() => transport.p_rawlist(testurl, verbose))
                     .then((res) => { if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res)) }) // Note not showing return
                     .then(() => delay(500))
-                    .then(() => transport.p_rawlist(testhash, verbose))
+                    .then(() => transport.p_rawlist(testurl, verbose))
                     .then((res) => console.assert(res.length === listlen + 1, "Should have added one item"))
                     //.then(() => console.log("TransportIPFS test complete"))
                     .then(() => resolve())
@@ -1911,7 +1928,7 @@ class Transportable {
     Based on Transportable class in python - generic base for anything transportable.
 
     Fields
-    _hash   Hash of data stored
+    _url   URL of data stored
     _data   Data (if its opaque)
     _needsfetch True if need to fetch from Dweb
      */
@@ -1931,27 +1948,30 @@ class Transportable {
     }
 
     p_store(verbose) {    // Python has a "data" parameter to override this._data but probably not needed
-        if (this._hash)
+        if (this._url)
             return new Promise((resolve, reject)=> resolve(this));  // Noop if already stored, use dirty() if change after retrieved
         let data = this._getdata();
-        if (verbose) console.log("Transportable.p_store data=", data, "hash=", this._hash);
-        this._hash = Dweb.transport.link(data); //store the hash since the HTTP is async (has form "/ipfs/xyz123" or "BLAKE2.xyz123"
-        if (verbose) console.log("Transportable.p_store hash=", this._hash);
+        if (verbose) console.log("Transportable.p_store data=", data);
+        this._url = Dweb.transport.url(data); //store the url since the HTTP is async (has form "ipfs:/ipfs/xyz123" or "BLAKE2.xyz123"
+        if (verbose) console.log("Transportable.p_store url=", this._url);
         let self = this;
         return Dweb.transport.p_rawstore(data, verbose)
             .then((msg) => {
-                if (msg !== self._hash) {
-                    console.log("ERROR Hash returned ",msg,"doesnt match hash expected",self._hash);
-                    throw new Dweb.errors.TransportError("Hash returned "+msg+" doesnt match hash expected "+self._hash)
+                if (msg !== self._url) {
+                    console.log("Transportable.p_store: ERROR URL returned ",msg,"doesnt match url expected",self._url);
+                    throw new Dweb.errors.TransportError("URL returned "+msg+" doesnt match url expected "+self._url)
                 }
                 return(msg); // Note this will be a return from the promise.
             }) // Caller should handle error and success
     }
 
     dirty() {   // Flag as dirty so needs uploading - subclasses may delete other, now invalid, info like signatures
-        this._hash = null;
+        this._url = null;
     }
 
+    static p_fetch(url, verbose) {
+        return Dweb.transport.p_rawfetch(url, verbose) // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
+    }
 
     file() { console.assert(false, "XXX Undefined function Transportable.file"); }
     url() { console.assert(false, "XXX Undefined function Transportable.url"); }

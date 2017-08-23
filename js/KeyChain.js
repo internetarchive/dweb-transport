@@ -18,8 +18,8 @@ class KeyChain extends CommonList {
         this.table = "kc";
     }
 
-    static p_new(key, name, verbose) {
-        let kc = new KeyChain({ name: name }, true, key, verbose);
+    static p_new(data, key, verbose) { //TODO-REL4-API
+        let kc = new KeyChain(data, true, key, verbose);
         return kc.p_store(verbose) // Dont need to wait on store to load and fetchlist but will do so to avoid clashes
             .then(() => KeyChain.addkeychains(kc))
             .then(() => kc.p_list_then_elements(verbose))
@@ -46,6 +46,7 @@ class KeyChain extends CommonList {
          :param obj: URL or a object to add (MutableBlock or ViewerKey)
          */
         let url = (typeof obj === "string") ? obj : obj._url;
+        if (!url) throw new Dweb.errors.CodingError("Make sure to p_store the obj before pushing");
         let sig = this._makesig(url, verbose);
         this._list.push(sig);                       // Add to local list
         return this.p_add(sig, verbose)             // Post to dweb, Resolves to undefined
@@ -160,7 +161,7 @@ class KeyChain extends CommonList {
                 if (verbose) {
                     console.log("Keychain.test 0 - create");
                 }
-                KeyChain.p_new({mnemonic: mnemonic}, "test_keychain kc", verbose)
+                KeyChain.p_new({name: "test_keychain kc"},{mnemonic: mnemonic}, verbose)
                     .then((kc1) => {
                         kc = kc1;
                         if (verbose) console.log("KEYCHAIN 1 - add MB to KC");
@@ -183,8 +184,8 @@ class KeyChain extends CommonList {
                         if (verbose) console.log("KEYCHAIN 4: reconstructing KeyChain and fetch");
                         Dweb.keychains = []; // Clear Key Chains
                     })
-                    //p_new(mnemonic, keygen, name, verbose)
-                    .then(() => kcs2 = KeyChain.p_new({ mnemonic: mnemonic}, "test_keychain kc", verbose))
+                    //p_new(data, key, verbose)
+                    .then(() => kcs2 = KeyChain.p_new({name: "test_keychain kc"},{mnemonic: mnemonic}. verbose))
                     // Note success is run AFTER all keys have been loaded
                     .then(() => {
                         mm = KeyChain.mykeys(Dweb.MutableBlock);

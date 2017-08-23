@@ -58,7 +58,7 @@
         fetchanddisplay(dict.url);
     }
 
-    function addtoelement(el, sd) {
+    function addtoelement(el, sd) { //TODO-REL4 use replacetext etc from htmlutils
         //Add the element from the list (subclass of SmartDict) to the HTML element
         //This adds a span element to a div, but it could really do anything
         let tx = document.createTextNode(sd.say);
@@ -94,7 +94,7 @@
                 .then(() => cl.listmonitor(
                     (sig) => sig.p_fetchdata(verbose)
                             .then((obj) => addtoelement(listdestn, obj)),
-                    true))
+                    verbose))
                 .then(() => objbrowser(cl, cl._url, null, "ObjBrowser", verbose))
                 .catch((err) => { console.log("ERROR:",err); alert(err.message); });
         } catch(err) {
@@ -109,7 +109,7 @@
             let val = oo[prop];
             let dests = el.querySelectorAll("[name="+ prop + "]");
             for (i in dests) {
-                dests[i].innerHTML = val;
+                dests[i].innerHTML = val;   //TODO-SECURITY replace with setting text
             }
         }
         // Now set up links to the urls for sharing
@@ -141,7 +141,7 @@
     <span class="button" onclick="togglevis(['el1','el2'],'inline');">New</span>
     <span id="el1">
         <form style="display:inline" name="fetchform" onsubmit="fetchit(); return false;">
-            <input class="propval" type="text" name="url" size="70" placeholder="/ipfs/12ab34cd"/>
+            <input class="propval" type="text" name="url" size="70" placeholder="ipfs:/ipfs/12ab34cd"/>
             <input class="button" type="submit" value="Fetch"/>
         </form>
         </span>

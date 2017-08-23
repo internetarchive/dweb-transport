@@ -1,0 +1,187 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>DWEB KeyChains and Access Control List example</title>
+    <link rel='stylesheet' href='example_styles.css'>
+    <script src="https://unpkg.com/ipfs-iiif-db/dist/browser.js"></script><!--or browser.min.js-->
+    <!--<script src="https://unpkg.com/ipfs-iiif-db@2.4.0/dist/browser.min.js"></script><!--or browser.min.js-->
+    <!--<script src="cached/browser.min.js"></script><!-- cached version of ipfs/iiif so can test offline-->
+    <script type="text/javascript" src="dweb_transport_ipfs_bundled.js"></script><!-- Dwebbundle via local filesystem when testing without Dweb-->
+    <!--<script src='/dweb/tinymce/tinymce.min.js'></script><!-- TinyMCE -->
+    <!--<script src='http://cloud.tinymce.com/stable/tinymce.min.js'></script><!-- TinyMCE -->
+    <!--<script src='/file/mb/BLAKE2.dfMoOqTdXvqKhoZo7HPvD5raBXfgH7chXsN2PElizs8=/tinymce.min.js'></script><!-- TinyMCE via relative URL-->
+    <script type="text/javascript" src="objbrowser.js"></script><!--objectbrowser functionality for debugging-->
+    <script type="text/javascript" src="htmlutils.js"></script><!--Non Dweb specific utility functions for workign with HTML-->
+    <script type="text/javascript">
+
+    </script>
+    <script>
+        function add_li_from_html_and_dict(el_ul, htmleach, dict, options) {
+            let el_li = document.createElement('li');
+            el_li.innerHTML=htmleach; //Note safe since html from above, not from net
+            replacetexts(el_li, dict);
+            if (options) {
+                if (options.class) el_li.classList.add(options.class);
+                if (options.onclick) el_li.setAttribute("onclick", options.onclick);
+            }
+            if (typeof el_ul === 'string') { el_ul = document.getElementById(el_ul)}
+            el_ul.appendChild(el_li);
+        }
+        function p_login_and_add_to_keychain(dict) {
+            // Add to HTML list of logins
+            return Dweb.KeyChain.p_new({ name: dict.name}, {passphrase: dict.name + "/" + dict.passphrase}, verbose)
+                .then((kc) => {
+                    let htmleach = "<span class='kclist_name' name='name'></span>";
+                    let el = add_li_from_html_and_dict("kclist_ul", htmleach, kc, {class: 'kclist_li', onclick: 'p_kc_click(this);'} );
+                    return kc;
+                })
+        }
+
+        function p_registrationsubmit() {
+            let verbose = true; //copious debugging in console log
+            if (verbose) console.log("p_registrationsubmit ---");
+            document.getElementById('registrationdiv').style.display='none';
+            let dict = form2dict("registrationform"); //name, passphrase
+            return p_login_and_add_to_keychain(dict)
+                    .then((kc) => objbrowser(kc,null,null,'ObjBrowser',verbose))
+        }
+
+        function logout() {
+            // Remove from keychains
+            Dweb.keychains = [];
+            deletechildren("kclist");   // Delete any visible ones
+        }
+
+        function p_loginformsubmit() {
+            // At the moment this is identical behavior to p_registrationsubmit, but that could change
+            let verbose = true; //copious debugging in console log
+            if (verbose) console.log("loginformsubmit ---");
+            let dict = form2dict("loginform"); //name, passphrase
+            return p_login_and_add_to_keychain(dict)
+                .then((kc) => objbrowser(kc,null,null,'ObjBrowser',verbose))
+        }
+
+        function p_kc_click(el) {
+            let kc = el.source;
+            document.getElementById("keys").style.display = "block";  // Show keylist
+            replacetexts("keylist_header", kc);    // Set name fields etc in keylistdiv
+            let destn_ul = document.getElementById("keylist_ul")
+            let htmleach = '<span name="name"></span> <span name="_publichash"></span>';
+            // Retrieve the keys for the keylist
+            return kc.p_list_then_elements()
+                // And add to the HTML
+                .then(() => kc._keys.map(
+                    (key)=> add_li_from_html_and_dict(destn_ul, htmleach, key, {class: 'keylist_li', onclick: 'p_key_click(this);'} )))
+        }
+        function p_newkey() {
+            let verbose = true; //copious debugging in console log
+            if (verbose) console.log("p_newkey ---");
+            document.getElementById('keynew_div').style.display='none';
+            let dict = form2dict("newkeyform"); //name
+            //TODO need source to add to
+            kc = document.getElementById('keylist_header').source;
+            key = new Dweb.KeyPair({name: dict.name, key: {keygen: true}, _acl: kc}, verbose )
+            let htmleach = "<span class='keylist_name' name='name'></span>";
+            let el = add_li_from_html_and_dict("keylist_ul", htmleach, key, {class: 'keylist_li', onclick: 'p_key_click(this);'} );
+            return key.p_store(verbose)
+                .then(() => kc.p_push(key, verbose));
+        }
+
+    </script>
+</head>
+<body>
+    <div id="status" class="status"></div>
+    <h1>Dweb - KeyChains and Access Control List Example</h1>
+    <!-- General design
+    Key Chains icon - opens / closes to
+        List of Key Chains - names - click -> Key Chain management opens
+        Passphrase & Login button - fill and login -> retrieved and listed above
+        Register button -> click -> registration dialogue
+    Registration dialogue [x]
+        My name for this list, Pass Phrase
+        Some description
+        Submit -> create KeyChain, add to KeyChains,
+    Key Chain Management screen [x]
+        Name of chain at top
+        List of items in chain: Name; publickey; some links -> TBD -> copy publickey
+        New Key button -> TBD
+        New ACL button -> TBD
+    ACL screen [x]
+        List of keys in ACL
+        Way to add new Key based on string
+        Need way to add this key to smartdict or list
+    -->
+    <img src="noun_186903_cc.png" class="iconopener" onclick="togglevis('keychains','inline');"/>
+    <div id="keychains" style="position:relative; left:25px; display:none;"><!-- needs position:relative, so parent for overdiv below-->
+        <div id="registrationdiv" class="overdiv" style="display:none">
+            <form name="registrationform" onsubmit="p_registrationsubmit(); return false;">
+                <input class="propval" type="text" name="name" size="50" placeholder="Your id - it doesnt have to be unique"/>
+                <input class="propval" type="text" name="passphrase" size="100" placeholder="Type a complex phrase, easy for you to remember, hard for others to guess, mixed case, numbers, punctuation are all good"/>
+                <input class="button" type="submit" value="Register"/>
+            </form>
+        </div>
+        <div class="displayedblock" syle="display:inline"><!--inline next to keychain-->
+            <ul id="kclist_ul" class="kclist_ul"><!-- List of all existing keychains--></ul>
+            <span class="button" onclick="logout();">Logout</span><!--logout all keychains-->
+                <form name="loginform" onsubmit="p_loginformsubmit(); return false;"><!--TODO-->
+                    <input class="propval" type="text" name="name" size="20" placeholder="Your id"/>
+                    <input class="propval" type="text" name="url" size="70" placeholder="Passphrase"/>
+                    <input class="button" type="submit" value="Login"/>
+                    <span class="button" onclick="togglevis('registrationdiv','block');">Register</span>
+                </form>
+        </div>
+
+    </div>
+
+
+    <div id="keys" style="position:relative; display:none;"><!-- needs position:relative, so parent for overdiv below-->
+        <div id="keynew_div" class="overdiv" style="display:none">
+            <form name="newkeyform" onsubmit="p_newkey(); return false;">
+                <input class="propval" type="text" name="name" size="50" placeholder="Name of the key"/>
+                <input class="button" type="submit" value="Generate"/>
+            </form>
+        </div>
+        <div id="keylist_div" class="displayedblock">
+            <div class="displayedblockheader" id="keylist_header">
+                Keys on KeyChain:
+                <span name="name">FFOOOO</span>
+                <span class="button" onclick="document.getElementById('keynew_div').style.display='block'">New</span>
+                <span class="button" onclick="document.getElementById('keys').style.display='none'">X</span><!--TODO replace with close icon-->
+            </div>
+            <ul id="keylist_ul" class="keylist_ul"><!-- List of all keys in keychain--></ul>
+        </div>
+
+    </div>
+
+    <hr><!-- Object Browser gives a way to look athte data structures being displayed -->
+
+    <div class="container">
+    <h4>Object browser <span class="hoverclue">....</span></h4>
+    <div class="hoveronly">
+    <ul class="hoveronly" id="ObjBrowser"></ul>
+    </div>
+    </div>
+
+    <script type="text/javascript">
+        <!--Start transport, and if passed a URL then open it-->
+        var url = new URL(window.location.href).searchParams.get("url")
+        console.log("Loaded with url=", url);
+
+        let verbose = false;
+        let transportclass = TransportIPFS;
+        setstatus("IPFS Starting");
+        //let transportclass = TransportHTTP    // Uncomment this to choose HTTP, but note p_setup below needs fixing
+        transportclass.p_setup({iiif: {store: "indexeddb"}}, verbose, {})
+            .then((t) => {
+                setstatus(t.ipfs.isOnline() ? "IPFS Online" : "IPFS Not online");
+                if (verbose) console.log("setup returned and transport set - including annotationList");
+                Dweb.transport = t;
+            })
+            //.then(() => { if(url) fetchanddisplay(url)})
+            .catch((err) => { console.log("ERROR:",err); alert(err.message); });
+    </script>
+</body>
+</html>
+
+
