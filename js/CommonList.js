@@ -144,7 +144,7 @@ class CommonList extends SmartDict {
          */
         //CL(url, data, master, key, verbose, options)
         let cl = new CommonList(null, false, this.keypair, verbose, {"name": this.name});
-        let prom = cl.p_store(verbose);    // Returns immediately but sets _url first
+        cl.p_store(verbose);    // Returns immediately but sets _url first
         this._publicurl = cl._url;
     }
 
@@ -171,18 +171,19 @@ class CommonList extends SmartDict {
          Equivalent to Array.push but returns a promise because asynchronous
          Sign and store a object on a list, stores both locally on _list and sends to Dweb
 
-         :param obj: Should be subclass of SmartDict, (Block is not supported)
+         :param obj: Should be subclass of SmartDict, (Block is not supported), can be URL of such an obj
          :resolves: sig created in process - for adding to lists etc.
          :throws:   ForbiddenError if not master;
          */
         if (!obj) throw new Dweb.errors.CodingError("CL.p_push obj should never be non-empty");
         let self = this;
         let sig;
-        return this.p_store() // Make sure stored - fetch might be a Noop if created locally
-            .then(() => obj.p_store())
+        return this.p_store() // Make sure stored
+            .then(() => {if (typeof obj !== 'string') obj.p_store()} )
             .then(() => {
                 if (!(self._master && self.keypair)) throw new Dweb.errors.ForbiddenError("Signing a new entry when not a master list");
-                sig = this._makesig(obj._url, verbose);
+                let url = (typeof obj === 'string') ? obj : obj._url
+                sig = this._makesig(url, verbose);
                 self._list.push(sig);   // Keep copy locally on _list
             })
             .then(() => self.p_add(sig, verbose))    // Add to list in dweb

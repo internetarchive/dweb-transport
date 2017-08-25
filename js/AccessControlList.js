@@ -24,6 +24,23 @@ class AccessControlList extends CommonList {
         this.table = "acl";
     }
 
+    static p_new(data, master, key, verbose, options, kc) { //TODO-REL4 integrate into tests etc
+        /* TODO-REL4-API
+            Create a new AccessControlList, store, add to keychain
+
+            :param data,master,key,verbose,options: see new CommonList
+            :param kc: Optional KeyChain to add to
+         */
+        let acl = new Dweb.AccessControlList(data, master, key, verbose, options); // Create ACL
+        if (master) {
+            kc = kc || Dweb.keychains[0];    // Default to first KeyChain
+            if (kc) {
+                return kc.p_push(acl, verbose).then((sig) => acl);
+            } else {
+                return acl.p_store(verbose).then((ur) => acl); // Ensure stored even if not put on KeyChain
+            }
+        }
+    }
     preflight(dd) {
         /*
         Prepare data for storage, ensure publickey available
@@ -173,13 +190,13 @@ class AccessControlList extends CommonList {
         /*
          Takes a dict,
          checks if encrypted (by presence of "encrypted" field, and returns immediately if not
-         Otherwise if can find the ACL's url in our keychains then decrypt with it.
+         Otherwise if can find the ACL's url in our keychains then decrypt with it (it will be a KeyChain, not a ACL in that case.
          Else returns a promise that resolves to the data
          No assumption is made about what is in the decrypted data
 
-         Chain is SD.p_uknwon_fetch > SD.p_decryptdata > ACL.p_decrypt > ACL|KC.decrypt, then SD.setdata
+         Chain is SD.p_fetch > SD.p_decryptdata > ACL.p_decrypt > ACL|KC.decrypt, then SD.setdata
 
-         :param value: object from parsing incoming JSON that may contain {acl, encrypted}
+         :param value: object from parsing incoming JSON that may contain {acl, encrypted} acl will be url of AccessControlList or KeyChain
          :return: data or promise that resolves to data
          :throws: AuthenticationError if cant decrypt
          */

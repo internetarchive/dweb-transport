@@ -148,20 +148,4 @@ exports.p_dwebupdate = function(url, type, data, successmethod) {
 */
 
 
-/*TODO: NOT PORTED OR TESTED WITH PROMISES
-exports.p_dweblist = function(div, url, verbose, success, successmethodeach) {
-    //TODO-UNUSED doesnt appear to be used, though should have been in example.html
-    //Retrieve a list, and create <li> elements of div to hold it.
-    //success, if present, is run after list retrieved, asynchronous with elements retrieved
-    //successeach, is run on each object in the list.
-    //TODO-LISTS this should probably be a different lsit from MB where multiple is assumed.
-    //TODO-LISTS success isnt used, presume something in chain runs success
-    verbose = false;
-    //(data, master, keypair, keygen, mnemonic, contenturl, contentacl, verbose)
-    const mb = SD.p_fetch(url,verbose)
-    return mb.p_list_then_elements(verbose)
-        .then(()=> mb.p_elem(div, verbose, successmethodeach)) // p_elem loads the block
-};
-*/
-
 

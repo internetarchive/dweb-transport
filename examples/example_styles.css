@@ -33,5 +33,6 @@
 .iconopener {width:20px;float:left}
 ,keylist_li, .kclist_li {display:inline; padding-left: 1em; padding-right: 1em;} /*A single login in a list of KeyChains or Keys */
 .keylist_ul, .kclist_ul {display:inline; -webkit-padding-start: 0px;} /*A List of KeyChains or Keys*/
+.keylist_icon {height: 12px; margin-right: 12px;}
 .hidden {display:none}
 .overdiv {position: absolute; top: 1em; left: 1em; z-index:10; background-color: #f0f0ff; border: 1px #e0e0e0 solid; padding: 5px; } /* Dialogue box over other*/

@@ -1,3 +1,6 @@
 Graphics:
-    noun_186903_cc.png  Keychain icon from noun project Thomas Soto
+    noun_186903_cc.png  Keychain icon by Thomas Soto from the Noun Project
     link.png            Unknown source
+    noun_691268_cc.png  Key icon by Aybige from the Noun Project
+    noun_1093404_cc.png Lock icon Agne from the Noun Project:
+    noun_1146472_cc.png Key by Setyo Ari Wibowo from the Noun Project

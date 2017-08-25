@@ -50,7 +50,7 @@
         function logout() {
             // Remove from keychains
             Dweb.keychains = [];
-            deletechildren("kclist");   // Delete any visible ones
+            deletechildren("kclist_ul");   // Delete any visible ones
         }
 
         function p_loginformsubmit() {
@@ -62,30 +62,44 @@
                 .then((kc) => objbrowser(kc,null,null,'ObjBrowser',verbose))
         }
 
+        function _kclist_push(obj) {
+            // Utility function to add new or existing element to KeyChain List
+            let destn_ul = document.getElementById("keylist_ul");
+            objtype = obj.table; // acl = AccessControlList, kp = KeyPair
+            objsym = {acl: "noun_1093404_cc.png", kp: "noun_1146472_cc.png"}[objtype]; //TODO-REL4 replace with image of key or lock etc
+            objclick = {acl: 'p_acl_click(this);', kp: 'p_key_click(this);'}
+            let htmleach = '<img class="keylist_icon" src="'+objsym+'"/><span class="keylist_name" name="name"></span>'
+            el = add_li_from_html_and_dict(destn_ul, htmleach, obj, {class: 'keylist_li', onclick: objclick } )
+            return el;
+        }
         function p_kc_click(el) {
             let kc = el.source;
             document.getElementById("keys").style.display = "block";  // Show keylist
-            replacetexts("keylist_header", kc);    // Set name fields etc in keylistdiv
-            let destn_ul = document.getElementById("keylist_ul")
-            let htmleach = '<span name="name"></span> <span name="_publichash"></span>';
+            replacetexts("keylist_header", kc);    // Set name fields etc in keylistdiv, sets source
             // Retrieve the keys for the keylist
             return kc.p_list_then_elements()
                 // And add to the HTML
-                .then(() => kc._keys.map(
-                    (key)=> add_li_from_html_and_dict(destn_ul, htmleach, key, {class: 'keylist_li', onclick: 'p_key_click(this);'} )))
+                .then(() => kc._keys.map((key)=> _kclist_push(key)))
         }
-        function p_newkey() {
+        function p_newkey() { //TODO-REL4 merge improvements between p_newkey and p_newacl
             let verbose = true; //copious debugging in console log
             if (verbose) console.log("p_newkey ---");
             document.getElementById('keynew_div').style.display='none';
             let dict = form2dict("newkeyform"); //name
-            //TODO need source to add to
             kc = document.getElementById('keylist_header').source;
             key = new Dweb.KeyPair({name: dict.name, key: {keygen: true}, _acl: kc}, verbose )
-            let htmleach = "<span class='keylist_name' name='name'></span>";
-            let el = add_li_from_html_and_dict("keylist_ul", htmleach, key, {class: 'keylist_li', onclick: 'p_key_click(this);'} );
+            let el = _kclist_push(key);
             return key.p_store(verbose)
                 .then(() => kc.p_push(key, verbose));
+        }
+        function p_newacl() { //TODO-REL4 merge improvements between p_newkey and p_newacl
+            let verbose = true; //copious debugging in console log
+            if (verbose) console.log("p_newacl ---");
+            document.getElementById('aclnew_div').style.display='none';
+            let dict = form2dict("newaclform"); //name
+            kc = document.getElementById('keylist_header').source;  // The KeyChain being added to.
+            return Dweb.AccessControlList.p_new({name: dict.name, _acl: kc}, true, {keygen: true}, verbose, null, kc )    //(data, master, key, verbose, options, kc)
+                .then((acl) => _kclist_push(acl));
         }
 
     </script>
@@ -99,18 +113,22 @@
         Passphrase & Login button - fill and login -> retrieved and listed above
         Register button -> click -> registration dialogue
     Registration dialogue [x]
-        My name for this list, Pass Phrase
-        Some description
+        Name of KeyChain/Login, Pass Phrase
         Submit -> create KeyChain, add to KeyChains,
     Key Chain Management screen [x]
         Name of chain at top
-        List of items in chain: Name; publickey; some links -> TBD -> copy publickey
-        New Key button -> TBD
+        List of items in chain: Name; publickey; some links -> TODO -> copy publickey
+            TODO - add ACL's to keychains and display here - open to ACL screen
+        New Key button -> New Key Form
         New ACL button -> TBD
+    New Key Form:
+        Name,
+        Generate button -> Generate key, add to KeyChain
     ACL screen [x]
         List of keys in ACL
         Way to add new Key based on string
         Need way to add this key to smartdict or list
+    //TODO - need some example of using them
     -->
     <img src="noun_186903_cc.png" class="iconopener" onclick="togglevis('keychains','inline');"/>
     <div id="keychains" style="position:relative; left:25px; display:none;"><!-- needs position:relative, so parent for overdiv below-->
@@ -142,11 +160,18 @@
                 <input class="button" type="submit" value="Generate"/>
             </form>
         </div>
+        <div id="aclnew_div" class="overdiv" style="display:none">
+            <form name="newaclform" onsubmit="p_newacl(); return false;">
+                <input class="propval" type="text" name="name" size="50" placeholder="Name of the ACL"/>
+                <input class="button" type="submit" value="Generate"/>
+            </form>
+        </div>
         <div id="keylist_div" class="displayedblock">
             <div class="displayedblockheader" id="keylist_header">
                 Keys on KeyChain:
-                <span name="name">FFOOOO</span>
-                <span class="button" onclick="document.getElementById('keynew_div').style.display='block'">New</span>
+                <span name="name"></span>
+                <span class="button" onclick="document.getElementById('keynew_div').style.display='block'">New Key</span>
+                <span class="button" onclick="document.getElementById('aclnew_div').style.display='block'">New Access Control List</span>
                 <span class="button" onclick="document.getElementById('keys').style.display='none'">X</span><!--TODO replace with close icon-->
             </div>
             <ul id="keylist_ul" class="keylist_ul"><!-- List of all keys in keychain--></ul>

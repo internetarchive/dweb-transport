@@ -3,7 +3,7 @@ const Dweb = require("./Dweb");
 
 class KeyChain extends CommonList {
     /*
-    KeyChain extends CommonList to store a users keys.
+    KeyChain extends CommonList to store a users keys, MutableBlocks and AccessControlLists
 
     Fields:
     _keys:  Array of keys (the signed objects on the list)
@@ -38,19 +38,6 @@ class KeyChain extends CommonList {
             .then((keys) => self._keys = keys)
             .then(() => { if (verbose) console.log("KC.p_list_then_elements Got keys", ...Dweb.utils.consolearr(self._keys))})
     }
-    p_push(obj, verbose) {
-        /*
-         Add a obj (usually a MutableBlock or a ViewerKey) to the keychain. by signing with this key.
-         Item should usually itself be encrypted (by setting its _acl field)
-
-         :param obj: URL or a object to add (MutableBlock or ViewerKey)
-         */
-        let url = (typeof obj === "string") ? obj : obj._url;
-        if (!url) throw new Dweb.errors.CodingError("Make sure to p_store the obj before pushing");
-        let sig = this._makesig(url, verbose);
-        this._list.push(sig);                       // Add to local list
-        return this.p_add(sig, verbose)             // Post to dweb, Resolves to undefined
-    }
 
     encrypt(data, b64) {
         /*
@@ -62,6 +49,7 @@ class KeyChain extends CommonList {
          */
         return this.keypair.encrypt(data, b64, this);  // data, b64, signer
     }
+
     decrypt(data, verbose) {
         /*
          Decrypt data - pair of .encrypt()
@@ -72,7 +60,7 @@ class KeyChain extends CommonList {
          :throws: :throws: EnryptionError if no encrypt.privateKey, CodingError if !data
          */
         if (! this.keypair._key.encrypt)
-            throw new Dweb.errors.EncryptionError("No decryption key in"+JSON.stringify(this.keypair._key))
+            throw new Dweb.errors.EncryptionError("No decryption key in"+JSON.stringify(this.keypair._key));
         return this.keypair.decrypt(data, this, "text"); //data, b64, signer - Throws EnryptionError if no encrypt.privateKey, CodingError if !data
     }
 
@@ -91,11 +79,11 @@ class KeyChain extends CommonList {
         }
     }
 
-    static find(publicurl, verbose) {
+    static find(publicurl, verbose) { //TODO-REFACTOR-FIND add SD.matches and use here
         /*
-        Locate a needed ACL or KeyChain by its url (both are on Dweb.keychains)
+        Locate a needed KeyChain by its url (both are on Dweb.keychains)
 
-        :param publicurl:  URL of ACL or KC needed
+        :param publicurl:  URL of KC needed
         :return: AccessControlList or KeyChain or null
         */
         for (let i in Dweb.keychains) {
@@ -131,13 +119,13 @@ class KeyChain extends CommonList {
     static mykeys(clstarget) {
         /*
         Utility function to find any keys in any of Dweb.keychains for the target class.
-        The targetclass should be something with its own key, typically a KeyPair or a MutableBlock
+        The targetclass should be something with its own key, typically a KeyPair or a subclass of CommonList (ACL, MB)
          */
         // its a double loop - Dweb.keychains is an array of KeyChain which are themselves a list of keys
         let res = [];
-        for (let i in Dweb.keychains) {
+        for (let i in Dweb.keychains) { //TODO-REFACTOR-FIND add SD.matches and use here NOTE NEEDS .instanceof as special case
             let keys = Dweb.keychains[i]._keys;
-            for (let j in keys) {
+            for (let j in keys) {   //TODO-REL4 should this be *of* keys
                 let k = keys[j];
                 if (k instanceof clstarget) res.push(k);
             }
@@ -153,96 +141,96 @@ class KeyChain extends CommonList {
             try {
                 // Set mnemonic to value that generates seed "01234567890123456789012345678901"
                 const mnemonic = "coral maze mimic half fat breeze thought champion couple muscle snack heavy gloom orchard tooth alert cram often ask hockey inform broken school cotton"; // 32 byte
-                // Test sequence extracted from test.py
-                const qbf="The quick brown fox ran over the lazy duck";
-                const vkpname="test_keychain viewerkeypair";
-                let kc, kcs2, mb, mblockm, mbmaster, mbm3, mm, sb, viewerkeypair;
-                const keypairexport =  "NACL SEED:w71YvVCR7Kk_lrgU2J1aGL4JMMAHnoUtyeHbqkIi2Bk="; // So same result each time
-                if (verbose) {
-                    console.log("Keychain.test 0 - create");
-                }
-                KeyChain.p_new({name: "test_keychain kc"},{mnemonic: mnemonic}, verbose)
-                    .then((kc1) => {
-                        kc = kc1;
-                        if (verbose) console.log("KEYCHAIN 1 - add MB to KC");
-                    })
-                    .then(() => Dweb.MutableBlock.p_new(kc, null, "test_keychain mblockm", true, qbf, true, verbose)) //acl, contentacl, name, _allowunsafestore, content, signandstore, verbose, options
-                    .then((mbm) => {mbmaster=mbm;  kc.p_push(mbmaster, verbose)})   //Sign and store on KC's list (returns immediately with Sig)
-                    .then(() => {
-                        if (verbose) console.log("KEYCHAIN 2 - add viewerkeypair to it");
-                        viewerkeypair = new Dweb.KeyPair({name: vkpname, key: keypairexport}, verbose);
-                        viewerkeypair._acl = kc;
-                        viewerkeypair.p_store(verbose); // Defaults to store private=True (which we want)   // Sets url, dont need to wait for it to store
-                    })
-                    .then(() =>  kc.p_push(viewerkeypair, verbose))
-                    .then(() => {
-                        if (verbose) console.log("KEYCHAIN 3: Fetching mbm url=", mbmaster._url);
-                        return Dweb.SmartDict.p_fetch(mbmaster._url, verbose); //Will be MutableBlock
-                    })
-                    .then((mbm2) => console.assert(mbm2.name === mbmaster.name, "Names should survive round trip",mbm2.name,"!==",mbmaster.name))
-                    .then(() => {
-                        if (verbose) console.log("KEYCHAIN 4: reconstructing KeyChain and fetch");
-                        Dweb.keychains = []; // Clear Key Chains
-                    })
-                    //p_new(data, key, verbose)
-                    .then(() => kcs2 = KeyChain.p_new({name: "test_keychain kc"},{mnemonic: mnemonic}. verbose))
-                    // Note success is run AFTER all keys have been loaded
-                    .then(() => {
-                        mm = KeyChain.mykeys(Dweb.MutableBlock);
-                        console.assert(mm.length, "Should find mblockm");
-                        mbm3 = mm[mm.length - 1];
-                        console.assert(mbm3 instanceof Dweb.MutableBlock, "Should be a mutable block", mbm3);
-                        console.assert(mbm3.name === mbmaster.name, "Names should survive round trip");
-                     })
-                    .then(() => {
-                        if (verbose) console.log("KEYCHAIN 5: Check can user ViewerKeyPair");
-                        // Uses acl passed in from AccessControlList.acl
-                        acl._allowunsafestore = true;
-                    })
-                    .then(() => verbose = true)
-                    .then(() => acl.p_add_acle(viewerkeypair._url, verbose))   //Add us as viewer
-                    .then(() => {
-                        console.assert("acl._list.length === 1", "Should have added exactly 1 viewerkeypair",acl);
-                        sb = new Dweb.StructuredBlock({"name": "test_sb", "data": qbf, "_acl": acl}, verbose); //url,data,verbose
-                    })
-                    .then(() => sb.p_store(verbose))
-                    .then(() => {
-                        let mvk = KeyChain.mykeys(Dweb.KeyPair)
-                        console.assert(mvk[0].name === vkpname, "Should find viewerkeypair stored above");
-                        if (verbose) console.log("KEYCHAIN 6: Check can fetch and decrypt - should use viewerkeypair stored above");
-                        return Dweb.SmartDict.p_fetch(sb._url, verbose); // Will be StructuredBlock, fetched and decrypted
-                    })
-                    .then((sb2) => {
-                        console.assert(sb2.data === qbf, "Data should survive round trip");
-                        if (verbose) console.log("KEYCHAIN 7: Check can store content via an MB");
-                        //MB.new(acl, contentacl, name, _allowunsafestore, content, signandstore, verbose)
-                    })
-                    .then(() => Dweb.MutableBlock.p_new(null, acl, "mblockm", true, qbf, true, verbose))
-                    .then((newmblockm) => {
-                        mblockm = newmblockm;
-                        //data, master, key, contenturl, contentacl, verbose, options
-                        return Dweb.SmartDict.p_fetch(mblockm._publicurl, verbose); // Will be MutableBlock
-                    })
-                    .then((newpublicmb) => mb = newpublicmb)
-                    .then(() => mb.p_list_then_current(verbose))
-                    .then(() => {
-                        console.assert(mb.content() === qbf, "Data should round trip through ACL");
-                    })
+        // Test sequence extracted from test.py
+        const qbf="The quick brown fox ran over the lazy duck";
+        const vkpname="test_keychain viewerkeypair";
+        let kc, kcs2, mb, mblockm, mbmaster, mbm3, mm, sb, viewerkeypair;
+        const keypairexport =  "NACL SEED:w71YvVCR7Kk_lrgU2J1aGL4JMMAHnoUtyeHbqkIi2Bk="; // So same result each time
+        if (verbose) {
+            console.log("Keychain.test 0 - create");
+        }
+        KeyChain.p_new({name: "test_keychain kc"},{mnemonic: mnemonic}, verbose)    //Note in KEYCHAIN 4 we recreate exactly same way.
+            .then((kc1) => {
+            kc = kc1;
+        if (verbose) console.log("KEYCHAIN 1 - add MB to KC");
+    })
+    .then(() => Dweb.MutableBlock.p_new(kc, null, "test_keychain mblockm", true, qbf, true, verbose)) //acl, contentacl, name, _allowunsafestore, content, signandstore, verbose, options
+    .then((mbm) => {mbmaster=mbm;  kc.p_push(mbmaster, verbose)})   //Sign and store on KC's list (returns immediately with Sig)
+    .then(() => {
+            if (verbose) console.log("KEYCHAIN 2 - add viewerkeypair to it");
+        viewerkeypair = new Dweb.KeyPair({name: vkpname, key: keypairexport}, verbose);
+        viewerkeypair._acl = kc;
+        viewerkeypair.p_store(verbose); // Defaults to store private=True (which we want)   // Sets url, dont need to wait for it to store
+    })
+    .then(() =>  kc.p_push(viewerkeypair, verbose))
+    .then(() => {
+            if (verbose) console.log("KEYCHAIN 3: Fetching mbm url=", mbmaster._url);
+        return Dweb.SmartDict.p_fetch(mbmaster._url, verbose); //Will be MutableBlock
+    })
+    .then((mbm2) => console.assert(mbm2.name === mbmaster.name, "Names should survive round trip",mbm2.name,"!==",mbmaster.name))
+    .then(() => {
+            if (verbose) console.log("KEYCHAIN 4: reconstructing KeyChain and fetch");
+        Dweb.keychains = []; // Clear Key Chains
+    })
+        //p_new(data, key, verbose)
+    .then(() => KeyChain.p_new({name: "test_keychain kc"},{mnemonic: mnemonic}, verbose))
+        // Note success is run AFTER all keys have been loaded
+    .then(() => {
+        mm = KeyChain.mykeys(Dweb.MutableBlock);
+        console.assert(mm.length, "Should find mblockm");
+        mbm3 = mm[mm.length - 1];
+        console.assert(mbm3 instanceof Dweb.MutableBlock, "Should be a mutable block", mbm3);
+        console.assert(mbm3.name === mbmaster.name, "Names should survive round trip");
+    })
+    .then(() => {
+            if (verbose) console.log("KEYCHAIN 5: Check can user ViewerKeyPair");
+        // Uses acl passed in from AccessControlList.acl
+        acl._allowunsafestore = true;
+    })
+    .then(() => verbose = true)
+    .then(() => acl.p_add_acle(viewerkeypair._url, verbose))   //Add us as viewer
+    .then(() => {
+            console.assert("acl._list.length === 1", "Should have added exactly 1 viewerkeypair",acl);
+        sb = new Dweb.StructuredBlock({"name": "test_sb", "data": qbf, "_acl": acl}, verbose); //url,data,verbose
+    })
+    .then(() => sb.p_store(verbose))
+    .then(() => {
+            let mvk = KeyChain.mykeys(Dweb.KeyPair);
+            console.assert(mvk[0].name === vkpname, "Should find viewerkeypair stored above");
+        if (verbose) console.log("KEYCHAIN 6: Check can fetch and decrypt - should use viewerkeypair stored above");
+        return Dweb.SmartDict.p_fetch(sb._url, verbose); // Will be StructuredBlock, fetched and decrypted
+    })
+    .then((sb2) => {
+            console.assert(sb2.data === qbf, "Data should survive round trip");
+        if (verbose) console.log("KEYCHAIN 7: Check can store content via an MB");
+        //MB.new(acl, contentacl, name, _allowunsafestore, content, signandstore, verbose)
+    })
+    .then(() => Dweb.MutableBlock.p_new(null, acl, "mblockm", true, qbf, true, verbose))
+    .then((newmblockm) => {
+            mblockm = newmblockm;
+        //data, master, key, contenturl, contentacl, verbose, options
+        return Dweb.SmartDict.p_fetch(mblockm._publicurl, verbose); // Will be MutableBlock
+    })
+    .then((newpublicmb) => mb = newpublicmb)
+    .then(() => mb.p_list_then_current(verbose))
+    .then(() => {
+            console.assert(mb.content() === qbf, "Data should round trip through ACL");
+    })
 
-                    .then(() => {
-                        if (verbose) console.log("KeyChain.test promises complete");
-                        //console.log("KeyChain.test requires more tests defined");
-                        resolve({kc: kc, mbmaster: mbmaster});
-                    })
-                    .catch((err) => {
-                        console.log("Error in KeyChain.p_test", err);   // Log since maybe "unhandled" if just throw
-                        reject(err);
-                    })
-            } catch (err) {
-                console.log("Caught exception in KeyChain.p_test", err);
-                throw err;
-            }
-        })
+    .then(() => {
+            if (verbose) console.log("KeyChain.test promises complete");
+        //console.log("KeyChain.test requires more tests defined");
+        resolve({kc: kc, mbmaster: mbmaster});
+    })
+    .catch((err) => {
+            console.log("Error in KeyChain.p_test", err);   // Log since maybe "unhandled" if just throw
+        reject(err);
+    })
+    } catch (err) {
+            console.log("Caught exception in KeyChain.p_test", err);
+            throw err;
+        }
+    })
     }
 }
 
