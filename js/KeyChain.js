@@ -79,23 +79,6 @@ class KeyChain extends CommonList {
         }
     }
 
-    static find(publicurl, verbose) { //TODO-REFACTOR-FIND add SD.matches and use here
-        /*
-        Locate a needed KeyChain by its url (both are on Dweb.keychains)
-
-        :param publicurl:  URL of KC needed
-        :return: AccessControlList or KeyChain or null
-        */
-        for (let i in Dweb.keychains) {
-            let kc = Dweb.keychains[i];
-            if (kc._publicurl === publicurl) {
-                if (verbose) console.log("KeyChain.find successful for",publicurl);
-                return kc;
-            }
-        }
-        return null;
-    }
-
     _p_storepublic(verbose) {
         /*
         Store a publicly viewable version of KeyChain - note the keys should be encrypted
@@ -116,21 +99,25 @@ class KeyChain extends CommonList {
         return super.p_store(verbose);  // Stores public version and sets _publicurl
     }
 
+    static keychains_find(dict, verbose) {
+        /*
+        Locate a needed KeyChain by some match (both are on Dweb.keychains)
+
+        :param dict:    dictionary to check against the keychain
+        :return:        AccessControlList or KeyChain or null
+        */
+        return Dweb.keychains.find((kc) => kc.match(dict))  // Returns undefined if none match or keychains is empty
+    }
+
     static mykeys(clstarget) {
         /*
         Utility function to find any keys in any of Dweb.keychains for the target class.
         The targetclass should be something with its own key, typically a KeyPair or a subclass of CommonList (ACL, MB)
+        keychains is an array of arrays so have to flatten the result.
          */
-        // its a double loop - Dweb.keychains is an array of KeyChain which are themselves a list of keys
-        let res = [];
-        for (let i in Dweb.keychains) { //TODO-REFACTOR-FIND add SD.matches and use here NOTE NEEDS .instanceof as special case
-            let keys = Dweb.keychains[i]._keys;
-            for (let j in keys) {   //TODO-REL4 should this be *of* keys
-                let k = keys[j];
-                if (k instanceof clstarget) res.push(k);
-            }
-        }
-        return res;
+        return [].concat(...Dweb.keychains.map(                     // Iterate over keychains, and flatten resulting arrays
+            (kc) => kc._keys.filter(                                // Filter only members of _keys
+                (key) => key.match({".instanceof": clstarget}))))   // That are instances of the target
     }
 
     static p_test(acl, verbose) {

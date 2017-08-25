@@ -65,7 +65,7 @@ class SmartDict extends Transportable {
     _getdata() {
         let dd = {};
         for (let i in this) {
-            //noinspection JSUnfilteredForInLoop
+            //noinspection JSUnfilteredForInLoop don't use "of" because want inherited attributes
             dd[i] = this[i];    // This just copies the attributes not functions
         }
         let res = Dweb.transport.dumps(this.preflight(dd));
@@ -86,6 +86,22 @@ class SmartDict extends Transportable {
             throw new Dweb.errors.EncryptionError("Should have been decrypted in p_fetch");
         this._setproperties(value); // Note value should not contain a "_data" field, so wont recurse even if catch "_data" at __setattr__()
     }
+
+
+    match(dict) { //TODO-REL4-API
+        /*
+        Checks if a object matches for each key:value pair in the dictionary.
+        Any key starting with "." is treated specially esp:
+        .instanceof: class: Checks if this is a instance of the class
+        other fields will be supported here, any unsupported field results in a false.
+         */
+        return Object.keys(dict).every((key) => {
+            return      (key[0] !== '.'             ? (this[key] === dict[key])
+                :   ( key === ".instanceof")    ? (this instanceof dict[key])
+                    :   false)
+        })
+    }
+
 
     static p_fetch(url, verbose) {
         /*

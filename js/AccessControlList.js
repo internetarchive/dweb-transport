@@ -204,7 +204,7 @@ class AccessControlList extends CommonList {
             return value;
         } else {
             let aclurl = value.acl;
-            let kc = Dweb.KeyChain.find(aclurl);  // Matching KeyChain or None
+            let kc = Dweb.KeyChain.keychains_find({_publicurl: aclurl});  // Matching KeyChain or None
             if (kc) {
                 return Dweb.transport.loads(kc.decrypt(value.encrypted, verbose)); // Exception: DecryptionFail - unlikely since publicurl matches
             } else {

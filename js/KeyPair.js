@@ -141,7 +141,7 @@ class KeyPair extends SmartDict {
         // Call route is ... data.setter > ...> key.setter > _importkey
         //TODO - Note fingerprint different from Python - this stores the key, change the Python
         if (typeof value === "object") {    // Should be array, not dict
-            for (let i in value) {
+            for (let i in value) { //TODO-REL4 replace with map
                 //noinspection JSUnfilteredForInLoop
                 this._importkey(value[i]);
             }
