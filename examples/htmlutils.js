@@ -82,3 +82,16 @@ function replacetexts(el, dict) { //TODO-REL4 put into example_list and example_
         }
     }
 }
+
+function show(el, displayvalue) {
+    displayvalue = displayvalue || "";
+    if (Array.isArray(el)) el.map((e) => show(e, displayvalue));
+    el = (typeof(el) === "string") ? document.getElementById(el) : el;
+    el.style.display = displayvalue;
+}
+
+function hide(el) {
+    if (Array.isArray(el)) el.map((e) => hide(e));
+    el = (typeof(el) === "string") ? document.getElementById(el) : el;
+    el.style.display = "none";
+}

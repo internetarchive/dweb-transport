@@ -18,12 +18,18 @@ class KeyChain extends CommonList {
         this.table = "kc";
     }
 
-    static p_new(data, key, verbose) { //TODO-REL4-API
+    static p_new(data, key, verbose) {
+        /*
+        Create a new KeyChain object based on a new or existing key.
+        Store and add to the Dweb.keychains, list any elements already on the KeyChain (relevant for existing keys)
+        data, key:  See CommonList for parameters
+        resolves to:    KeyChain created
+         */
         let kc = new KeyChain(data, true, key, verbose);
         return kc.p_store(verbose) // Dont need to wait on store to load and fetchlist but will do so to avoid clashes
             .then(() => KeyChain.addkeychains(kc))
             .then(() => kc.p_list_then_elements(verbose))
-            .then(() => kc) //Fetches blocks in p_loadandfetchlist.success
+            .then(() => kc)
             // Note kc returned from promise NOT from p_new so have to catch in a ".then"
     }
 
@@ -31,12 +37,15 @@ class KeyChain extends CommonList {
 
     p_list_then_elements(verbose) {
         /*
-        Subclass CommonList to store elements in _keys
+        Subclasses CommonList to store elements in a _keys array.
+
+        resolves to:    Array of KeyPair
          */
         let self = this;
         return super.p_list_then_elements(verbose)
             .then((keys) => self._keys = keys)
             .then(() => { if (verbose) console.log("KC.p_list_then_elements Got keys", ...Dweb.utils.consolearr(self._keys))})
+            .then(() => self._keys)
     }
 
     encrypt(data, b64) {
@@ -45,14 +54,14 @@ class KeyChain extends CommonList {
 
          :param res: The material to encrypt, usually JSON but could probably also be opaque bytes
          :param b64: True if result wanted in urlsafebase64 (usually)
-         :return:    Encrypted data
+         :return:    Data encrypted by Public Key of this KeyChain.
          */
         return this.keypair.encrypt(data, b64, this);  // data, b64, signer
     }
 
     decrypt(data, verbose) {
         /*
-         Decrypt data - pair of .encrypt()
+         Decrypt data with this KeyChain - pair of .encrypt()
          Chain is SD.p_fetch > SD.p_decryptdata > ACL|KC.decrypt, then SD.setdata
 
          :param data: String from json, b64 encoded
@@ -68,7 +77,7 @@ class KeyChain extends CommonList {
 
     static addkeychains(keychains) {
         /*
-        Add keys I can view under to Dweb.keychains where it will be used by the ACL
+        Add keys I can use for viewing to Dweb.keychains where it will be iterated over during decryption.
 
         :param keychains:   keychain or Array of keychains
         */
@@ -82,7 +91,8 @@ class KeyChain extends CommonList {
     _p_storepublic(verbose) {
         /*
         Store a publicly viewable version of KeyChain - note the keys should be encrypted
-        Note - doesnt return a promise, the store is happening in the background
+        Note - does not return a promise, the store is happening in the background
+        Sets this_publicurl to the URL of this stored version.
         */
         if (verbose) console.log("KeyChain._p_storepublic");
         let kc = new KeyChain({name: this.name}, false, this.keypair, verbose);
@@ -92,7 +102,7 @@ class KeyChain extends CommonList {
 
     p_store(verbose) {
         /*
-        Unlike other p_store this ONLY stores the public version, and sets the _publicurl,
+        Unlike other p_store this ONLY stores the public version, and sets the _publicurl, on the assumption that the private key of a KeyChain should never be stored.
         Private/master version should never be stored since the KeyChain is itself the encryption root.
         */
         this.dontstoremaster = true;    // Make sure p_store only stores public version
@@ -101,9 +111,9 @@ class KeyChain extends CommonList {
 
     static keychains_find(dict, verbose) {
         /*
-        Locate a needed KeyChain by some match (both are on Dweb.keychains)
+        Locate a needed KeyChain on Dweb.keychains by some filter.
 
-        :param dict:    dictionary to check against the keychain
+        :param dict:    dictionary to check against the keychain (see CommonList.match() for interpretation
         :return:        AccessControlList or KeyChain or null
         */
         return Dweb.keychains.find((kc) => kc.match(dict))  // Returns undefined if none match or keychains is empty
@@ -112,13 +122,16 @@ class KeyChain extends CommonList {
     static mykeys(clstarget) {
         /*
         Utility function to find any keys in any of Dweb.keychains for the target class.
-        The targetclass should be something with its own key, typically a KeyPair or a subclass of CommonList (ACL, MB)
-        keychains is an array of arrays so have to flatten the result.
+
+        clstarget:  Class to search Dweb.keychains for, KeyPair, or something with a KeyPair e.g. subclass of CommonList(ACL, MB)
+        returns:    (possibly empty) array of KeyPair or CommonList
          */
+        //Dweb.keychains is an array of arrays so have to flatten the result.
         return [].concat(...Dweb.keychains.map(                     // Iterate over keychains, and flatten resulting arrays
             (kc) => kc._keys.filter(                                // Filter only members of _keys
                 (key) => key.match({".instanceof": clstarget}))))   // That are instances of the target
     }
+
 
     static p_test(acl, verbose) {
         /* Fairly broad test of AccessControlList and KeyChain */

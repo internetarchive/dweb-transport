@@ -2,18 +2,18 @@ const CommonList = require("./CommonList"); // AccessControlList extends this
 const SmartDict = require("./SmartDict");   // _AccessControlListEntry extends this
 const Dweb = require("./Dweb");
 
-//TODO-REL3-API - whole file
-
 class AccessControlList extends CommonList {
     /*
     An AccessControlList is a list for each control domain, with the entries being who has access.
 
     To create a list, it just requires a key pair, like any other List
 
-    See Authentication.rst //TODO-REL3 incorporate in docs
-
     Fields:
     accesskey:  Secret key with which things are encrypted. We are controlling who gets this.
+    _list: Contains a list of signatures, each for a SmartDict each of which is:
+        viewerkeypair: public URL of the KeyPair of an authorised viewer
+        token:  accesskey encrypted with PublicKey from the KeyPair
+
     */
 
     constructor(data, master, key, verbose, options) {
@@ -24,8 +24,8 @@ class AccessControlList extends CommonList {
         this.table = "acl";
     }
 
-    static p_new(data, master, key, verbose, options, kc) { //TODO-REL4 integrate into tests etc
-        /* TODO-REL4-API
+    static p_new(data, master, key, verbose, options, kc) {
+        /*
             Create a new AccessControlList, store, add to keychain
 
             :param data,master,key,verbose,options: see new CommonList
@@ -44,6 +44,7 @@ class AccessControlList extends CommonList {
     preflight(dd) {
         /*
         Prepare data for storage, ensure publickey available
+
         :param dd: dict containing data preparing for storage (from subclass)
         :returns: dict ready for storage if not modified by subclass
          */
@@ -56,7 +57,7 @@ class AccessControlList extends CommonList {
 
     p_add_acle(viewerpublicurl, verbose) {
         /*
-        Add a new ACL entry - that gives a viewer the ability to see the accesskey
+        Add a new ACL entry - that gives a viewer the ability to see the accesskey of this URL
 
         :param viewerpublicurl: The url of the viewers KeyPair object (contains a publickey)
         :resolves to: this for chaining
@@ -115,6 +116,7 @@ class AccessControlList extends CommonList {
 
     decrypt(data, viewerkeypair, verbose) {
         /*
+            Decrypt data for a viewer.
             Chain is SD.p_fetch > SD.p_decryptdata > ACL|KC.decrypt, then SD.setdata
 
             :param data: string from json of encrypted data - b64 encrypted
@@ -143,47 +145,15 @@ class AccessControlList extends CommonList {
 
     _p_storepublic(verbose) {
         /*
-        Store a public version of the ACL - shouldnt include accesskey, or privatekey
-        Note - doesnt return a promise, the store is happening in the background
+        Store a public version of the ACL - should not include accesskey, or privatekey
+        Note - does not return a promise, the store is happening in the background
+        Sets _publicurl to the URL stored under.
         */
         if (verbose) console.log("AccessControlList._p_storepublic");
         //AC(data, master, key, verbose, options) {
         let acl = new AccessControlList({"name": this.name}, false, this.keypair, verbose, {});
         acl.p_store(verbose); // Async, but will set _url immediately
         this._publicurl = acl._url;  //returns immediately with precalculated url
-    }
-
-    static p_test(verbose) {
-        // Test ACL - note creates and returns a ACL suitable for other tests
-        if (verbose) console.log("AccessControlList.p_test");
-        return new Promise((resolve, reject) => {
-            try {
-                if (verbose) console.log("Creating AccessControlList");
-                // Create a acl for testing, - full breakout is in test_keychain
-                let accesskey = Dweb.KeyPair.randomkey();
-                let aclseed = "01234567890123456789012345678902";    // Note seed with 01 at end used in mnemonic faking
-                let keypair = new Dweb.KeyPair({key: {seed: aclseed}}, verbose);
-                //ACL(data, master, keypair, keygen, mnemonic, verbose, options)
-                let acl = new Dweb.AccessControlList({
-                    name: "test_acl.acl",
-                    accesskey: Dweb.KeyPair.b64enc(accesskey)
-                }, true, keypair, verbose, {});
-                acl._allowunsafestore = true;    // Not setting _acl on this
-                acl.p_store(verbose)
-                .then(() => {
-                    acl._allowunsafestore = false;
-                    if (verbose) console.log("Creating AccessControlList url=", acl._url);
-                    resolve(acl);
-                })
-                .catch((err) => {
-                    console.log("Error in AccessControlList.p_test", err);   // Log since maybe "unhandled" if just throw
-                    reject(err);
-                });
-            } catch(err) {
-                console.log("Caught exception in AccessControlList.p_test", err);
-                throw err;
-            }
-        })
     }
 
     static p_decryptdata(value, verbose) {
@@ -198,7 +168,7 @@ class AccessControlList extends CommonList {
 
          :param value: object from parsing incoming JSON that may contain {acl, encrypted} acl will be url of AccessControlList or KeyChain
          :return: data or promise that resolves to data
-         :throws: AuthenticationError if cant decrypt
+         :throws: AuthenticationError if cannot decrypt
          */
         if (! value.encrypted) {
             return value;
@@ -219,9 +189,40 @@ class AccessControlList extends CommonList {
                     .catch((err) => { console.log("Unable to decrypt:",value); throw(err);});
             }
         }
-    };
+    }
 
-
+    static p_test(verbose) {
+        // Test ACL - note creates and returns a ACL suitable for other tests
+        if (verbose) console.log("AccessControlList.p_test");
+        return new Promise((resolve, reject) => {
+            try {
+                if (verbose) console.log("Creating AccessControlList");
+                // Create a acl for testing, - full breakout is in test_keychain
+                let accesskey = Dweb.KeyPair.randomkey();
+                let aclseed = "01234567890123456789012345678902";    // Note seed with 01 at end used in mnemonic faking
+                let keypair = new Dweb.KeyPair({key: {seed: aclseed}}, verbose);
+                //ACL(data, master, keypair, keygen, mnemonic, verbose, options)
+                let acl = new Dweb.AccessControlList({
+                    name: "test_acl.acl",
+                    accesskey: Dweb.KeyPair.b64enc(accesskey)
+                }, true, keypair, verbose, {});
+                acl._allowunsafestore = true;    // Not setting _acl on this
+                acl.p_store(verbose)
+                    .then(() => {
+                        acl._allowunsafestore = false;
+                        if (verbose) console.log("Creating AccessControlList url=", acl._url);
+                        resolve(acl);
+                    })
+                    .catch((err) => {
+                        console.log("Error in AccessControlList.p_test", err);   // Log since maybe "unhandled" if just throw
+                        reject(err);
+                    });
+            } catch(err) {
+                console.log("Caught exception in AccessControlList.p_test", err);
+                throw err;
+            }
+        })
+    }
 
 }
 exports = module.exports = AccessControlList;

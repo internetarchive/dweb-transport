@@ -41,7 +41,7 @@
         function p_registrationsubmit() {
             let verbose = true; //copious debugging in console log
             if (verbose) console.log("p_registrationsubmit ---");
-            document.getElementById('registrationdiv').style.display='none';
+            hide('registrationdiv');
             let dict = form2dict("registrationform"); //name, passphrase
             return p_login_and_add_to_keychain(dict)
                     .then((kc) => objbrowser(kc,null,null,'ObjBrowser',verbose))
@@ -62,29 +62,29 @@
                 .then((kc) => objbrowser(kc,null,null,'ObjBrowser',verbose))
         }
 
+        const objsyms = {acl: "noun_1093404_cc.png", kp: "noun_1146472_cc.png"} /* If change here - see also Keys on KeyChain code below*/
         function _kclist_push(obj) {
             // Utility function to add new or existing element to KeyChain List
-            let destn_ul = document.getElementById("keylist_ul");
             objtype = obj.table; // acl = AccessControlList, kp = KeyPair
-            objsym = {acl: "noun_1093404_cc.png", kp: "noun_1146472_cc.png"}[objtype]; //TODO-REL4 replace with image of key or lock etc
-            objclick = {acl: 'p_acl_click(this);', kp: 'p_key_click(this);'}
+            objsym = objsyms[objtype];
+            objclick = {acl: 'p_acl_click(this);', kp: 'p_key_click(this);'}[objtype];
             let htmleach = '<img class="keylist_icon" src="'+objsym+'"/><span class="keylist_name" name="name"></span>'
-            el = add_li_from_html_and_dict(destn_ul, htmleach, obj, {class: 'keylist_li', onclick: objclick } )
+            el = add_li_from_html_and_dict("keylist_ul", htmleach, obj, {class: 'keylist_li', onclick: objclick } )
             return el;
         }
         function p_kc_click(el) {
             let kc = el.source;
-            document.getElementById("keys").style.display = "block";  // Show keylist
+            show('keys'); //block - Show keylist
             replacetexts("keylist_header", kc);    // Set name fields etc in keylistdiv, sets source
-            // Retrieve the keys for the keylist
-            return kc.p_list_then_elements()
-                // And add to the HTML
-                .then(() => kc._keys.map((key)=> _kclist_push(key)))
+            deletechildren("keylist_ul")
+
+            return kc.p_list_then_elements()                            // Retrieve the keys for the keylist
+                .then(() => kc._keys.map((key)=> _kclist_push(key)))    // And add to the HTML
         }
-        function p_newkey() { //TODO-REL4 merge improvements between p_newkey and p_newacl
+        function p_newkey() {
             let verbose = true; //copious debugging in console log
             if (verbose) console.log("p_newkey ---");
-            document.getElementById('keynew_div').style.display='none';
+            hide('keynew_div');
             let dict = form2dict("newkeyform"); //name
             kc = document.getElementById('keylist_header').source;
             key = new Dweb.KeyPair({name: dict.name, key: {keygen: true}, _acl: kc}, verbose )
@@ -92,14 +92,20 @@
             return key.p_store(verbose)
                 .then(() => kc.p_push(key, verbose));
         }
-        function p_newacl() { //TODO-REL4 merge improvements between p_newkey and p_newacl
+        function p_newacl() {
             let verbose = true; //copious debugging in console log
             if (verbose) console.log("p_newacl ---");
-            document.getElementById('aclnew_div').style.display='none';
+            hide('aclnew_div');
             let dict = form2dict("newaclform"); //name
             kc = document.getElementById('keylist_header').source;  // The KeyChain being added to.
             return Dweb.AccessControlList.p_new({name: dict.name, _acl: kc}, true, {keygen: true}, verbose, null, kc )    //(data, master, key, verbose, options, kc)
                 .then((acl) => _kclist_push(acl));
+        }
+        function p_key_click(el) {
+            let verbose = true; //copious debugging in console log
+            if (verbose) console.log("p_key_click ---");
+            source = el.source;
+            window.prompt("Copy tp clipboard (Ctrl-C + OK)", el.source._url);
         }
 
     </script>
@@ -170,9 +176,10 @@
             <div class="displayedblockheader" id="keylist_header">
                 Keys on KeyChain:
                 <span name="name"></span>
-                <span class="button" onclick="document.getElementById('keynew_div').style.display='block'">New Key</span>
-                <span class="button" onclick="document.getElementById('aclnew_div').style.display='block'">New Access Control List</span>
-                <span class="button" onclick="document.getElementById('keys').style.display='none'">X</span><!--TODO replace with close icon-->
+                <!--If change icons, see objsyms above-->
+                <span class="button" onclick="show('keynew_div');"><img class="keylist_icon" src="noun_1146472_cc.png"/>New</span>
+                <span class="button" onclick="show('aclnew_div');"<img class="keylist_icon" src="noun_1093404_cc.png"/>New</span>
+                <span class="button" onclick="hide'keys');">X</span><!--TODO replace with close icon-->
             </div>
             <ul id="keylist_ul" class="keylist_ul"><!-- List of all keys in keychain--></ul>
         </div>

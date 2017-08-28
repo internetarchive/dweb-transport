@@ -88,12 +88,14 @@ class SmartDict extends Transportable {
     }
 
 
-    match(dict) { //TODO-REL4-API
+    match(dict) {
         /*
         Checks if a object matches for each key:value pair in the dictionary.
         Any key starting with "." is treated specially esp:
         .instanceof: class: Checks if this is a instance of the class
         other fields will be supported here, any unsupported field results in a false.
+
+        :returns: boolean, true if matches
          */
         return Object.keys(dict).every((key) => {
             return      (key[0] !== '.'             ? (this[key] === dict[key])
@@ -121,16 +123,15 @@ class SmartDict extends Transportable {
                 data = Dweb.transport.loads(data);      // Parse JSON //TODO-REL3 maybe function in Transportable
                 let table = data.table;              // Find the class it belongs to
                 cls = Dweb[table2class[table]];         // Gets class name, then looks up in Dweb - avoids dependency
-                console.assert(cls, "SmartDict.p_fetch:",table,"isnt implemented in table2class"); //TODO Should probably raise a specific subclass of Error
+                if (!cls) throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: "+table+" isnt implemented in table2class");
                 //console.log(cls);
-                console.assert((table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict), "Avoid data driven hacks to other classes")
+                if (!((table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict))) throw new Dweb.errors.ForbiddenError("Avoiding data driven hacks to other classes - seeing "+table);
                 return data;
             })
             .then((data) => cls.p_decrypt(data, verbose))    // decrypt - may return string or obj , note it can be suclassed for different encryption
             .then((data) => {
                     data._url = url;                         // Save where we got it - preempts a store - must do this afer decrypt
-                    let obj = new cls(data);
-                    return obj;
+                    return new cls(data);
             })                // Returns new block that should be a subclass of SmartDict
             .catch((err) => {console.log("cant fetch and decrypt unknown"); throw(err)});
     }

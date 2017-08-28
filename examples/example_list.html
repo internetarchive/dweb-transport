@@ -79,7 +79,7 @@
                 .then(() => {
                     console.log("Fetched=", cl);
                     // Only display the input prompt if its a master list.
-                    document.getElementById("entryrow").style.display = (cl._master ? "" : "none")
+                    if (cl.master) { show("entryrow"); } else { hide("entryrow"); }
                     // Display the name and urls of the list
                     displayobj(destn, cl);
                     // Fetch the current elements from the list if any

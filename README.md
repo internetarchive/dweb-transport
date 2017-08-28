@@ -39,6 +39,21 @@ The link icon next to the public hash will only give them the ability to display
 
 Hover over "Object Browser" to see the structure of the object.
 
+###AUTHENTICATION example
+In your browser, open the file:  examples/example_keys.html  
+Click on the "KeyChain icon"  
+Click on Register  
+Choose a name for your first keychain, remember exactly how you spelled and capitalised it.  
+Choose a long and complex passphrase that is easy for you to remember and hard for others to guess, ideally include numbers and punctuation, but you'll need to remember this exactly.
+Note there is no way to change a name or password later, since there is no central authority to change them with. 
+Your name should appear next to the keyhain icon.  
+Click on your name.  
+A box should appear showing that you have no keys.  
+Click on New Key, give it a name (which you dont have to remember) and click Generate  
+The new key should show up.
+Click on "New Access Control List, give it a name (which you dont have to remember) and click Generate
+...  stuff still being written  
+Click on the Key - you should get a prompt which you can copy the URL out of.  
 
 ## Installing a compilable version
 If you haven't already, then install npm from [https://nodejs.org/en/download]  

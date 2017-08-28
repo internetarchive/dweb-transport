@@ -6,10 +6,10 @@ exports.Signature = require("./Signature");
 exports.CommonList = require("./CommonList");
 exports.AccessControlList = require("./AccessControlList");
 exports.KeyChain = require('./KeyChain');
-/* Later libraries
+//* Later libraries //TODO-REL4 comment out before REL4
 exports.StructuredBlock = require('./StructuredBlock');
 exports.MutableBlock = require("./MutableBlock");
-*/
+//*/
 
 // Javascript library for dweb
 // The crypto uses https://github.com/jedisct1/libsodium.js but https://github.com/paixaop/node-sodium may also be suitable if we move to node

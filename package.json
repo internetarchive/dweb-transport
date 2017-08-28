@@ -5,7 +5,7 @@
   "dependencies": {
     "cids": ">=0.5.1",
     "crypto": ">=0.0.3",
-    "ipfs": ">=0.25.1",
+    "ipfs": "^0.25.2",
     "ipfs-iiif-db": "^2.4.0",
     "jsdom": "^11.2.0",
     "libsodium-wrappers": "git+https://git@github.com/mitra42/libsodium.js.git",

@@ -48,9 +48,11 @@ let defaultipfsoptions = {
     //start: false,
     //TODO-IPFS-Q how is this decentralized - can it run offline? Does it depend on star-signal.cloud.ipfs.team
     config: {
-        Addresses: { Swarm: [ '/libp2p-webrtc-star/dns4/star-signal.cloud.ipfs.team/wss' ] },   // For IIIF - same as defaults
-        Discovery: { webRTCStar: { Enabled: true } }    // For IIIF - same as defaults
+//        Addresses: { Swarm: [ '/libp2p-webrtc-star/dns4/star-signal.cloud.ipfs.team/wss' ] },   // For IIIF - same as defaults
+//      Addresses: { Swarm: [ ] },   // For IIIF - same as defaults - disable WebRTC to test browser crash, note disables IIIF so doesnt work.
+                                    // For IIIF - same as defaults
     },
+    //init: false,
     EXPERIMENTAL: {
         pubsub: true
     }

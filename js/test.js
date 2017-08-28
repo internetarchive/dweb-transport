@@ -35,13 +35,15 @@ let acl;
     .then(() => Dweb.KeyPair.test(verbose))
     .then(() => Dweb.AccessControlList.p_test(verbose))
     .then((newacl) => acl = newacl)
-    /* - tests for later modules
-    .then(() => Dweb.KeyChain.p_test(acl, verbose)) // depends on MutableBlock for test, though not for KeyChain itself
+    //TODO-REL4 comment out before REL4
+    //* - tests for later modules
     .then(() => Dweb.StructuredBlock.test(document, verbose))
     .then((testobjs) => sb = testobjs.sb)
     .then(() => console.log("sb=",sb))
     .then(() => Dweb.MutableBlock.test(sb, verbose))
-     */
+    .then(() => verbose = true)
+    .then(() => Dweb.KeyChain.p_test(acl, verbose)) // depends on MutableBlock for test, though not for KeyChain itself
+     //*/ /TODO-REL4 comment out before REL4
     .then(() => console.log("delaying 10 secs"))
     .then(() => delay(10000))
     .then(()=>console.log("Completed test - running IPFS in background, hit Ctrl-C to exit"))

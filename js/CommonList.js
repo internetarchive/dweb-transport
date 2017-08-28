@@ -29,8 +29,6 @@ class CommonList extends SmartDict {
             :param options: dict that overrides any fields of data
          */
         super(data, verbose, options);
-        //TODO-REL4 move next chunk to _setdata
-        this._list = [];   // Array of members of the list
         if (key) {
             this._setkeypair(key, verbose);
         }
@@ -41,6 +39,10 @@ class CommonList extends SmartDict {
         this.table = "cl";
     }
 
+    _setdata(value) {
+        super._setdata(value);
+        this._list = this._list || [];        // Clear list (not undefined field) if setting data
+    }
     keytype() {
         /*
         Return the type of key to use from Dweb.KeyPair.KEYTYPE* constants

@@ -141,10 +141,7 @@ class KeyPair extends SmartDict {
         // Call route is ... data.setter > ...> key.setter > _importkey
         //TODO - Note fingerprint different from Python - this stores the key, change the Python
         if (typeof value === "object") {    // Should be array, not dict
-            for (let i in value) { //TODO-REL4 replace with map
-                //noinspection JSUnfilteredForInLoop
-                this._importkey(value[i]);
-            }
+            value.map((k) => this._importkey(k));
         } else {
             let arr = value.split(':',2);
             let tag = arr[0];
@@ -346,7 +343,10 @@ class KeyPair extends SmartDict {
     };
 
     static sha256(data) {
-        //TODO-REL4 document how many bytes returned - see passphrase above
+        /*
+        data:       String or Buffer containing string of arbitrary length
+        returns:    32 byte Uint8Array with SHA256 hash
+         */
         let b2 = (data instanceof Buffer) ? data : new Buffer(data);
         return crypto.createHash('sha256').update(b2).digest();
     }
