@@ -25,6 +25,12 @@ TODO-IPFS ComeBackFor: TransportHTTP & TransportHTTPBase (make use promises)
 const IPFS = require('ipfs');
 const CID = require('cids');
 //const IpfsIiifDb = require('ipfs-iiif-db');  //https://github.com/pgte/ipfs-iiif-db
+const Y = require('yjs')
+require('y-memory')(Y)
+require('y-array')(Y)
+require('y-text')(Y)
+require('y-ipfs-connector')(Y)
+
 
 const multihashes = require('multihashes'); // TODO-IPFS only required because IPFS makes it hard to get this
 
@@ -43,32 +49,33 @@ const Dweb = require('./Dweb');
 //Debugging only
 
 let defaultipfsoptions = {
-    repo: '/tmp/ipfs_dweb20170824', //TODO-IPFS think through where, esp for browser
+    repo: '/tmp/ipfs_dweb20170828B', //TODO-IPFS think through where, esp for browser
     //init: false,
     //start: false,
     //TODO-IPFS-Q how is this decentralized - can it run offline? Does it depend on star-signal.cloud.ipfs.team
     config: {
-//        Addresses: { Swarm: [ '/libp2p-webrtc-star/dns4/star-signal.cloud.ipfs.team/wss' ] },   // For IIIF - same as defaults
+        Addresses: { Swarm: [ '/libp2p-webrtc-star/dns4/star-signal.cloud.ipfs.team/wss' ] },   // For IIIF - same as defaults
 //      Addresses: { Swarm: [ ] },   // For IIIF - same as defaults - disable WebRTC to test browser crash, note disables IIIF so doesnt work.
                                     // For IIIF - same as defaults
     },
-    //init: false,
+    //init: true, // Comment out for IIIF
     EXPERIMENTAL: {
         pubsub: true
     }
 };
 
-let yoptions = {
+let defaultyarrayoptions = {
     db: {
         name: 'memory'
     },
     connector: {
         name: 'ipfs',
-        room: 'dweb'
+        room: 'dweb20170828'
         //ipfs: ipfs,   // Need to link IPFS here once created
     },
     share: {
-        textfield: 'Text'
+        //textfield: 'Text'
+        array: 'Array'
     }
 };
 
@@ -76,7 +83,7 @@ let yoptions = {
 let defaultiiifoptions = {
         //ipfs: ..., //Will have ipfsoptions stored during startup
         store: "leveldb",
-        partition: "dweb20170824" //TODO-IIIF try making parition a variable and connecting to multiple.
+        partition: "dweb20170828" //TODO-IIIF try making parition a variable and connecting to multiple.
 };
 
 const annotationlistexample = { //TODO-IPFS update this to better example
@@ -103,6 +110,17 @@ class TransportIPFS extends Transport {
         this.options = options;         // Dictionary of options { ipfs: {...}, iiif: {...}, yarray: {...} }
     }
 
+
+    _makepromises() {
+        //Utility function to promisify Block
+        //Replaced promisified utility since only two to promisify
+        //this.promisified = {ipfs:{}};
+        //makepromises(this.ipfs, this.promisified.ipfs, [ { block: ["put", "get"] }]); // Has to be after this.ipfs defined
+        this.promisified = { ipfs: { block: {
+            put: promisify(this.ipfs.block.put),
+            get: promisify(this.ipfs.block.get)
+        }}}
+    }
     // This starts up IPFS under IIIF
     p_iiifstart(verbose) { //TODO-REL4-API
 
@@ -113,13 +131,7 @@ class TransportIPFS extends Transport {
         const res = IIIF(iiifoptions); //Note this doesn't start either IPFS or annotationlist
         this.iiif = res;
         this.ipfs = res.ipfs;
-        //Replaced promisified utility since only two to promisify
-        //this.promisified = {ipfs:{}};
-        //makepromises(this.ipfs, this.promisified.ipfs, [ { block: ["put", "get"] }]); // Has to be after this.ipfs defined
-        this.promisified = { ipfs: { block: {
-            put: promisify(this.ipfs.block.put),
-            get: promisify(this.ipfs.block.get)
-        }}}
+        this._makepromises()
         let self = this;
         return new Promise((resolve, reject) => {
             self.ipfs.version()
@@ -129,7 +141,7 @@ class TransportIPFS extends Transport {
                     this.annotationList = this.iiif.annotationList(annotationlistexample);    //TODO-IPFS-MULTILIST move this to the list command - means splitting stuff under it that calls bootstrap
                     this.annotationList.on('started', (event) => {
                         console.log("IPFS node after annotation list start",self.ipfs.isOnline() ? "now online" : "but still offline");   //TODO throw error if not online
-                        if (verbose) { console.log("annotationList started, list at start = ", ...Dweb.utils.consolearr(t.annotationList.getResources()));}
+                        if (verbose) { console.log("annotationList started, list at start = ", ...Dweb.utils.consolearr(this.annotationList.getResources()));}
                         resolve();  // Cant resolve till annotation list online
                     }) // Note delayed resole after really online
                 })
@@ -140,15 +152,47 @@ class TransportIPFS extends Transport {
         })
     }
 
+    p_yarraystart(verbose) { //TODO-REL4-API
 
-    static p_setup(verbose, options) { // Note can pass multiple options dictionaries - furthest right overrides.
+        let yarrayoptions = this.options.yarray;
+        let self = this;
+        return new Promise((resolve, reject) => {
+            this.ipfs = new IPFS(this.options.ipfs)
+            this.ipfs.on('ready', () => {
+                this._makepromises()
+                resolve();
+            });
+            this.ipfs.on('error', (err) => reject(err));
+        })
+        .then(() => self.ipfs.version())
+        .then((version) => console.log('IPFS READY',version))
+        .then(() => {
+            yarrayoptions.connector.ipfs = this.ipfs; // Note that Y needs the IPFS instance, while IIIF needs the IPFS options.
+            return Y(yarrayoptions)
+        })
+        .then((y) => {
+            this.yarray = y
+            console.log("Y started");
+        })
+        .catch((err) => {
+            console.log("Error caught in p_yarraystart",err);
+            throw(err);
+        })
+        //Lots of issues with "init" not knowing state before it//  this.ipfs.init({emptyRepo: true, bits: 2048})     //.then((unused) => ipfs.init({emptyRepo: true, bits: 2048}))
+    }
+
+
+    static p_setup(verbose, options) { // Note can pass multiple options dictionaries - furthest right overrides. //TODO-REL4-API
         let combinedoptions = {
-            ipfs: Object.assign(defaultipfsoptions, options.ipfs),
-            iiif: Object.assign(defaultiiifoptions, options.iiif) }
+            iiif: Object.assign(defaultiiifoptions, options.iiif),  //TODO-YARRAY comment out
+            yarray: Object.assign(defaultyarrayoptions, options.yarray),
+            ipfs: Object.assign(defaultipfsoptions, options.ipfs)
+        }
         //let combinedoptions = Object.assign({ ipfs: defaultipfsoptions, yarray: defaultyoptions}, ...optionsarr )
         console.log("IPFS options", JSON.stringify(combinedoptions));
-        let t = new TransportIPFS(verbose, combinedoptions, );   // Note doesnt start IPFS or IIIF or Y
-        return t.p_iiifstart(verbose)
+        let t = new TransportIPFS(verbose, combinedoptions);   // Note doesnt start IPFS or IIIF or Y
+        //return t.p_iiifstart(verbose)
+        return t.p_yarraystart(verbose)
             .then(() => t)
             .catch((err) => {
                 console.log("Uncaught error in TransportIPFS.setup", err);
@@ -210,7 +254,8 @@ class TransportIPFS extends Transport {
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
         return new Promise((resolve, reject) => {  //XXXREJECT
             try {
-                let res = this.annotationList.getResources()
+                //let res = this.annotationList.getResources()
+                let res = this.yarray.share.array.toArray()
                     .filter((obj) => (obj.signedby === url));
                 if (verbose) console.log("p_rawlist found", ...Dweb.utils.consolearr(res));
                 resolve(res);
@@ -223,13 +268,21 @@ class TransportIPFS extends Transport {
     listmonitor(url, callback, verbose) {
         // Typically called immediately after a p_rawlist to get notification of future items
         //TODO-IPFS-MULTILIST will want to make more efficient.
-        this.annotationList.on('resource inserted', (event) => {
+        //this.annotationList.on('resource inserted', (event) => {
+        this.yarray.share.array.observe((event) => {
+            if (event.type === 'insert') { // Currently ignoring deletions.
+                //console.log("XXX@273", event);
+                if (verbose) console.log('resources inserted', event.values);
+                event.values.filter((obj) => obj.signedby === url).map(callback)
+            }
+            /*
             let obj = event.value;
             if (verbose) console.log('resource inserted', obj);
             //obj["signature"] = obj["@id"];
             //delete obj["@id"];
             //console.log('resource after transform', obj);
             if (callback && (obj.signedby === url)) callback(obj);
+            */
         })
     }
 
@@ -245,8 +298,9 @@ class TransportIPFS extends Transport {
     rawadd(url, date, signature, signedby, verbose) {
         console.assert(url && signature && signedby, "p_rawadd args",url,signature,signedby);
         if (verbose) console.log("p_rawadd", url, date, signature, signedby);
-        let value = {"@id": signature, "url": url, "date": date, "signature": signature, "signedby": signedby};
-        this.annotationList.pushResource(value);
+        let value = {"url": url, "date": date, "signature": signature, "signedby": signedby};
+        //this.annotationList.pushResource(value);
+        this.yarray.share.array.push([value]);
     }
     p_rawadd(url, date, signature, signedby, verbose) {
         return new Promise((resolve, reject)=> { try {
