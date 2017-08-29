@@ -58,8 +58,26 @@ let defaultipfsoptions = {
     }
 };
 
+let yoptions = {
+    db: {
+        name: 'memory'
+    },
+    connector: {
+        name: 'ipfs',
+        room: 'dweb'
+        //ipfs: ipfs,   // Need to link IPFS here once created
+    },
+    share: {
+        textfield: 'Text'
+    }
+};
+
 // See https://github.com/pgte/ipfs-iiif-db for options
-let defaultiiifoptions = { ipfs: defaultipfsoptions, store: "leveldb", partition: "dweb20170824" }; //TODO-IIIF try making parition a variable and connecting to multiple
+let defaultiiifoptions = {
+        //ipfs: ..., //Will have ipfsoptions stored during startup
+        store: "leveldb",
+        partition: "dweb20170824" //TODO-IIIF try making parition a variable and connecting to multiple.
+};
 
 const annotationlistexample = { //TODO-IPFS update this to better example
     "@id": "foobar",    // Only required field is @id
@@ -70,69 +88,72 @@ const annotationlistexample = { //TODO-IPFS update this to better example
 };
 
 class TransportIPFS extends Transport {
+    /*
+    IPFS specific transport
 
-    constructor(ipfsoptions, verbose, options) {
+    Fields:
+    ipfs: object returned when starting IPFS
+    iiif: object returned when starting iiif
+    yarray: object returned when starting yarray
+     */
+
+    constructor(verbose, options) {
         super(verbose, options);
-        this.ipfs = undefined;  // Not yet defined
-        this.ipfsoptions = ipfsoptions; // Dictionary of options, currently unused
-        this.options = options;
-
+        this.ipfs = undefined;          // Undefined till start IPFS
+        this.options = options;         // Dictionary of options { ipfs: {...}, iiif: {...}, yarray: {...} }
     }
 
-    // This chunk starts up IPFS (old version w/o IIIF)
-    static ipfsstart(iiifoptions, verbose) {
+    // This starts up IPFS under IIIF
+    p_iiifstart(verbose) { //TODO-REL4-API
+
         //let ipfs = new IPFS(ipfsoptions); // Without CRDT (for lists)
         // Next line is for browser compatibility - there is a bug in browserify so IIIF has to be loaded separately in browser, by test.js for node
         let IIIF = typeof IpfsIiifDb === "undefined" ? TransportIPFS.IpfsIiifDb : IpfsIiifDb;
+        let iiifoptions = Object.assign(this.options.iiif, {ipfs: this.options.ipfs}); // IIIF wants to see the IPFS options.
         const res = IIIF(iiifoptions); //Note this doesn't start either IPFS or annotationlist
-        const ipfs = res.ipfs;
+        this.iiif = res;
+        this.ipfs = res.ipfs;
+        //Replaced promisified utility since only two to promisify
+        //this.promisified = {ipfs:{}};
+        //makepromises(this.ipfs, this.promisified.ipfs, [ { block: ["put", "get"] }]); // Has to be after this.ipfs defined
+        this.promisified = { ipfs: { block: {
+            put: promisify(this.ipfs.block.put),
+            get: promisify(this.ipfs.block.get)
+        }}}
+        let self = this;
         return new Promise((resolve, reject) => {
-            ipfs.version()
+            self.ipfs.version()
                 .then((version) => console.log("Version=", version))
-                //TODO-IPFS - have to disable init and start for CRDT/lists as it starts itself - will be a problem for TODO-IPFS-MULTILIST
-                //.then((unused) => ipfs.init({emptyRepo: true, bits: 2048}))
-                //.then((version) => console.log("initialized"))
-                //.then((unused) => ipfs.start())
-                .then((unused) => console.log("IPFS node",ipfs.isOnline() ? "and online" : "but offline"))    //TODO throw error if not online
-                .then(() => resolve(res))
-                //.then(() => resolve(ipfs))  // Whatever happens above, want to return ipfs to caller
+                .then(() => {
+                    console.log("IPFS/IIIF node",self.ipfs.isOnline() ? "and online" : "but offline");    //TODO throw error if not online
+                    this.annotationList = this.iiif.annotationList(annotationlistexample);    //TODO-IPFS-MULTILIST move this to the list command - means splitting stuff under it that calls bootstrap
+                    this.annotationList.on('started', (event) => {
+                        console.log("IPFS node after annotation list start",self.ipfs.isOnline() ? "now online" : "but still offline");   //TODO throw error if not online
+                        if (verbose) { console.log("annotationList started, list at start = ", ...Dweb.utils.consolearr(t.annotationList.getResources()));}
+                        resolve();  // Cant resolve till annotation list online
+                    }) // Note delayed resole after really online
+                })
                 .catch((err) => {
-                    console.log("UNCAUGHT ERROR in ipfsstart", err);
+                    console.log("UNCAUGHT ERROR in TransportIPFS.iiifstart", err);
                     reject(err)
                 })
         })
     }
 
 
-    static p_setup(ipfsiiifoptions, verbose, options) {
-        let combinedipfsoptions = Object.assign(defaultipfsoptions, ipfsiiifoptions.ipfs);
-        let combinediiifoptions = Object.assign(defaultiiifoptions, ipfsiiifoptions.iiif,{ipfs:defaultipfsoptions});   // Top level in this case
-        console.log("IPFS options", JSON.stringify(combinediiifoptions));
-        let t = new TransportIPFS(combinedipfsoptions, verbose, options);
-        return new Promise((resolve, reject) => {
-            TransportIPFS.ipfsstart(combinediiifoptions, verbose)
-            .then((res) => {
-                t.iiif = res;
-                t.ipfs = res.ipfs;
-                //Replaced promisified utility since only two to promisify
-                //t.promisified = {ipfs:{}};
-                //makepromises(t.ipfs, t.promisified.ipfs, [ { block: ["put", "get"] }]); // Has to be after t.ipfs defined
-                t.promisified = { ipfs: { block: {
-                    put: promisify(t.ipfs.block.put),
-                    get: promisify(t.ipfs.block.get)
-                }}}
-                t.annotationList = res.annotationList(annotationlistexample);    //TODO-IPFS-MULTILIST move this to the list command - means splitting stuff under it that calls bootstrap
-                t.annotationList.on('started', (event) => {
-                    console.log("IPFS node after annotation list start",t.ipfs.isOnline() ? "now online" : "but still offline");   //TODO throw error if not online
-                    if (verbose) { console.log("annotationList started, list at start = ", ...Dweb.utils.consolearr(t.annotationList.getResources()));}
-                    resolve(t);  // Cant resolve till annotation list online
-                })
-            })
+    static p_setup(verbose, options) { // Note can pass multiple options dictionaries - furthest right overrides.
+        let combinedoptions = {
+            ipfs: Object.assign(defaultipfsoptions, options.ipfs),
+            iiif: Object.assign(defaultiiifoptions, options.iiif) }
+        //let combinedoptions = Object.assign({ ipfs: defaultipfsoptions, yarray: defaultyoptions}, ...optionsarr )
+        console.log("IPFS options", JSON.stringify(combinedoptions));
+        let t = new TransportIPFS(verbose, combinedoptions, );   // Note doesnt start IPFS or IIIF or Y
+        return t.p_iiifstart(verbose)
+            .then(() => t)
             .catch((err) => {
                 console.log("Uncaught error in TransportIPFS.setup", err);
-                reject(err);
+                throw(err);
             })
-        })
     }
 
     url(data) {

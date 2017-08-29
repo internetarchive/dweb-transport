@@ -194,7 +194,7 @@
     let transportclass = TransportIPFS;
     setstatus("IPFS Starting");
     //let transportclass = TransportHTTP    // Uncomment this to choose HTTP, but note p_setup below needs fixing
-    transportclass.p_setup({iiif: {store: "indexeddb"}}, verbose, {})
+    transportclass.p_setup(verbose, {iiif: {store: "indexeddb"}})
         .then((t) => {
             setstatus(t.ipfs.isOnline() ? "IPFS Online" : "IPFS Not online");
             if (verbose) console.log("setup returned and transport set - including annotationList");

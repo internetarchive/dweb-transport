@@ -28,7 +28,7 @@ class TransportHTTP extends TransportHTTPBase {
         })
     }
 
-    static setup(ipandport, options) {
+    static setup(ipandport, options) {  //TODO-HTTP work this into new setup format with one set of options.
         let verbose = false;    //TODO check if should be in args
         return new TransportHTTP(ipandport, verbose, options);
     }
