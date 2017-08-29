@@ -49,7 +49,7 @@ const Dweb = require('./Dweb');
 //Debugging only
 
 let defaultipfsoptions = {
-    repo: '/tmp/ipfs_dweb20170828B', //TODO-IPFS think through where, esp for browser
+    repo: '/tmp/ipfs_dweb20170828', //TODO-IPFS think through where, esp for browser
     //init: false,
     //start: false,
     //TODO-IPFS-Q how is this decentralized - can it run offline? Does it depend on star-signal.cloud.ipfs.team
@@ -188,11 +188,10 @@ class TransportIPFS extends Transport {
             yarray: Object.assign(defaultyarrayoptions, options.yarray),
             ipfs: Object.assign(defaultipfsoptions, options.ipfs)
         }
-        //let combinedoptions = Object.assign({ ipfs: defaultipfsoptions, yarray: defaultyoptions}, ...optionsarr )
         console.log("IPFS options", JSON.stringify(combinedoptions));
         let t = new TransportIPFS(verbose, combinedoptions);   // Note doesnt start IPFS or IIIF or Y
-        //return t.p_iiifstart(verbose)
-        return t.p_yarraystart(verbose)
+        return t.p_iiifstart(verbose)
+        //return t.p_yarraystart(verbose)
             .then(() => t)
             .catch((err) => {
                 console.log("Uncaught error in TransportIPFS.setup", err);
@@ -222,7 +221,7 @@ class TransportIPFS extends Transport {
 
     static url2cid(url) {
         let arr = url.split('/');
-        if (!(arr.length===3 && arr[0] == "ipfs:" && arr[1]==="ipfs"))
+        if (!(arr.length===3 && arr[0] === "ipfs:" && arr[1]==="ipfs"))
                 throw new Dweb.errors.TransportError("TransportIPFS.url2cid bad format for url should be ipfs:/ipfs/...: "+url);
         return new CID(arr[2])
     }
@@ -254,8 +253,7 @@ class TransportIPFS extends Transport {
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
         return new Promise((resolve, reject) => {  //XXXREJECT
             try {
-                //let res = this.annotationList.getResources()
-                let res = this.yarray.share.array.toArray()
+                let res = (this.iiif ? this.annotationList.getResources() : this.yarray.share.array.toArray()) // Support IIIF or Y for now
                     .filter((obj) => (obj.signedby === url));
                 if (verbose) console.log("p_rawlist found", ...Dweb.utils.consolearr(res));
                 resolve(res);
@@ -268,22 +266,21 @@ class TransportIPFS extends Transport {
     listmonitor(url, callback, verbose) {
         // Typically called immediately after a p_rawlist to get notification of future items
         //TODO-IPFS-MULTILIST will want to make more efficient.
-        //this.annotationList.on('resource inserted', (event) => {
-        this.yarray.share.array.observe((event) => {
-            if (event.type === 'insert') { // Currently ignoring deletions.
-                //console.log("XXX@273", event);
-                if (verbose) console.log('resources inserted', event.values);
-                event.values.filter((obj) => obj.signedby === url).map(callback)
-            }
-            /*
-            let obj = event.value;
-            if (verbose) console.log('resource inserted', obj);
-            //obj["signature"] = obj["@id"];
-            //delete obj["@id"];
-            //console.log('resource after transform', obj);
-            if (callback && (obj.signedby === url)) callback(obj);
-            */
-        })
+        if (this.iiif) {
+            this.annotationList.on('resource inserted', (event) => {
+                let obj = event.value;
+                if (verbose) console.log('resource inserted', obj);
+                if (callback && (obj.signedby === url)) callback(obj);
+            });
+        } else {
+            this.yarray.share.array.observe((event) => {
+                if (event.type === 'insert') { // Currently ignoring deletions.
+                    //console.log("XXX@273", event);
+                    if (verbose) console.log('resources inserted', event.values);
+                    event.values.filter((obj) => obj.signedby === url).map(callback)
+                }
+            });
+        }
     }
 
     rawreverse() { console.assert(false, "XXX Undefined function TransportHTTP.rawreverse"); }
@@ -299,8 +296,12 @@ class TransportIPFS extends Transport {
         console.assert(url && signature && signedby, "p_rawadd args",url,signature,signedby);
         if (verbose) console.log("p_rawadd", url, date, signature, signedby);
         let value = {"url": url, "date": date, "signature": signature, "signedby": signedby};
-        //this.annotationList.pushResource(value);
-        this.yarray.share.array.push([value]);
+        if (this.iiif) {
+            value["@id"] = signature;
+            this.annotationList.pushResource(value);
+        } else {
+            this.yarray.share.array.push([value]);
+        }
     }
     p_rawadd(url, date, signature, signedby, verbose) {
         return new Promise((resolve, reject)=> { try {
