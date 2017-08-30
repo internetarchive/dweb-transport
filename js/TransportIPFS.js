@@ -24,7 +24,9 @@ TODO-IPFS ComeBackFor: TransportHTTP & TransportHTTPBase (make use promises)
 
 const IPFS = require('ipfs');
 const CID = require('cids');
+// Leave IpfsIiiifDb commented out as there is (or at least "was") a bug where browserify crashes if included directly - include seperately in the app.
 //const IpfsIiifDb = require('ipfs-iiif-db');  //https://github.com/pgte/ipfs-iiif-db
+// The following only required for Y version
 const Y = require('yjs')
 require('y-memory')(Y)
 require('y-array')(Y)
@@ -83,10 +85,10 @@ let defaultyarrayoptions = {
 let defaultiiifoptions = {
         //ipfs: ..., //Will have ipfsoptions stored during startup
         store: "leveldb",
-        partition: "dweb20170828" //TODO-IIIF try making parition a variable and connecting to multiple.
+        partition: "dweb20170828" //TODO-IIIF try making parition a variable and connecting to multiple lists.
 };
 
-const annotationlistexample = { //TODO-IPFS update this to better example
+const annotationlistexample = { //TODO-IPFS update this to better example, not required for Y, only IIIF
     "@id": "foobar",    // Only required field is @id
     "url": "ipfs:/ipfs/A1B2C3D4E5",
     "date": "20170104T1234",
@@ -190,8 +192,12 @@ class TransportIPFS extends Transport {
         }
         console.log("IPFS options", JSON.stringify(combinedoptions));
         let t = new TransportIPFS(verbose, combinedoptions);   // Note doesnt start IPFS or IIIF or Y
-        return t.p_iiifstart(verbose)
-        //return t.p_yarraystart(verbose)
+        //Switch the comments on the next two lines to switch back and forth between IIIF or Y for testing
+        //TODO-REL4 move the IIIF/Y choice into options
+        //TODO-REL5 try multiple Y-lists
+        //TODO-REL5 move to multi-transport
+        //return t.p_iiifstart(verbose)
+        return t.p_yarraystart(verbose)
             .then(() => t)
             .catch((err) => {
                 console.log("Uncaught error in TransportIPFS.setup", err);

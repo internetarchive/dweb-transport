@@ -1282,7 +1282,7 @@ exports = module.exports = KeyPair;
 
 
 }).call(this,require("buffer").Buffer)
-},{"./Dweb":4,"./SmartDict":9,"buffer":128,"crypto":141,"libsodium-wrappers":477}],7:[function(require,module,exports){
+},{"./Dweb":4,"./SmartDict":9,"buffer":128,"crypto":141,"libsodium-wrappers":482}],7:[function(require,module,exports){
 // ######### Parallel development to MutableBlock.py ########
 
 const CommonList = require("./CommonList");
@@ -1990,7 +1990,15 @@ TODO-IPFS ComeBackFor: TransportHTTP & TransportHTTPBase (make use promises)
 
 const IPFS = require('ipfs');
 const CID = require('cids');
+// Leave IpfsIiiifDb commented out as there is (or at least "was") a bug where browserify crashes if included directly - include seperately in the app.
 //const IpfsIiifDb = require('ipfs-iiif-db');  //https://github.com/pgte/ipfs-iiif-db
+// The following only required for Y version
+const Y = require('yjs')
+require('y-memory')(Y)
+require('y-array')(Y)
+require('y-text')(Y)
+require('y-ipfs-connector')(Y)
+
 
 const multihashes = require('multihashes'); // TODO-IPFS only required because IPFS makes it hard to get this
 
@@ -2009,25 +2017,44 @@ const Dweb = require('./Dweb');
 //Debugging only
 
 let defaultipfsoptions = {
-    repo: '/tmp/ipfs_dweb20170824', //TODO-IPFS think through where, esp for browser
+    repo: '/tmp/ipfs_dweb20170828', //TODO-IPFS think through where, esp for browser
     //init: false,
     //start: false,
     //TODO-IPFS-Q how is this decentralized - can it run offline? Does it depend on star-signal.cloud.ipfs.team
     config: {
-//        Addresses: { Swarm: [ '/libp2p-webrtc-star/dns4/star-signal.cloud.ipfs.team/wss' ] },   // For IIIF - same as defaults
+        Addresses: { Swarm: [ '/libp2p-webrtc-star/dns4/star-signal.cloud.ipfs.team/wss' ] },   // For IIIF - same as defaults
 //      Addresses: { Swarm: [ ] },   // For IIIF - same as defaults - disable WebRTC to test browser crash, note disables IIIF so doesnt work.
                                     // For IIIF - same as defaults
     },
-    //init: false,
+    //init: true, // Comment out for IIIF
     EXPERIMENTAL: {
         pubsub: true
     }
 };
 
-// See https://github.com/pgte/ipfs-iiif-db for options
-let defaultiiifoptions = { ipfs: defaultipfsoptions, store: "leveldb", partition: "dweb20170824" }; //TODO-IIIF try making parition a variable and connecting to multiple
+let defaultyarrayoptions = {
+    db: {
+        name: 'memory'
+    },
+    connector: {
+        name: 'ipfs',
+        room: 'dweb20170828'
+        //ipfs: ipfs,   // Need to link IPFS here once created
+    },
+    share: {
+        //textfield: 'Text'
+        array: 'Array'
+    }
+};
 
-const annotationlistexample = { //TODO-IPFS update this to better example
+// See https://github.com/pgte/ipfs-iiif-db for options
+let defaultiiifoptions = {
+        //ipfs: ..., //Will have ipfsoptions stored during startup
+        store: "leveldb",
+        partition: "dweb20170828" //TODO-IIIF try making parition a variable and connecting to multiple lists.
+};
+
+const annotationlistexample = { //TODO-IPFS update this to better example, not required for Y, only IIIF
     "@id": "foobar",    // Only required field is @id
     "url": "ipfs:/ipfs/A1B2C3D4E5",
     "date": "20170104T1234",
@@ -2036,69 +2063,112 @@ const annotationlistexample = { //TODO-IPFS update this to better example
 };
 
 class TransportIPFS extends Transport {
+    /*
+    IPFS specific transport
 
-    constructor(ipfsoptions, verbose, options) {
+    Fields:
+    ipfs: object returned when starting IPFS
+    iiif: object returned when starting iiif
+    yarray: object returned when starting yarray
+     */
+
+    constructor(verbose, options) {
         super(verbose, options);
-        this.ipfs = undefined;  // Not yet defined
-        this.ipfsoptions = ipfsoptions; // Dictionary of options, currently unused
-        this.options = options;
-
+        this.ipfs = undefined;          // Undefined till start IPFS
+        this.options = options;         // Dictionary of options { ipfs: {...}, iiif: {...}, yarray: {...} }
     }
 
-    // This chunk starts up IPFS (old version w/o IIIF)
-    static ipfsstart(iiifoptions, verbose) {
+
+    _makepromises() {
+        //Utility function to promisify Block
+        //Replaced promisified utility since only two to promisify
+        //this.promisified = {ipfs:{}};
+        //makepromises(this.ipfs, this.promisified.ipfs, [ { block: ["put", "get"] }]); // Has to be after this.ipfs defined
+        this.promisified = { ipfs: { block: {
+            put: promisify(this.ipfs.block.put),
+            get: promisify(this.ipfs.block.get)
+        }}}
+    }
+    // This starts up IPFS under IIIF
+    p_iiifstart(verbose) { //TODO-REL4-API
+
         //let ipfs = new IPFS(ipfsoptions); // Without CRDT (for lists)
         // Next line is for browser compatibility - there is a bug in browserify so IIIF has to be loaded separately in browser, by test.js for node
         let IIIF = typeof IpfsIiifDb === "undefined" ? TransportIPFS.IpfsIiifDb : IpfsIiifDb;
+        let iiifoptions = Object.assign(this.options.iiif, {ipfs: this.options.ipfs}); // IIIF wants to see the IPFS options.
         const res = IIIF(iiifoptions); //Note this doesn't start either IPFS or annotationlist
-        const ipfs = res.ipfs;
+        this.iiif = res;
+        this.ipfs = res.ipfs;
+        this._makepromises()
+        let self = this;
         return new Promise((resolve, reject) => {
-            ipfs.version()
+            self.ipfs.version()
                 .then((version) => console.log("Version=", version))
-                //TODO-IPFS - have to disable init and start for CRDT/lists as it starts itself - will be a problem for TODO-IPFS-MULTILIST
-                //.then((unused) => ipfs.init({emptyRepo: true, bits: 2048}))
-                //.then((version) => console.log("initialized"))
-                //.then((unused) => ipfs.start())
-                .then((unused) => console.log("IPFS node",ipfs.isOnline() ? "and online" : "but offline"))    //TODO throw error if not online
-                .then(() => resolve(res))
-                //.then(() => resolve(ipfs))  // Whatever happens above, want to return ipfs to caller
+                .then(() => {
+                    console.log("IPFS/IIIF node",self.ipfs.isOnline() ? "and online" : "but offline");    //TODO throw error if not online
+                    this.annotationList = this.iiif.annotationList(annotationlistexample);    //TODO-IPFS-MULTILIST move this to the list command - means splitting stuff under it that calls bootstrap
+                    this.annotationList.on('started', (event) => {
+                        console.log("IPFS node after annotation list start",self.ipfs.isOnline() ? "now online" : "but still offline");   //TODO throw error if not online
+                        if (verbose) { console.log("annotationList started, list at start = ", ...Dweb.utils.consolearr(this.annotationList.getResources()));}
+                        resolve();  // Cant resolve till annotation list online
+                    }) // Note delayed resole after really online
+                })
                 .catch((err) => {
-                    console.log("UNCAUGHT ERROR in ipfsstart", err);
+                    console.log("UNCAUGHT ERROR in TransportIPFS.iiifstart", err);
                     reject(err)
                 })
         })
     }
 
+    p_yarraystart(verbose) { //TODO-REL4-API
 
-    static p_setup(ipfsiiifoptions, verbose, options) {
-        let combinedipfsoptions = Object.assign(defaultipfsoptions, ipfsiiifoptions.ipfs);
-        let combinediiifoptions = Object.assign(defaultiiifoptions, ipfsiiifoptions.iiif,{ipfs:defaultipfsoptions});   // Top level in this case
-        console.log("IPFS options", JSON.stringify(combinediiifoptions));
-        let t = new TransportIPFS(combinedipfsoptions, verbose, options);
+        let yarrayoptions = this.options.yarray;
+        let self = this;
         return new Promise((resolve, reject) => {
-            TransportIPFS.ipfsstart(combinediiifoptions, verbose)
-            .then((res) => {
-                t.iiif = res;
-                t.ipfs = res.ipfs;
-                //Replaced promisified utility since only two to promisify
-                //t.promisified = {ipfs:{}};
-                //makepromises(t.ipfs, t.promisified.ipfs, [ { block: ["put", "get"] }]); // Has to be after t.ipfs defined
-                t.promisified = { ipfs: { block: {
-                    put: promisify(t.ipfs.block.put),
-                    get: promisify(t.ipfs.block.get)
-                }}}
-                t.annotationList = res.annotationList(annotationlistexample);    //TODO-IPFS-MULTILIST move this to the list command - means splitting stuff under it that calls bootstrap
-                t.annotationList.on('started', (event) => {
-                    console.log("IPFS node after annotation list start",t.ipfs.isOnline() ? "now online" : "but still offline");   //TODO throw error if not online
-                    if (verbose) { console.log("annotationList started, list at start = ", ...Dweb.utils.consolearr(t.annotationList.getResources()));}
-                    resolve(t);  // Cant resolve till annotation list online
-                })
-            })
+            this.ipfs = new IPFS(this.options.ipfs)
+            this.ipfs.on('ready', () => {
+                this._makepromises()
+                resolve();
+            });
+            this.ipfs.on('error', (err) => reject(err));
+        })
+        .then(() => self.ipfs.version())
+        .then((version) => console.log('IPFS READY',version))
+        .then(() => {
+            yarrayoptions.connector.ipfs = this.ipfs; // Note that Y needs the IPFS instance, while IIIF needs the IPFS options.
+            return Y(yarrayoptions)
+        })
+        .then((y) => {
+            this.yarray = y
+            console.log("Y started");
+        })
+        .catch((err) => {
+            console.log("Error caught in p_yarraystart",err);
+            throw(err);
+        })
+        //Lots of issues with "init" not knowing state before it//  this.ipfs.init({emptyRepo: true, bits: 2048})     //.then((unused) => ipfs.init({emptyRepo: true, bits: 2048}))
+    }
+
+
+    static p_setup(verbose, options) { // Note can pass multiple options dictionaries - furthest right overrides. //TODO-REL4-API
+        let combinedoptions = {
+            iiif: Object.assign(defaultiiifoptions, options.iiif),  //TODO-YARRAY comment out
+            yarray: Object.assign(defaultyarrayoptions, options.yarray),
+            ipfs: Object.assign(defaultipfsoptions, options.ipfs)
+        }
+        console.log("IPFS options", JSON.stringify(combinedoptions));
+        let t = new TransportIPFS(verbose, combinedoptions);   // Note doesnt start IPFS or IIIF or Y
+        //Switch the comments on the next two lines to switch back and forth between IIIF or Y for testing
+        //TODO-REL4 move the IIIF/Y choice into options
+        //TODO-REL5 try multiple Y-lists
+        //TODO-REL5 move to multi-transport
+        //return t.p_iiifstart(verbose)
+        return t.p_yarraystart(verbose)
+            .then(() => t)
             .catch((err) => {
                 console.log("Uncaught error in TransportIPFS.setup", err);
-                reject(err);
+                throw(err);
             })
-        })
     }
 
     url(data) {
@@ -2123,7 +2193,7 @@ class TransportIPFS extends Transport {
 
     static url2cid(url) {
         let arr = url.split('/');
-        if (!(arr.length===3 && arr[0] == "ipfs:" && arr[1]==="ipfs"))
+        if (!(arr.length===3 && arr[0] === "ipfs:" && arr[1]==="ipfs"))
                 throw new Dweb.errors.TransportError("TransportIPFS.url2cid bad format for url should be ipfs:/ipfs/...: "+url);
         return new CID(arr[2])
     }
@@ -2155,7 +2225,7 @@ class TransportIPFS extends Transport {
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
         return new Promise((resolve, reject) => {  //XXXREJECT
             try {
-                let res = this.annotationList.getResources()
+                let res = (this.iiif ? this.annotationList.getResources() : this.yarray.share.array.toArray()) // Support IIIF or Y for now
                     .filter((obj) => (obj.signedby === url));
                 if (verbose) console.log("p_rawlist found", ...Dweb.utils.consolearr(res));
                 resolve(res);
@@ -2168,14 +2238,21 @@ class TransportIPFS extends Transport {
     listmonitor(url, callback, verbose) {
         // Typically called immediately after a p_rawlist to get notification of future items
         //TODO-IPFS-MULTILIST will want to make more efficient.
-        this.annotationList.on('resource inserted', (event) => {
-            let obj = event.value;
-            if (verbose) console.log('resource inserted', obj);
-            //obj["signature"] = obj["@id"];
-            //delete obj["@id"];
-            //console.log('resource after transform', obj);
-            if (callback && (obj.signedby === url)) callback(obj);
-        })
+        if (this.iiif) {
+            this.annotationList.on('resource inserted', (event) => {
+                let obj = event.value;
+                if (verbose) console.log('resource inserted', obj);
+                if (callback && (obj.signedby === url)) callback(obj);
+            });
+        } else {
+            this.yarray.share.array.observe((event) => {
+                if (event.type === 'insert') { // Currently ignoring deletions.
+                    //console.log("XXX@273", event);
+                    if (verbose) console.log('resources inserted', event.values);
+                    event.values.filter((obj) => obj.signedby === url).map(callback)
+                }
+            });
+        }
     }
 
     rawreverse() { console.assert(false, "XXX Undefined function TransportHTTP.rawreverse"); }
@@ -2190,8 +2267,13 @@ class TransportIPFS extends Transport {
     rawadd(url, date, signature, signedby, verbose) {
         console.assert(url && signature && signedby, "p_rawadd args",url,signature,signedby);
         if (verbose) console.log("p_rawadd", url, date, signature, signedby);
-        let value = {"@id": signature, "url": url, "date": date, "signature": signature, "signedby": signedby};
-        this.annotationList.pushResource(value);
+        let value = {"url": url, "date": date, "signature": signature, "signedby": signedby};
+        if (this.iiif) {
+            value["@id"] = signature;
+            this.annotationList.pushResource(value);
+        } else {
+            this.yarray.share.array.push([value]);
+        }
     }
     p_rawadd(url, date, signature, signedby, verbose) {
         return new Promise((resolve, reject)=> { try {
@@ -2267,7 +2349,7 @@ class TransportIPFS extends Transport {
 exports = module.exports = TransportIPFS;
 
 }).call(this,require("buffer").Buffer)
-},{"./Dweb":4,"./Transport":11,"buffer":128,"cids":129,"crypto":141,"ipfs":333,"multihashes":555,"promisify-es6":604}],13:[function(require,module,exports){
+},{"./Dweb":4,"./Transport":11,"buffer":128,"cids":129,"crypto":141,"ipfs":338,"multihashes":562,"promisify-es6":611,"y-array":778,"y-ipfs-connector":781,"y-memory":782,"y-text":784,"yjs":792}],13:[function(require,module,exports){
 // ######### Parallel development to CommonBlock.py ########
 const Dweb = require("./Dweb");
 
@@ -2372,7 +2454,7 @@ window.sodium = require("libsodium-wrappers");  // Needed for cryptotest
 window.TransportIPFS = require('./TransportIPFS');
 //window.TransportHTTP = require('./TransportHTTP');
 
-},{"./Dweb":4,"./TransportIPFS":12,"libsodium-wrappers":477}],15:[function(require,module,exports){
+},{"./Dweb":4,"./TransportIPFS":12,"libsodium-wrappers":482}],15:[function(require,module,exports){
 module.exports = after
 
 function after(count, callback, err_cb) {
@@ -2507,7 +2589,7 @@ Entity.prototype.encode = function encode(data, enc, /* internal */ reporter) {
   return this._getEncoder(enc).encode(data, reporter);
 };
 
-},{"../asn1":17,"inherits":242,"vm":765}],19:[function(require,module,exports){
+},{"../asn1":17,"inherits":244,"vm":773}],19:[function(require,module,exports){
 var inherits = require('inherits');
 var Reporter = require('../base').Reporter;
 var Buffer = require('buffer').Buffer;
@@ -2625,7 +2707,7 @@ EncoderBuffer.prototype.join = function join(out, offset) {
   return out;
 };
 
-},{"../base":20,"buffer":128,"inherits":242}],20:[function(require,module,exports){
+},{"../base":20,"buffer":128,"inherits":244}],20:[function(require,module,exports){
 var base = exports;
 
 base.Reporter = require('./reporter').Reporter;
@@ -3269,7 +3351,7 @@ Node.prototype._isPrintstr = function isPrintstr(str) {
   return /^[A-Za-z0-9 '\(\)\+,\-\.\/:=\?]*$/.test(str);
 };
 
-},{"../base":20,"minimalistic-assert":538}],22:[function(require,module,exports){
+},{"../base":20,"minimalistic-assert":545}],22:[function(require,module,exports){
 var inherits = require('inherits');
 
 function Reporter(options) {
@@ -3392,7 +3474,7 @@ ReporterError.prototype.rethrow = function rethrow(msg) {
   return this;
 };
 
-},{"inherits":242}],23:[function(require,module,exports){
+},{"inherits":244}],23:[function(require,module,exports){
 var constants = require('../constants');
 
 exports.tagClass = {
@@ -3783,7 +3865,7 @@ function derDecodeLen(buf, primitive, fail) {
   return len;
 }
 
-},{"../../asn1":17,"inherits":242}],26:[function(require,module,exports){
+},{"../../asn1":17,"inherits":244}],26:[function(require,module,exports){
 var decoders = exports;
 
 decoders.der = require('./der');
@@ -3840,7 +3922,7 @@ PEMDecoder.prototype.decode = function decode(data, options) {
   return DERDecoder.prototype.decode.call(this, input, options);
 };
 
-},{"./der":25,"buffer":128,"inherits":242}],28:[function(require,module,exports){
+},{"./der":25,"buffer":128,"inherits":244}],28:[function(require,module,exports){
 var inherits = require('inherits');
 var Buffer = require('buffer').Buffer;
 
@@ -4137,7 +4219,7 @@ function encodeTag(tag, primitive, cls, reporter) {
   return res;
 }
 
-},{"../../asn1":17,"buffer":128,"inherits":242}],29:[function(require,module,exports){
+},{"../../asn1":17,"buffer":128,"inherits":244}],29:[function(require,module,exports){
 var encoders = exports;
 
 encoders.der = require('./der');
@@ -4166,7 +4248,7 @@ PEMEncoder.prototype.encode = function encode(data, options) {
   return out.join('\n');
 };
 
-},{"./der":28,"inherits":242}],31:[function(require,module,exports){
+},{"./der":28,"inherits":244}],31:[function(require,module,exports){
 (function (global){
 'use strict';
 
@@ -4660,7 +4742,7 @@ var objectKeys = Object.keys || function (obj) {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"util/":756}],32:[function(require,module,exports){
+},{"util/":764}],32:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -4771,7 +4853,7 @@ function rethrow(error) {
     throw error;
 }
 module.exports = exports['default'];
-},{"./internal/initialParams":50,"./internal/setImmediate":59,"lodash/isObject":527}],33:[function(require,module,exports){
+},{"./internal/initialParams":50,"./internal/setImmediate":59,"lodash/isObject":534}],33:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -4871,7 +4953,7 @@ function doWhilst(iteratee, test, callback) {
     _iteratee(next);
 }
 module.exports = exports['default'];
-},{"./internal/onlyOnce":55,"./internal/slice":60,"./internal/wrapAsync":62,"lodash/noop":531}],35:[function(require,module,exports){
+},{"./internal/onlyOnce":55,"./internal/slice":60,"./internal/wrapAsync":62,"lodash/noop":538}],35:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -5112,7 +5194,7 @@ var eachOfGeneric = (0, _doLimit2.default)(_eachOfLimit2.default, Infinity);
  * });
  */
 module.exports = exports['default'];
-},{"./eachOfLimit":38,"./internal/breakLoop":43,"./internal/doLimit":45,"./internal/once":54,"./internal/onlyOnce":55,"./internal/wrapAsync":62,"lodash/isArrayLike":523,"lodash/noop":531}],38:[function(require,module,exports){
+},{"./eachOfLimit":38,"./internal/breakLoop":43,"./internal/doLimit":45,"./internal/once":54,"./internal/onlyOnce":55,"./internal/wrapAsync":62,"lodash/isArrayLike":530,"lodash/noop":538}],38:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -5423,7 +5505,7 @@ function _createTester(check, getResult) {
     };
 }
 module.exports = exports['default'];
-},{"./breakLoop":43,"lodash/noop":531}],45:[function(require,module,exports){
+},{"./breakLoop":43,"lodash/noop":538}],45:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -5532,7 +5614,7 @@ function _eachOfLimit(limit) {
     };
 }
 module.exports = exports['default'];
-},{"./breakLoop":43,"./iterator":51,"./once":54,"./onlyOnce":55,"lodash/noop":531}],48:[function(require,module,exports){
+},{"./breakLoop":43,"./iterator":51,"./once":54,"./onlyOnce":55,"lodash/noop":538}],48:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -5608,7 +5690,7 @@ function _filter(eachfn, coll, iteratee, callback) {
     filter(eachfn, coll, (0, _wrapAsync2.default)(iteratee), callback || _noop2.default);
 }
 module.exports = exports['default'];
-},{"./wrapAsync":62,"lodash/_arrayMap":499,"lodash/_baseProperty":507,"lodash/isArrayLike":523,"lodash/noop":531}],49:[function(require,module,exports){
+},{"./wrapAsync":62,"lodash/_arrayMap":506,"lodash/_baseProperty":514,"lodash/isArrayLike":530,"lodash/noop":538}],49:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -5703,7 +5785,7 @@ function iterator(coll) {
     return iterator ? createES2015Iterator(iterator) : createObjectIterator(coll);
 }
 module.exports = exports['default'];
-},{"./getIterator":49,"lodash/isArrayLike":523,"lodash/keys":530}],52:[function(require,module,exports){
+},{"./getIterator":49,"lodash/isArrayLike":530,"lodash/keys":537}],52:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -5739,7 +5821,7 @@ function _asyncMap(eachfn, arr, iteratee, callback) {
     });
 }
 module.exports = exports['default'];
-},{"./wrapAsync":62,"lodash/noop":531}],53:[function(require,module,exports){
+},{"./wrapAsync":62,"lodash/noop":538}],53:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -5825,7 +5907,7 @@ function _parallel(eachfn, tasks, callback) {
     });
 }
 module.exports = exports['default'];
-},{"./slice":60,"./wrapAsync":62,"lodash/isArrayLike":523,"lodash/noop":531}],57:[function(require,module,exports){
+},{"./slice":60,"./wrapAsync":62,"lodash/isArrayLike":530,"lodash/noop":538}],57:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -6020,7 +6102,7 @@ function queue(worker, concurrency, payload) {
     return q;
 }
 module.exports = exports['default'];
-},{"./DoublyLinkedList":42,"./onlyOnce":55,"./setImmediate":59,"./wrapAsync":62,"lodash/_baseIndexOf":502,"lodash/isArray":522,"lodash/noop":531}],58:[function(require,module,exports){
+},{"./DoublyLinkedList":42,"./onlyOnce":55,"./setImmediate":59,"./wrapAsync":62,"lodash/_baseIndexOf":509,"lodash/isArray":529,"lodash/noop":538}],58:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -6087,7 +6169,7 @@ if (hasSetImmediate) {
 
 exports.default = wrap(_defer);
 }).call(this,require('_process'))
-},{"./slice":60,"_process":602}],60:[function(require,module,exports){
+},{"./slice":60,"_process":609}],60:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -6651,7 +6733,7 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
  */
 exports.default = (0, _doParallel2.default)((0, _createTester2.default)(Boolean, _identity2.default));
 module.exports = exports['default'];
-},{"./internal/createTester":44,"./internal/doParallel":46,"lodash/identity":520}],70:[function(require,module,exports){
+},{"./internal/createTester":44,"./internal/doParallel":46,"lodash/identity":527}],70:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -6855,7 +6937,7 @@ module.exports = exports['default'];
  *     callback(null, 'done');
  * }
  */
-},{"./internal/once":54,"./internal/onlyOnce":55,"./internal/slice":60,"./internal/wrapAsync":62,"lodash/isArray":522,"lodash/noop":531}],72:[function(require,module,exports){
+},{"./internal/once":54,"./internal/onlyOnce":55,"./internal/slice":60,"./internal/wrapAsync":62,"lodash/isArray":529,"lodash/noop":538}],72:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -6928,7 +7010,7 @@ function whilst(test, iteratee, callback) {
     _iteratee(next);
 }
 module.exports = exports['default'];
-},{"./internal/onlyOnce":55,"./internal/slice":60,"./internal/wrapAsync":62,"lodash/noop":531}],73:[function(require,module,exports){
+},{"./internal/onlyOnce":55,"./internal/slice":60,"./internal/wrapAsync":62,"lodash/noop":538}],73:[function(require,module,exports){
 
 /**
  * Expose `Backoff`.
@@ -10467,7 +10549,7 @@ module.exports = {
   encode: encode
 }
 
-},{"safe-buffer":706}],80:[function(require,module,exports){
+},{"safe-buffer":713}],80:[function(require,module,exports){
 // Blake2B in pure Javascript
 // Adapted from the reference implementation in RFC7693
 // Ported to Javascript by DC - https://github.com/dcposch
@@ -16553,7 +16635,7 @@ Decoder.decodeFirst = Decoder.decode
 module.exports = Decoder
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
-},{"./constants":86,"./decoder.asm":87,"./simple":92,"./tagged":93,"./utils":94,"bignumber.js":78,"buffer":128,"ieee754":240,"url":751}],89:[function(require,module,exports){
+},{"./constants":86,"./decoder.asm":87,"./simple":92,"./tagged":93,"./utils":94,"bignumber.js":78,"buffer":128,"ieee754":242,"url":759}],89:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -17249,7 +17331,7 @@ class Encoder {
 module.exports = Encoder
 
 }).call(this,require("buffer").Buffer)
-},{"./constants":86,"./utils":94,"bignumber.js":78,"buffer":128,"url":751}],91:[function(require,module,exports){
+},{"./constants":86,"./utils":94,"bignumber.js":78,"buffer":128,"url":759}],91:[function(require,module,exports){
 'use strict'
 
 // exports.Commented = require('./commented')
@@ -17991,7 +18073,7 @@ function xorTest (a, b) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./aes":97,"./ghash":102,"buffer":128,"buffer-xor":127,"cipher-base":130,"inherits":242}],99:[function(require,module,exports){
+},{"./aes":97,"./ghash":102,"buffer":128,"buffer-xor":127,"cipher-base":130,"inherits":244}],99:[function(require,module,exports){
 var ciphers = require('./encrypter')
 exports.createCipher = exports.Cipher = ciphers.createCipher
 exports.createCipheriv = exports.Cipheriv = ciphers.createCipheriv
@@ -18145,7 +18227,7 @@ exports.createDecipher = createDecipher
 exports.createDecipheriv = createDecipheriv
 
 }).call(this,require("buffer").Buffer)
-},{"./aes":97,"./authCipher":98,"./modes":103,"./modes/cbc":104,"./modes/cfb":105,"./modes/cfb1":106,"./modes/cfb8":107,"./modes/ctr":108,"./modes/ecb":109,"./modes/ofb":110,"./streamCipher":111,"buffer":128,"cipher-base":130,"evp_bytestokey":216,"inherits":242}],101:[function(require,module,exports){
+},{"./aes":97,"./authCipher":98,"./modes":103,"./modes/cbc":104,"./modes/cfb":105,"./modes/cfb1":106,"./modes/cfb8":107,"./modes/ctr":108,"./modes/ecb":109,"./modes/ofb":110,"./streamCipher":111,"buffer":128,"cipher-base":130,"evp_bytestokey":216,"inherits":244}],101:[function(require,module,exports){
 (function (Buffer){
 var aes = require('./aes')
 var Transform = require('cipher-base')
@@ -18271,7 +18353,7 @@ exports.createCipheriv = createCipheriv
 exports.createCipher = createCipher
 
 }).call(this,require("buffer").Buffer)
-},{"./aes":97,"./authCipher":98,"./modes":103,"./modes/cbc":104,"./modes/cfb":105,"./modes/cfb1":106,"./modes/cfb8":107,"./modes/ctr":108,"./modes/ecb":109,"./modes/ofb":110,"./streamCipher":111,"buffer":128,"cipher-base":130,"evp_bytestokey":216,"inherits":242}],102:[function(require,module,exports){
+},{"./aes":97,"./authCipher":98,"./modes":103,"./modes/cbc":104,"./modes/cfb":105,"./modes/cfb1":106,"./modes/cfb8":107,"./modes/ctr":108,"./modes/ecb":109,"./modes/ofb":110,"./streamCipher":111,"buffer":128,"cipher-base":130,"evp_bytestokey":216,"inherits":244}],102:[function(require,module,exports){
 (function (Buffer){
 var zeros = new Buffer(16)
 zeros.fill(0)
@@ -18749,7 +18831,7 @@ StreamCipher.prototype._final = function () {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./aes":97,"buffer":128,"cipher-base":130,"inherits":242}],112:[function(require,module,exports){
+},{"./aes":97,"buffer":128,"cipher-base":130,"inherits":244}],112:[function(require,module,exports){
 var ebtk = require('evp_bytestokey')
 var aes = require('browserify-aes/browser')
 var DES = require('browserify-des')
@@ -18871,7 +18953,7 @@ DES.prototype._final = function () {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"cipher-base":130,"des.js":161,"inherits":242}],114:[function(require,module,exports){
+},{"buffer":128,"cipher-base":130,"des.js":161,"inherits":244}],114:[function(require,module,exports){
 exports['des-ecb'] = {
   key: 8,
   iv: 0
@@ -18941,7 +19023,7 @@ function getr(priv) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"bn.js":85,"buffer":128,"randombytes":689}],116:[function(require,module,exports){
+},{"bn.js":85,"buffer":128,"randombytes":696}],116:[function(require,module,exports){
 (function (Buffer){
 const Sha3 = require('js-sha3')
 
@@ -19677,7 +19759,7 @@ module.exports = {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./algorithms.json":119,"./sign":122,"./verify":123,"buffer":128,"create-hash":136,"inherits":242,"stream":742}],122:[function(require,module,exports){
+},{"./algorithms.json":119,"./sign":122,"./verify":123,"buffer":128,"create-hash":136,"inherits":244,"stream":749}],122:[function(require,module,exports){
 (function (Buffer){
 // much of this based on https://github.com/indutny/self-signed/blob/gh-pages/lib/rsa.js
 var createHmac = require('create-hmac')
@@ -19826,7 +19908,7 @@ module.exports.getKey = getKey
 module.exports.makeKey = makeKey
 
 }).call(this,require("buffer").Buffer)
-},{"./curves.json":120,"bn.js":85,"browserify-rsa":115,"buffer":128,"create-hmac":139,"elliptic":174,"parse-asn1":586}],123:[function(require,module,exports){
+},{"./curves.json":120,"bn.js":85,"browserify-rsa":115,"buffer":128,"create-hmac":139,"elliptic":174,"parse-asn1":593}],123:[function(require,module,exports){
 (function (Buffer){
 // much of this based on https://github.com/indutny/self-signed/blob/gh-pages/lib/rsa.js
 var BN = require('bn.js')
@@ -19913,7 +19995,7 @@ function checkValue (b, q) {
 module.exports = verify
 
 }).call(this,require("buffer").Buffer)
-},{"./curves.json":120,"bn.js":85,"buffer":128,"elliptic":174,"parse-asn1":586}],124:[function(require,module,exports){
+},{"./curves.json":120,"bn.js":85,"buffer":128,"elliptic":174,"parse-asn1":593}],124:[function(require,module,exports){
 arguments[4][96][0].apply(exports,arguments)
 },{"dup":96}],125:[function(require,module,exports){
 var basex = require('base-x')
@@ -20014,7 +20096,7 @@ module.exports = function base (ALPHABET) {
   }
 }
 
-},{"safe-buffer":706}],127:[function(require,module,exports){
+},{"safe-buffer":713}],127:[function(require,module,exports){
 (function (Buffer){
 module.exports = function xor (a, b) {
   var length = Math.min(a.length, b.length)
@@ -21744,7 +21826,7 @@ function numberIsNaN (obj) {
   return obj !== obj // eslint-disable-line no-self-compare
 }
 
-},{"base64-js":77,"ieee754":240}],129:[function(require,module,exports){
+},{"base64-js":77,"ieee754":242}],129:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -22008,7 +22090,7 @@ CID.codecs = codecs
 module.exports = CID
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"multibase":548,"multicodec":550,"multicodec/src/base-table":549,"multicodec/src/varint-table":553,"multihashes":555}],130:[function(require,module,exports){
+},{"buffer":128,"multibase":555,"multicodec":557,"multicodec/src/base-table":556,"multicodec/src/varint-table":560,"multihashes":562}],130:[function(require,module,exports){
 var Buffer = require('safe-buffer').Buffer
 var Transform = require('stream').Transform
 var StringDecoder = require('string_decoder').StringDecoder
@@ -22109,7 +22191,7 @@ CipherBase.prototype._toString = function (value, enc, fin) {
 
 module.exports = CipherBase
 
-},{"inherits":242,"safe-buffer":706,"stream":742,"string_decoder":745}],131:[function(require,module,exports){
+},{"inherits":244,"safe-buffer":713,"stream":749,"string_decoder":752}],131:[function(require,module,exports){
 /**
  * Slice reference.
  */
@@ -22418,7 +22500,7 @@ function objectToString(o) {
 }
 
 }).call(this,{"isBuffer":require("../../is-buffer/index.js")})
-},{"../../is-buffer/index.js":372}],135:[function(require,module,exports){
+},{"../../is-buffer/index.js":377}],135:[function(require,module,exports){
 (function (Buffer){
 var elliptic = require('elliptic');
 var BN = require('bn.js');
@@ -22600,7 +22682,7 @@ module.exports = function createHash (alg) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./md5":138,"buffer":128,"cipher-base":130,"inherits":242,"ripemd160":704,"sha.js":722}],137:[function(require,module,exports){
+},{"./md5":138,"buffer":128,"cipher-base":130,"inherits":244,"ripemd160":711,"sha.js":729}],137:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 var intSize = 4
@@ -22851,7 +22933,7 @@ module.exports = function createHmac (alg, key) {
   return new Hmac(alg, key)
 }
 
-},{"./legacy":140,"cipher-base":130,"create-hash/md5":138,"inherits":242,"ripemd160":704,"safe-buffer":706,"sha.js":722}],140:[function(require,module,exports){
+},{"./legacy":140,"cipher-base":130,"create-hash/md5":138,"inherits":244,"ripemd160":711,"safe-buffer":713,"sha.js":729}],140:[function(require,module,exports){
 'use strict'
 var inherits = require('inherits')
 var Buffer = require('safe-buffer').Buffer
@@ -22899,7 +22981,7 @@ Hmac.prototype._final = function () {
 }
 module.exports = Hmac
 
-},{"cipher-base":130,"inherits":242,"safe-buffer":706}],141:[function(require,module,exports){
+},{"cipher-base":130,"inherits":244,"safe-buffer":713}],141:[function(require,module,exports){
 'use strict'
 
 exports.randomBytes = exports.rng = exports.pseudoRandomBytes = exports.prng = require('randombytes')
@@ -22993,7 +23075,7 @@ exports.constants = {
   'POINT_CONVERSION_HYBRID': 6
 }
 
-},{"browserify-cipher":112,"browserify-sign":121,"browserify-sign/algos":118,"create-ecdh":135,"create-hash":136,"create-hmac":139,"diffie-hellman":167,"pbkdf2":591,"public-encrypt":613,"randombytes":689}],142:[function(require,module,exports){
+},{"browserify-cipher":112,"browserify-sign":121,"browserify-sign/algos":118,"create-ecdh":135,"create-hash":136,"create-hmac":139,"diffie-hellman":167,"pbkdf2":598,"public-encrypt":620,"randombytes":696}],142:[function(require,module,exports){
 /* @flow */
 'use strict'
 
@@ -23104,7 +23186,7 @@ class KeyTransformDatastore /* :: <Value> */ {
 
 module.exports = KeyTransformDatastore
 
-},{"pull-stream":642}],144:[function(require,module,exports){
+},{"pull-stream":649}],144:[function(require,module,exports){
 /* @flow */
 'use strict'
 
@@ -23297,7 +23379,7 @@ class MountDatastore /* :: <Value> */ {
 
 module.exports = MountDatastore
 
-},{"./keytransform":143,"async/each":35,"interface-datastore":245,"pull-many":632,"pull-stream":642}],145:[function(require,module,exports){
+},{"./keytransform":143,"async/each":35,"interface-datastore":247,"pull-many":639,"pull-stream":649}],145:[function(require,module,exports){
 /* @flow */
 'use strict'
 
@@ -23353,7 +23435,7 @@ class NamespaceDatastore/* :: <Value> */ extends KeytransformDatastore /* :: <Va
 
 module.exports = NamespaceDatastore
 
-},{"./keytransform":143,"interface-datastore":245}],146:[function(require,module,exports){
+},{"./keytransform":143,"interface-datastore":247}],146:[function(require,module,exports){
 /* @flow */
 'use strict'
 
@@ -23532,7 +23614,7 @@ exports.Prefix = Prefix
 exports.Suffix = Suffix
 exports.NextToLast = NextToLast
 
-},{"./shard-readme":146,"interface-datastore":245,"left-pad":387}],148:[function(require,module,exports){
+},{"./shard-readme":146,"interface-datastore":247,"left-pad":392}],148:[function(require,module,exports){
 (function (Buffer){
 /* @flow */
 'use strict'
@@ -23720,7 +23802,7 @@ class ShardingDatastore {
 module.exports = ShardingDatastore
 
 }).call(this,require("buffer").Buffer)
-},{"./keytransform":143,"./shard":147,"async/parallel":64,"async/waterfall":71,"buffer":128,"interface-datastore":245,"pull-stream":642}],149:[function(require,module,exports){
+},{"./keytransform":143,"./shard":147,"async/parallel":64,"async/waterfall":71,"buffer":128,"interface-datastore":247,"pull-stream":649}],149:[function(require,module,exports){
 /* @flow */
 'use strict'
 
@@ -23994,7 +24076,7 @@ class LevelDatastore {
 module.exports = LevelDatastore
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"interface-datastore":245,"levelup":408,"pull-stream":642}],151:[function(require,module,exports){
+},{"buffer":128,"interface-datastore":247,"levelup":413,"pull-stream":649}],151:[function(require,module,exports){
 (function (process){
 /**
  * This is the web browser implementation of `debug()`.
@@ -24183,7 +24265,7 @@ function localstorage() {
 }
 
 }).call(this,require('_process'))
-},{"./debug":152,"_process":602}],152:[function(require,module,exports){
+},{"./debug":152,"_process":609}],152:[function(require,module,exports){
 
 /**
  * This is the common logic for both the Node.js and web browser
@@ -24387,7 +24469,7 @@ function coerce(val) {
   return val;
 }
 
-},{"ms":540}],153:[function(require,module,exports){
+},{"ms":547}],153:[function(require,module,exports){
 (function (Buffer){
 /*!
  * @description Recursive object extending
@@ -24571,7 +24653,7 @@ DeferredIterator.prototype._operation = function (method, args) {
 
 module.exports = DeferredIterator;
 
-},{"abstract-leveldown":159,"util":756}],155:[function(require,module,exports){
+},{"abstract-leveldown":159,"util":764}],155:[function(require,module,exports){
 (function (Buffer,process){
 var util              = require('util')
   , AbstractLevelDOWN = require('abstract-leveldown').AbstractLevelDOWN
@@ -24631,7 +24713,7 @@ module.exports                  = DeferredLevelDOWN
 module.exports.DeferredIterator = DeferredIterator
 
 }).call(this,{"isBuffer":require("../is-buffer/index.js")},require('_process'))
-},{"../is-buffer/index.js":372,"./deferred-iterator":154,"_process":602,"abstract-leveldown":159,"util":756}],156:[function(require,module,exports){
+},{"../is-buffer/index.js":377,"./deferred-iterator":154,"_process":609,"abstract-leveldown":159,"util":764}],156:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2017 Rod Vagg, MIT License */
 
@@ -24723,7 +24805,7 @@ AbstractChainedBatch.prototype.write = function (options, callback) {
 module.exports = AbstractChainedBatch
 
 }).call(this,require('_process'))
-},{"_process":602}],157:[function(require,module,exports){
+},{"_process":609}],157:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2017 Rod Vagg, MIT License */
 
@@ -24776,7 +24858,7 @@ AbstractIterator.prototype.end = function (callback) {
 module.exports = AbstractIterator
 
 }).call(this,require('_process'))
-},{"_process":602}],158:[function(require,module,exports){
+},{"_process":609}],158:[function(require,module,exports){
 (function (Buffer,process){
 /* Copyright (c) 2017 Rod Vagg, MIT License */
 
@@ -25052,7 +25134,7 @@ AbstractLevelDOWN.prototype._checkKey = function (obj, type) {
 module.exports = AbstractLevelDOWN
 
 }).call(this,{"isBuffer":require("../../../is-buffer/index.js")},require('_process'))
-},{"../../../is-buffer/index.js":372,"./abstract-chained-batch":156,"./abstract-iterator":157,"_process":602,"xtend":769}],159:[function(require,module,exports){
+},{"../../../is-buffer/index.js":377,"./abstract-chained-batch":156,"./abstract-iterator":157,"_process":609,"xtend":777}],159:[function(require,module,exports){
 exports.AbstractLevelDOWN    = require('./abstract-leveldown')
 exports.AbstractIterator     = require('./abstract-iterator')
 exports.AbstractChainedBatch = require('./abstract-chained-batch')
@@ -25150,7 +25232,7 @@ proto._update = function _update(inp, inOff, out, outOff) {
   }
 };
 
-},{"inherits":242,"minimalistic-assert":538}],163:[function(require,module,exports){
+},{"inherits":244,"minimalistic-assert":545}],163:[function(require,module,exports){
 'use strict';
 
 var assert = require('minimalistic-assert');
@@ -25293,7 +25375,7 @@ Cipher.prototype._finalDecrypt = function _finalDecrypt() {
   return this._unpad(out);
 };
 
-},{"minimalistic-assert":538}],164:[function(require,module,exports){
+},{"minimalistic-assert":545}],164:[function(require,module,exports){
 'use strict';
 
 var assert = require('minimalistic-assert');
@@ -25438,7 +25520,7 @@ DES.prototype._decrypt = function _decrypt(state, lStart, rStart, out, off) {
   utils.rip(l, r, out, off);
 };
 
-},{"../des":161,"inherits":242,"minimalistic-assert":538}],165:[function(require,module,exports){
+},{"../des":161,"inherits":244,"minimalistic-assert":545}],165:[function(require,module,exports){
 'use strict';
 
 var assert = require('minimalistic-assert');
@@ -25495,7 +25577,7 @@ EDE.prototype._update = function _update(inp, inOff, out, outOff) {
 EDE.prototype._pad = DES.prototype._pad;
 EDE.prototype._unpad = DES.prototype._unpad;
 
-},{"../des":161,"inherits":242,"minimalistic-assert":538}],166:[function(require,module,exports){
+},{"../des":161,"inherits":244,"minimalistic-assert":545}],166:[function(require,module,exports){
 'use strict';
 
 exports.readUInt32BE = function readUInt32BE(bytes, off) {
@@ -25967,7 +26049,7 @@ function formatReturnValue(bn, enc) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./generatePrime":169,"bn.js":85,"buffer":128,"miller-rabin":537,"randombytes":689}],169:[function(require,module,exports){
+},{"./generatePrime":169,"bn.js":85,"buffer":128,"miller-rabin":544,"randombytes":696}],169:[function(require,module,exports){
 var randomBytes = require('randombytes');
 module.exports = findPrime;
 findPrime.simpleSieve = simpleSieve;
@@ -26074,7 +26156,7 @@ function findPrime(bits, gen) {
 
 }
 
-},{"bn.js":85,"miller-rabin":537,"randombytes":689}],170:[function(require,module,exports){
+},{"bn.js":85,"miller-rabin":544,"randombytes":696}],170:[function(require,module,exports){
 module.exports={
     "modp1": {
         "gen": "02",
@@ -26445,7 +26527,7 @@ Duplexify.prototype.end = function(data, enc, cb) {
 module.exports = Duplexify
 
 }).call(this,require('_process'),require("buffer").Buffer)
-},{"_process":602,"buffer":128,"end-of-stream":190,"inherits":242,"readable-stream":700,"stream-shift":743}],174:[function(require,module,exports){
+},{"_process":609,"buffer":128,"end-of-stream":190,"inherits":244,"readable-stream":707,"stream-shift":750}],174:[function(require,module,exports){
 'use strict';
 
 var elliptic = exports;
@@ -27272,7 +27354,7 @@ Point.prototype.eqXToP = function eqXToP(x) {
 Point.prototype.toP = Point.prototype.normalize;
 Point.prototype.mixedAdd = Point.prototype.add;
 
-},{"../../elliptic":174,"../curve":177,"bn.js":85,"inherits":242}],177:[function(require,module,exports){
+},{"../../elliptic":174,"../curve":177,"bn.js":85,"inherits":244}],177:[function(require,module,exports){
 'use strict';
 
 var curve = exports;
@@ -27464,7 +27546,7 @@ Point.prototype.getX = function getX() {
   return this.x.fromRed();
 };
 
-},{"../../elliptic":174,"../curve":177,"bn.js":85,"inherits":242}],179:[function(require,module,exports){
+},{"../../elliptic":174,"../curve":177,"bn.js":85,"inherits":244}],179:[function(require,module,exports){
 'use strict';
 
 var curve = require('../curve');
@@ -28404,7 +28486,7 @@ JPoint.prototype.isInfinity = function isInfinity() {
   return this.z.cmpn(0) === 0;
 };
 
-},{"../../elliptic":174,"../curve":177,"bn.js":85,"inherits":242}],180:[function(require,module,exports){
+},{"../../elliptic":174,"../curve":177,"bn.js":85,"inherits":244}],180:[function(require,module,exports){
 'use strict';
 
 var curves = exports;
@@ -28611,7 +28693,7 @@ defineCurve('secp256k1', {
   ]
 });
 
-},{"../elliptic":174,"./precomputed/secp256k1":187,"hash.js":226}],181:[function(require,module,exports){
+},{"../elliptic":174,"./precomputed/secp256k1":187,"hash.js":227}],181:[function(require,module,exports){
 'use strict';
 
 var BN = require('bn.js');
@@ -28853,7 +28935,7 @@ EC.prototype.getKeyRecoveryParam = function(e, signature, Q, enc) {
   throw new Error('Unable to find valid recovery factor');
 };
 
-},{"../../elliptic":174,"./key":182,"./signature":183,"bn.js":85,"hmac-drbg":238}],182:[function(require,module,exports){
+},{"../../elliptic":174,"./key":182,"./signature":183,"bn.js":85,"hmac-drbg":239}],182:[function(require,module,exports){
 'use strict';
 
 var BN = require('bn.js');
@@ -29231,7 +29313,7 @@ EDDSA.prototype.isPoint = function isPoint(val) {
   return val instanceof this.pointClass;
 };
 
-},{"../../elliptic":174,"./key":185,"./signature":186,"hash.js":226}],185:[function(require,module,exports){
+},{"../../elliptic":174,"./key":185,"./signature":186,"hash.js":227}],185:[function(require,module,exports){
 'use strict';
 
 var elliptic = require('../../elliptic');
@@ -30301,7 +30383,7 @@ function intFromLE(bytes) {
 utils.intFromLE = intFromLE;
 
 
-},{"bn.js":85,"minimalistic-assert":538,"minimalistic-crypto-utils":539}],189:[function(require,module,exports){
+},{"bn.js":85,"minimalistic-assert":545,"minimalistic-crypto-utils":546}],189:[function(require,module,exports){
 module.exports={
   "_from": "elliptic@^6.2.3",
   "_id": "elliptic@6.4.0",
@@ -30476,7 +30558,7 @@ var eos = function(stream, opts, callback) {
 
 module.exports = eos;
 
-},{"once":580}],191:[function(require,module,exports){
+},{"once":587}],191:[function(require,module,exports){
 
 module.exports = require('./lib/index');
 
@@ -31240,7 +31322,7 @@ Socket.prototype.filterUpgrades = function (upgrades) {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./transport":194,"./transports/index":195,"component-emitter":132,"debug":151,"engine.io-parser":201,"indexof":241,"parsejson":587,"parseqs":588,"parseuri":589}],194:[function(require,module,exports){
+},{"./transport":194,"./transports/index":195,"component-emitter":132,"debug":151,"engine.io-parser":201,"indexof":243,"parsejson":594,"parseqs":595,"parseuri":596}],194:[function(require,module,exports){
 /**
  * Module dependencies.
  */
@@ -32355,7 +32437,7 @@ Polling.prototype.uri = function () {
   return schema + '://' + (ipv6 ? '[' + this.hostname + ']' : this.hostname) + port + this.path + query;
 };
 
-},{"../transport":194,"component-inherit":133,"debug":151,"engine.io-parser":201,"parseqs":588,"xmlhttprequest-ssl":200,"yeast":770}],199:[function(require,module,exports){
+},{"../transport":194,"component-inherit":133,"debug":151,"engine.io-parser":201,"parseqs":595,"xmlhttprequest-ssl":200,"yeast":785}],199:[function(require,module,exports){
 (function (global){
 /**
  * Module dependencies.
@@ -32645,7 +32727,7 @@ WS.prototype.check = function () {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../transport":194,"component-inherit":133,"debug":151,"engine.io-parser":201,"parseqs":588,"ws":96,"yeast":770}],200:[function(require,module,exports){
+},{"../transport":194,"component-inherit":133,"debug":151,"engine.io-parser":201,"parseqs":595,"ws":96,"yeast":785}],200:[function(require,module,exports){
 (function (global){
 // browser shim for xmlhttprequest module
 
@@ -32686,7 +32768,7 @@ module.exports = function (opts) {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"has-cors":224}],201:[function(require,module,exports){
+},{"has-cors":225}],201:[function(require,module,exports){
 (function (global){
 /**
  * Module dependencies.
@@ -33296,7 +33378,7 @@ exports.decodePayloadAsBinary = function (data, binaryType, callback) {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./keys":202,"./utf8":203,"after":15,"arraybuffer.slice":16,"base64-arraybuffer":76,"blob":84,"has-binary2":222}],202:[function(require,module,exports){
+},{"./keys":202,"./utf8":203,"after":15,"arraybuffer.slice":16,"base64-arraybuffer":76,"blob":84,"has-binary2":223}],202:[function(require,module,exports){
 
 /**
  * Gets the keys for an object.
@@ -34332,7 +34414,7 @@ Account.prototype.isEmpty = function () {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"ethereumjs-util":213,"rlp":705}],209:[function(require,module,exports){
+},{"buffer":128,"ethereumjs-util":213,"rlp":712}],209:[function(require,module,exports){
 (function (Buffer){
 'use strict';
 
@@ -35259,7 +35341,7 @@ exports.defineProperties = function (self, fields, data) {
 };
 
 }).call(this,require("buffer").Buffer)
-},{"assert":31,"bn.js":85,"buffer":128,"create-hash":136,"ethjs-util":214,"keccak":380,"rlp":705,"secp256k1":707}],211:[function(require,module,exports){
+},{"assert":31,"bn.js":85,"buffer":128,"create-hash":136,"ethjs-util":214,"keccak":385,"rlp":712,"secp256k1":714}],211:[function(require,module,exports){
 (function (Buffer){
 'use strict';
 
@@ -35589,7 +35671,7 @@ module.exports = Transaction;
 }).call(this,require("buffer").Buffer)
 },{"buffer":128,"ethereum-common/params.json":207,"ethereumjs-util":212}],212:[function(require,module,exports){
 arguments[4][210][0].apply(exports,arguments)
-},{"assert":31,"bn.js":85,"buffer":128,"create-hash":136,"dup":210,"ethjs-util":214,"keccak":380,"rlp":705,"secp256k1":707}],213:[function(require,module,exports){
+},{"assert":31,"bn.js":85,"buffer":128,"create-hash":136,"dup":210,"ethjs-util":214,"keccak":385,"rlp":712,"secp256k1":714}],213:[function(require,module,exports){
 (function (Buffer){
 const SHA3 = require('keccakjs')
 const secp256k1 = require('secp256k1')
@@ -36294,7 +36376,7 @@ exports.defineProperties = function (self, fields, data) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"assert":31,"bn.js":85,"buffer":128,"create-hash":136,"keccakjs":386,"rlp":705,"secp256k1":707}],214:[function(require,module,exports){
+},{"assert":31,"bn.js":85,"buffer":128,"create-hash":136,"keccakjs":391,"rlp":712,"secp256k1":714}],214:[function(require,module,exports){
 (function (Buffer){
 'use strict';
 
@@ -36517,7 +36599,7 @@ module.exports = {
   isHexString: isHexString
 };
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"is-hex-prefixed":374,"strip-hex-prefix":746}],215:[function(require,module,exports){
+},{"buffer":128,"is-hex-prefixed":379,"strip-hex-prefix":753}],215:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -36894,6 +36976,706 @@ function EVP_BytesToKey (password, salt, keyLen, ivLen) {
 
 }).call(this,require("buffer").Buffer)
 },{"buffer":128,"create-hash/md5":138}],217:[function(require,module,exports){
+/**
+ * This library modifies the diff-patch-match library by Neil Fraser
+ * by removing the patch and match functionality and certain advanced
+ * options in the diff function. The original license is as follows:
+ *
+ * ===
+ *
+ * Diff Match and Patch
+ *
+ * Copyright 2006 Google Inc.
+ * http://code.google.com/p/google-diff-match-patch/
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+/**
+ * The data structure representing a diff is an array of tuples:
+ * [[DIFF_DELETE, 'Hello'], [DIFF_INSERT, 'Goodbye'], [DIFF_EQUAL, ' world.']]
+ * which means: delete 'Hello', add 'Goodbye' and keep ' world.'
+ */
+var DIFF_DELETE = -1;
+var DIFF_INSERT = 1;
+var DIFF_EQUAL = 0;
+
+
+/**
+ * Find the differences between two texts.  Simplifies the problem by stripping
+ * any common prefix or suffix off the texts before diffing.
+ * @param {string} text1 Old string to be diffed.
+ * @param {string} text2 New string to be diffed.
+ * @param {Int} cursor_pos Expected edit position in text1 (optional)
+ * @return {Array} Array of diff tuples.
+ */
+function diff_main(text1, text2, cursor_pos) {
+  // Check for equality (speedup).
+  if (text1 == text2) {
+    if (text1) {
+      return [[DIFF_EQUAL, text1]];
+    }
+    return [];
+  }
+
+  // Check cursor_pos within bounds
+  if (cursor_pos < 0 || text1.length < cursor_pos) {
+    cursor_pos = null;
+  }
+
+  // Trim off common prefix (speedup).
+  var commonlength = diff_commonPrefix(text1, text2);
+  var commonprefix = text1.substring(0, commonlength);
+  text1 = text1.substring(commonlength);
+  text2 = text2.substring(commonlength);
+
+  // Trim off common suffix (speedup).
+  commonlength = diff_commonSuffix(text1, text2);
+  var commonsuffix = text1.substring(text1.length - commonlength);
+  text1 = text1.substring(0, text1.length - commonlength);
+  text2 = text2.substring(0, text2.length - commonlength);
+
+  // Compute the diff on the middle block.
+  var diffs = diff_compute_(text1, text2);
+
+  // Restore the prefix and suffix.
+  if (commonprefix) {
+    diffs.unshift([DIFF_EQUAL, commonprefix]);
+  }
+  if (commonsuffix) {
+    diffs.push([DIFF_EQUAL, commonsuffix]);
+  }
+  diff_cleanupMerge(diffs);
+  if (cursor_pos != null) {
+    diffs = fix_cursor(diffs, cursor_pos);
+  }
+  return diffs;
+};
+
+
+/**
+ * Find the differences between two texts.  Assumes that the texts do not
+ * have any common prefix or suffix.
+ * @param {string} text1 Old string to be diffed.
+ * @param {string} text2 New string to be diffed.
+ * @return {Array} Array of diff tuples.
+ */
+function diff_compute_(text1, text2) {
+  var diffs;
+
+  if (!text1) {
+    // Just add some text (speedup).
+    return [[DIFF_INSERT, text2]];
+  }
+
+  if (!text2) {
+    // Just delete some text (speedup).
+    return [[DIFF_DELETE, text1]];
+  }
+
+  var longtext = text1.length > text2.length ? text1 : text2;
+  var shorttext = text1.length > text2.length ? text2 : text1;
+  var i = longtext.indexOf(shorttext);
+  if (i != -1) {
+    // Shorter text is inside the longer text (speedup).
+    diffs = [[DIFF_INSERT, longtext.substring(0, i)],
+             [DIFF_EQUAL, shorttext],
+             [DIFF_INSERT, longtext.substring(i + shorttext.length)]];
+    // Swap insertions for deletions if diff is reversed.
+    if (text1.length > text2.length) {
+      diffs[0][0] = diffs[2][0] = DIFF_DELETE;
+    }
+    return diffs;
+  }
+
+  if (shorttext.length == 1) {
+    // Single character string.
+    // After the previous speedup, the character can't be an equality.
+    return [[DIFF_DELETE, text1], [DIFF_INSERT, text2]];
+  }
+
+  // Check to see if the problem can be split in two.
+  var hm = diff_halfMatch_(text1, text2);
+  if (hm) {
+    // A half-match was found, sort out the return data.
+    var text1_a = hm[0];
+    var text1_b = hm[1];
+    var text2_a = hm[2];
+    var text2_b = hm[3];
+    var mid_common = hm[4];
+    // Send both pairs off for separate processing.
+    var diffs_a = diff_main(text1_a, text2_a);
+    var diffs_b = diff_main(text1_b, text2_b);
+    // Merge the results.
+    return diffs_a.concat([[DIFF_EQUAL, mid_common]], diffs_b);
+  }
+
+  return diff_bisect_(text1, text2);
+};
+
+
+/**
+ * Find the 'middle snake' of a diff, split the problem in two
+ * and return the recursively constructed diff.
+ * See Myers 1986 paper: An O(ND) Difference Algorithm and Its Variations.
+ * @param {string} text1 Old string to be diffed.
+ * @param {string} text2 New string to be diffed.
+ * @return {Array} Array of diff tuples.
+ * @private
+ */
+function diff_bisect_(text1, text2) {
+  // Cache the text lengths to prevent multiple calls.
+  var text1_length = text1.length;
+  var text2_length = text2.length;
+  var max_d = Math.ceil((text1_length + text2_length) / 2);
+  var v_offset = max_d;
+  var v_length = 2 * max_d;
+  var v1 = new Array(v_length);
+  var v2 = new Array(v_length);
+  // Setting all elements to -1 is faster in Chrome & Firefox than mixing
+  // integers and undefined.
+  for (var x = 0; x < v_length; x++) {
+    v1[x] = -1;
+    v2[x] = -1;
+  }
+  v1[v_offset + 1] = 0;
+  v2[v_offset + 1] = 0;
+  var delta = text1_length - text2_length;
+  // If the total number of characters is odd, then the front path will collide
+  // with the reverse path.
+  var front = (delta % 2 != 0);
+  // Offsets for start and end of k loop.
+  // Prevents mapping of space beyond the grid.
+  var k1start = 0;
+  var k1end = 0;
+  var k2start = 0;
+  var k2end = 0;
+  for (var d = 0; d < max_d; d++) {
+    // Walk the front path one step.
+    for (var k1 = -d + k1start; k1 <= d - k1end; k1 += 2) {
+      var k1_offset = v_offset + k1;
+      var x1;
+      if (k1 == -d || (k1 != d && v1[k1_offset - 1] < v1[k1_offset + 1])) {
+        x1 = v1[k1_offset + 1];
+      } else {
+        x1 = v1[k1_offset - 1] + 1;
+      }
+      var y1 = x1 - k1;
+      while (x1 < text1_length && y1 < text2_length &&
+             text1.charAt(x1) == text2.charAt(y1)) {
+        x1++;
+        y1++;
+      }
+      v1[k1_offset] = x1;
+      if (x1 > text1_length) {
+        // Ran off the right of the graph.
+        k1end += 2;
+      } else if (y1 > text2_length) {
+        // Ran off the bottom of the graph.
+        k1start += 2;
+      } else if (front) {
+        var k2_offset = v_offset + delta - k1;
+        if (k2_offset >= 0 && k2_offset < v_length && v2[k2_offset] != -1) {
+          // Mirror x2 onto top-left coordinate system.
+          var x2 = text1_length - v2[k2_offset];
+          if (x1 >= x2) {
+            // Overlap detected.
+            return diff_bisectSplit_(text1, text2, x1, y1);
+          }
+        }
+      }
+    }
+
+    // Walk the reverse path one step.
+    for (var k2 = -d + k2start; k2 <= d - k2end; k2 += 2) {
+      var k2_offset = v_offset + k2;
+      var x2;
+      if (k2 == -d || (k2 != d && v2[k2_offset - 1] < v2[k2_offset + 1])) {
+        x2 = v2[k2_offset + 1];
+      } else {
+        x2 = v2[k2_offset - 1] + 1;
+      }
+      var y2 = x2 - k2;
+      while (x2 < text1_length && y2 < text2_length &&
+             text1.charAt(text1_length - x2 - 1) ==
+             text2.charAt(text2_length - y2 - 1)) {
+        x2++;
+        y2++;
+      }
+      v2[k2_offset] = x2;
+      if (x2 > text1_length) {
+        // Ran off the left of the graph.
+        k2end += 2;
+      } else if (y2 > text2_length) {
+        // Ran off the top of the graph.
+        k2start += 2;
+      } else if (!front) {
+        var k1_offset = v_offset + delta - k2;
+        if (k1_offset >= 0 && k1_offset < v_length && v1[k1_offset] != -1) {
+          var x1 = v1[k1_offset];
+          var y1 = v_offset + x1 - k1_offset;
+          // Mirror x2 onto top-left coordinate system.
+          x2 = text1_length - x2;
+          if (x1 >= x2) {
+            // Overlap detected.
+            return diff_bisectSplit_(text1, text2, x1, y1);
+          }
+        }
+      }
+    }
+  }
+  // Diff took too long and hit the deadline or
+  // number of diffs equals number of characters, no commonality at all.
+  return [[DIFF_DELETE, text1], [DIFF_INSERT, text2]];
+};
+
+
+/**
+ * Given the location of the 'middle snake', split the diff in two parts
+ * and recurse.
+ * @param {string} text1 Old string to be diffed.
+ * @param {string} text2 New string to be diffed.
+ * @param {number} x Index of split point in text1.
+ * @param {number} y Index of split point in text2.
+ * @return {Array} Array of diff tuples.
+ */
+function diff_bisectSplit_(text1, text2, x, y) {
+  var text1a = text1.substring(0, x);
+  var text2a = text2.substring(0, y);
+  var text1b = text1.substring(x);
+  var text2b = text2.substring(y);
+
+  // Compute both diffs serially.
+  var diffs = diff_main(text1a, text2a);
+  var diffsb = diff_main(text1b, text2b);
+
+  return diffs.concat(diffsb);
+};
+
+
+/**
+ * Determine the common prefix of two strings.
+ * @param {string} text1 First string.
+ * @param {string} text2 Second string.
+ * @return {number} The number of characters common to the start of each
+ *     string.
+ */
+function diff_commonPrefix(text1, text2) {
+  // Quick check for common null cases.
+  if (!text1 || !text2 || text1.charAt(0) != text2.charAt(0)) {
+    return 0;
+  }
+  // Binary search.
+  // Performance analysis: http://neil.fraser.name/news/2007/10/09/
+  var pointermin = 0;
+  var pointermax = Math.min(text1.length, text2.length);
+  var pointermid = pointermax;
+  var pointerstart = 0;
+  while (pointermin < pointermid) {
+    if (text1.substring(pointerstart, pointermid) ==
+        text2.substring(pointerstart, pointermid)) {
+      pointermin = pointermid;
+      pointerstart = pointermin;
+    } else {
+      pointermax = pointermid;
+    }
+    pointermid = Math.floor((pointermax - pointermin) / 2 + pointermin);
+  }
+  return pointermid;
+};
+
+
+/**
+ * Determine the common suffix of two strings.
+ * @param {string} text1 First string.
+ * @param {string} text2 Second string.
+ * @return {number} The number of characters common to the end of each string.
+ */
+function diff_commonSuffix(text1, text2) {
+  // Quick check for common null cases.
+  if (!text1 || !text2 ||
+      text1.charAt(text1.length - 1) != text2.charAt(text2.length - 1)) {
+    return 0;
+  }
+  // Binary search.
+  // Performance analysis: http://neil.fraser.name/news/2007/10/09/
+  var pointermin = 0;
+  var pointermax = Math.min(text1.length, text2.length);
+  var pointermid = pointermax;
+  var pointerend = 0;
+  while (pointermin < pointermid) {
+    if (text1.substring(text1.length - pointermid, text1.length - pointerend) ==
+        text2.substring(text2.length - pointermid, text2.length - pointerend)) {
+      pointermin = pointermid;
+      pointerend = pointermin;
+    } else {
+      pointermax = pointermid;
+    }
+    pointermid = Math.floor((pointermax - pointermin) / 2 + pointermin);
+  }
+  return pointermid;
+};
+
+
+/**
+ * Do the two texts share a substring which is at least half the length of the
+ * longer text?
+ * This speedup can produce non-minimal diffs.
+ * @param {string} text1 First string.
+ * @param {string} text2 Second string.
+ * @return {Array.<string>} Five element Array, containing the prefix of
+ *     text1, the suffix of text1, the prefix of text2, the suffix of
+ *     text2 and the common middle.  Or null if there was no match.
+ */
+function diff_halfMatch_(text1, text2) {
+  var longtext = text1.length > text2.length ? text1 : text2;
+  var shorttext = text1.length > text2.length ? text2 : text1;
+  if (longtext.length < 4 || shorttext.length * 2 < longtext.length) {
+    return null;  // Pointless.
+  }
+
+  /**
+   * Does a substring of shorttext exist within longtext such that the substring
+   * is at least half the length of longtext?
+   * Closure, but does not reference any external variables.
+   * @param {string} longtext Longer string.
+   * @param {string} shorttext Shorter string.
+   * @param {number} i Start index of quarter length substring within longtext.
+   * @return {Array.<string>} Five element Array, containing the prefix of
+   *     longtext, the suffix of longtext, the prefix of shorttext, the suffix
+   *     of shorttext and the common middle.  Or null if there was no match.
+   * @private
+   */
+  function diff_halfMatchI_(longtext, shorttext, i) {
+    // Start with a 1/4 length substring at position i as a seed.
+    var seed = longtext.substring(i, i + Math.floor(longtext.length / 4));
+    var j = -1;
+    var best_common = '';
+    var best_longtext_a, best_longtext_b, best_shorttext_a, best_shorttext_b;
+    while ((j = shorttext.indexOf(seed, j + 1)) != -1) {
+      var prefixLength = diff_commonPrefix(longtext.substring(i),
+                                           shorttext.substring(j));
+      var suffixLength = diff_commonSuffix(longtext.substring(0, i),
+                                           shorttext.substring(0, j));
+      if (best_common.length < suffixLength + prefixLength) {
+        best_common = shorttext.substring(j - suffixLength, j) +
+            shorttext.substring(j, j + prefixLength);
+        best_longtext_a = longtext.substring(0, i - suffixLength);
+        best_longtext_b = longtext.substring(i + prefixLength);
+        best_shorttext_a = shorttext.substring(0, j - suffixLength);
+        best_shorttext_b = shorttext.substring(j + prefixLength);
+      }
+    }
+    if (best_common.length * 2 >= longtext.length) {
+      return [best_longtext_a, best_longtext_b,
+              best_shorttext_a, best_shorttext_b, best_common];
+    } else {
+      return null;
+    }
+  }
+
+  // First check if the second quarter is the seed for a half-match.
+  var hm1 = diff_halfMatchI_(longtext, shorttext,
+                             Math.ceil(longtext.length / 4));
+  // Check again based on the third quarter.
+  var hm2 = diff_halfMatchI_(longtext, shorttext,
+                             Math.ceil(longtext.length / 2));
+  var hm;
+  if (!hm1 && !hm2) {
+    return null;
+  } else if (!hm2) {
+    hm = hm1;
+  } else if (!hm1) {
+    hm = hm2;
+  } else {
+    // Both matched.  Select the longest.
+    hm = hm1[4].length > hm2[4].length ? hm1 : hm2;
+  }
+
+  // A half-match was found, sort out the return data.
+  var text1_a, text1_b, text2_a, text2_b;
+  if (text1.length > text2.length) {
+    text1_a = hm[0];
+    text1_b = hm[1];
+    text2_a = hm[2];
+    text2_b = hm[3];
+  } else {
+    text2_a = hm[0];
+    text2_b = hm[1];
+    text1_a = hm[2];
+    text1_b = hm[3];
+  }
+  var mid_common = hm[4];
+  return [text1_a, text1_b, text2_a, text2_b, mid_common];
+};
+
+
+/**
+ * Reorder and merge like edit sections.  Merge equalities.
+ * Any edit section can move as long as it doesn't cross an equality.
+ * @param {Array} diffs Array of diff tuples.
+ */
+function diff_cleanupMerge(diffs) {
+  diffs.push([DIFF_EQUAL, '']);  // Add a dummy entry at the end.
+  var pointer = 0;
+  var count_delete = 0;
+  var count_insert = 0;
+  var text_delete = '';
+  var text_insert = '';
+  var commonlength;
+  while (pointer < diffs.length) {
+    switch (diffs[pointer][0]) {
+      case DIFF_INSERT:
+        count_insert++;
+        text_insert += diffs[pointer][1];
+        pointer++;
+        break;
+      case DIFF_DELETE:
+        count_delete++;
+        text_delete += diffs[pointer][1];
+        pointer++;
+        break;
+      case DIFF_EQUAL:
+        // Upon reaching an equality, check for prior redundancies.
+        if (count_delete + count_insert > 1) {
+          if (count_delete !== 0 && count_insert !== 0) {
+            // Factor out any common prefixies.
+            commonlength = diff_commonPrefix(text_insert, text_delete);
+            if (commonlength !== 0) {
+              if ((pointer - count_delete - count_insert) > 0 &&
+                  diffs[pointer - count_delete - count_insert - 1][0] ==
+                  DIFF_EQUAL) {
+                diffs[pointer - count_delete - count_insert - 1][1] +=
+                    text_insert.substring(0, commonlength);
+              } else {
+                diffs.splice(0, 0, [DIFF_EQUAL,
+                                    text_insert.substring(0, commonlength)]);
+                pointer++;
+              }
+              text_insert = text_insert.substring(commonlength);
+              text_delete = text_delete.substring(commonlength);
+            }
+            // Factor out any common suffixies.
+            commonlength = diff_commonSuffix(text_insert, text_delete);
+            if (commonlength !== 0) {
+              diffs[pointer][1] = text_insert.substring(text_insert.length -
+                  commonlength) + diffs[pointer][1];
+              text_insert = text_insert.substring(0, text_insert.length -
+                  commonlength);
+              text_delete = text_delete.substring(0, text_delete.length -
+                  commonlength);
+            }
+          }
+          // Delete the offending records and add the merged ones.
+          if (count_delete === 0) {
+            diffs.splice(pointer - count_insert,
+                count_delete + count_insert, [DIFF_INSERT, text_insert]);
+          } else if (count_insert === 0) {
+            diffs.splice(pointer - count_delete,
+                count_delete + count_insert, [DIFF_DELETE, text_delete]);
+          } else {
+            diffs.splice(pointer - count_delete - count_insert,
+                count_delete + count_insert, [DIFF_DELETE, text_delete],
+                [DIFF_INSERT, text_insert]);
+          }
+          pointer = pointer - count_delete - count_insert +
+                    (count_delete ? 1 : 0) + (count_insert ? 1 : 0) + 1;
+        } else if (pointer !== 0 && diffs[pointer - 1][0] == DIFF_EQUAL) {
+          // Merge this equality with the previous one.
+          diffs[pointer - 1][1] += diffs[pointer][1];
+          diffs.splice(pointer, 1);
+        } else {
+          pointer++;
+        }
+        count_insert = 0;
+        count_delete = 0;
+        text_delete = '';
+        text_insert = '';
+        break;
+    }
+  }
+  if (diffs[diffs.length - 1][1] === '') {
+    diffs.pop();  // Remove the dummy entry at the end.
+  }
+
+  // Second pass: look for single edits surrounded on both sides by equalities
+  // which can be shifted sideways to eliminate an equality.
+  // e.g: A<ins>BA</ins>C -> <ins>AB</ins>AC
+  var changes = false;
+  pointer = 1;
+  // Intentionally ignore the first and last element (don't need checking).
+  while (pointer < diffs.length - 1) {
+    if (diffs[pointer - 1][0] == DIFF_EQUAL &&
+        diffs[pointer + 1][0] == DIFF_EQUAL) {
+      // This is a single edit surrounded by equalities.
+      if (diffs[pointer][1].substring(diffs[pointer][1].length -
+          diffs[pointer - 1][1].length) == diffs[pointer - 1][1]) {
+        // Shift the edit over the previous equality.
+        diffs[pointer][1] = diffs[pointer - 1][1] +
+            diffs[pointer][1].substring(0, diffs[pointer][1].length -
+                                        diffs[pointer - 1][1].length);
+        diffs[pointer + 1][1] = diffs[pointer - 1][1] + diffs[pointer + 1][1];
+        diffs.splice(pointer - 1, 1);
+        changes = true;
+      } else if (diffs[pointer][1].substring(0, diffs[pointer + 1][1].length) ==
+          diffs[pointer + 1][1]) {
+        // Shift the edit over the next equality.
+        diffs[pointer - 1][1] += diffs[pointer + 1][1];
+        diffs[pointer][1] =
+            diffs[pointer][1].substring(diffs[pointer + 1][1].length) +
+            diffs[pointer + 1][1];
+        diffs.splice(pointer + 1, 1);
+        changes = true;
+      }
+    }
+    pointer++;
+  }
+  // If shifts were made, the diff needs reordering and another shift sweep.
+  if (changes) {
+    diff_cleanupMerge(diffs);
+  }
+};
+
+
+var diff = diff_main;
+diff.INSERT = DIFF_INSERT;
+diff.DELETE = DIFF_DELETE;
+diff.EQUAL = DIFF_EQUAL;
+
+module.exports = diff;
+
+/*
+ * Modify a diff such that the cursor position points to the start of a change:
+ * E.g.
+ *   cursor_normalize_diff([[DIFF_EQUAL, 'abc']], 1)
+ *     => [1, [[DIFF_EQUAL, 'a'], [DIFF_EQUAL, 'bc']]]
+ *   cursor_normalize_diff([[DIFF_INSERT, 'new'], [DIFF_DELETE, 'xyz']], 2)
+ *     => [2, [[DIFF_INSERT, 'new'], [DIFF_DELETE, 'xy'], [DIFF_DELETE, 'z']]]
+ *
+ * @param {Array} diffs Array of diff tuples
+ * @param {Int} cursor_pos Suggested edit position. Must not be out of bounds!
+ * @return {Array} A tuple [cursor location in the modified diff, modified diff]
+ */
+function cursor_normalize_diff (diffs, cursor_pos) {
+  if (cursor_pos === 0) {
+    return [DIFF_EQUAL, diffs];
+  }
+  for (var current_pos = 0, i = 0; i < diffs.length; i++) {
+    var d = diffs[i];
+    if (d[0] === DIFF_DELETE || d[0] === DIFF_EQUAL) {
+      var next_pos = current_pos + d[1].length;
+      if (cursor_pos === next_pos) {
+        return [i + 1, diffs];
+      } else if (cursor_pos < next_pos) {
+        // copy to prevent side effects
+        diffs = diffs.slice();
+        // split d into two diff changes
+        var split_pos = cursor_pos - current_pos;
+        var d_left = [d[0], d[1].slice(0, split_pos)];
+        var d_right = [d[0], d[1].slice(split_pos)];
+        diffs.splice(i, 1, d_left, d_right);
+        return [i + 1, diffs];
+      } else {
+        current_pos = next_pos;
+      }
+    }
+  }
+  throw new Error('cursor_pos is out of bounds!')
+}
+
+/*
+ * Modify a diff such that the edit position is "shifted" to the proposed edit location (cursor_position).
+ *
+ * Case 1)
+ *   Check if a naive shift is possible:
+ *     [0, X], [ 1, Y] -> [ 1, Y], [0, X]    (if X + Y === Y + X)
+ *     [0, X], [-1, Y] -> [-1, Y], [0, X]    (if X + Y === Y + X) - holds same result
+ * Case 2)
+ *   Check if the following shifts are possible:
+ *     [0, 'pre'], [ 1, 'prefix'] -> [ 1, 'pre'], [0, 'pre'], [ 1, 'fix']
+ *     [0, 'pre'], [-1, 'prefix'] -> [-1, 'pre'], [0, 'pre'], [-1, 'fix']
+ *         ^            ^
+ *         d          d_next
+ *
+ * @param {Array} diffs Array of diff tuples
+ * @param {Int} cursor_pos Suggested edit position. Must not be out of bounds!
+ * @return {Array} Array of diff tuples
+ */
+function fix_cursor (diffs, cursor_pos) {
+  var norm = cursor_normalize_diff(diffs, cursor_pos);
+  var ndiffs = norm[1];
+  var cursor_pointer = norm[0];
+  var d = ndiffs[cursor_pointer];
+  var d_next = ndiffs[cursor_pointer + 1];
+
+  if (d == null) {
+    // Text was deleted from end of original string,
+    // cursor is now out of bounds in new string
+    return diffs;
+  } else if (d[0] !== DIFF_EQUAL) {
+    // A modification happened at the cursor location.
+    // This is the expected outcome, so we can return the original diff.
+    return diffs;
+  } else {
+    if (d_next != null && d[1] + d_next[1] === d_next[1] + d[1]) {
+      // Case 1)
+      // It is possible to perform a naive shift
+      ndiffs.splice(cursor_pointer, 2, d_next, d)
+      return merge_tuples(ndiffs, cursor_pointer, 2)
+    } else if (d_next != null && d_next[1].indexOf(d[1]) === 0) {
+      // Case 2)
+      // d[1] is a prefix of d_next[1]
+      // We can assume that d_next[0] !== 0, since d[0] === 0
+      // Shift edit locations..
+      ndiffs.splice(cursor_pointer, 2, [d_next[0], d[1]], [0, d[1]]);
+      var suffix = d_next[1].slice(d[1].length);
+      if (suffix.length > 0) {
+        ndiffs.splice(cursor_pointer + 2, 0, [d_next[0], suffix]);
+      }
+      return merge_tuples(ndiffs, cursor_pointer, 3)
+    } else {
+      // Not possible to perform any modification
+      return diffs;
+    }
+  }
+
+}
+
+/*
+ * Try to merge tuples with their neigbors in a given range.
+ * E.g. [0, 'a'], [0, 'b'] -> [0, 'ab']
+ *
+ * @param {Array} diffs Array of diff tuples.
+ * @param {Int} start Position of the first element to merge (diffs[start] is also merged with diffs[start - 1]).
+ * @param {Int} length Number of consecutive elements to check.
+ * @return {Array} Array of merged diff tuples.
+ */
+function merge_tuples (diffs, start, length) {
+  // Check from (start-1) to (start+length).
+  for (var i = start + length - 1; i >= 0 && i >= start - 1; i--) {
+    if (i + 1 < diffs.length) {
+      var left_d = diffs[i];
+      var right_d = diffs[i+1];
+      if (left_d[0] === right_d[1]) {
+        diffs.splice(i, 2, [left_d[0], left_d[1] + right_d[1]]);
+      }
+    }
+  }
+  return diffs;
+}
+
+},{}],218:[function(require,module,exports){
 const EventEmitter = require('events').EventEmitter
 const assert = require('assert')
 const fsm = require('fsm')
@@ -36972,7 +37754,7 @@ function reach (curr, next, reachable) {
   return here[next].length === 1
 }
 
-},{"assert":31,"events":215,"fsm":218}],218:[function(require,module,exports){
+},{"assert":31,"events":215,"fsm":219}],219:[function(require,module,exports){
 function each(obj, iter) {
   for(var key in obj) {
     var value = obj[key]
@@ -37146,7 +37928,7 @@ var combine = exports.combine = function (fsm1, fsm2, start1, start2) {
 }
 
 
-},{}],219:[function(require,module,exports){
+},{}],220:[function(require,module,exports){
 var util = require('util')
 
 var INDENT_START = /[\{\[]/
@@ -37209,7 +37991,7 @@ module.exports = function() {
   return line
 }
 
-},{"util":756}],220:[function(require,module,exports){
+},{"util":764}],221:[function(require,module,exports){
 var isProperty = require('is-property')
 
 var gen = function(obj, prop) {
@@ -37223,7 +38005,7 @@ gen.property = function (prop) {
 
 module.exports = gen
 
-},{"is-property":376}],221:[function(require,module,exports){
+},{"is-property":381}],222:[function(require,module,exports){
 // originally pulled out of simple-peer
 
 module.exports = function getBrowserRTC () {
@@ -37240,7 +38022,7 @@ module.exports = function getBrowserRTC () {
   return wrtc
 }
 
-},{}],222:[function(require,module,exports){
+},{}],223:[function(require,module,exports){
 (function (global){
 /* global Blob File */
 
@@ -37306,14 +38088,14 @@ function hasBinary (obj) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"isarray":223}],223:[function(require,module,exports){
+},{"isarray":224}],224:[function(require,module,exports){
 var toString = {}.toString;
 
 module.exports = Array.isArray || function (arr) {
   return toString.call(arr) == '[object Array]';
 };
 
-},{}],224:[function(require,module,exports){
+},{}],225:[function(require,module,exports){
 
 /**
  * Module exports.
@@ -37332,7 +38114,7 @@ try {
   module.exports = false;
 }
 
-},{}],225:[function(require,module,exports){
+},{}],226:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 var Transform = require('stream').Transform
@@ -37419,7 +38201,7 @@ HashBase.prototype._digest = function () {
 module.exports = HashBase
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"inherits":242,"stream":742}],226:[function(require,module,exports){
+},{"buffer":128,"inherits":244,"stream":749}],227:[function(require,module,exports){
 var hash = exports;
 
 hash.utils = require('./hash/utils');
@@ -37436,7 +38218,7 @@ hash.sha384 = hash.sha.sha384;
 hash.sha512 = hash.sha.sha512;
 hash.ripemd160 = hash.ripemd.ripemd160;
 
-},{"./hash/common":227,"./hash/hmac":228,"./hash/ripemd":229,"./hash/sha":230,"./hash/utils":237}],227:[function(require,module,exports){
+},{"./hash/common":228,"./hash/hmac":229,"./hash/ripemd":230,"./hash/sha":231,"./hash/utils":238}],228:[function(require,module,exports){
 'use strict';
 
 var utils = require('./utils');
@@ -37530,7 +38312,7 @@ BlockHash.prototype._pad = function pad() {
   return res;
 };
 
-},{"./utils":237,"minimalistic-assert":538}],228:[function(require,module,exports){
+},{"./utils":238,"minimalistic-assert":545}],229:[function(require,module,exports){
 'use strict';
 
 var utils = require('./utils');
@@ -37579,7 +38361,7 @@ Hmac.prototype.digest = function digest(enc) {
   return this.outer.digest(enc);
 };
 
-},{"./utils":237,"minimalistic-assert":538}],229:[function(require,module,exports){
+},{"./utils":238,"minimalistic-assert":545}],230:[function(require,module,exports){
 'use strict';
 
 var utils = require('./utils');
@@ -37727,7 +38509,7 @@ var sh = [
   8, 5, 12, 9, 12, 5, 14, 6, 8, 13, 6, 5, 15, 13, 11, 11
 ];
 
-},{"./common":227,"./utils":237}],230:[function(require,module,exports){
+},{"./common":228,"./utils":238}],231:[function(require,module,exports){
 'use strict';
 
 exports.sha1 = require('./sha/1');
@@ -37736,7 +38518,7 @@ exports.sha256 = require('./sha/256');
 exports.sha384 = require('./sha/384');
 exports.sha512 = require('./sha/512');
 
-},{"./sha/1":231,"./sha/224":232,"./sha/256":233,"./sha/384":234,"./sha/512":235}],231:[function(require,module,exports){
+},{"./sha/1":232,"./sha/224":233,"./sha/256":234,"./sha/384":235,"./sha/512":236}],232:[function(require,module,exports){
 'use strict';
 
 var utils = require('../utils');
@@ -37812,7 +38594,7 @@ SHA1.prototype._digest = function digest(enc) {
     return utils.split32(this.h, 'big');
 };
 
-},{"../common":227,"../utils":237,"./common":236}],232:[function(require,module,exports){
+},{"../common":228,"../utils":238,"./common":237}],233:[function(require,module,exports){
 'use strict';
 
 var utils = require('../utils');
@@ -37844,7 +38626,7 @@ SHA224.prototype._digest = function digest(enc) {
 };
 
 
-},{"../utils":237,"./256":233}],233:[function(require,module,exports){
+},{"../utils":238,"./256":234}],234:[function(require,module,exports){
 'use strict';
 
 var utils = require('../utils');
@@ -37951,7 +38733,7 @@ SHA256.prototype._digest = function digest(enc) {
     return utils.split32(this.h, 'big');
 };
 
-},{"../common":227,"../utils":237,"./common":236,"minimalistic-assert":538}],234:[function(require,module,exports){
+},{"../common":228,"../utils":238,"./common":237,"minimalistic-assert":545}],235:[function(require,module,exports){
 'use strict';
 
 var utils = require('../utils');
@@ -37988,7 +38770,7 @@ SHA384.prototype._digest = function digest(enc) {
     return utils.split32(this.h.slice(0, 12), 'big');
 };
 
-},{"../utils":237,"./512":235}],235:[function(require,module,exports){
+},{"../utils":238,"./512":236}],236:[function(require,module,exports){
 'use strict';
 
 var utils = require('../utils');
@@ -38320,7 +39102,7 @@ function g1_512_lo(xh, xl) {
   return r;
 }
 
-},{"../common":227,"../utils":237,"minimalistic-assert":538}],236:[function(require,module,exports){
+},{"../common":228,"../utils":238,"minimalistic-assert":545}],237:[function(require,module,exports){
 'use strict';
 
 var utils = require('../utils');
@@ -38371,7 +39153,7 @@ function g1_256(x) {
 }
 exports.g1_256 = g1_256;
 
-},{"../utils":237}],237:[function(require,module,exports){
+},{"../utils":238}],238:[function(require,module,exports){
 'use strict';
 
 var assert = require('minimalistic-assert');
@@ -38626,7 +39408,7 @@ function shr64_lo(ah, al, num) {
 }
 exports.shr64_lo = shr64_lo;
 
-},{"inherits":242,"minimalistic-assert":538}],238:[function(require,module,exports){
+},{"inherits":244,"minimalistic-assert":545}],239:[function(require,module,exports){
 'use strict';
 
 var hash = require('hash.js');
@@ -38741,7 +39523,63 @@ HmacDRBG.prototype.generate = function generate(len, enc, add, addEnc) {
   return utils.encode(res, enc);
 };
 
-},{"hash.js":226,"minimalistic-assert":538,"minimalistic-crypto-utils":539}],239:[function(require,module,exports){
+},{"hash.js":227,"minimalistic-assert":545,"minimalistic-crypto-utils":546}],240:[function(require,module,exports){
+'use strict'
+
+const cloneDeep = require('lodash.clonedeep')
+const debug = require('debug')('hyperdiff')
+const pullAt = require('lodash.pullat')
+
+const isPresent = (itemIndex) => itemIndex !== -1
+
+function GET_INITIAL_STATE () {
+  return { common: [], removed: [] }
+}
+
+function hasItemWithProps (collection, item, props) {
+  return props.every(prop => item[prop] === collection[prop])
+}
+
+function indexOf (collection, item, props) {
+  return collection.indexOf(item)
+}
+
+function findIndexWithProps (collection, item, props) {
+  return collection.findIndex(function (origItem) {
+    return hasItemWithProps(origItem, item, props)
+  })
+}
+
+function determinateCollections (orig, dist) {
+  return {first: orig, second: cloneDeep(dist)}
+}
+
+function determinateFindIndex (props) {
+  return props ? findIndexWithProps : indexOf
+}
+
+function hyperdiff (orig, dist, props) {
+  const {first, second} = determinateCollections(orig, dist)
+  const findIndex = determinateFindIndex(props)
+  debug('preconditions first=%j second=%j findIndex=%s', first, second, findIndex.name)
+
+  const results = first.reduce(function (acc, item, index) {
+    const itemIndex = findIndex(second, item, props)
+    const destination = isPresent(itemIndex) ? 'common' : 'removed'
+    acc[destination].push(item)
+    pullAt(second, itemIndex)
+    debug('index=%s value=%s collection=%s', index, item, destination)
+    return acc
+  }, GET_INITIAL_STATE())
+
+  results.added = second
+  debug('added=%j removed=%j common%j', results.added, results.removed, results.common)
+  return results
+}
+
+module.exports = hyperdiff
+
+},{"debug":151,"lodash.clonedeep":484,"lodash.pullat":497}],241:[function(require,module,exports){
 /**
  * Copyright (c) 2016 Tim Kuijsten
  *
@@ -38879,7 +39717,7 @@ function idbReadableStream(db, storeName, opts) {
 
 module.exports = idbReadableStream
 
-},{"stream":742,"xtend":769}],240:[function(require,module,exports){
+},{"stream":749,"xtend":777}],242:[function(require,module,exports){
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m
   var eLen = nBytes * 8 - mLen - 1
@@ -38965,7 +39803,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],241:[function(require,module,exports){
+},{}],243:[function(require,module,exports){
 
 var indexOf = [].indexOf;
 
@@ -38976,7 +39814,7 @@ module.exports = function(arr, obj){
   }
   return -1;
 };
-},{}],242:[function(require,module,exports){
+},{}],244:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -39001,7 +39839,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],243:[function(require,module,exports){
+},{}],245:[function(require,module,exports){
 'use strict'
 
 const defer = require('pull-defer/duplex')
@@ -39063,12 +39901,12 @@ module.exports = class Connection {
   }
 }
 
-},{"pull-defer/duplex":623}],244:[function(require,module,exports){
+},{"pull-defer/duplex":630}],246:[function(require,module,exports){
 'use strict'
 
 exports.Connection = require('./connection')
 
-},{"./connection":243}],245:[function(require,module,exports){
+},{"./connection":245}],247:[function(require,module,exports){
 /* @flow */
 'use strict'
 
@@ -39136,7 +39974,7 @@ export type Order<Value> = (QueryResult<Value>, Callback<QueryResult<Value>>) =>
 
 */
 
-},{"./key":246,"./memory":247,"./utils":248}],246:[function(require,module,exports){
+},{"./key":248,"./memory":249,"./utils":250}],248:[function(require,module,exports){
 (function (Buffer){
 /* @flow */
 'use strict'
@@ -39512,7 +40350,7 @@ function namespaceValue (ns /* : string */) /* : string */ {
 module.exports = Key
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"path":590,"uuid/v4":759}],247:[function(require,module,exports){
+},{"buffer":128,"path":597,"uuid/v4":767}],249:[function(require,module,exports){
 /* @flow */
 'use strict'
 
@@ -39644,7 +40482,7 @@ class MemoryDatastore {
 
 module.exports = MemoryDatastore
 
-},{"./key":246,"./utils":248,"async/setImmediate":68,"pull-stream":642}],248:[function(require,module,exports){
+},{"./key":248,"./utils":250,"async/setImmediate":68,"pull-stream":649}],250:[function(require,module,exports){
 'use strict'
 
 const pull = require('pull-stream')
@@ -39725,7 +40563,7 @@ exports.tmpdir = () => {
   return path.join(os.tmpdir(), uuid())
 }
 
-},{"os":581,"path":590,"pull-defer/source":626,"pull-stream":642,"uuid/v4":759}],249:[function(require,module,exports){
+},{"os":588,"path":597,"pull-defer/source":633,"pull-stream":649,"uuid/v4":767}],251:[function(require,module,exports){
 'use strict';
 
 var ip = exports;
@@ -40143,7 +40981,7 @@ ip.fromLong = function(ipl) {
       (ipl & 255) );
 };
 
-},{"buffer":128,"os":581}],250:[function(require,module,exports){
+},{"buffer":128,"os":588}],252:[function(require,module,exports){
 (function (process){
 /**
  * This is the web browser implementation of `debug()`.
@@ -40342,7 +41180,7 @@ function localstorage() {
 }
 
 }).call(this,require('_process'))
-},{"./debug":251,"_process":602}],251:[function(require,module,exports){
+},{"./debug":253,"_process":609}],253:[function(require,module,exports){
 
 /**
  * This is the common logic for both the Node.js and web browser
@@ -40569,7 +41407,7 @@ function coerce(val) {
   return val;
 }
 
-},{"ms":540}],252:[function(require,module,exports){
+},{"ms":547}],254:[function(require,module,exports){
 'use strict'
 
 const SECOND = 1000
@@ -40584,7 +41422,7 @@ module.exports = {
   maxListeners: 1000
 }
 
-},{}],253:[function(require,module,exports){
+},{}],255:[function(require,module,exports){
 'use strict'
 
 const each = require('async/each')
@@ -40871,7 +41709,7 @@ class DecisionEngine {
 
 module.exports = DecisionEngine
 
-},{"../types/message":259,"../types/wantlist":262,"../utils":263,"./ledger":254,"async/each":35,"async/eachSeries":40,"async/map":63,"async/setImmediate":68,"async/waterfall":71,"lodash.debounce":479,"lodash.find":481,"lodash.groupby":484,"lodash.pullallwith":490,"lodash.uniqwith":495,"lodash.values":496}],254:[function(require,module,exports){
+},{"../types/message":261,"../types/wantlist":264,"../utils":265,"./ledger":256,"async/each":35,"async/eachSeries":40,"async/map":63,"async/setImmediate":68,"async/waterfall":71,"lodash.debounce":485,"lodash.find":487,"lodash.groupby":490,"lodash.pullallwith":496,"lodash.uniqwith":502,"lodash.values":503}],256:[function(require,module,exports){
 'use strict'
 
 const Wantlist = require('../types/wantlist')
@@ -40917,7 +41755,7 @@ class Ledger {
 
 module.exports = Ledger
 
-},{"../types/wantlist":262}],255:[function(require,module,exports){
+},{"../types/wantlist":264}],257:[function(require,module,exports){
 'use strict'
 
 const waterfall = require('async/waterfall')
@@ -41303,7 +42141,7 @@ class Bitswap {
 
 module.exports = Bitswap
 
-},{"./decision-engine":253,"./network":256,"./notifications":257,"./utils":263,"./want-manager":264,"async/each":35,"async/map":63,"async/reject":66,"async/series":67,"async/waterfall":71,"once":580}],256:[function(require,module,exports){
+},{"./decision-engine":255,"./network":258,"./notifications":259,"./utils":265,"./want-manager":266,"async/each":35,"async/map":63,"async/reject":66,"async/series":67,"async/waterfall":71,"once":587}],258:[function(require,module,exports){
 'use strict'
 
 const lp = require('pull-length-prefixed')
@@ -41495,7 +42333,7 @@ function writeMessage (conn, msg, callback) {
 
 module.exports = Network
 
-},{"./constants":252,"./types/message":259,"./utils":263,"async/each":35,"async/setImmediate":68,"async/waterfall":71,"pull-length-prefixed":631,"pull-stream":642}],257:[function(require,module,exports){
+},{"./constants":254,"./types/message":261,"./utils":265,"async/each":35,"async/setImmediate":68,"async/waterfall":71,"pull-length-prefixed":638,"pull-stream":649}],259:[function(require,module,exports){
 'use strict'
 
 const EventEmitter = require('events').EventEmitter
@@ -41611,7 +42449,7 @@ class Notifications extends EventEmitter {
 
 module.exports = Notifications
 
-},{"./constants":252,"./utils":263,"events":215}],258:[function(require,module,exports){
+},{"./constants":254,"./utils":265,"events":215}],260:[function(require,module,exports){
 'use strict'
 
 const WantlistEntry = require('../wantlist').Entry
@@ -41653,7 +42491,7 @@ module.exports = class BitswapMessageEntry {
   }
 }
 
-},{"../wantlist":262,"assert":31,"cids":129}],259:[function(require,module,exports){
+},{"../wantlist":264,"assert":31,"cids":129}],261:[function(require,module,exports){
 'use strict'
 
 const protobuf = require('protocol-buffers')
@@ -41864,7 +42702,7 @@ BitswapMessage.deserialize = (raw, callback) => {
 BitswapMessage.Entry = Entry
 module.exports = BitswapMessage
 
-},{"./entry":258,"./message.proto":260,"assert":31,"async/each":35,"cids":129,"ipfs-block":268,"lodash.isequalwith":487,"multicodec/src/name-table":551,"multihashing-async":559,"protocol-buffers":611,"varint-decoder":760}],260:[function(require,module,exports){
+},{"./entry":260,"./message.proto":262,"assert":31,"async/each":35,"cids":129,"ipfs-block":270,"lodash.isequalwith":493,"multicodec/src/name-table":558,"multihashing-async":566,"protocol-buffers":618,"varint-decoder":768}],262:[function(require,module,exports){
 'use strict'
 
 // from: https://github.com/ipfs/go-ipfs/blob/master/exchange/bitswap/message/pb/message.proto
@@ -41894,7 +42732,7 @@ module.exports = `
   }
 `
 
-},{}],261:[function(require,module,exports){
+},{}],263:[function(require,module,exports){
 'use strict'
 
 const assert = require('assert')
@@ -41938,7 +42776,7 @@ class WantListEntry {
 
 module.exports = WantListEntry
 
-},{"assert":31,"cids":129}],262:[function(require,module,exports){
+},{"assert":31,"cids":129}],264:[function(require,module,exports){
 'use strict'
 
 const sort = require('lodash.sortby')
@@ -42014,7 +42852,7 @@ class Wantlist {
 Wantlist.Entry = Entry
 module.exports = Wantlist
 
-},{"./entry":261,"lodash.sortby":492}],263:[function(require,module,exports){
+},{"./entry":263,"lodash.sortby":499}],265:[function(require,module,exports){
 'use strict'
 
 const debug = require('debug')
@@ -42042,7 +42880,7 @@ exports.logger = (id, subsystem) => {
   return logger
 }
 
-},{"debug":250}],264:[function(require,module,exports){
+},{"debug":252}],266:[function(require,module,exports){
 'use strict'
 
 const setImmediate = require('async/setImmediate')
@@ -42180,7 +43018,7 @@ module.exports = class WantManager {
   }
 }
 
-},{"../constants":252,"../types/message":259,"../types/wantlist":262,"../utils":263,"./msg-queue":265,"async/setImmediate":68}],265:[function(require,module,exports){
+},{"../constants":254,"../types/message":261,"../types/wantlist":264,"../utils":265,"./msg-queue":267,"async/setImmediate":68}],267:[function(require,module,exports){
 'use strict'
 
 const debounce = require('lodash.debounce')
@@ -42246,7 +43084,7 @@ module.exports = class MsgQueue {
   }
 }
 
-},{"../types/message":259,"../utils":263,"lodash.debounce":479}],266:[function(require,module,exports){
+},{"../types/message":261,"../utils":265,"lodash.debounce":485}],268:[function(require,module,exports){
 'use strict'
 
 /**
@@ -42357,7 +43195,7 @@ class BlockService {
 
 module.exports = BlockService
 
-},{}],267:[function(require,module,exports){
+},{}],269:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -42498,7 +43336,7 @@ CID.isCID = (other) => {
 module.exports = CID
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"multibase":548,"multicodec":550,"multicodec/src/base-table":549,"multicodec/src/varint-table":553,"multihashes":555}],268:[function(require,module,exports){
+},{"buffer":128,"multibase":555,"multicodec":557,"multicodec/src/base-table":556,"multicodec/src/varint-table":560,"multihashes":562}],270:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -42568,7 +43406,273 @@ class Block {
 module.exports = Block
 
 }).call(this,{"isBuffer":require("../../is-buffer/index.js")})
-},{"../../is-buffer/index.js":372,"cids":267}],269:[function(require,module,exports){
+},{"../../is-buffer/index.js":377,"cids":269}],271:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const EventEmitter = require('events')
+const pull = require('pull-stream')
+const Pushable = require('pull-pushable')
+
+const PROTOCOL = require('./protocol')
+
+module.exports = class Connection extends EventEmitter {
+  constructor (id, ipfs, room) {
+    super()
+    this._id = id
+    this._ipfs = ipfs
+    this._room = room
+    this._connection = null
+    this._connecting = false
+  }
+
+  push (message) {
+    if (this._connection) {
+      this._connection.push(encode(message))
+    } else {
+      if (!this._connecting) {
+        this._getConnection()
+      }
+      this.once('connect', () => {
+        this.push(message)
+      })
+    }
+  }
+
+  stop () {
+    if (this._connection) {
+      this._connection.end()
+    }
+  }
+
+  _getConnection () {
+    this._connecting = true
+    this._getPeerAddresses(this._id, (err, peerAddresses) => {
+      if (err) {
+        this.emit('error', err)
+        return // early
+      }
+
+      if (!peerAddresses.length) {
+        this.emit('error', new Error('could not connect to ' + this._id))
+        return // early
+      }
+
+      this._ipfs._libp2pNode.dial(peerAddresses[0], PROTOCOL, (err, conn) => {
+        if (err) {
+          this.emit('error', err)
+          return // early
+        }
+        this._connecting = false
+        const pushable = Pushable()
+        this._connection = pushable
+        pull(
+          pushable,
+          conn,
+          pull.onEnd((err) => {
+            delete this._connection
+            if (err) {
+              this.emit('error', err)
+            }
+          })
+        )
+        this.emit('connect', pushable)
+      })
+    })
+  }
+
+  _getPeerAddresses (peerId, callback) {
+    this._ipfs.swarm.peers((err, peersAddresses) => {
+      if (err) {
+        callback(err)
+        return // early
+      }
+
+      callback(
+        null,
+        peersAddresses
+          .filter(
+            (peerAddress) => peerAddress.peer.id.toB58String() === peerId)
+          .map(peerAddress => peerAddress.addr)
+      )
+    })
+  }
+}
+
+function encode (_message) {
+  let message = _message
+  if (!Buffer.isBuffer(message)) {
+    message = Buffer.from(message)
+  }
+  return message
+}
+
+}).call(this,require("buffer").Buffer)
+},{"./protocol":273,"buffer":128,"events":215,"pull-pushable":644,"pull-stream":649}],272:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const diff = require('hyperdiff')
+const EventEmitter = require('events')
+const timers = require('timers')
+const clone = require('lodash.clonedeep')
+const pull = require('pull-stream')
+
+const PROTOCOL = require('./protocol')
+const Connection = require('./connection')
+
+const DEFAULT_OPTIONS = {
+  pollInterval: 1000
+}
+
+module.exports = (ipfs, topic, options) => {
+  return new PubSubRoom(ipfs, topic, options)
+}
+
+class PubSubRoom extends EventEmitter {
+  constructor (ipfs, topic, options) {
+    super()
+    this._ipfs = ipfs
+    this._topic = topic
+    this._options = Object.assign({}, clone(DEFAULT_OPTIONS), clone(options))
+    this._peers = []
+    this._connections = {}
+
+    if (!this._ipfs.pubsub) {
+      throw new Error('This IPFS node does not have pubsub.')
+    }
+
+    // if (this._ipfs.isOnline()) {
+    //   this._start()
+    // }
+    // this._ipfs.on('ready', this._start.bind(this))
+
+    this._ipfs.on('stop', this.leave.bind(this))
+
+    this._start()
+  }
+
+  getPeers () {
+    return this._peers.slice(0)
+  }
+
+  hasPeer (peer) {
+    return this._peers.indexOf(peer) >= 0
+  }
+
+  leave () {
+    timers.clearInterval()
+    Object.keys(this._connections).forEach((peer) => {
+      this._connections[peer].stop()
+    })
+    this.emit('stop')
+  }
+
+  broadcast (_message) {
+    let message = _message
+    if (!Buffer.isBuffer(message)) {
+      message = Buffer.from(message)
+    }
+    this._ipfs.pubsub.publish(this._topic, message, (err) => {
+      if (err) {
+        this.emit('error', err)
+      }
+    })
+  }
+
+  sendTo (peer, message) {
+    let conn = this._connections[peer]
+    if (!conn) {
+      conn = new Connection(peer, this._ipfs, this)
+      conn.on('error', (err) => this.emit('error', err))
+    }
+    conn.push(message)
+  }
+
+  _start () {
+    this._interval = timers.setInterval(
+      this._pollPeers.bind(this),
+      this._options.pollInterval)
+
+    const listener = this._onMessage.bind(this)
+    this._ipfs.pubsub.subscribe(this._topic, listener, (err) => {
+      if (err) {
+        this.emit('error', err)
+      } else {
+        this.emit('subscribed', this._topic)
+      }
+    })
+
+    this.once('stop', () => {
+      this._ipfs.pubsub.unsubscribe(this._topic, listener)
+    })
+
+    this._ipfs._libp2pNode.handle(PROTOCOL, this._handleDirectConnection.bind(this))
+  }
+
+  _pollPeers () {
+    this._ipfs.pubsub.peers(this._topic, (err, _newPeers) => {
+      if (err) {
+        this.emit('error', err)
+        return // early
+      }
+
+      const newPeers = _newPeers.sort()
+
+      if (this._emitChanges(newPeers)) {
+        this._peers = newPeers
+      }
+    })
+  }
+
+  _emitChanges (newPeers) {
+    const differences = diff(this._peers, newPeers)
+
+    differences.added.forEach((addedPeer) => this.emit('peer joined', addedPeer))
+    differences.removed.forEach((removedPeer) => this.emit('peer left', removedPeer))
+
+    return differences.added.length > 0 || differences.removed.length > 0
+  }
+
+  _onMessage (message) {
+    this.emit('message', message)
+  }
+
+  _handleDirectConnection (protocol, conn) {
+    conn.getPeerInfo((err, peerInfo) => {
+      if (err) {
+        throw err
+      }
+
+      const peerId = peerInfo.id.toB58String()
+
+      pull(
+        conn,
+        pull.map((message) => {
+          this.emit('message', {
+            from: peerId,
+            data: message
+          })
+          return message
+        }),
+        pull.onEnd((err) => {
+          // do nothinfg
+          if (err) {
+            this.emit('warning', err)
+          }
+        })
+      )
+    })
+  }
+}
+
+}).call(this,require("buffer").Buffer)
+},{"./connection":271,"./protocol":273,"buffer":128,"events":215,"hyperdiff":240,"lodash.clonedeep":484,"pull-stream":649,"timers":755}],273:[function(require,module,exports){
+'use strict'
+
+module.exports = 'ipfs-pubsub-room/v1'
+
+},{}],274:[function(require,module,exports){
 'use strict'
 
 const Key = require('interface-datastore').Key
@@ -42609,7 +43713,7 @@ module.exports = (store) => {
   }
 }
 
-},{"interface-datastore":245,"safe-buffer":706}],270:[function(require,module,exports){
+},{"interface-datastore":247,"safe-buffer":713}],275:[function(require,module,exports){
 'use strict'
 
 exports.create = function createBackend (name, path, options) {
@@ -42618,7 +43722,7 @@ exports.create = function createBackend (name, path, options) {
   return new Ctor(path, backendOptions)
 }
 
-},{}],271:[function(require,module,exports){
+},{}],276:[function(require,module,exports){
 'use strict'
 
 const core = require('datastore-core')
@@ -42772,7 +43876,7 @@ function createBaseStore (store) {
   }
 }
 
-},{"async/reject":66,"async/setImmediate":68,"base32.js":75,"cids":129,"datastore-core":142,"interface-datastore":245,"ipfs-block":268}],272:[function(require,module,exports){
+},{"async/reject":66,"async/setImmediate":68,"base32.js":75,"cids":129,"datastore-core":142,"interface-datastore":247,"ipfs-block":270}],277:[function(require,module,exports){
 'use strict'
 
 const Key = require('interface-datastore').Key
@@ -42882,7 +43986,7 @@ module.exports = (store) => {
   }
 }
 
-},{"async/queue":65,"async/waterfall":71,"interface-datastore":245,"lodash.get":483,"lodash.has":485,"lodash.set":491,"safe-buffer":706}],273:[function(require,module,exports){
+},{"async/queue":65,"async/waterfall":71,"interface-datastore":247,"lodash.get":489,"lodash.has":491,"lodash.set":498,"safe-buffer":713}],278:[function(require,module,exports){
 'use strict'
 
 // Default configuration for a repo in the browser
@@ -42908,7 +44012,7 @@ module.exports = {
   }
 }
 
-},{"datastore-level":150,"level-js":400}],274:[function(require,module,exports){
+},{"datastore-level":150,"level-js":405}],279:[function(require,module,exports){
 'use strict'
 
 const waterfall = require('async/waterfall')
@@ -43138,7 +44242,7 @@ function buildOptions (_options) {
   return options
 }
 
-},{"./api-addr":269,"./backends":270,"./blockstore":271,"./config":272,"./default-options":273,"./lock":275,"./lock-memory":275,"./version":276,"assert":31,"async/each":35,"async/parallel":64,"async/series":67,"async/waterfall":71,"debug":151,"path":590}],275:[function(require,module,exports){
+},{"./api-addr":274,"./backends":275,"./blockstore":276,"./config":277,"./default-options":278,"./lock":280,"./lock-memory":280,"./version":281,"assert":31,"async/each":35,"async/parallel":64,"async/series":67,"async/waterfall":71,"debug":151,"path":597}],280:[function(require,module,exports){
 'use strict'
 
 const debug = require('debug')
@@ -43191,7 +44295,7 @@ exports.locked = (dir, callback) => {
   })
 }
 
-},{"async/setImmediate":68,"debug":151}],276:[function(require,module,exports){
+},{"async/setImmediate":68,"debug":151}],281:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -43258,9 +44362,9 @@ module.exports = (store) => {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"debug":151,"interface-datastore":245}],277:[function(require,module,exports){
+},{"buffer":128,"debug":151,"interface-datastore":247}],282:[function(require,module,exports){
 arguments[4][153][0].apply(exports,arguments)
-},{"buffer":128,"dup":153}],278:[function(require,module,exports){
+},{"buffer":128,"dup":153}],283:[function(require,module,exports){
 'use strict'
 
 const pull = require('pull-stream')
@@ -43319,7 +44423,7 @@ module.exports = function balancedReduceToRoot (reduce, options) {
   }
 }
 
-},{"pull-batch":619,"pull-pair":633,"pull-pushable":637,"pull-stream":642}],279:[function(require,module,exports){
+},{"pull-batch":626,"pull-pair":640,"pull-pushable":644,"pull-stream":649}],284:[function(require,module,exports){
 'use strict'
 
 const balancedReducer = require('./balanced-reducer')
@@ -43333,7 +44437,7 @@ module.exports = function (reduce, _options) {
   return balancedReducer(reduce, options)
 }
 
-},{"./balanced-reducer":278}],280:[function(require,module,exports){
+},{"./balanced-reducer":283}],285:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -43483,7 +44587,7 @@ module.exports = function (createChunker, ipldResolver, createReducer, _options)
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./reduce":284,"async/parallel":64,"async/waterfall":71,"buffer":128,"cids":129,"deep-extend":277,"ipfs-unixfs":306,"ipld-dag-pb":352,"pull-stream":642,"pull-through":673}],281:[function(require,module,exports){
+},{"./reduce":289,"async/parallel":64,"async/waterfall":71,"buffer":128,"cids":129,"deep-extend":282,"ipfs-unixfs":311,"ipld-dag-pb":357,"pull-stream":649,"pull-through":680}],286:[function(require,module,exports){
 'use strict'
 
 const pullPushable = require('pull-pushable')
@@ -43505,7 +44609,7 @@ module.exports = function createBuildStream (createStrategy, ipldResolver, optio
   }
 }
 
-},{"pull-pushable":637,"pull-write":675}],282:[function(require,module,exports){
+},{"pull-pushable":644,"pull-write":682}],287:[function(require,module,exports){
 'use strict'
 
 const pull = require('pull-stream')
@@ -43544,7 +44648,7 @@ module.exports = function (reduce, options) {
   }
 }
 
-},{"pull-batch":619,"pull-pair":633,"pull-pushable":637,"pull-stream":642}],283:[function(require,module,exports){
+},{"pull-batch":626,"pull-pair":640,"pull-pushable":644,"pull-stream":649}],288:[function(require,module,exports){
 'use strict'
 
 const assert = require('assert')
@@ -43578,7 +44682,7 @@ module.exports = function (Chunker, ipldResolver, _options) {
   return createBuildStream(createStrategy, ipldResolver, options)
 }
 
-},{"./balanced":279,"./builder":280,"./create-build-stream":281,"./flat":282,"./trickle":285,"assert":31}],284:[function(require,module,exports){
+},{"./balanced":284,"./builder":285,"./create-build-stream":286,"./flat":287,"./trickle":290,"assert":31}],289:[function(require,module,exports){
 'use strict'
 
 const waterfall = require('async/waterfall')
@@ -43638,7 +44742,7 @@ module.exports = function (file, ipldResolver, options) {
   }
 }
 
-},{"async/waterfall":71,"cids":129,"ipfs-unixfs":306,"ipld-dag-pb":352}],285:[function(require,module,exports){
+},{"async/waterfall":71,"cids":129,"ipfs-unixfs":311,"ipld-dag-pb":357}],290:[function(require,module,exports){
 'use strict'
 
 const trickleReducer = require('./trickle-reducer')
@@ -43653,7 +44757,7 @@ module.exports = function (reduce, _options) {
   return trickleReducer(reduce, options)
 }
 
-},{"./trickle-reducer":286}],286:[function(require,module,exports){
+},{"./trickle-reducer":291}],291:[function(require,module,exports){
 'use strict'
 
 const pull = require('pull-stream')
@@ -43800,7 +44904,7 @@ module.exports = function trickleReduceToRoot (reduce, options) {
   }
 }
 
-},{"pull-batch":619,"pull-pair":633,"pull-pause":636,"pull-pushable":637,"pull-stream":642,"pull-through":673,"pull-write":675}],287:[function(require,module,exports){
+},{"pull-batch":626,"pull-pair":640,"pull-pause":643,"pull-pushable":644,"pull-stream":649,"pull-through":680,"pull-write":682}],292:[function(require,module,exports){
 'use strict'
 
 const pullBlock = require('pull-block')
@@ -43810,7 +44914,7 @@ module.exports = (options) => {
   return pullBlock(maxSize, { zeroPadding: false, emitEmpty: true })
 }
 
-},{"pull-block":620}],288:[function(require,module,exports){
+},{"pull-block":627}],293:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -43825,7 +44929,7 @@ module.exports = (multihash) => {
 }
 
 }).call(this,{"isBuffer":require("../../../is-buffer/index.js")})
-},{"../../../is-buffer/index.js":372,"multihashes":555}],289:[function(require,module,exports){
+},{"../../../is-buffer/index.js":377,"multihashes":562}],294:[function(require,module,exports){
 'use strict'
 
 const path = require('path')
@@ -43875,7 +44979,7 @@ function dirExporter (node, name, pathRest, ipldResolver, resolve, parent) {
   return cat(streams)
 }
 
-},{"cids":129,"path":590,"pull-cat":621,"pull-paramap":634,"pull-stream":642}],290:[function(require,module,exports){
+},{"cids":129,"path":597,"pull-cat":628,"pull-paramap":641,"pull-stream":649}],295:[function(require,module,exports){
 'use strict'
 
 const path = require('path')
@@ -43949,7 +45053,7 @@ function shardedDirExporter (node, name, pathRest, ipldResolver, resolve, parent
   return cat(streams)
 }
 
-},{"./clean-multihash":288,"cids":129,"path":590,"pull-cat":621,"pull-paramap":634,"pull-stream":642}],291:[function(require,module,exports){
+},{"./clean-multihash":293,"cids":129,"path":597,"pull-cat":628,"pull-paramap":641,"pull-stream":649}],296:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -43998,7 +45102,7 @@ module.exports = (node, name, pathRest, ipldResolver) => {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"cids":129,"ipfs-unixfs":306,"pull-paramap":634,"pull-stream":642,"pull-traverse":674}],292:[function(require,module,exports){
+},{"buffer":128,"cids":129,"ipfs-unixfs":311,"pull-paramap":641,"pull-stream":649,"pull-traverse":681}],297:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -44065,7 +45169,7 @@ module.exports = (path, dag) => {
 }
 
 }).call(this,{"isBuffer":require("../../../is-buffer/index.js")})
-},{"../../../is-buffer/index.js":372,"./resolve":294,"cids":129,"pull-defer":624,"pull-stream":642}],293:[function(require,module,exports){
+},{"../../../is-buffer/index.js":377,"./resolve":299,"cids":129,"pull-defer":631,"pull-stream":649}],298:[function(require,module,exports){
 'use strict'
 
 const path = require('path')
@@ -44103,7 +45207,7 @@ function sanitizeCID (cid) {
   return new CID(cid.version, cid.codec, cid.multihash)
 }
 
-},{"cids":129,"path":590,"pull-defer":624,"pull-stream":642}],294:[function(require,module,exports){
+},{"cids":129,"path":597,"pull-defer":631,"pull-stream":649}],299:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -44140,7 +45244,7 @@ function typeOf (node) {
 }
 
 }).call(this,{"isBuffer":require("../../../is-buffer/index.js")})
-},{"../../../is-buffer/index.js":372,"./dir-flat":289,"./dir-hamt-sharded":290,"./file":291,"./object":293,"ipfs-unixfs":306,"pull-stream":642}],295:[function(require,module,exports){
+},{"../../../is-buffer/index.js":377,"./dir-flat":294,"./dir-hamt-sharded":295,"./file":296,"./object":298,"ipfs-unixfs":311,"pull-stream":649}],300:[function(require,module,exports){
 (function (process){
 'use strict'
 
@@ -44433,7 +45537,7 @@ function asyncTransformBucket (bucket, asyncMap, asyncReduce, callback) {
 module.exports = Bucket
 
 }).call(this,require('_process'))
-},{"./consumable-hash":297,"_process":602,"async/eachSeries":40,"async/map":63,"sparse-array":740}],296:[function(require,module,exports){
+},{"./consumable-hash":302,"_process":609,"async/eachSeries":40,"async/map":63,"sparse-array":747}],301:[function(require,module,exports){
 'use strict'
 
 const START_MASKS = [
@@ -44517,7 +45621,7 @@ function maskFor (start, length) {
   return START_MASKS[start] & STOP_MASKS[Math.min(length + start - 1, 7)]
 }
 
-},{}],297:[function(require,module,exports){
+},{}],302:[function(require,module,exports){
 (function (Buffer,process){
 'use strict'
 
@@ -44624,7 +45728,7 @@ class InfiniteHash {
 }
 
 }).call(this,{"isBuffer":require("../../../is-buffer/index.js")},require('_process'))
-},{"../../../is-buffer/index.js":372,"./consumable-buffer":296,"_process":602,"async/whilst":72}],298:[function(require,module,exports){
+},{"../../../is-buffer/index.js":377,"./consumable-buffer":301,"_process":609,"async/whilst":72}],303:[function(require,module,exports){
 'use strict'
 
 const Bucket = require('./bucket')
@@ -44635,7 +45739,7 @@ module.exports = function createHAMT (options) {
 
 module.exports.isBucket = Bucket.isBucket
 
-},{"./bucket":295}],299:[function(require,module,exports){
+},{"./bucket":300}],304:[function(require,module,exports){
 (function (process){
 'use strict'
 
@@ -44730,7 +45834,7 @@ function createDirFlat (props) {
 }
 
 }).call(this,require('_process'))
-},{"./dir":301,"_process":602,"async/eachSeries":40,"async/waterfall":71,"cids":129,"ipfs-unixfs":306,"ipld-dag-pb":352}],300:[function(require,module,exports){
+},{"./dir":306,"_process":609,"async/eachSeries":40,"async/waterfall":71,"cids":129,"ipfs-unixfs":311,"ipld-dag-pb":357}],305:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -44906,13 +46010,13 @@ function flush (options, bucket, path, ipldResolver, source, callback) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"../hamt":298,"./dir":301,"async/waterfall":71,"async/whilst":72,"buffer":128,"cids":129,"ipfs-unixfs":306,"ipld-dag-pb":352,"left-pad":387,"multihashing-async":559}],301:[function(require,module,exports){
+},{"../hamt":303,"./dir":306,"async/waterfall":71,"async/whilst":72,"buffer":128,"cids":129,"ipfs-unixfs":311,"ipld-dag-pb":357,"left-pad":392,"multihashing-async":566}],306:[function(require,module,exports){
 'use strict'
 
 module.exports = class Dir {
 }
 
-},{}],302:[function(require,module,exports){
+},{}],307:[function(require,module,exports){
 'use strict'
 
 const waterfall = require('async/waterfall')
@@ -44988,7 +46092,7 @@ function definitelyShardOne (oldDir, callback) {
   )
 }
 
-},{"./dir-sharded":300,"async/waterfall":71}],303:[function(require,module,exports){
+},{"./dir-sharded":305,"async/waterfall":71}],308:[function(require,module,exports){
 (function (process){
 'use strict'
 
@@ -45090,7 +46194,7 @@ module.exports = function (ipldResolver, _options) {
 }
 
 }).call(this,require('_process'))
-},{"../builder":283,"../chunker/fixed-size":287,"./tree-builder":304,"_process":602,"assert":31,"async/setImmediate":68,"pull-pause":636,"pull-pushable":637,"pull-stream":642,"pull-write":675}],304:[function(require,module,exports){
+},{"../builder":288,"../chunker/fixed-size":292,"./tree-builder":309,"_process":609,"assert":31,"async/setImmediate":68,"pull-pause":643,"pull-pushable":644,"pull-stream":649,"pull-write":682}],309:[function(require,module,exports){
 (function (process){
 'use strict'
 
@@ -45312,13 +46416,13 @@ function notEmpty (str) {
 }
 
 }).call(this,require('_process'))
-},{"./dir":301,"./dir-flat":299,"./flat-to-shard":302,"_process":602,"async/eachOfSeries":39,"async/eachSeries":40,"async/queue":65,"async/waterfall":71,"pull-pushable":637,"pull-write":675}],305:[function(require,module,exports){
+},{"./dir":306,"./dir-flat":304,"./flat-to-shard":307,"_process":609,"async/eachOfSeries":39,"async/eachSeries":40,"async/queue":65,"async/waterfall":71,"pull-pushable":644,"pull-write":682}],310:[function(require,module,exports){
 'use strict'
 
 exports.importer = exports.Importer = require('./importer')
 exports.exporter = exports.Exporter = require('./exporter')
 
-},{"./exporter":292,"./importer":303}],306:[function(require,module,exports){
+},{"./exporter":297,"./importer":308}],311:[function(require,module,exports){
 'use strict'
 
 const protobuf = require('protocol-buffers')
@@ -45422,7 +46526,7 @@ Data.unmarshal = (marsheled) => {
 
 exports = module.exports = Data
 
-},{"./unixfs.proto":307,"protocol-buffers":611}],307:[function(require,module,exports){
+},{"./unixfs.proto":312,"protocol-buffers":618}],312:[function(require,module,exports){
 'use strict'
 
 module.exports = `message Data {
@@ -45448,11 +46552,11 @@ message Metadata {
   required string MimeType = 1;
 }`
 
-},{}],308:[function(require,module,exports){
-arguments[4][250][0].apply(exports,arguments)
-},{"./debug":309,"_process":602,"dup":250}],309:[function(require,module,exports){
-arguments[4][251][0].apply(exports,arguments)
-},{"dup":251,"ms":540}],310:[function(require,module,exports){
+},{}],313:[function(require,module,exports){
+arguments[4][252][0].apply(exports,arguments)
+},{"./debug":314,"_process":609,"dup":252}],314:[function(require,module,exports){
+arguments[4][253][0].apply(exports,arguments)
+},{"dup":253,"ms":547}],315:[function(require,module,exports){
 module.exports={
   "_from": "ipfs@0.25.2",
   "_id": "ipfs@0.25.2",
@@ -45839,7 +46943,7 @@ module.exports={
   "version": "0.25.2"
 }
 
-},{}],311:[function(require,module,exports){
+},{}],316:[function(require,module,exports){
 'use strict'
 
 const waterfall = require('async/waterfall')
@@ -45951,7 +47055,7 @@ module.exports = (self) => {
   })
 }
 
-},{"async/series":67,"async/waterfall":71,"deep-extend":153}],312:[function(require,module,exports){
+},{"async/series":67,"async/waterfall":71,"deep-extend":153}],317:[function(require,module,exports){
 'use strict'
 
 const OFFLINE_ERROR = require('../utils').OFFLINE_ERROR
@@ -45991,7 +47095,7 @@ module.exports = function bitswap (self) {
   }
 }
 
-},{"../utils":338}],313:[function(require,module,exports){
+},{"../utils":343}],318:[function(require,module,exports){
 'use strict'
 
 const Block = require('ipfs-block')
@@ -46076,7 +47180,7 @@ function cleanCid (cid) {
   return new CID(cid)
 }
 
-},{"async/waterfall":71,"cids":129,"ipfs-block":268,"multihashes":555,"multihashing-async":559}],314:[function(require,module,exports){
+},{"async/waterfall":71,"cids":129,"ipfs-block":270,"multihashes":562,"multihashing-async":566}],319:[function(require,module,exports){
 'use strict'
 
 const defaultNodes = require('../runtime/config-nodejs.json').Bootstrap
@@ -46148,7 +47252,7 @@ module.exports = function bootstrap (self) {
   }
 }
 
-},{"../runtime/config-nodejs.json":334}],315:[function(require,module,exports){
+},{"../runtime/config-nodejs.json":339}],320:[function(require,module,exports){
 'use strict'
 
 const promisify = require('promisify-es6')
@@ -46172,7 +47276,7 @@ module.exports = function config (self) {
   }
 }
 
-},{"promisify-es6":604}],316:[function(require,module,exports){
+},{"promisify-es6":611}],321:[function(require,module,exports){
 'use strict'
 
 const promisify = require('promisify-es6')
@@ -46252,7 +47356,7 @@ module.exports = function dag (self) {
   }
 }
 
-},{"cids":129,"promisify-es6":604,"pull-stream":642}],317:[function(require,module,exports){
+},{"cids":129,"promisify-es6":611,"pull-stream":649}],322:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -46419,7 +47523,7 @@ module.exports = (self) => {
 }
 
 }).call(this,{"isBuffer":require("../../../../is-buffer/index.js")})
-},{"../../../../is-buffer/index.js":372,"async/each":35,"async/every":41,"cids":129,"peer-id":597,"promisify-es6":604}],318:[function(require,module,exports){
+},{"../../../../is-buffer/index.js":377,"async/each":35,"async/every":41,"cids":129,"peer-id":604,"promisify-es6":611}],323:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -46621,7 +47725,7 @@ class AddStreamDuplex extends Duplex {
 }
 
 }).call(this,{"isBuffer":require("../../../../is-buffer/index.js")})
-},{"../../../../is-buffer/index.js":372,"async/waterfall":71,"ipfs-unixfs-engine":305,"is-stream":377,"multihashes":555,"promisify-es6":604,"pull-pushable":637,"pull-sort":640,"pull-stream":642,"pull-stream-to-stream":641,"stream":700,"stream-to-pull-stream":744}],319:[function(require,module,exports){
+},{"../../../../is-buffer/index.js":377,"async/waterfall":71,"ipfs-unixfs-engine":310,"is-stream":382,"multihashes":562,"promisify-es6":611,"pull-pushable":644,"pull-sort":647,"pull-stream":649,"pull-stream-to-stream":648,"stream":707,"stream-to-pull-stream":751}],324:[function(require,module,exports){
 'use strict'
 
 const promisify = require('promisify-es6')
@@ -46648,7 +47752,7 @@ module.exports = function id (self) {
   })
 }
 
-},{"async/setImmediate":68,"promisify-es6":604}],320:[function(require,module,exports){
+},{"async/setImmediate":68,"promisify-es6":611}],325:[function(require,module,exports){
 'use strict'
 
 exports.preStart = require('./pre-start')
@@ -46672,7 +47776,7 @@ exports.bitswap = require('./bitswap')
 exports.pubsub = require('./pubsub')
 exports.dht = require('./dht')
 
-},{"./bitswap":312,"./block":313,"./bootstrap":314,"./config":315,"./dag":316,"./dht":317,"./files":318,"./id":319,"./init":321,"./is-online":322,"./libp2p":323,"./object":324,"./ping":325,"./pre-start":326,"./pubsub":327,"./repo":328,"./start":329,"./stop":330,"./swarm":331,"./version":332}],321:[function(require,module,exports){
+},{"./bitswap":317,"./block":318,"./bootstrap":319,"./config":320,"./dag":321,"./dht":322,"./files":323,"./id":324,"./init":326,"./is-online":327,"./libp2p":328,"./object":329,"./ping":330,"./pre-start":331,"./pubsub":332,"./repo":333,"./start":334,"./stop":335,"./swarm":336,"./version":337}],326:[function(require,module,exports){
 'use strict'
 
 const peerId = require('peer-id')
@@ -46765,7 +47869,7 @@ module.exports = function init (self) {
   })
 }
 
-},{"../runtime/config-nodejs.json":334,"./init-assets":96,"async/parallel":64,"async/waterfall":71,"peer-id":597,"promisify-es6":604}],322:[function(require,module,exports){
+},{"../runtime/config-nodejs.json":339,"./init-assets":96,"async/parallel":64,"async/waterfall":71,"peer-id":604,"promisify-es6":611}],327:[function(require,module,exports){
 'use strict'
 
 module.exports = function isOnline (self) {
@@ -46774,7 +47878,7 @@ module.exports = function isOnline (self) {
   }
 }
 
-},{}],323:[function(require,module,exports){
+},{}],328:[function(require,module,exports){
 'use strict'
 
 // libp2p-nodejs gets replaced by libp2p-browser when webpacked/browserified
@@ -46837,7 +47941,7 @@ module.exports = function libp2p (self) {
   }
 }
 
-},{"../runtime/libp2p-nodejs":335,"lodash.get":483,"promisify-es6":604}],324:[function(require,module,exports){
+},{"../runtime/libp2p-nodejs":340,"lodash.get":489,"promisify-es6":611}],329:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -47141,7 +48245,7 @@ module.exports = function object (self) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"assert":31,"async/waterfall":71,"buffer":128,"cids":129,"ipfs-unixfs":306,"ipld-dag-pb":352,"multihashes":555,"promisify-es6":604}],325:[function(require,module,exports){
+},{"assert":31,"async/waterfall":71,"buffer":128,"cids":129,"ipfs-unixfs":311,"ipld-dag-pb":357,"multihashes":562,"promisify-es6":611}],330:[function(require,module,exports){
 'use strict'
 
 const promisify = require('promisify-es6')
@@ -47152,7 +48256,7 @@ module.exports = function ping (self) {
   })
 }
 
-},{"promisify-es6":604}],326:[function(require,module,exports){
+},{"promisify-es6":611}],331:[function(require,module,exports){
 'use strict'
 
 const peerId = require('peer-id')
@@ -47194,7 +48298,7 @@ module.exports = function preStart (self) {
   }
 }
 
-},{"async/waterfall":71,"mafmt":535,"multiaddr":543,"peer-id":597,"peer-info":598}],327:[function(require,module,exports){
+},{"async/waterfall":71,"mafmt":542,"multiaddr":550,"peer-id":604,"peer-info":605}],332:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -47295,7 +48399,7 @@ module.exports = function pubsub (self) {
 }
 
 }).call(this,{"isBuffer":require("../../../../is-buffer/index.js")})
-},{"../../../../is-buffer/index.js":372,"../utils":338,"async/setImmediate":68,"promisify-es6":604}],328:[function(require,module,exports){
+},{"../../../../is-buffer/index.js":377,"../utils":343,"async/setImmediate":68,"promisify-es6":611}],333:[function(require,module,exports){
 'use strict'
 
 module.exports = function repo (self) {
@@ -47314,7 +48418,7 @@ module.exports = function repo (self) {
   }
 }
 
-},{}],329:[function(require,module,exports){
+},{}],334:[function(require,module,exports){
 'use strict'
 
 const series = require('async/series')
@@ -47377,7 +48481,7 @@ module.exports = (self) => {
   })
 }
 
-},{"async/series":67,"async/setImmediate":68,"ipfs-bitswap":255,"libp2p-floodsub":431,"promisify-es6":604}],330:[function(require,module,exports){
+},{"async/series":67,"async/setImmediate":68,"ipfs-bitswap":257,"libp2p-floodsub":436,"promisify-es6":611}],335:[function(require,module,exports){
 'use strict'
 
 const series = require('async/series')
@@ -47423,7 +48527,7 @@ module.exports = (self) => {
   }
 }
 
-},{"async/series":67}],331:[function(require,module,exports){
+},{"async/series":67}],336:[function(require,module,exports){
 'use strict'
 
 const multiaddr = require('multiaddr')
@@ -47517,7 +48621,7 @@ module.exports = function swarm (self) {
   }
 }
 
-},{"../utils":338,"lodash.flatmap":482,"lodash.values":496,"multiaddr":543,"promisify-es6":604}],332:[function(require,module,exports){
+},{"../utils":343,"lodash.flatmap":488,"lodash.values":503,"multiaddr":550,"promisify-es6":611}],337:[function(require,module,exports){
 'use strict'
 
 const pkg = require('../../../package.json')
@@ -47538,7 +48642,7 @@ module.exports = function version (self) {
   })
 }
 
-},{"../../../package.json":310,"promisify-es6":604}],333:[function(require,module,exports){
+},{"../../../package.json":315,"promisify-es6":611}],338:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -47662,7 +48766,7 @@ exports.createNode = (options) => {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./boot":311,"./components":320,"./runtime/repo-nodejs":336,"./state":337,"buffer":128,"cids":129,"debug":308,"deep-extend":153,"events":215,"ipfs-block-service":266,"ipld-resolver":371,"multiaddr":543,"multihashes":555,"peer-book":596,"peer-id":597,"peer-info":598}],334:[function(require,module,exports){
+},{"./boot":316,"./components":325,"./runtime/repo-nodejs":341,"./state":342,"buffer":128,"cids":129,"debug":313,"deep-extend":153,"events":215,"ipfs-block-service":268,"ipld-resolver":376,"multiaddr":550,"multihashes":562,"peer-book":603,"peer-id":604,"peer-info":605}],339:[function(require,module,exports){
 module.exports={
   "Addresses": {
     "Swarm": [
@@ -47692,7 +48796,7 @@ module.exports={
   ]
 }
 
-},{}],335:[function(require,module,exports){
+},{}],340:[function(require,module,exports){
 'use strict'
 
 const WS = require('libp2p-websockets')
@@ -47727,7 +48831,7 @@ class Node extends libp2p {
 
 module.exports = Node
 
-},{"libp2p":476,"libp2p-multiplex":441,"libp2p-railing":449,"libp2p-secio":457,"libp2p-webrtc-star":471,"libp2p-websockets":473}],336:[function(require,module,exports){
+},{"libp2p":481,"libp2p-multiplex":446,"libp2p-railing":454,"libp2p-secio":462,"libp2p-webrtc-star":476,"libp2p-websockets":478}],341:[function(require,module,exports){
 'use strict'
 
 const IPFSRepo = require('ipfs-repo')
@@ -47737,7 +48841,7 @@ module.exports = (dir) => {
   return new IPFSRepo(repoPath)
 }
 
-},{"ipfs-repo":274}],337:[function(require,module,exports){
+},{"ipfs-repo":279}],342:[function(require,module,exports){
 'use strict'
 
 const debug = require('debug')
@@ -47804,18 +48908,18 @@ module.exports = (self) => {
   return s
 }
 
-},{"debug":308,"fsm-event":217}],338:[function(require,module,exports){
+},{"debug":313,"fsm-event":218}],343:[function(require,module,exports){
 'use strict'
 
 exports.OFFLINE_ERROR = new Error('This command must be run in online mode. Try running \'ipfs daemon\' first.')
 
-},{}],339:[function(require,module,exports){
+},{}],344:[function(require,module,exports){
 'use strict'
 
 exports.util = require('./util.js')
 exports.resolver = require('./resolver.js')
 
-},{"./resolver.js":340,"./util.js":341}],340:[function(require,module,exports){
+},{"./resolver.js":345,"./util.js":346}],345:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -47953,7 +49057,7 @@ exports.isLink = (block, path, callback) => {
 }
 
 }).call(this,{"isBuffer":require("../../is-buffer/index.js")})
-},{"../../is-buffer/index.js":372,"./util":341,"traverse":749}],341:[function(require,module,exports){
+},{"../../is-buffer/index.js":377,"./util":346,"traverse":757}],346:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -48074,9 +49178,9 @@ exports.cid = (dagNode, callback) => {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./resolver":340,"async/setImmediate":68,"async/waterfall":71,"borc":91,"buffer":128,"cids":129,"is-circular":373,"multihashing-async":559}],342:[function(require,module,exports){
-arguments[4][267][0].apply(exports,arguments)
-},{"buffer":128,"dup":267,"multibase":548,"multicodec":550,"multicodec/src/base-table":549,"multicodec/src/varint-table":553,"multihashes":555}],343:[function(require,module,exports){
+},{"./resolver":345,"async/setImmediate":68,"async/waterfall":71,"borc":91,"buffer":128,"cids":129,"is-circular":378,"multihashing-async":566}],347:[function(require,module,exports){
+arguments[4][269][0].apply(exports,arguments)
+},{"buffer":128,"dup":269,"multibase":555,"multicodec":557,"multicodec/src/base-table":556,"multicodec/src/varint-table":560,"multihashes":562}],348:[function(require,module,exports){
 'use strict'
 
 const DAGLink = require('./index.js')
@@ -48088,7 +49192,7 @@ function create (name, size, multihash, callback) {
 
 module.exports = create
 
-},{"./index.js":344}],344:[function(require,module,exports){
+},{"./index.js":349}],349:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -48153,7 +49257,7 @@ exports = module.exports = DAGLink
 exports.create = require('./create')
 
 }).call(this,{"isBuffer":require("../../../is-buffer/index.js")})
-},{"../../../is-buffer/index.js":372,"./create":343,"assert":31,"multihashes":555}],345:[function(require,module,exports){
+},{"../../../is-buffer/index.js":377,"./create":348,"assert":31,"multihashes":562}],350:[function(require,module,exports){
 'use strict'
 
 const dagNodeUtil = require('./util')
@@ -48190,7 +49294,7 @@ function addLink (node, link, callback) {
 
 module.exports = addLink
 
-},{"./../dag-link":344,"./create":347,"./util":350}],346:[function(require,module,exports){
+},{"./../dag-link":349,"./create":352,"./util":355}],351:[function(require,module,exports){
 'use strict'
 
 const dagNodeUtil = require('./util')
@@ -48206,7 +49310,7 @@ function clone (dagNode, callback) {
 
 module.exports = clone
 
-},{"./create":347,"./util":350}],347:[function(require,module,exports){
+},{"./create":352,"./util":355}],352:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -48276,7 +49380,7 @@ function create (data, dagLinks, hashAlg, callback) {
 module.exports = create
 
 }).call(this,require("buffer").Buffer)
-},{"../util.js":354,"./../dag-link":344,"./index.js":348,"./util.js":350,"buffer":128,"multihashing-async":559,"stable":741}],348:[function(require,module,exports){
+},{"../util.js":359,"./../dag-link":349,"./index.js":353,"./util.js":355,"buffer":128,"multihashing-async":566,"stable":748}],353:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -48364,7 +49468,7 @@ exports.addLink = require('./addLink')
 exports.rmLink = require('./rmLink')
 
 }).call(this,require("buffer").Buffer)
-},{"./addLink":345,"./clone":346,"./create":347,"./rmLink":349,"assert":31,"buffer":128,"multihashes":555}],349:[function(require,module,exports){
+},{"./addLink":350,"./clone":351,"./create":352,"./rmLink":354,"assert":31,"buffer":128,"multihashes":562}],354:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -48391,7 +49495,7 @@ function rmLink (dagNode, nameOrMultihash, callback) {
 module.exports = rmLink
 
 }).call(this,{"isBuffer":require("../../../is-buffer/index.js")})
-},{"../../../is-buffer/index.js":372,"./create":347,"./util":350}],350:[function(require,module,exports){
+},{"../../../is-buffer/index.js":377,"./create":352,"./util":355}],355:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -48436,7 +49540,7 @@ exports.linkSort = linkSort
 exports.toDAGLink = toDAGLink
 
 }).call(this,require("buffer").Buffer)
-},{"./../dag-link":344,"buffer":128}],351:[function(require,module,exports){
+},{"./../dag-link":349,"buffer":128}],356:[function(require,module,exports){
 'use strict'
 
 module.exports = `// An IPFS MerkleDAG Link
@@ -48462,7 +49566,7 @@ message PBNode {
   optional bytes Data = 1;
 }`
 
-},{}],352:[function(require,module,exports){
+},{}],357:[function(require,module,exports){
 'use strict'
 
 exports.DAGNode = require('./dag-node')
@@ -48475,7 +49579,7 @@ exports.DAGLink = require('./dag-link')
 exports.resolver = require('./resolver')
 exports.util = require('./util')
 
-},{"./dag-link":344,"./dag-node":348,"./resolver":353,"./util":354}],353:[function(require,module,exports){
+},{"./dag-link":349,"./dag-node":353,"./resolver":358,"./util":359}],358:[function(require,module,exports){
 'use strict'
 
 const waterfall = require('async/waterfall')
@@ -48602,7 +49706,7 @@ exports.isLink = (block, path, callback) => {
   })
 }
 
-},{"./util":354,"async/waterfall":71}],354:[function(require,module,exports){
+},{"./util":359,"async/waterfall":71}],359:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -48676,7 +49780,7 @@ exports.deserialize = deserialize
 exports.cid = cid
 
 }).call(this,require("buffer").Buffer)
-},{"./dag-link":344,"./dag-node":348,"./dag.proto":351,"buffer":128,"cids":342,"protocol-buffers":611}],355:[function(require,module,exports){
+},{"./dag-link":349,"./dag-node":353,"./dag.proto":356,"buffer":128,"cids":347,"protocol-buffers":618}],360:[function(require,module,exports){
 'use strict'
 const EthAccount = require('ethereumjs-account')
 const createResolver = require('../util/createResolver')
@@ -48739,7 +49843,7 @@ function mapFromEthObj (account, options, callback) {
   callback(null, paths)
 }
 
-},{"../util/cidFromHash":364,"../util/createResolver":366,"ethereumjs-account":208}],356:[function(require,module,exports){
+},{"../util/cidFromHash":369,"../util/createResolver":371,"ethereumjs-account":208}],361:[function(require,module,exports){
 'use strict'
 const waterfall = require('async/waterfall')
 const each = require('async/each')
@@ -48811,7 +49915,7 @@ function mapFromEthObj (ethBlockList, options, callback) {
   })
 }
 
-},{"../eth-block":357,"../util/cidFromHash":364,"../util/createResolver":366,"async/asyncify":32,"async/each":35,"async/waterfall":71,"ethereumjs-block/header":209,"multihashing-async":559,"rlp":705}],357:[function(require,module,exports){
+},{"../eth-block":362,"../util/cidFromHash":369,"../util/createResolver":371,"async/asyncify":32,"async/each":35,"async/waterfall":71,"ethereumjs-block/header":209,"multihashing-async":566,"rlp":712}],362:[function(require,module,exports){
 'use strict'
 const EthBlockHeader = require('ethereumjs-block/header')
 const createResolver = require('../util/createResolver')
@@ -48912,7 +50016,7 @@ function mapFromEthObj (ethObj, options, callback) {
   callback(null, paths)
 }
 
-},{"../util/cidFromHash":364,"../util/createResolver":366,"ethereumjs-block/header":209}],358:[function(require,module,exports){
+},{"../util/cidFromHash":369,"../util/createResolver":371,"ethereumjs-block/header":209}],363:[function(require,module,exports){
 'use strict'
 /* eslint max-nested-callbacks: ["error", 5] */
 
@@ -48923,7 +50027,7 @@ const ethStateTrieResolver = createTrieResolver('eth-state-trie', ethAccountSnap
 
 module.exports = ethStateTrieResolver
 
-},{"../eth-account-snapshot":355,"../util/createTrieResolver":367}],359:[function(require,module,exports){
+},{"../eth-account-snapshot":360,"../util/createTrieResolver":372}],364:[function(require,module,exports){
 'use strict'
 /* eslint max-nested-callbacks: ["error", 5] */
 
@@ -48933,7 +50037,7 @@ const ethStorageTrieResolver = createTrieResolver('eth-storage-trie')
 
 module.exports = ethStorageTrieResolver
 
-},{"../util/createTrieResolver":367}],360:[function(require,module,exports){
+},{"../util/createTrieResolver":372}],365:[function(require,module,exports){
 'use strict'
 /* eslint max-nested-callbacks: ["error", 5] */
 
@@ -48944,7 +50048,7 @@ const ethTxTrieResolver = createTrieResolver('eth-tx-trie', ethTxResolver)
 
 module.exports = ethTxTrieResolver
 
-},{"../eth-tx":361,"../util/createTrieResolver":367}],361:[function(require,module,exports){
+},{"../eth-tx":366,"../util/createTrieResolver":372}],366:[function(require,module,exports){
 'use strict'
 const EthTx = require('ethereumjs-tx')
 const createResolver = require('../util/createResolver')
@@ -49019,7 +50123,7 @@ function mapFromEthObj (tx, options, callback) {
   callback(null, paths)
 }
 
-},{"../util/cidFromHash":364,"../util/createResolver":366,"ethereumjs-tx":211}],362:[function(require,module,exports){
+},{"../util/cidFromHash":369,"../util/createResolver":371,"ethereumjs-tx":211}],367:[function(require,module,exports){
 'use strict'
 
 module.exports = {
@@ -49032,7 +50136,7 @@ module.exports = {
   ethTxTrie: require('../eth-tx-trie')
 }
 
-},{"../eth-account-snapshot":355,"../eth-block":357,"../eth-block-list":356,"../eth-state-trie":358,"../eth-storage-trie":359,"../eth-tx":361,"../eth-tx-trie":360}],363:[function(require,module,exports){
+},{"../eth-account-snapshot":360,"../eth-block":362,"../eth-block-list":361,"../eth-state-trie":363,"../eth-storage-trie":364,"../eth-tx":366,"../eth-tx-trie":365}],368:[function(require,module,exports){
 'use strict'
 const cidFromHash = require('./cidFromHash')
 
@@ -49044,7 +50148,7 @@ function cidFromEthObj (multicodec, ethObj) {
   return cid
 }
 
-},{"./cidFromHash":364}],364:[function(require,module,exports){
+},{"./cidFromHash":369}],369:[function(require,module,exports){
 'use strict'
 const CID = require('cids')
 const multihashes = require('multihashes')
@@ -49057,7 +50161,7 @@ function cidFromHash (codec, hashBuffer) {
   return cid
 }
 
-},{"cids":129,"multihashes":555}],365:[function(require,module,exports){
+},{"cids":129,"multihashes":562}],370:[function(require,module,exports){
 module.exports = createIsLink
 
 function createIsLink (resolve) {
@@ -49080,7 +50184,7 @@ function createIsLink (resolve) {
   }
 }
 
-},{}],366:[function(require,module,exports){
+},{}],371:[function(require,module,exports){
 'use strict'
 const waterfall = require('async/waterfall')
 const createIsLink = require('../util/createIsLink')
@@ -49183,7 +50287,7 @@ function createResolver (multicodec, EthObjClass, mapFromEthObject) {
     })
   }
 }
-},{"../util/createIsLink":365,"../util/createUtil":368,"async/waterfall":71}],367:[function(require,module,exports){
+},{"../util/createIsLink":370,"../util/createUtil":373,"async/waterfall":71}],372:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 const each = require('async/each')
@@ -49295,7 +50399,7 @@ function nibbleToPath (data) {
   return data.map((num) => num.toString(16)).join('/')
 }
 }).call(this,{"isBuffer":require("../../is-buffer/index.js")})
-},{"../../is-buffer/index.js":372,"./cidFromEthObj":363,"./cidFromHash":364,"./createIsLink":365,"./createResolver":366,"./createUtil":368,"./isExternalLink":369,"./toIpfsBlock":370,"async/asyncify":32,"async/each":35,"async/waterfall":71,"merkle-patricia-tree/trieNode":536,"rlp":705}],368:[function(require,module,exports){
+},{"../../is-buffer/index.js":377,"./cidFromEthObj":368,"./cidFromHash":369,"./createIsLink":370,"./createResolver":371,"./createUtil":373,"./isExternalLink":374,"./toIpfsBlock":375,"async/asyncify":32,"async/each":35,"async/waterfall":71,"merkle-patricia-tree/trieNode":543,"rlp":712}],373:[function(require,module,exports){
 const cidFromEthObj = require('./cidFromEthObj')
 const asyncify = require('async/asyncify')
 
@@ -49309,13 +50413,13 @@ function createUtil (multicodec, EthObjClass) {
   }
 }
 
-},{"./cidFromEthObj":363,"async/asyncify":32}],369:[function(require,module,exports){
+},{"./cidFromEthObj":368,"async/asyncify":32}],374:[function(require,module,exports){
 module.exports = isExternalLink
 
 function isExternalLink (obj) {
   return Boolean(obj['/'])
 }
-},{}],370:[function(require,module,exports){
+},{}],375:[function(require,module,exports){
 const IpfsBlock = require('ipfs-block')
 const CID = require('cids')
 const multihashing = require('multihashing-async')
@@ -49332,7 +50436,7 @@ function toIpfsBlock (multicodec, value, callback) {
   })
 }
 
-},{"cids":129,"ipfs-block":268,"multihashing-async":559}],371:[function(require,module,exports){
+},{"cids":129,"ipfs-block":270,"multihashing-async":566}],376:[function(require,module,exports){
 'use strict'
 
 const Block = require('ipfs-block')
@@ -49724,7 +50828,7 @@ IPLDResolver.inMemory = function (callback) {
 
 module.exports = IPLDResolver
 
-},{"async/doUntil":33,"async/map":63,"async/series":67,"async/waterfall":71,"cids":129,"interface-datastore":245,"ipfs-block":268,"ipfs-block-service":266,"ipfs-repo":274,"ipld-dag-cbor":339,"ipld-dag-pb":352,"ipld-eth-star":362,"path":590,"pull-defer":624,"pull-stream":642,"pull-traverse":674}],372:[function(require,module,exports){
+},{"async/doUntil":33,"async/map":63,"async/series":67,"async/waterfall":71,"cids":129,"interface-datastore":247,"ipfs-block":270,"ipfs-block-service":268,"ipfs-repo":279,"ipld-dag-cbor":344,"ipld-dag-pb":357,"ipld-eth-star":367,"path":597,"pull-defer":631,"pull-stream":649,"pull-traverse":681}],377:[function(require,module,exports){
 /*!
  * Determine if an object is a Buffer
  *
@@ -49747,7 +50851,7 @@ function isSlowBuffer (obj) {
   return typeof obj.readFloatLE === 'function' && typeof obj.slice === 'function' && isBuffer(obj.slice(0, 0))
 }
 
-},{}],373:[function(require,module,exports){
+},{}],378:[function(require,module,exports){
 module.exports = isCircular
 
 /**
@@ -49793,7 +50897,7 @@ CircularChecker.prototype.isCircular = function (obj, seen) {
   return false
 }
 
-},{}],374:[function(require,module,exports){
+},{}],379:[function(require,module,exports){
 /**
  * Returns a `Boolean` on whether or not the a `String` starts with '0x'
  * @param {String} str the string input value
@@ -49808,19 +50912,19 @@ module.exports = function isHexPrefixed(str) {
   return str.slice(0, 2) === '0x';
 }
 
-},{}],375:[function(require,module,exports){
+},{}],380:[function(require,module,exports){
 module.exports = isPromise;
 
 function isPromise(obj) {
   return obj && typeof obj.then === 'function';
 }
-},{}],376:[function(require,module,exports){
+},{}],381:[function(require,module,exports){
 "use strict"
 function isProperty(str) {
   return /^[$A-Z\_a-z\xaa\xb5\xba\xc0-\xd6\xd8-\xf6\xf8-\u02c1\u02c6-\u02d1\u02e0-\u02e4\u02ec\u02ee\u0370-\u0374\u0376\u0377\u037a-\u037d\u0386\u0388-\u038a\u038c\u038e-\u03a1\u03a3-\u03f5\u03f7-\u0481\u048a-\u0527\u0531-\u0556\u0559\u0561-\u0587\u05d0-\u05ea\u05f0-\u05f2\u0620-\u064a\u066e\u066f\u0671-\u06d3\u06d5\u06e5\u06e6\u06ee\u06ef\u06fa-\u06fc\u06ff\u0710\u0712-\u072f\u074d-\u07a5\u07b1\u07ca-\u07ea\u07f4\u07f5\u07fa\u0800-\u0815\u081a\u0824\u0828\u0840-\u0858\u08a0\u08a2-\u08ac\u0904-\u0939\u093d\u0950\u0958-\u0961\u0971-\u0977\u0979-\u097f\u0985-\u098c\u098f\u0990\u0993-\u09a8\u09aa-\u09b0\u09b2\u09b6-\u09b9\u09bd\u09ce\u09dc\u09dd\u09df-\u09e1\u09f0\u09f1\u0a05-\u0a0a\u0a0f\u0a10\u0a13-\u0a28\u0a2a-\u0a30\u0a32\u0a33\u0a35\u0a36\u0a38\u0a39\u0a59-\u0a5c\u0a5e\u0a72-\u0a74\u0a85-\u0a8d\u0a8f-\u0a91\u0a93-\u0aa8\u0aaa-\u0ab0\u0ab2\u0ab3\u0ab5-\u0ab9\u0abd\u0ad0\u0ae0\u0ae1\u0b05-\u0b0c\u0b0f\u0b10\u0b13-\u0b28\u0b2a-\u0b30\u0b32\u0b33\u0b35-\u0b39\u0b3d\u0b5c\u0b5d\u0b5f-\u0b61\u0b71\u0b83\u0b85-\u0b8a\u0b8e-\u0b90\u0b92-\u0b95\u0b99\u0b9a\u0b9c\u0b9e\u0b9f\u0ba3\u0ba4\u0ba8-\u0baa\u0bae-\u0bb9\u0bd0\u0c05-\u0c0c\u0c0e-\u0c10\u0c12-\u0c28\u0c2a-\u0c33\u0c35-\u0c39\u0c3d\u0c58\u0c59\u0c60\u0c61\u0c85-\u0c8c\u0c8e-\u0c90\u0c92-\u0ca8\u0caa-\u0cb3\u0cb5-\u0cb9\u0cbd\u0cde\u0ce0\u0ce1\u0cf1\u0cf2\u0d05-\u0d0c\u0d0e-\u0d10\u0d12-\u0d3a\u0d3d\u0d4e\u0d60\u0d61\u0d7a-\u0d7f\u0d85-\u0d96\u0d9a-\u0db1\u0db3-\u0dbb\u0dbd\u0dc0-\u0dc6\u0e01-\u0e30\u0e32\u0e33\u0e40-\u0e46\u0e81\u0e82\u0e84\u0e87\u0e88\u0e8a\u0e8d\u0e94-\u0e97\u0e99-\u0e9f\u0ea1-\u0ea3\u0ea5\u0ea7\u0eaa\u0eab\u0ead-\u0eb0\u0eb2\u0eb3\u0ebd\u0ec0-\u0ec4\u0ec6\u0edc-\u0edf\u0f00\u0f40-\u0f47\u0f49-\u0f6c\u0f88-\u0f8c\u1000-\u102a\u103f\u1050-\u1055\u105a-\u105d\u1061\u1065\u1066\u106e-\u1070\u1075-\u1081\u108e\u10a0-\u10c5\u10c7\u10cd\u10d0-\u10fa\u10fc-\u1248\u124a-\u124d\u1250-\u1256\u1258\u125a-\u125d\u1260-\u1288\u128a-\u128d\u1290-\u12b0\u12b2-\u12b5\u12b8-\u12be\u12c0\u12c2-\u12c5\u12c8-\u12d6\u12d8-\u1310\u1312-\u1315\u1318-\u135a\u1380-\u138f\u13a0-\u13f4\u1401-\u166c\u166f-\u167f\u1681-\u169a\u16a0-\u16ea\u16ee-\u16f0\u1700-\u170c\u170e-\u1711\u1720-\u1731\u1740-\u1751\u1760-\u176c\u176e-\u1770\u1780-\u17b3\u17d7\u17dc\u1820-\u1877\u1880-\u18a8\u18aa\u18b0-\u18f5\u1900-\u191c\u1950-\u196d\u1970-\u1974\u1980-\u19ab\u19c1-\u19c7\u1a00-\u1a16\u1a20-\u1a54\u1aa7\u1b05-\u1b33\u1b45-\u1b4b\u1b83-\u1ba0\u1bae\u1baf\u1bba-\u1be5\u1c00-\u1c23\u1c4d-\u1c4f\u1c5a-\u1c7d\u1ce9-\u1cec\u1cee-\u1cf1\u1cf5\u1cf6\u1d00-\u1dbf\u1e00-\u1f15\u1f18-\u1f1d\u1f20-\u1f45\u1f48-\u1f4d\u1f50-\u1f57\u1f59\u1f5b\u1f5d\u1f5f-\u1f7d\u1f80-\u1fb4\u1fb6-\u1fbc\u1fbe\u1fc2-\u1fc4\u1fc6-\u1fcc\u1fd0-\u1fd3\u1fd6-\u1fdb\u1fe0-\u1fec\u1ff2-\u1ff4\u1ff6-\u1ffc\u2071\u207f\u2090-\u209c\u2102\u2107\u210a-\u2113\u2115\u2119-\u211d\u2124\u2126\u2128\u212a-\u212d\u212f-\u2139\u213c-\u213f\u2145-\u2149\u214e\u2160-\u2188\u2c00-\u2c2e\u2c30-\u2c5e\u2c60-\u2ce4\u2ceb-\u2cee\u2cf2\u2cf3\u2d00-\u2d25\u2d27\u2d2d\u2d30-\u2d67\u2d6f\u2d80-\u2d96\u2da0-\u2da6\u2da8-\u2dae\u2db0-\u2db6\u2db8-\u2dbe\u2dc0-\u2dc6\u2dc8-\u2dce\u2dd0-\u2dd6\u2dd8-\u2dde\u2e2f\u3005-\u3007\u3021-\u3029\u3031-\u3035\u3038-\u303c\u3041-\u3096\u309d-\u309f\u30a1-\u30fa\u30fc-\u30ff\u3105-\u312d\u3131-\u318e\u31a0-\u31ba\u31f0-\u31ff\u3400-\u4db5\u4e00-\u9fcc\ua000-\ua48c\ua4d0-\ua4fd\ua500-\ua60c\ua610-\ua61f\ua62a\ua62b\ua640-\ua66e\ua67f-\ua697\ua6a0-\ua6ef\ua717-\ua71f\ua722-\ua788\ua78b-\ua78e\ua790-\ua793\ua7a0-\ua7aa\ua7f8-\ua801\ua803-\ua805\ua807-\ua80a\ua80c-\ua822\ua840-\ua873\ua882-\ua8b3\ua8f2-\ua8f7\ua8fb\ua90a-\ua925\ua930-\ua946\ua960-\ua97c\ua984-\ua9b2\ua9cf\uaa00-\uaa28\uaa40-\uaa42\uaa44-\uaa4b\uaa60-\uaa76\uaa7a\uaa80-\uaaaf\uaab1\uaab5\uaab6\uaab9-\uaabd\uaac0\uaac2\uaadb-\uaadd\uaae0-\uaaea\uaaf2-\uaaf4\uab01-\uab06\uab09-\uab0e\uab11-\uab16\uab20-\uab26\uab28-\uab2e\uabc0-\uabe2\uac00-\ud7a3\ud7b0-\ud7c6\ud7cb-\ud7fb\uf900-\ufa6d\ufa70-\ufad9\ufb00-\ufb06\ufb13-\ufb17\ufb1d\ufb1f-\ufb28\ufb2a-\ufb36\ufb38-\ufb3c\ufb3e\ufb40\ufb41\ufb43\ufb44\ufb46-\ufbb1\ufbd3-\ufd3d\ufd50-\ufd8f\ufd92-\ufdc7\ufdf0-\ufdfb\ufe70-\ufe74\ufe76-\ufefc\uff21-\uff3a\uff41-\uff5a\uff66-\uffbe\uffc2-\uffc7\uffca-\uffcf\uffd2-\uffd7\uffda-\uffdc][$A-Z\_a-z\xaa\xb5\xba\xc0-\xd6\xd8-\xf6\xf8-\u02c1\u02c6-\u02d1\u02e0-\u02e4\u02ec\u02ee\u0370-\u0374\u0376\u0377\u037a-\u037d\u0386\u0388-\u038a\u038c\u038e-\u03a1\u03a3-\u03f5\u03f7-\u0481\u048a-\u0527\u0531-\u0556\u0559\u0561-\u0587\u05d0-\u05ea\u05f0-\u05f2\u0620-\u064a\u066e\u066f\u0671-\u06d3\u06d5\u06e5\u06e6\u06ee\u06ef\u06fa-\u06fc\u06ff\u0710\u0712-\u072f\u074d-\u07a5\u07b1\u07ca-\u07ea\u07f4\u07f5\u07fa\u0800-\u0815\u081a\u0824\u0828\u0840-\u0858\u08a0\u08a2-\u08ac\u0904-\u0939\u093d\u0950\u0958-\u0961\u0971-\u0977\u0979-\u097f\u0985-\u098c\u098f\u0990\u0993-\u09a8\u09aa-\u09b0\u09b2\u09b6-\u09b9\u09bd\u09ce\u09dc\u09dd\u09df-\u09e1\u09f0\u09f1\u0a05-\u0a0a\u0a0f\u0a10\u0a13-\u0a28\u0a2a-\u0a30\u0a32\u0a33\u0a35\u0a36\u0a38\u0a39\u0a59-\u0a5c\u0a5e\u0a72-\u0a74\u0a85-\u0a8d\u0a8f-\u0a91\u0a93-\u0aa8\u0aaa-\u0ab0\u0ab2\u0ab3\u0ab5-\u0ab9\u0abd\u0ad0\u0ae0\u0ae1\u0b05-\u0b0c\u0b0f\u0b10\u0b13-\u0b28\u0b2a-\u0b30\u0b32\u0b33\u0b35-\u0b39\u0b3d\u0b5c\u0b5d\u0b5f-\u0b61\u0b71\u0b83\u0b85-\u0b8a\u0b8e-\u0b90\u0b92-\u0b95\u0b99\u0b9a\u0b9c\u0b9e\u0b9f\u0ba3\u0ba4\u0ba8-\u0baa\u0bae-\u0bb9\u0bd0\u0c05-\u0c0c\u0c0e-\u0c10\u0c12-\u0c28\u0c2a-\u0c33\u0c35-\u0c39\u0c3d\u0c58\u0c59\u0c60\u0c61\u0c85-\u0c8c\u0c8e-\u0c90\u0c92-\u0ca8\u0caa-\u0cb3\u0cb5-\u0cb9\u0cbd\u0cde\u0ce0\u0ce1\u0cf1\u0cf2\u0d05-\u0d0c\u0d0e-\u0d10\u0d12-\u0d3a\u0d3d\u0d4e\u0d60\u0d61\u0d7a-\u0d7f\u0d85-\u0d96\u0d9a-\u0db1\u0db3-\u0dbb\u0dbd\u0dc0-\u0dc6\u0e01-\u0e30\u0e32\u0e33\u0e40-\u0e46\u0e81\u0e82\u0e84\u0e87\u0e88\u0e8a\u0e8d\u0e94-\u0e97\u0e99-\u0e9f\u0ea1-\u0ea3\u0ea5\u0ea7\u0eaa\u0eab\u0ead-\u0eb0\u0eb2\u0eb3\u0ebd\u0ec0-\u0ec4\u0ec6\u0edc-\u0edf\u0f00\u0f40-\u0f47\u0f49-\u0f6c\u0f88-\u0f8c\u1000-\u102a\u103f\u1050-\u1055\u105a-\u105d\u1061\u1065\u1066\u106e-\u1070\u1075-\u1081\u108e\u10a0-\u10c5\u10c7\u10cd\u10d0-\u10fa\u10fc-\u1248\u124a-\u124d\u1250-\u1256\u1258\u125a-\u125d\u1260-\u1288\u128a-\u128d\u1290-\u12b0\u12b2-\u12b5\u12b8-\u12be\u12c0\u12c2-\u12c5\u12c8-\u12d6\u12d8-\u1310\u1312-\u1315\u1318-\u135a\u1380-\u138f\u13a0-\u13f4\u1401-\u166c\u166f-\u167f\u1681-\u169a\u16a0-\u16ea\u16ee-\u16f0\u1700-\u170c\u170e-\u1711\u1720-\u1731\u1740-\u1751\u1760-\u176c\u176e-\u1770\u1780-\u17b3\u17d7\u17dc\u1820-\u1877\u1880-\u18a8\u18aa\u18b0-\u18f5\u1900-\u191c\u1950-\u196d\u1970-\u1974\u1980-\u19ab\u19c1-\u19c7\u1a00-\u1a16\u1a20-\u1a54\u1aa7\u1b05-\u1b33\u1b45-\u1b4b\u1b83-\u1ba0\u1bae\u1baf\u1bba-\u1be5\u1c00-\u1c23\u1c4d-\u1c4f\u1c5a-\u1c7d\u1ce9-\u1cec\u1cee-\u1cf1\u1cf5\u1cf6\u1d00-\u1dbf\u1e00-\u1f15\u1f18-\u1f1d\u1f20-\u1f45\u1f48-\u1f4d\u1f50-\u1f57\u1f59\u1f5b\u1f5d\u1f5f-\u1f7d\u1f80-\u1fb4\u1fb6-\u1fbc\u1fbe\u1fc2-\u1fc4\u1fc6-\u1fcc\u1fd0-\u1fd3\u1fd6-\u1fdb\u1fe0-\u1fec\u1ff2-\u1ff4\u1ff6-\u1ffc\u2071\u207f\u2090-\u209c\u2102\u2107\u210a-\u2113\u2115\u2119-\u211d\u2124\u2126\u2128\u212a-\u212d\u212f-\u2139\u213c-\u213f\u2145-\u2149\u214e\u2160-\u2188\u2c00-\u2c2e\u2c30-\u2c5e\u2c60-\u2ce4\u2ceb-\u2cee\u2cf2\u2cf3\u2d00-\u2d25\u2d27\u2d2d\u2d30-\u2d67\u2d6f\u2d80-\u2d96\u2da0-\u2da6\u2da8-\u2dae\u2db0-\u2db6\u2db8-\u2dbe\u2dc0-\u2dc6\u2dc8-\u2dce\u2dd0-\u2dd6\u2dd8-\u2dde\u2e2f\u3005-\u3007\u3021-\u3029\u3031-\u3035\u3038-\u303c\u3041-\u3096\u309d-\u309f\u30a1-\u30fa\u30fc-\u30ff\u3105-\u312d\u3131-\u318e\u31a0-\u31ba\u31f0-\u31ff\u3400-\u4db5\u4e00-\u9fcc\ua000-\ua48c\ua4d0-\ua4fd\ua500-\ua60c\ua610-\ua61f\ua62a\ua62b\ua640-\ua66e\ua67f-\ua697\ua6a0-\ua6ef\ua717-\ua71f\ua722-\ua788\ua78b-\ua78e\ua790-\ua793\ua7a0-\ua7aa\ua7f8-\ua801\ua803-\ua805\ua807-\ua80a\ua80c-\ua822\ua840-\ua873\ua882-\ua8b3\ua8f2-\ua8f7\ua8fb\ua90a-\ua925\ua930-\ua946\ua960-\ua97c\ua984-\ua9b2\ua9cf\uaa00-\uaa28\uaa40-\uaa42\uaa44-\uaa4b\uaa60-\uaa76\uaa7a\uaa80-\uaaaf\uaab1\uaab5\uaab6\uaab9-\uaabd\uaac0\uaac2\uaadb-\uaadd\uaae0-\uaaea\uaaf2-\uaaf4\uab01-\uab06\uab09-\uab0e\uab11-\uab16\uab20-\uab26\uab28-\uab2e\uabc0-\uabe2\uac00-\ud7a3\ud7b0-\ud7c6\ud7cb-\ud7fb\uf900-\ufa6d\ufa70-\ufad9\ufb00-\ufb06\ufb13-\ufb17\ufb1d\ufb1f-\ufb28\ufb2a-\ufb36\ufb38-\ufb3c\ufb3e\ufb40\ufb41\ufb43\ufb44\ufb46-\ufbb1\ufbd3-\ufd3d\ufd50-\ufd8f\ufd92-\ufdc7\ufdf0-\ufdfb\ufe70-\ufe74\ufe76-\ufefc\uff21-\uff3a\uff41-\uff5a\uff66-\uffbe\uffc2-\uffc7\uffca-\uffcf\uffd2-\uffd7\uffda-\uffdc0-9\u0300-\u036f\u0483-\u0487\u0591-\u05bd\u05bf\u05c1\u05c2\u05c4\u05c5\u05c7\u0610-\u061a\u064b-\u0669\u0670\u06d6-\u06dc\u06df-\u06e4\u06e7\u06e8\u06ea-\u06ed\u06f0-\u06f9\u0711\u0730-\u074a\u07a6-\u07b0\u07c0-\u07c9\u07eb-\u07f3\u0816-\u0819\u081b-\u0823\u0825-\u0827\u0829-\u082d\u0859-\u085b\u08e4-\u08fe\u0900-\u0903\u093a-\u093c\u093e-\u094f\u0951-\u0957\u0962\u0963\u0966-\u096f\u0981-\u0983\u09bc\u09be-\u09c4\u09c7\u09c8\u09cb-\u09cd\u09d7\u09e2\u09e3\u09e6-\u09ef\u0a01-\u0a03\u0a3c\u0a3e-\u0a42\u0a47\u0a48\u0a4b-\u0a4d\u0a51\u0a66-\u0a71\u0a75\u0a81-\u0a83\u0abc\u0abe-\u0ac5\u0ac7-\u0ac9\u0acb-\u0acd\u0ae2\u0ae3\u0ae6-\u0aef\u0b01-\u0b03\u0b3c\u0b3e-\u0b44\u0b47\u0b48\u0b4b-\u0b4d\u0b56\u0b57\u0b62\u0b63\u0b66-\u0b6f\u0b82\u0bbe-\u0bc2\u0bc6-\u0bc8\u0bca-\u0bcd\u0bd7\u0be6-\u0bef\u0c01-\u0c03\u0c3e-\u0c44\u0c46-\u0c48\u0c4a-\u0c4d\u0c55\u0c56\u0c62\u0c63\u0c66-\u0c6f\u0c82\u0c83\u0cbc\u0cbe-\u0cc4\u0cc6-\u0cc8\u0cca-\u0ccd\u0cd5\u0cd6\u0ce2\u0ce3\u0ce6-\u0cef\u0d02\u0d03\u0d3e-\u0d44\u0d46-\u0d48\u0d4a-\u0d4d\u0d57\u0d62\u0d63\u0d66-\u0d6f\u0d82\u0d83\u0dca\u0dcf-\u0dd4\u0dd6\u0dd8-\u0ddf\u0df2\u0df3\u0e31\u0e34-\u0e3a\u0e47-\u0e4e\u0e50-\u0e59\u0eb1\u0eb4-\u0eb9\u0ebb\u0ebc\u0ec8-\u0ecd\u0ed0-\u0ed9\u0f18\u0f19\u0f20-\u0f29\u0f35\u0f37\u0f39\u0f3e\u0f3f\u0f71-\u0f84\u0f86\u0f87\u0f8d-\u0f97\u0f99-\u0fbc\u0fc6\u102b-\u103e\u1040-\u1049\u1056-\u1059\u105e-\u1060\u1062-\u1064\u1067-\u106d\u1071-\u1074\u1082-\u108d\u108f-\u109d\u135d-\u135f\u1712-\u1714\u1732-\u1734\u1752\u1753\u1772\u1773\u17b4-\u17d3\u17dd\u17e0-\u17e9\u180b-\u180d\u1810-\u1819\u18a9\u1920-\u192b\u1930-\u193b\u1946-\u194f\u19b0-\u19c0\u19c8\u19c9\u19d0-\u19d9\u1a17-\u1a1b\u1a55-\u1a5e\u1a60-\u1a7c\u1a7f-\u1a89\u1a90-\u1a99\u1b00-\u1b04\u1b34-\u1b44\u1b50-\u1b59\u1b6b-\u1b73\u1b80-\u1b82\u1ba1-\u1bad\u1bb0-\u1bb9\u1be6-\u1bf3\u1c24-\u1c37\u1c40-\u1c49\u1c50-\u1c59\u1cd0-\u1cd2\u1cd4-\u1ce8\u1ced\u1cf2-\u1cf4\u1dc0-\u1de6\u1dfc-\u1dff\u200c\u200d\u203f\u2040\u2054\u20d0-\u20dc\u20e1\u20e5-\u20f0\u2cef-\u2cf1\u2d7f\u2de0-\u2dff\u302a-\u302f\u3099\u309a\ua620-\ua629\ua66f\ua674-\ua67d\ua69f\ua6f0\ua6f1\ua802\ua806\ua80b\ua823-\ua827\ua880\ua881\ua8b4-\ua8c4\ua8d0-\ua8d9\ua8e0-\ua8f1\ua900-\ua909\ua926-\ua92d\ua947-\ua953\ua980-\ua983\ua9b3-\ua9c0\ua9d0-\ua9d9\uaa29-\uaa36\uaa43\uaa4c\uaa4d\uaa50-\uaa59\uaa7b\uaab0\uaab2-\uaab4\uaab7\uaab8\uaabe\uaabf\uaac1\uaaeb-\uaaef\uaaf5\uaaf6\uabe3-\uabea\uabec\uabed\uabf0-\uabf9\ufb1e\ufe00-\ufe0f\ufe20-\ufe26\ufe33\ufe34\ufe4d-\ufe4f\uff10-\uff19\uff3f]*$/.test(str)
 }
 module.exports = isProperty
-},{}],377:[function(require,module,exports){
+},{}],382:[function(require,module,exports){
 'use strict';
 
 var isStream = module.exports = function (stream) {
@@ -49843,9 +50947,9 @@ isStream.transform = function (stream) {
 	return isStream.duplex(stream) && typeof stream._transform === 'function' && typeof stream._transformState === 'object';
 };
 
-},{}],378:[function(require,module,exports){
-arguments[4][223][0].apply(exports,arguments)
-},{"dup":223}],379:[function(require,module,exports){
+},{}],383:[function(require,module,exports){
+arguments[4][224][0].apply(exports,arguments)
+},{"dup":224}],384:[function(require,module,exports){
 (function (process,global){
 /**
  * [js-sha3]{@link https://github.com/emn178/js-sha3}
@@ -50471,11 +51575,11 @@ arguments[4][223][0].apply(exports,arguments)
 })();
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"_process":602}],380:[function(require,module,exports){
+},{"_process":609}],385:[function(require,module,exports){
 'use strict'
 module.exports = require('./lib/api')(require('./lib/keccak'))
 
-},{"./lib/api":381,"./lib/keccak":385}],381:[function(require,module,exports){
+},{"./lib/api":386,"./lib/keccak":390}],386:[function(require,module,exports){
 'use strict'
 var createKeccak = require('./keccak')
 var createShake = require('./shake')
@@ -50505,7 +51609,7 @@ module.exports = function (KeccakState) {
   }
 }
 
-},{"./keccak":382,"./shake":383}],382:[function(require,module,exports){
+},{"./keccak":387,"./shake":388}],387:[function(require,module,exports){
 'use strict'
 var Buffer = require('safe-buffer').Buffer
 var Transform = require('stream').Transform
@@ -50591,7 +51695,7 @@ module.exports = function (KeccakState) {
   return Keccak
 }
 
-},{"inherits":242,"safe-buffer":706,"stream":742}],383:[function(require,module,exports){
+},{"inherits":244,"safe-buffer":713,"stream":749}],388:[function(require,module,exports){
 'use strict'
 var Buffer = require('safe-buffer').Buffer
 var Transform = require('stream').Transform
@@ -50668,7 +51772,7 @@ module.exports = function (KeccakState) {
   return Shake
 }
 
-},{"inherits":242,"safe-buffer":706,"stream":742}],384:[function(require,module,exports){
+},{"inherits":244,"safe-buffer":713,"stream":749}],389:[function(require,module,exports){
 'use strict'
 var P1600_ROUND_CONSTANTS = [1, 0, 32898, 0, 32906, 2147483648, 2147516416, 2147483648, 32907, 0, 2147483649, 0, 2147516545, 2147483648, 32777, 2147483648, 138, 0, 136, 0, 2147516425, 0, 2147483658, 0, 2147516555, 0, 139, 2147483648, 32905, 2147483648, 32771, 2147483648, 32770, 2147483648, 128, 2147483648, 32778, 0, 2147483658, 2147483648, 2147516545, 2147483648, 32896, 2147483648, 2147483649, 0, 2147516424, 2147483648]
 
@@ -50857,7 +51961,7 @@ exports.p1600 = function (s) {
   }
 }
 
-},{}],385:[function(require,module,exports){
+},{}],390:[function(require,module,exports){
 'use strict'
 var Buffer = require('safe-buffer').Buffer
 var keccakState = require('./keccak-state-unroll')
@@ -50929,10 +52033,10 @@ Keccak.prototype.copy = function (dest) {
 
 module.exports = Keccak
 
-},{"./keccak-state-unroll":384,"safe-buffer":706}],386:[function(require,module,exports){
+},{"./keccak-state-unroll":389,"safe-buffer":713}],391:[function(require,module,exports){
 module.exports = require('browserify-sha3').SHA3Hash
 
-},{"browserify-sha3":116}],387:[function(require,module,exports){
+},{"browserify-sha3":116}],392:[function(require,module,exports){
 /* This program is free software. It comes without any warranty, to
      * the extent permitted by applicable law. You can redistribute it
      * and/or modify it under the terms of the Do What The Fuck You Want
@@ -50986,7 +52090,7 @@ function leftPad (str, len, ch) {
   return pad + str;
 }
 
-},{}],388:[function(require,module,exports){
+},{}],393:[function(require,module,exports){
 var encodings = require('./lib/encodings');
 
 module.exports = Codec;
@@ -51094,7 +52198,7 @@ Codec.prototype.valueAsBuffer = function(opts){
 };
 
 
-},{"./lib/encodings":389}],389:[function(require,module,exports){
+},{"./lib/encodings":394}],394:[function(require,module,exports){
 (function (Buffer){
 
 exports.utf8 = exports['utf-8'] = {
@@ -51180,7 +52284,7 @@ function isBinary(data){
 
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128}],390:[function(require,module,exports){
+},{"buffer":128}],395:[function(require,module,exports){
 /* Copyright (c) 2012-2015 LevelUP contributors
  * See list at <https://github.com/rvagg/node-levelup#contributing>
  * MIT License
@@ -51204,7 +52308,7 @@ module.exports = {
   , EncodingError       : createError('EncodingError', LevelUPError)
 }
 
-},{"errno":205}],391:[function(require,module,exports){
+},{"errno":205}],396:[function(require,module,exports){
 var inherits = require('inherits');
 var Readable = require('readable-stream').Readable;
 var extend = require('xtend');
@@ -51262,12 +52366,12 @@ ReadStream.prototype._cleanup = function(){
 };
 
 
-},{"inherits":242,"level-errors":390,"readable-stream":398,"xtend":769}],392:[function(require,module,exports){
+},{"inherits":244,"level-errors":395,"readable-stream":403,"xtend":777}],397:[function(require,module,exports){
 module.exports = Array.isArray || function (arr) {
   return Object.prototype.toString.call(arr) == '[object Array]';
 };
 
-},{}],393:[function(require,module,exports){
+},{}],398:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -51360,7 +52464,7 @@ function forEach (xs, f) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_readable":395,"./_stream_writable":397,"_process":602,"core-util-is":134,"inherits":242}],394:[function(require,module,exports){
+},{"./_stream_readable":400,"./_stream_writable":402,"_process":609,"core-util-is":134,"inherits":244}],399:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -51408,7 +52512,7 @@ PassThrough.prototype._transform = function(chunk, encoding, cb) {
   cb(null, chunk);
 };
 
-},{"./_stream_transform":396,"core-util-is":134,"inherits":242}],395:[function(require,module,exports){
+},{"./_stream_transform":401,"core-util-is":134,"inherits":244}],400:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -52363,7 +53467,7 @@ function indexOf (xs, x) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_duplex":393,"_process":602,"buffer":128,"core-util-is":134,"events":215,"inherits":242,"isarray":392,"stream":742,"string_decoder/":399,"util":96}],396:[function(require,module,exports){
+},{"./_stream_duplex":398,"_process":609,"buffer":128,"core-util-is":134,"events":215,"inherits":244,"isarray":397,"stream":749,"string_decoder/":404,"util":96}],401:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -52574,7 +53678,7 @@ function done(stream, er) {
   return stream.push(null);
 }
 
-},{"./_stream_duplex":393,"core-util-is":134,"inherits":242}],397:[function(require,module,exports){
+},{"./_stream_duplex":398,"core-util-is":134,"inherits":244}],402:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -53055,7 +54159,7 @@ function endWritable(stream, state, cb) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_duplex":393,"_process":602,"buffer":128,"core-util-is":134,"inherits":242,"stream":742}],398:[function(require,module,exports){
+},{"./_stream_duplex":398,"_process":609,"buffer":128,"core-util-is":134,"inherits":244,"stream":749}],403:[function(require,module,exports){
 (function (process){
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = require('stream');
@@ -53069,7 +54173,7 @@ if (!process.browser && process.env.READABLE_STREAM === 'disable') {
 }
 
 }).call(this,require('_process'))
-},{"./lib/_stream_duplex.js":393,"./lib/_stream_passthrough.js":394,"./lib/_stream_readable.js":395,"./lib/_stream_transform.js":396,"./lib/_stream_writable.js":397,"_process":602,"stream":742}],399:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":398,"./lib/_stream_passthrough.js":399,"./lib/_stream_readable.js":400,"./lib/_stream_transform.js":401,"./lib/_stream_writable.js":402,"_process":609,"stream":749}],404:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -53292,7 +54396,7 @@ function base64DetectIncompleteChar(buffer) {
   this.charLength = this.charReceived ? 3 : 0;
 }
 
-},{"buffer":128}],400:[function(require,module,exports){
+},{"buffer":128}],405:[function(require,module,exports){
 (function (process,Buffer){
 module.exports = Level
 
@@ -53594,7 +54698,7 @@ Level.destroy = function(db, callback) {
 }
 
 }).call(this,require('_process'),require("buffer").Buffer)
-},{"./iterator":401,"_process":602,"abstract-leveldown":405,"buffer":128,"util":756,"xtend":769}],401:[function(require,module,exports){
+},{"./iterator":406,"_process":609,"abstract-leveldown":410,"buffer":128,"util":764,"xtend":777}],406:[function(require,module,exports){
 (function (process,Buffer){
 var util = require('util')
 var AbstractIterator  = require('abstract-leveldown').AbstractIterator
@@ -53781,7 +54885,7 @@ Iterator.prototype._next = function(callback) {
 }
 
 }).call(this,require('_process'),require("buffer").Buffer)
-},{"_process":602,"abstract-leveldown":405,"buffer":128,"idb-readable-stream":239,"ltgt":534,"stream":742,"util":756,"xtend":769}],402:[function(require,module,exports){
+},{"_process":609,"abstract-leveldown":410,"buffer":128,"idb-readable-stream":241,"ltgt":541,"stream":749,"util":764,"xtend":777}],407:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -53864,7 +54968,7 @@ AbstractChainedBatch.prototype.write = function (options, callback) {
 
 module.exports = AbstractChainedBatch
 }).call(this,require('_process'))
-},{"_process":602}],403:[function(require,module,exports){
+},{"_process":609}],408:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -53917,7 +55021,7 @@ AbstractIterator.prototype.end = function (callback) {
 module.exports = AbstractIterator
 
 }).call(this,require('_process'))
-},{"_process":602}],404:[function(require,module,exports){
+},{"_process":609}],409:[function(require,module,exports){
 (function (Buffer,process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -54193,11 +55297,11 @@ AbstractLevelDOWN.prototype._checkKey = function (obj, type) {
 module.exports = AbstractLevelDOWN
 
 }).call(this,{"isBuffer":require("../../../is-buffer/index.js")},require('_process'))
-},{"../../../is-buffer/index.js":372,"./abstract-chained-batch":402,"./abstract-iterator":403,"_process":602,"xtend":769}],405:[function(require,module,exports){
+},{"../../../is-buffer/index.js":377,"./abstract-chained-batch":407,"./abstract-iterator":408,"_process":609,"xtend":777}],410:[function(require,module,exports){
 arguments[4][159][0].apply(exports,arguments)
-},{"./abstract-chained-batch":402,"./abstract-iterator":403,"./abstract-leveldown":404,"./is-leveldown":406,"dup":159}],406:[function(require,module,exports){
+},{"./abstract-chained-batch":407,"./abstract-iterator":408,"./abstract-leveldown":409,"./is-leveldown":411,"dup":159}],411:[function(require,module,exports){
 arguments[4][160][0].apply(exports,arguments)
-},{"./abstract-leveldown":404,"dup":160}],407:[function(require,module,exports){
+},{"./abstract-leveldown":409,"dup":160}],412:[function(require,module,exports){
 /* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
  * MIT License
@@ -54282,7 +55386,7 @@ Batch.prototype.write = function (callback) {
 
 module.exports = Batch
 
-},{"./util":409,"level-errors":390}],408:[function(require,module,exports){
+},{"./util":414,"level-errors":395}],413:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
@@ -54649,7 +55753,7 @@ module.exports.repair = deprecate(
 )
 
 }).call(this,require('_process'))
-},{"./batch":407,"./leveldown":96,"./util":409,"_process":602,"deferred-leveldown":155,"events":215,"level-codec":388,"level-errors":390,"level-iterator-stream":391,"prr":612,"util":756,"xtend":769}],409:[function(require,module,exports){
+},{"./batch":412,"./leveldown":96,"./util":414,"_process":609,"deferred-leveldown":155,"events":215,"level-codec":393,"level-errors":395,"level-iterator-stream":396,"prr":619,"util":764,"xtend":777}],414:[function(require,module,exports){
 /* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
  * MIT License
@@ -54685,7 +55789,7 @@ module.exports = {
   isDefined: isDefined
 }
 
-},{}],410:[function(require,module,exports){
+},{}],415:[function(require,module,exports){
 'use strict'
 
 const secp256k1 = require('secp256k1')
@@ -54776,7 +55880,7 @@ module.exports = (randomBytes) => {
   }
 }
 
-},{"async/setImmediate":68,"multihashing-async":559,"secp256k1":708}],411:[function(require,module,exports){
+},{"async/setImmediate":68,"multihashing-async":566,"secp256k1":715}],416:[function(require,module,exports){
 'use strict'
 
 const multihashing = require('multihashing-async')
@@ -54896,7 +56000,7 @@ module.exports = (keysProtobuf, randomBytes, crypto) => {
   }
 }
 
-},{"./crypto":410,"multihashing-async":559}],412:[function(require,module,exports){
+},{"./crypto":415,"multihashing-async":566}],417:[function(require,module,exports){
 'use strict'
 
 const crypto = require('browserify-aes')
@@ -54906,7 +56010,7 @@ module.exports = {
   createDecipheriv: crypto.createDecipheriv
 }
 
-},{"browserify-aes":99}],413:[function(require,module,exports){
+},{"browserify-aes":99}],418:[function(require,module,exports){
 'use strict'
 
 const ciphers = require('./ciphers')
@@ -54938,7 +56042,7 @@ exports.create = function (key, iv, callback) {
   callback(null, res)
 }
 
-},{"./ciphers":412}],414:[function(require,module,exports){
+},{"./ciphers":417}],419:[function(require,module,exports){
 'use strict'
 
 const nodeify = require('nodeify')
@@ -54976,7 +56080,7 @@ exports.create = function (hashType, secret, callback) {
   }), callback)
 }
 
-},{"../webcrypto.js":429,"./lengths":415,"nodeify":579,"safe-buffer":706}],415:[function(require,module,exports){
+},{"../webcrypto.js":434,"./lengths":420,"nodeify":586,"safe-buffer":713}],420:[function(require,module,exports){
 'use strict'
 
 module.exports = {
@@ -54985,7 +56089,7 @@ module.exports = {
   SHA512: 64
 }
 
-},{}],416:[function(require,module,exports){
+},{}],421:[function(require,module,exports){
 'use strict'
 
 const hmac = require('./hmac')
@@ -54999,7 +56103,7 @@ exports.hmac = hmac
 exports.keys = keys
 exports.randomBytes = require('./random-bytes')
 
-},{"./aes":413,"./hmac":414,"./keys":421,"./random-bytes":427}],417:[function(require,module,exports){
+},{"./aes":418,"./hmac":419,"./keys":426,"./random-bytes":432}],422:[function(require,module,exports){
 'use strict'
 
 const webcrypto = require('../webcrypto.js')()
@@ -55129,7 +56233,7 @@ function unmarshalPrivateKey (curve, key) {
   return result
 }
 
-},{"../util":428,"../webcrypto.js":429,"asn1.js":17,"nodeify":579,"safe-buffer":706}],418:[function(require,module,exports){
+},{"../util":433,"../webcrypto.js":434,"asn1.js":17,"nodeify":586,"safe-buffer":713}],423:[function(require,module,exports){
 'use strict'
 
 const multihashing = require('multihashing-async')
@@ -55295,7 +56399,7 @@ module.exports = {
   generateKeyPairFromSeed
 }
 
-},{"./ed25519":419,"./keys.proto":423,"multihashing-async":559,"protocol-buffers":611,"safe-buffer":706}],419:[function(require,module,exports){
+},{"./ed25519":424,"./keys.proto":428,"multihashing-async":566,"protocol-buffers":618,"safe-buffer":713}],424:[function(require,module,exports){
 'use strict'
 
 const nacl = require('tweetnacl')
@@ -55344,7 +56448,7 @@ exports.hashAndVerify = function (key, sig, msg, callback) {
   })
 }
 
-},{"async/setImmediate":68,"safe-buffer":706,"tweetnacl":750}],420:[function(require,module,exports){
+},{"async/setImmediate":68,"safe-buffer":713,"tweetnacl":758}],425:[function(require,module,exports){
 'use strict'
 
 const ecdh = require('./ecdh')
@@ -55357,7 +56461,7 @@ module.exports = (curve, callback) => {
   ecdh.generateEphmeralKeyPair(curve, callback)
 }
 
-},{"./ecdh":417}],421:[function(require,module,exports){
+},{"./ecdh":422}],426:[function(require,module,exports){
 'use strict'
 
 const protobuf = require('protocol-buffers')
@@ -55468,7 +56572,7 @@ exports.marshalPrivateKey = (key, type) => {
   return key.bytes
 }
 
-},{"../random-bytes":427,"./ed25519-class":418,"./ephemeral-keys":420,"./key-stretcher":422,"./keys.proto":423,"./rsa-class":425,"libp2p-crypto-secp256k1":411,"protocol-buffers":611}],422:[function(require,module,exports){
+},{"../random-bytes":432,"./ed25519-class":423,"./ephemeral-keys":425,"./key-stretcher":427,"./keys.proto":428,"./rsa-class":430,"libp2p-crypto-secp256k1":416,"protocol-buffers":618}],427:[function(require,module,exports){
 'use strict'
 
 const whilst = require('async/whilst')
@@ -55579,7 +56683,7 @@ module.exports = (cipherType, hash, secret, callback) => {
   })
 }
 
-},{"../hmac":414,"async/whilst":72,"safe-buffer":706}],423:[function(require,module,exports){
+},{"../hmac":419,"async/whilst":72,"safe-buffer":713}],428:[function(require,module,exports){
 'use strict'
 
 module.exports = `enum KeyType {
@@ -55598,7 +56702,7 @@ message PrivateKey {
   required bytes Data = 2;
 }`
 
-},{}],424:[function(require,module,exports){
+},{}],429:[function(require,module,exports){
 'use strict'
 
 const nodeify = require('nodeify')
@@ -55720,7 +56824,7 @@ function derivePublicFromPrivate (jwKey) {
   )
 }
 
-},{"../webcrypto.js":429,"./rsa-utils":426,"nodeify":579,"safe-buffer":706}],425:[function(require,module,exports){
+},{"../webcrypto.js":434,"./rsa-utils":431,"nodeify":586,"safe-buffer":713}],430:[function(require,module,exports){
 'use strict'
 
 const multihashing = require('multihashing-async')
@@ -55855,7 +56959,7 @@ module.exports = {
   generateKeyPair
 }
 
-},{"./keys.proto":423,"./rsa":424,"multihashing-async":559,"protocol-buffers":611}],426:[function(require,module,exports){
+},{"./keys.proto":428,"./rsa":429,"multihashing-async":566,"protocol-buffers":618}],431:[function(require,module,exports){
 'use strict'
 
 const asn1 = require('asn1.js')
@@ -55971,7 +57075,7 @@ exports.jwkToPkix = function (jwk) {
   }, 'der')
 }
 
-},{"./../util":428,"asn1.js":17}],427:[function(require,module,exports){
+},{"./../util":433,"asn1.js":17}],432:[function(require,module,exports){
 'use strict'
 
 const rsa = require('./keys/rsa')
@@ -55986,7 +57090,7 @@ function randomBytes (number) {
 
 module.exports = randomBytes
 
-},{"./keys/rsa":424}],428:[function(require,module,exports){
+},{"./keys/rsa":429}],433:[function(require,module,exports){
 'use strict'
 
 const BN = require('asn1.js').bignum
@@ -56009,7 +57113,7 @@ exports.toBn = function toBn (str) {
   return new BN(Buffer.from(str, 'base64'))
 }
 
-},{"asn1.js":17,"safe-buffer":706}],429:[function(require,module,exports){
+},{"asn1.js":17,"safe-buffer":713}],434:[function(require,module,exports){
 /* global self */
 
 'use strict'
@@ -56027,7 +57131,7 @@ module.exports = () => {
   throw new Error('Please use an environment with crypto support')
 }
 
-},{"webcrypto-shim":766}],430:[function(require,module,exports){
+},{"webcrypto-shim":774}],435:[function(require,module,exports){
 'use strict'
 
 const debug = require('debug')
@@ -56040,7 +57144,7 @@ module.exports = {
   multicodec: '/floodsub/1.0.0'
 }
 
-},{"debug":151}],431:[function(require,module,exports){
+},{"debug":151}],436:[function(require,module,exports){
 'use strict'
 
 const EventEmitter = require('events')
@@ -56383,7 +57487,7 @@ class FloodSub extends EventEmitter {
 
 module.exports = FloodSub
 
-},{"./config":430,"./message":432,"./peer":435,"./utils":436,"assert":31,"async/each":35,"async/setImmediate":68,"events":215,"lodash.values":496,"pull-length-prefixed":631,"pull-stream":642,"safe-buffer":706,"time-cache":747}],432:[function(require,module,exports){
+},{"./config":435,"./message":437,"./peer":440,"./utils":441,"assert":31,"async/each":35,"async/setImmediate":68,"events":215,"lodash.values":503,"pull-length-prefixed":638,"pull-stream":649,"safe-buffer":713,"time-cache":754}],437:[function(require,module,exports){
 'use strict'
 
 const protobuf = require('protocol-buffers')
@@ -56395,7 +57499,7 @@ exports = module.exports
 exports.rpc = rpcProto
 exports.td = topicDescriptorProto
 
-},{"./rpc.proto.js":433,"./topic-descriptor.proto.js":434,"protocol-buffers":611}],433:[function(require,module,exports){
+},{"./rpc.proto.js":438,"./topic-descriptor.proto.js":439,"protocol-buffers":618}],438:[function(require,module,exports){
 'use strict'
 module.exports = `
 message RPC {
@@ -56415,7 +57519,7 @@ message RPC {
   }
 }`
 
-},{}],434:[function(require,module,exports){
+},{}],439:[function(require,module,exports){
 'use strict'
 module.exports = `
 // topicCID = cid(merkledag_protobuf(topicDescriptor)); (not the topic.name)
@@ -56447,7 +57551,7 @@ message TopicDescriptor {
   }
 }`
 
-},{}],435:[function(require,module,exports){
+},{}],440:[function(require,module,exports){
 'use strict'
 
 const lp = require('pull-length-prefixed')
@@ -56622,7 +57726,7 @@ class Peer {
 
 module.exports = Peer
 
-},{"./message":432,"async/setImmediate":68,"pull-length-prefixed":631,"pull-pushable":637,"pull-stream":642}],436:[function(require,module,exports){
+},{"./message":437,"async/setImmediate":68,"pull-length-prefixed":638,"pull-pushable":644,"pull-stream":649}],441:[function(require,module,exports){
 'use strict'
 
 const crypto = require('libp2p-crypto')
@@ -56692,7 +57796,7 @@ exports.ensureArray = (maybeArray) => {
   return maybeArray
 }
 
-},{"libp2p-crypto":416}],437:[function(require,module,exports){
+},{"libp2p-crypto":421}],442:[function(require,module,exports){
 'use strict'
 const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
@@ -56753,7 +57857,7 @@ function hasObservedAddr (input) {
   return input.observedAddr && input.observedAddr.length > 0
 }
 
-},{"./message":440,"multiaddr":543,"peer-id":597,"peer-info":598,"pull-length-prefixed":631,"pull-stream":642}],438:[function(require,module,exports){
+},{"./message":445,"multiaddr":550,"peer-id":604,"peer-info":605,"pull-length-prefixed":638,"pull-stream":649}],443:[function(require,module,exports){
 'use strict'
 
 exports = module.exports
@@ -56761,7 +57865,7 @@ exports.multicodec = '/ipfs/id/1.0.0'
 exports.listener = require('./listener')
 exports.dialer = require('./dialer')
 
-},{"./dialer":437,"./listener":439}],439:[function(require,module,exports){
+},{"./dialer":442,"./listener":444}],444:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -56798,7 +57902,7 @@ module.exports = (conn, pInfoSelf) => {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./message":440,"buffer":128,"pull-length-prefixed":631,"pull-stream":642}],440:[function(require,module,exports){
+},{"./message":445,"buffer":128,"pull-length-prefixed":638,"pull-stream":649}],445:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -56832,7 +57936,7 @@ message Identify {
 module.exports = protobuf(schema).Identify
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"protocol-buffers":611}],441:[function(require,module,exports){
+},{"buffer":128,"protocol-buffers":618}],446:[function(require,module,exports){
 'use strict'
 
 const Multiplex = require('multiplex')
@@ -56865,12 +57969,12 @@ exports.multicodec = MULTIPLEX_CODEC
 exports.dialer = (conn) => create(conn, false)
 exports.listener = (conn) => create(conn, true)
 
-},{"./multiplex-codec":442,"./muxer":443,"multiplex":566,"pull-stream-to-stream":641,"pump":684}],442:[function(require,module,exports){
+},{"./multiplex-codec":447,"./muxer":448,"multiplex":573,"pull-stream-to-stream":648,"pump":691}],447:[function(require,module,exports){
 'use strict'
 
 module.exports = '/mplex/6.7.0'
 
-},{}],443:[function(require,module,exports){
+},{}],448:[function(require,module,exports){
 'use strict'
 
 const EventEmitter = require('events').EventEmitter
@@ -56941,7 +58045,7 @@ function catchError (stream) {
   }
 }
 
-},{"./multiplex-codec":442,"async/setImmediate":68,"events":215,"interface-connection":244,"pull-catch":622,"pull-stream":642,"stream-to-pull-stream":744}],444:[function(require,module,exports){
+},{"./multiplex-codec":447,"async/setImmediate":68,"events":215,"interface-connection":246,"pull-catch":629,"pull-stream":649,"stream-to-pull-stream":751}],449:[function(require,module,exports){
 'use strict'
 
 module.exports = {
@@ -56949,7 +58053,7 @@ module.exports = {
   PING_LENGTH: 32
 }
 
-},{}],445:[function(require,module,exports){
+},{}],450:[function(require,module,exports){
 'use strict'
 
 const pull = require('pull-stream')
@@ -57001,7 +58105,7 @@ exports = module.exports
 exports.mount = mount
 exports.unmount = unmount
 
-},{"./constants":444,"debug":151,"pull-handshake":628,"pull-stream":642}],446:[function(require,module,exports){
+},{"./constants":449,"debug":151,"pull-handshake":635,"pull-stream":649}],451:[function(require,module,exports){
 'use strict'
 
 const handler = require('./handler')
@@ -57010,7 +58114,7 @@ exports = module.exports = require('./ping')
 exports.mount = handler.mount
 exports.unmount = handler.unmount
 
-},{"./handler":445,"./ping":447}],447:[function(require,module,exports){
+},{"./handler":450,"./ping":452}],452:[function(require,module,exports){
 'use strict'
 
 const EventEmitter = require('events').EventEmitter
@@ -57091,7 +58195,7 @@ class Ping extends EventEmitter {
 
 module.exports = Ping
 
-},{"./constants":444,"./util":448,"debug":151,"events":215,"pull-handshake":628,"pull-stream":642}],448:[function(require,module,exports){
+},{"./constants":449,"./util":453,"debug":151,"events":215,"pull-handshake":635,"pull-stream":649}],453:[function(require,module,exports){
 'use strict'
 
 const crypto = require('libp2p-crypto')
@@ -57106,7 +58210,7 @@ exports.rnd = (length) => {
   return crypto.randomBytes(length)
 }
 
-},{"./constants":444,"libp2p-crypto":416}],449:[function(require,module,exports){
+},{"./constants":449,"libp2p-crypto":421}],454:[function(require,module,exports){
 'use strict'
 
 const PeerId = require('peer-id')
@@ -57158,7 +58262,7 @@ class Railing extends EventEmitter {
 
 module.exports = Railing
 
-},{"async/setImmediate":68,"debug":151,"events":215,"multiaddr":543,"peer-id":597,"peer-info":598}],450:[function(require,module,exports){
+},{"async/setImmediate":68,"debug":151,"events":215,"multiaddr":550,"peer-id":604,"peer-info":605}],455:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -57241,7 +58345,7 @@ function ensureBuffer () {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"pull-length-prefixed":631,"pull-stream":642}],451:[function(require,module,exports){
+},{"buffer":128,"pull-length-prefixed":638,"pull-stream":649}],456:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -57443,7 +58547,7 @@ exports.verifyNonce = (state, n2) => {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"../support":459,"./secio.proto":456,"async/parallel":64,"async/waterfall":71,"buffer":128,"debug":151,"libp2p-crypto":416,"peer-id":597,"protocol-buffers":611}],452:[function(require,module,exports){
+},{"../support":464,"./secio.proto":461,"async/parallel":64,"async/waterfall":71,"buffer":128,"debug":151,"libp2p-crypto":421,"peer-id":604,"protocol-buffers":618}],457:[function(require,module,exports){
 'use strict'
 
 const debug = require('debug')
@@ -57482,7 +58586,7 @@ module.exports = function exchange (state, cb) {
   })
 }
 
-},{"../support":459,"./crypto":451,"async/waterfall":71,"debug":151}],453:[function(require,module,exports){
+},{"../support":464,"./crypto":456,"async/waterfall":71,"debug":151}],458:[function(require,module,exports){
 'use strict'
 
 const pull = require('pull-stream')
@@ -57544,7 +58648,7 @@ module.exports = function finish (state, cb) {
   })
 }
 
-},{"../etm":450,"./crypto":451,"debug":151,"pull-handshake":628,"pull-stream":642}],454:[function(require,module,exports){
+},{"../etm":455,"./crypto":456,"debug":151,"pull-handshake":635,"pull-stream":649}],459:[function(require,module,exports){
 'use strict'
 
 const series = require('async/series')
@@ -57574,7 +58678,7 @@ module.exports = function handshake (state) {
   return state.stream
 }
 
-},{"./exchange":452,"./finish":453,"./propose":455,"async/series":67}],455:[function(require,module,exports){
+},{"./exchange":457,"./finish":458,"./propose":460,"async/series":67}],460:[function(require,module,exports){
 'use strict'
 
 const debug = require('debug')
@@ -57611,7 +58715,7 @@ module.exports = function propose (state, cb) {
   })
 }
 
-},{"../support":459,"./crypto":451,"async/waterfall":71,"debug":151}],456:[function(require,module,exports){
+},{"../support":464,"./crypto":456,"async/waterfall":71,"debug":151}],461:[function(require,module,exports){
 'use strict'
 
 module.exports = `message Propose {
@@ -57627,7 +58731,7 @@ message Exchange {
   optional bytes signature = 2;
 }`
 
-},{}],457:[function(require,module,exports){
+},{}],462:[function(require,module,exports){
 'use strict'
 
 const pull = require('pull-stream')
@@ -57671,7 +58775,7 @@ module.exports = {
   }
 }
 
-},{"./handshake":454,"./state":458,"interface-connection":244,"pull-stream":642}],458:[function(require,module,exports){
+},{"./handshake":459,"./state":463,"interface-connection":246,"pull-stream":649}],463:[function(require,module,exports){
 'use strict'
 
 const handshake = require('pull-handshake')
@@ -57745,7 +58849,7 @@ class State {
 
 module.exports = State
 
-},{"pull-defer":624,"pull-handshake":628}],459:[function(require,module,exports){
+},{"pull-defer":631,"pull-handshake":635}],464:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -57884,11 +58988,11 @@ exports.read = function read (reader, cb) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"async/parallel":64,"buffer":128,"libp2p-crypto":416,"multihashing-async":559,"pull-length-prefixed":631,"pull-stream":642}],460:[function(require,module,exports){
-arguments[4][250][0].apply(exports,arguments)
-},{"./debug":461,"_process":602,"dup":250}],461:[function(require,module,exports){
-arguments[4][251][0].apply(exports,arguments)
-},{"dup":251,"ms":540}],462:[function(require,module,exports){
+},{"async/parallel":64,"buffer":128,"libp2p-crypto":421,"multihashing-async":566,"pull-length-prefixed":638,"pull-stream":649}],465:[function(require,module,exports){
+arguments[4][252][0].apply(exports,arguments)
+},{"./debug":466,"_process":609,"dup":252}],466:[function(require,module,exports){
+arguments[4][253][0].apply(exports,arguments)
+},{"dup":253,"ms":547}],467:[function(require,module,exports){
 'use strict'
 
 const identify = require('libp2p-identify')
@@ -58002,7 +59106,7 @@ module.exports = function connection (swarm) {
   }
 }
 
-},{"./plaintext":468,"./protocol-muxer":469,"async/setImmediate":68,"async/waterfall":71,"debug":460,"libp2p-identify":438,"multistream-select":569}],463:[function(require,module,exports){
+},{"./plaintext":473,"./protocol-muxer":474,"async/setImmediate":68,"async/waterfall":71,"debug":465,"libp2p-identify":443,"multistream-select":576}],468:[function(require,module,exports){
 'use strict'
 
 const multistream = require('multistream-select')
@@ -58207,7 +59311,7 @@ function dial (swarm) {
 
 module.exports = dial
 
-},{"./get-peer-info":464,"./protocol-muxer":469,"async/setImmediate":68,"debug":460,"interface-connection":244,"multistream-select":569}],464:[function(require,module,exports){
+},{"./get-peer-info":469,"./protocol-muxer":474,"async/setImmediate":68,"debug":465,"interface-connection":246,"multistream-select":576}],469:[function(require,module,exports){
 'use strict'
 
 const PeerId = require('peer-id')
@@ -58250,7 +59354,7 @@ function getPeerInfo (peer, peerBook) {
 
 module.exports = getPeerInfo
 
-},{"multiaddr":543,"peer-id":597,"peer-info":598}],465:[function(require,module,exports){
+},{"multiaddr":550,"peer-id":604,"peer-info":605}],470:[function(require,module,exports){
 'use strict'
 
 const util = require('util')
@@ -58387,7 +59491,7 @@ function Swarm (peerInfo, peerBook) {
   }
 }
 
-},{"./connection":462,"./dial":463,"./get-peer-info":464,"./plaintext":468,"./protocol-muxer":469,"./transport":470,"assert":31,"async/each":35,"async/series":67,"events":215,"util":756}],466:[function(require,module,exports){
+},{"./connection":467,"./dial":468,"./get-peer-info":469,"./plaintext":473,"./protocol-muxer":474,"./transport":475,"assert":31,"async/each":35,"async/series":67,"events":215,"util":764}],471:[function(require,module,exports){
 'use strict'
 
 const map = require('async/map')
@@ -58477,7 +59581,7 @@ class LimitDialer {
 
 module.exports = LimitDialer
 
-},{"./queue":467,"async/map":63,"debug":460}],467:[function(require,module,exports){
+},{"./queue":472,"async/map":63,"debug":465}],472:[function(require,module,exports){
 'use strict'
 
 const Connection = require('interface-connection').Connection
@@ -58582,7 +59686,7 @@ class DialQueue {
 
 module.exports = DialQueue
 
-},{"async/queue":65,"async/timeout":70,"debug":460,"interface-connection":244,"pull-stream":642}],468:[function(require,module,exports){
+},{"async/queue":65,"async/timeout":70,"debug":465,"interface-connection":246,"pull-stream":649}],473:[function(require,module,exports){
 'use strict'
 
 module.exports = {
@@ -58592,7 +59696,7 @@ module.exports = {
   }
 }
 
-},{}],469:[function(require,module,exports){
+},{}],474:[function(require,module,exports){
 'use strict'
 
 const multistream = require('multistream-select')
@@ -58615,7 +59719,7 @@ module.exports = function protocolMuxer (protocols, conn) {
   })
 }
 
-},{"multistream-select":569}],470:[function(require,module,exports){
+},{"multistream-select":576}],475:[function(require,module,exports){
 'use strict'
 
 const parallel = require('async/parallel')
@@ -58750,7 +59854,7 @@ function dialables (tp, multiaddrs) {
 
 function noop () {}
 
-},{"./limit-dialer":466,"./protocol-muxer":469,"async/parallel":64,"debug":460,"once":580}],471:[function(require,module,exports){
+},{"./limit-dialer":471,"./protocol-muxer":474,"async/parallel":64,"debug":465,"once":587}],476:[function(require,module,exports){
 'use strict'
 
 const debug = require('debug')
@@ -58980,7 +60084,7 @@ class WebRTCStar {
 
 module.exports = WebRTCStar
 
-},{"./utils":472,"async/setImmediate":68,"debug":151,"events":215,"interface-connection":244,"mafmt":535,"multiaddr":543,"once":580,"peer-id":597,"peer-info":598,"simple-peer":730,"socket.io-client":731,"stream-to-pull-stream":744,"webrtcsupport":767}],472:[function(require,module,exports){
+},{"./utils":477,"async/setImmediate":68,"debug":151,"events":215,"interface-connection":246,"mafmt":542,"multiaddr":550,"once":587,"peer-id":604,"peer-info":605,"simple-peer":737,"socket.io-client":738,"stream-to-pull-stream":751,"webrtcsupport":775}],477:[function(require,module,exports){
 'use strict'
 
 const multiaddr = require('multiaddr')
@@ -59005,7 +60109,7 @@ function cleanUrlSIO (ma) {
 exports = module.exports
 exports.cleanUrlSIO = cleanUrlSIO
 
-},{"multiaddr":543}],473:[function(require,module,exports){
+},{"multiaddr":550}],478:[function(require,module,exports){
 'use strict'
 
 const connect = require('pull-ws/client')
@@ -59067,7 +60171,7 @@ class WebSockets {
 
 module.exports = WebSockets
 
-},{"./listener":474,"./ma-to-url":475,"debug":151,"interface-connection":244,"lodash.includes":486,"mafmt":535,"pull-ws/client":677}],474:[function(require,module,exports){
+},{"./listener":479,"./ma-to-url":480,"debug":151,"interface-connection":246,"lodash.includes":492,"mafmt":542,"pull-ws/client":684}],479:[function(require,module,exports){
 'use strict'
 
 const Connection = require('interface-connection').Connection
@@ -59106,7 +60210,7 @@ module.exports = (options, handler) => {
   return listener
 }
 
-},{"interface-connection":244,"lodash.includes":486,"pull-ws/server":96}],475:[function(require,module,exports){
+},{"interface-connection":246,"lodash.includes":492,"pull-ws/server":96}],480:[function(require,module,exports){
 'use strict'
 
 const debug = require('debug')
@@ -59145,7 +60249,7 @@ function maToUrl (ma) {
 
 module.exports = maToUrl
 
-},{"debug":151}],476:[function(require,module,exports){
+},{"debug":151}],481:[function(require,module,exports){
 'use strict'
 
 const EventEmitter = require('events').EventEmitter
@@ -59473,7 +60577,7 @@ class Node extends EventEmitter {
 
 module.exports = Node
 
-},{"assert":31,"async/each":35,"async/series":67,"async/setImmediate":68,"events":215,"libp2p-ping":446,"libp2p-swarm":465,"mafmt":535,"multiaddr":543,"peer-book":596,"peer-id":597,"peer-info":598}],477:[function(require,module,exports){
+},{"assert":31,"async/each":35,"async/series":67,"async/setImmediate":68,"events":215,"libp2p-ping":451,"libp2p-swarm":470,"mafmt":542,"multiaddr":550,"peer-book":603,"peer-id":604,"peer-info":605}],482:[function(require,module,exports){
 (function (process){
 (function (root, factory) {
     if (typeof process === "object" && typeof process.stdout === "undefined") {
@@ -64101,7 +65205,7 @@ module.exports = Node
 })));
 
 }).call(this,require('_process'))
-},{"_process":602,"libsodium":478}],478:[function(require,module,exports){
+},{"_process":609,"libsodium":483}],483:[function(require,module,exports){
 (function (process){
 (function (root, factory) {
     if (typeof define === "function" && define.amd) {
@@ -64135,7 +65239,1759 @@ return{_sodium_library_version_minor:Re,_sodium_hex2bin:Na,_crypto_pwhash_passwd
 }));
 
 }).call(this,require('_process'))
-},{"_process":602,"crypto":141,"fs":124,"path":590}],479:[function(require,module,exports){
+},{"_process":609,"crypto":141,"fs":124,"path":597}],484:[function(require,module,exports){
+(function (global){
+/**
+ * lodash (Custom Build) <https://lodash.com/>
+ * Build: `lodash modularize exports="npm" -o ./`
+ * Copyright jQuery Foundation and other contributors <https://jquery.org/>
+ * Released under MIT license <https://lodash.com/license>
+ * Based on Underscore.js 1.8.3 <http://underscorejs.org/LICENSE>
+ * Copyright Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ */
+
+/** Used as the size to enable large array optimizations. */
+var LARGE_ARRAY_SIZE = 200;
+
+/** Used to stand-in for `undefined` hash values. */
+var HASH_UNDEFINED = '__lodash_hash_undefined__';
+
+/** Used as references for various `Number` constants. */
+var MAX_SAFE_INTEGER = 9007199254740991;
+
+/** `Object#toString` result references. */
+var argsTag = '[object Arguments]',
+    arrayTag = '[object Array]',
+    boolTag = '[object Boolean]',
+    dateTag = '[object Date]',
+    errorTag = '[object Error]',
+    funcTag = '[object Function]',
+    genTag = '[object GeneratorFunction]',
+    mapTag = '[object Map]',
+    numberTag = '[object Number]',
+    objectTag = '[object Object]',
+    promiseTag = '[object Promise]',
+    regexpTag = '[object RegExp]',
+    setTag = '[object Set]',
+    stringTag = '[object String]',
+    symbolTag = '[object Symbol]',
+    weakMapTag = '[object WeakMap]';
+
+var arrayBufferTag = '[object ArrayBuffer]',
+    dataViewTag = '[object DataView]',
+    float32Tag = '[object Float32Array]',
+    float64Tag = '[object Float64Array]',
+    int8Tag = '[object Int8Array]',
+    int16Tag = '[object Int16Array]',
+    int32Tag = '[object Int32Array]',
+    uint8Tag = '[object Uint8Array]',
+    uint8ClampedTag = '[object Uint8ClampedArray]',
+    uint16Tag = '[object Uint16Array]',
+    uint32Tag = '[object Uint32Array]';
+
+/**
+ * Used to match `RegExp`
+ * [syntax characters](http://ecma-international.org/ecma-262/7.0/#sec-patterns).
+ */
+var reRegExpChar = /[\\^$.*+?()[\]{}|]/g;
+
+/** Used to match `RegExp` flags from their coerced string values. */
+var reFlags = /\w*$/;
+
+/** Used to detect host constructors (Safari). */
+var reIsHostCtor = /^\[object .+?Constructor\]$/;
+
+/** Used to detect unsigned integer values. */
+var reIsUint = /^(?:0|[1-9]\d*)$/;
+
+/** Used to identify `toStringTag` values supported by `_.clone`. */
+var cloneableTags = {};
+cloneableTags[argsTag] = cloneableTags[arrayTag] =
+cloneableTags[arrayBufferTag] = cloneableTags[dataViewTag] =
+cloneableTags[boolTag] = cloneableTags[dateTag] =
+cloneableTags[float32Tag] = cloneableTags[float64Tag] =
+cloneableTags[int8Tag] = cloneableTags[int16Tag] =
+cloneableTags[int32Tag] = cloneableTags[mapTag] =
+cloneableTags[numberTag] = cloneableTags[objectTag] =
+cloneableTags[regexpTag] = cloneableTags[setTag] =
+cloneableTags[stringTag] = cloneableTags[symbolTag] =
+cloneableTags[uint8Tag] = cloneableTags[uint8ClampedTag] =
+cloneableTags[uint16Tag] = cloneableTags[uint32Tag] = true;
+cloneableTags[errorTag] = cloneableTags[funcTag] =
+cloneableTags[weakMapTag] = false;
+
+/** Detect free variable `global` from Node.js. */
+var freeGlobal = typeof global == 'object' && global && global.Object === Object && global;
+
+/** Detect free variable `self`. */
+var freeSelf = typeof self == 'object' && self && self.Object === Object && self;
+
+/** Used as a reference to the global object. */
+var root = freeGlobal || freeSelf || Function('return this')();
+
+/** Detect free variable `exports`. */
+var freeExports = typeof exports == 'object' && exports && !exports.nodeType && exports;
+
+/** Detect free variable `module`. */
+var freeModule = freeExports && typeof module == 'object' && module && !module.nodeType && module;
+
+/** Detect the popular CommonJS extension `module.exports`. */
+var moduleExports = freeModule && freeModule.exports === freeExports;
+
+/**
+ * Adds the key-value `pair` to `map`.
+ *
+ * @private
+ * @param {Object} map The map to modify.
+ * @param {Array} pair The key-value pair to add.
+ * @returns {Object} Returns `map`.
+ */
+function addMapEntry(map, pair) {
+  // Don't return `map.set` because it's not chainable in IE 11.
+  map.set(pair[0], pair[1]);
+  return map;
+}
+
+/**
+ * Adds `value` to `set`.
+ *
+ * @private
+ * @param {Object} set The set to modify.
+ * @param {*} value The value to add.
+ * @returns {Object} Returns `set`.
+ */
+function addSetEntry(set, value) {
+  // Don't return `set.add` because it's not chainable in IE 11.
+  set.add(value);
+  return set;
+}
+
+/**
+ * A specialized version of `_.forEach` for arrays without support for
+ * iteratee shorthands.
+ *
+ * @private
+ * @param {Array} [array] The array to iterate over.
+ * @param {Function} iteratee The function invoked per iteration.
+ * @returns {Array} Returns `array`.
+ */
+function arrayEach(array, iteratee) {
+  var index = -1,
+      length = array ? array.length : 0;
+
+  while (++index < length) {
+    if (iteratee(array[index], index, array) === false) {
+      break;
+    }
+  }
+  return array;
+}
+
+/**
+ * Appends the elements of `values` to `array`.
+ *
+ * @private
+ * @param {Array} array The array to modify.
+ * @param {Array} values The values to append.
+ * @returns {Array} Returns `array`.
+ */
+function arrayPush(array, values) {
+  var index = -1,
+      length = values.length,
+      offset = array.length;
+
+  while (++index < length) {
+    array[offset + index] = values[index];
+  }
+  return array;
+}
+
+/**
+ * A specialized version of `_.reduce` for arrays without support for
+ * iteratee shorthands.
+ *
+ * @private
+ * @param {Array} [array] The array to iterate over.
+ * @param {Function} iteratee The function invoked per iteration.
+ * @param {*} [accumulator] The initial value.
+ * @param {boolean} [initAccum] Specify using the first element of `array` as
+ *  the initial value.
+ * @returns {*} Returns the accumulated value.
+ */
+function arrayReduce(array, iteratee, accumulator, initAccum) {
+  var index = -1,
+      length = array ? array.length : 0;
+
+  if (initAccum && length) {
+    accumulator = array[++index];
+  }
+  while (++index < length) {
+    accumulator = iteratee(accumulator, array[index], index, array);
+  }
+  return accumulator;
+}
+
+/**
+ * The base implementation of `_.times` without support for iteratee shorthands
+ * or max array length checks.
+ *
+ * @private
+ * @param {number} n The number of times to invoke `iteratee`.
+ * @param {Function} iteratee The function invoked per iteration.
+ * @returns {Array} Returns the array of results.
+ */
+function baseTimes(n, iteratee) {
+  var index = -1,
+      result = Array(n);
+
+  while (++index < n) {
+    result[index] = iteratee(index);
+  }
+  return result;
+}
+
+/**
+ * Gets the value at `key` of `object`.
+ *
+ * @private
+ * @param {Object} [object] The object to query.
+ * @param {string} key The key of the property to get.
+ * @returns {*} Returns the property value.
+ */
+function getValue(object, key) {
+  return object == null ? undefined : object[key];
+}
+
+/**
+ * Checks if `value` is a host object in IE < 9.
+ *
+ * @private
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is a host object, else `false`.
+ */
+function isHostObject(value) {
+  // Many host objects are `Object` objects that can coerce to strings
+  // despite having improperly defined `toString` methods.
+  var result = false;
+  if (value != null && typeof value.toString != 'function') {
+    try {
+      result = !!(value + '');
+    } catch (e) {}
+  }
+  return result;
+}
+
+/**
+ * Converts `map` to its key-value pairs.
+ *
+ * @private
+ * @param {Object} map The map to convert.
+ * @returns {Array} Returns the key-value pairs.
+ */
+function mapToArray(map) {
+  var index = -1,
+      result = Array(map.size);
+
+  map.forEach(function(value, key) {
+    result[++index] = [key, value];
+  });
+  return result;
+}
+
+/**
+ * Creates a unary function that invokes `func` with its argument transformed.
+ *
+ * @private
+ * @param {Function} func The function to wrap.
+ * @param {Function} transform The argument transform.
+ * @returns {Function} Returns the new function.
+ */
+function overArg(func, transform) {
+  return function(arg) {
+    return func(transform(arg));
+  };
+}
+
+/**
+ * Converts `set` to an array of its values.
+ *
+ * @private
+ * @param {Object} set The set to convert.
+ * @returns {Array} Returns the values.
+ */
+function setToArray(set) {
+  var index = -1,
+      result = Array(set.size);
+
+  set.forEach(function(value) {
+    result[++index] = value;
+  });
+  return result;
+}
+
+/** Used for built-in method references. */
+var arrayProto = Array.prototype,
+    funcProto = Function.prototype,
+    objectProto = Object.prototype;
+
+/** Used to detect overreaching core-js shims. */
+var coreJsData = root['__core-js_shared__'];
+
+/** Used to detect methods masquerading as native. */
+var maskSrcKey = (function() {
+  var uid = /[^.]+$/.exec(coreJsData && coreJsData.keys && coreJsData.keys.IE_PROTO || '');
+  return uid ? ('Symbol(src)_1.' + uid) : '';
+}());
+
+/** Used to resolve the decompiled source of functions. */
+var funcToString = funcProto.toString;
+
+/** Used to check objects for own properties. */
+var hasOwnProperty = objectProto.hasOwnProperty;
+
+/**
+ * Used to resolve the
+ * [`toStringTag`](http://ecma-international.org/ecma-262/7.0/#sec-object.prototype.tostring)
+ * of values.
+ */
+var objectToString = objectProto.toString;
+
+/** Used to detect if a method is native. */
+var reIsNative = RegExp('^' +
+  funcToString.call(hasOwnProperty).replace(reRegExpChar, '\\$&')
+  .replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, '$1.*?') + '$'
+);
+
+/** Built-in value references. */
+var Buffer = moduleExports ? root.Buffer : undefined,
+    Symbol = root.Symbol,
+    Uint8Array = root.Uint8Array,
+    getPrototype = overArg(Object.getPrototypeOf, Object),
+    objectCreate = Object.create,
+    propertyIsEnumerable = objectProto.propertyIsEnumerable,
+    splice = arrayProto.splice;
+
+/* Built-in method references for those with the same name as other `lodash` methods. */
+var nativeGetSymbols = Object.getOwnPropertySymbols,
+    nativeIsBuffer = Buffer ? Buffer.isBuffer : undefined,
+    nativeKeys = overArg(Object.keys, Object);
+
+/* Built-in method references that are verified to be native. */
+var DataView = getNative(root, 'DataView'),
+    Map = getNative(root, 'Map'),
+    Promise = getNative(root, 'Promise'),
+    Set = getNative(root, 'Set'),
+    WeakMap = getNative(root, 'WeakMap'),
+    nativeCreate = getNative(Object, 'create');
+
+/** Used to detect maps, sets, and weakmaps. */
+var dataViewCtorString = toSource(DataView),
+    mapCtorString = toSource(Map),
+    promiseCtorString = toSource(Promise),
+    setCtorString = toSource(Set),
+    weakMapCtorString = toSource(WeakMap);
+
+/** Used to convert symbols to primitives and strings. */
+var symbolProto = Symbol ? Symbol.prototype : undefined,
+    symbolValueOf = symbolProto ? symbolProto.valueOf : undefined;
+
+/**
+ * Creates a hash object.
+ *
+ * @private
+ * @constructor
+ * @param {Array} [entries] The key-value pairs to cache.
+ */
+function Hash(entries) {
+  var index = -1,
+      length = entries ? entries.length : 0;
+
+  this.clear();
+  while (++index < length) {
+    var entry = entries[index];
+    this.set(entry[0], entry[1]);
+  }
+}
+
+/**
+ * Removes all key-value entries from the hash.
+ *
+ * @private
+ * @name clear
+ * @memberOf Hash
+ */
+function hashClear() {
+  this.__data__ = nativeCreate ? nativeCreate(null) : {};
+}
+
+/**
+ * Removes `key` and its value from the hash.
+ *
+ * @private
+ * @name delete
+ * @memberOf Hash
+ * @param {Object} hash The hash to modify.
+ * @param {string} key The key of the value to remove.
+ * @returns {boolean} Returns `true` if the entry was removed, else `false`.
+ */
+function hashDelete(key) {
+  return this.has(key) && delete this.__data__[key];
+}
+
+/**
+ * Gets the hash value for `key`.
+ *
+ * @private
+ * @name get
+ * @memberOf Hash
+ * @param {string} key The key of the value to get.
+ * @returns {*} Returns the entry value.
+ */
+function hashGet(key) {
+  var data = this.__data__;
+  if (nativeCreate) {
+    var result = data[key];
+    return result === HASH_UNDEFINED ? undefined : result;
+  }
+  return hasOwnProperty.call(data, key) ? data[key] : undefined;
+}
+
+/**
+ * Checks if a hash value for `key` exists.
+ *
+ * @private
+ * @name has
+ * @memberOf Hash
+ * @param {string} key The key of the entry to check.
+ * @returns {boolean} Returns `true` if an entry for `key` exists, else `false`.
+ */
+function hashHas(key) {
+  var data = this.__data__;
+  return nativeCreate ? data[key] !== undefined : hasOwnProperty.call(data, key);
+}
+
+/**
+ * Sets the hash `key` to `value`.
+ *
+ * @private
+ * @name set
+ * @memberOf Hash
+ * @param {string} key The key of the value to set.
+ * @param {*} value The value to set.
+ * @returns {Object} Returns the hash instance.
+ */
+function hashSet(key, value) {
+  var data = this.__data__;
+  data[key] = (nativeCreate && value === undefined) ? HASH_UNDEFINED : value;
+  return this;
+}
+
+// Add methods to `Hash`.
+Hash.prototype.clear = hashClear;
+Hash.prototype['delete'] = hashDelete;
+Hash.prototype.get = hashGet;
+Hash.prototype.has = hashHas;
+Hash.prototype.set = hashSet;
+
+/**
+ * Creates an list cache object.
+ *
+ * @private
+ * @constructor
+ * @param {Array} [entries] The key-value pairs to cache.
+ */
+function ListCache(entries) {
+  var index = -1,
+      length = entries ? entries.length : 0;
+
+  this.clear();
+  while (++index < length) {
+    var entry = entries[index];
+    this.set(entry[0], entry[1]);
+  }
+}
+
+/**
+ * Removes all key-value entries from the list cache.
+ *
+ * @private
+ * @name clear
+ * @memberOf ListCache
+ */
+function listCacheClear() {
+  this.__data__ = [];
+}
+
+/**
+ * Removes `key` and its value from the list cache.
+ *
+ * @private
+ * @name delete
+ * @memberOf ListCache
+ * @param {string} key The key of the value to remove.
+ * @returns {boolean} Returns `true` if the entry was removed, else `false`.
+ */
+function listCacheDelete(key) {
+  var data = this.__data__,
+      index = assocIndexOf(data, key);
+
+  if (index < 0) {
+    return false;
+  }
+  var lastIndex = data.length - 1;
+  if (index == lastIndex) {
+    data.pop();
+  } else {
+    splice.call(data, index, 1);
+  }
+  return true;
+}
+
+/**
+ * Gets the list cache value for `key`.
+ *
+ * @private
+ * @name get
+ * @memberOf ListCache
+ * @param {string} key The key of the value to get.
+ * @returns {*} Returns the entry value.
+ */
+function listCacheGet(key) {
+  var data = this.__data__,
+      index = assocIndexOf(data, key);
+
+  return index < 0 ? undefined : data[index][1];
+}
+
+/**
+ * Checks if a list cache value for `key` exists.
+ *
+ * @private
+ * @name has
+ * @memberOf ListCache
+ * @param {string} key The key of the entry to check.
+ * @returns {boolean} Returns `true` if an entry for `key` exists, else `false`.
+ */
+function listCacheHas(key) {
+  return assocIndexOf(this.__data__, key) > -1;
+}
+
+/**
+ * Sets the list cache `key` to `value`.
+ *
+ * @private
+ * @name set
+ * @memberOf ListCache
+ * @param {string} key The key of the value to set.
+ * @param {*} value The value to set.
+ * @returns {Object} Returns the list cache instance.
+ */
+function listCacheSet(key, value) {
+  var data = this.__data__,
+      index = assocIndexOf(data, key);
+
+  if (index < 0) {
+    data.push([key, value]);
+  } else {
+    data[index][1] = value;
+  }
+  return this;
+}
+
+// Add methods to `ListCache`.
+ListCache.prototype.clear = listCacheClear;
+ListCache.prototype['delete'] = listCacheDelete;
+ListCache.prototype.get = listCacheGet;
+ListCache.prototype.has = listCacheHas;
+ListCache.prototype.set = listCacheSet;
+
+/**
+ * Creates a map cache object to store key-value pairs.
+ *
+ * @private
+ * @constructor
+ * @param {Array} [entries] The key-value pairs to cache.
+ */
+function MapCache(entries) {
+  var index = -1,
+      length = entries ? entries.length : 0;
+
+  this.clear();
+  while (++index < length) {
+    var entry = entries[index];
+    this.set(entry[0], entry[1]);
+  }
+}
+
+/**
+ * Removes all key-value entries from the map.
+ *
+ * @private
+ * @name clear
+ * @memberOf MapCache
+ */
+function mapCacheClear() {
+  this.__data__ = {
+    'hash': new Hash,
+    'map': new (Map || ListCache),
+    'string': new Hash
+  };
+}
+
+/**
+ * Removes `key` and its value from the map.
+ *
+ * @private
+ * @name delete
+ * @memberOf MapCache
+ * @param {string} key The key of the value to remove.
+ * @returns {boolean} Returns `true` if the entry was removed, else `false`.
+ */
+function mapCacheDelete(key) {
+  return getMapData(this, key)['delete'](key);
+}
+
+/**
+ * Gets the map value for `key`.
+ *
+ * @private
+ * @name get
+ * @memberOf MapCache
+ * @param {string} key The key of the value to get.
+ * @returns {*} Returns the entry value.
+ */
+function mapCacheGet(key) {
+  return getMapData(this, key).get(key);
+}
+
+/**
+ * Checks if a map value for `key` exists.
+ *
+ * @private
+ * @name has
+ * @memberOf MapCache
+ * @param {string} key The key of the entry to check.
+ * @returns {boolean} Returns `true` if an entry for `key` exists, else `false`.
+ */
+function mapCacheHas(key) {
+  return getMapData(this, key).has(key);
+}
+
+/**
+ * Sets the map `key` to `value`.
+ *
+ * @private
+ * @name set
+ * @memberOf MapCache
+ * @param {string} key The key of the value to set.
+ * @param {*} value The value to set.
+ * @returns {Object} Returns the map cache instance.
+ */
+function mapCacheSet(key, value) {
+  getMapData(this, key).set(key, value);
+  return this;
+}
+
+// Add methods to `MapCache`.
+MapCache.prototype.clear = mapCacheClear;
+MapCache.prototype['delete'] = mapCacheDelete;
+MapCache.prototype.get = mapCacheGet;
+MapCache.prototype.has = mapCacheHas;
+MapCache.prototype.set = mapCacheSet;
+
+/**
+ * Creates a stack cache object to store key-value pairs.
+ *
+ * @private
+ * @constructor
+ * @param {Array} [entries] The key-value pairs to cache.
+ */
+function Stack(entries) {
+  this.__data__ = new ListCache(entries);
+}
+
+/**
+ * Removes all key-value entries from the stack.
+ *
+ * @private
+ * @name clear
+ * @memberOf Stack
+ */
+function stackClear() {
+  this.__data__ = new ListCache;
+}
+
+/**
+ * Removes `key` and its value from the stack.
+ *
+ * @private
+ * @name delete
+ * @memberOf Stack
+ * @param {string} key The key of the value to remove.
+ * @returns {boolean} Returns `true` if the entry was removed, else `false`.
+ */
+function stackDelete(key) {
+  return this.__data__['delete'](key);
+}
+
+/**
+ * Gets the stack value for `key`.
+ *
+ * @private
+ * @name get
+ * @memberOf Stack
+ * @param {string} key The key of the value to get.
+ * @returns {*} Returns the entry value.
+ */
+function stackGet(key) {
+  return this.__data__.get(key);
+}
+
+/**
+ * Checks if a stack value for `key` exists.
+ *
+ * @private
+ * @name has
+ * @memberOf Stack
+ * @param {string} key The key of the entry to check.
+ * @returns {boolean} Returns `true` if an entry for `key` exists, else `false`.
+ */
+function stackHas(key) {
+  return this.__data__.has(key);
+}
+
+/**
+ * Sets the stack `key` to `value`.
+ *
+ * @private
+ * @name set
+ * @memberOf Stack
+ * @param {string} key The key of the value to set.
+ * @param {*} value The value to set.
+ * @returns {Object} Returns the stack cache instance.
+ */
+function stackSet(key, value) {
+  var cache = this.__data__;
+  if (cache instanceof ListCache) {
+    var pairs = cache.__data__;
+    if (!Map || (pairs.length < LARGE_ARRAY_SIZE - 1)) {
+      pairs.push([key, value]);
+      return this;
+    }
+    cache = this.__data__ = new MapCache(pairs);
+  }
+  cache.set(key, value);
+  return this;
+}
+
+// Add methods to `Stack`.
+Stack.prototype.clear = stackClear;
+Stack.prototype['delete'] = stackDelete;
+Stack.prototype.get = stackGet;
+Stack.prototype.has = stackHas;
+Stack.prototype.set = stackSet;
+
+/**
+ * Creates an array of the enumerable property names of the array-like `value`.
+ *
+ * @private
+ * @param {*} value The value to query.
+ * @param {boolean} inherited Specify returning inherited property names.
+ * @returns {Array} Returns the array of property names.
+ */
+function arrayLikeKeys(value, inherited) {
+  // Safari 8.1 makes `arguments.callee` enumerable in strict mode.
+  // Safari 9 makes `arguments.length` enumerable in strict mode.
+  var result = (isArray(value) || isArguments(value))
+    ? baseTimes(value.length, String)
+    : [];
+
+  var length = result.length,
+      skipIndexes = !!length;
+
+  for (var key in value) {
+    if ((inherited || hasOwnProperty.call(value, key)) &&
+        !(skipIndexes && (key == 'length' || isIndex(key, length)))) {
+      result.push(key);
+    }
+  }
+  return result;
+}
+
+/**
+ * Assigns `value` to `key` of `object` if the existing value is not equivalent
+ * using [`SameValueZero`](http://ecma-international.org/ecma-262/7.0/#sec-samevaluezero)
+ * for equality comparisons.
+ *
+ * @private
+ * @param {Object} object The object to modify.
+ * @param {string} key The key of the property to assign.
+ * @param {*} value The value to assign.
+ */
+function assignValue(object, key, value) {
+  var objValue = object[key];
+  if (!(hasOwnProperty.call(object, key) && eq(objValue, value)) ||
+      (value === undefined && !(key in object))) {
+    object[key] = value;
+  }
+}
+
+/**
+ * Gets the index at which the `key` is found in `array` of key-value pairs.
+ *
+ * @private
+ * @param {Array} array The array to inspect.
+ * @param {*} key The key to search for.
+ * @returns {number} Returns the index of the matched value, else `-1`.
+ */
+function assocIndexOf(array, key) {
+  var length = array.length;
+  while (length--) {
+    if (eq(array[length][0], key)) {
+      return length;
+    }
+  }
+  return -1;
+}
+
+/**
+ * The base implementation of `_.assign` without support for multiple sources
+ * or `customizer` functions.
+ *
+ * @private
+ * @param {Object} object The destination object.
+ * @param {Object} source The source object.
+ * @returns {Object} Returns `object`.
+ */
+function baseAssign(object, source) {
+  return object && copyObject(source, keys(source), object);
+}
+
+/**
+ * The base implementation of `_.clone` and `_.cloneDeep` which tracks
+ * traversed objects.
+ *
+ * @private
+ * @param {*} value The value to clone.
+ * @param {boolean} [isDeep] Specify a deep clone.
+ * @param {boolean} [isFull] Specify a clone including symbols.
+ * @param {Function} [customizer] The function to customize cloning.
+ * @param {string} [key] The key of `value`.
+ * @param {Object} [object] The parent object of `value`.
+ * @param {Object} [stack] Tracks traversed objects and their clone counterparts.
+ * @returns {*} Returns the cloned value.
+ */
+function baseClone(value, isDeep, isFull, customizer, key, object, stack) {
+  var result;
+  if (customizer) {
+    result = object ? customizer(value, key, object, stack) : customizer(value);
+  }
+  if (result !== undefined) {
+    return result;
+  }
+  if (!isObject(value)) {
+    return value;
+  }
+  var isArr = isArray(value);
+  if (isArr) {
+    result = initCloneArray(value);
+    if (!isDeep) {
+      return copyArray(value, result);
+    }
+  } else {
+    var tag = getTag(value),
+        isFunc = tag == funcTag || tag == genTag;
+
+    if (isBuffer(value)) {
+      return cloneBuffer(value, isDeep);
+    }
+    if (tag == objectTag || tag == argsTag || (isFunc && !object)) {
+      if (isHostObject(value)) {
+        return object ? value : {};
+      }
+      result = initCloneObject(isFunc ? {} : value);
+      if (!isDeep) {
+        return copySymbols(value, baseAssign(result, value));
+      }
+    } else {
+      if (!cloneableTags[tag]) {
+        return object ? value : {};
+      }
+      result = initCloneByTag(value, tag, baseClone, isDeep);
+    }
+  }
+  // Check for circular references and return its corresponding clone.
+  stack || (stack = new Stack);
+  var stacked = stack.get(value);
+  if (stacked) {
+    return stacked;
+  }
+  stack.set(value, result);
+
+  if (!isArr) {
+    var props = isFull ? getAllKeys(value) : keys(value);
+  }
+  arrayEach(props || value, function(subValue, key) {
+    if (props) {
+      key = subValue;
+      subValue = value[key];
+    }
+    // Recursively populate clone (susceptible to call stack limits).
+    assignValue(result, key, baseClone(subValue, isDeep, isFull, customizer, key, value, stack));
+  });
+  return result;
+}
+
+/**
+ * The base implementation of `_.create` without support for assigning
+ * properties to the created object.
+ *
+ * @private
+ * @param {Object} prototype The object to inherit from.
+ * @returns {Object} Returns the new object.
+ */
+function baseCreate(proto) {
+  return isObject(proto) ? objectCreate(proto) : {};
+}
+
+/**
+ * The base implementation of `getAllKeys` and `getAllKeysIn` which uses
+ * `keysFunc` and `symbolsFunc` to get the enumerable property names and
+ * symbols of `object`.
+ *
+ * @private
+ * @param {Object} object The object to query.
+ * @param {Function} keysFunc The function to get the keys of `object`.
+ * @param {Function} symbolsFunc The function to get the symbols of `object`.
+ * @returns {Array} Returns the array of property names and symbols.
+ */
+function baseGetAllKeys(object, keysFunc, symbolsFunc) {
+  var result = keysFunc(object);
+  return isArray(object) ? result : arrayPush(result, symbolsFunc(object));
+}
+
+/**
+ * The base implementation of `getTag`.
+ *
+ * @private
+ * @param {*} value The value to query.
+ * @returns {string} Returns the `toStringTag`.
+ */
+function baseGetTag(value) {
+  return objectToString.call(value);
+}
+
+/**
+ * The base implementation of `_.isNative` without bad shim checks.
+ *
+ * @private
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is a native function,
+ *  else `false`.
+ */
+function baseIsNative(value) {
+  if (!isObject(value) || isMasked(value)) {
+    return false;
+  }
+  var pattern = (isFunction(value) || isHostObject(value)) ? reIsNative : reIsHostCtor;
+  return pattern.test(toSource(value));
+}
+
+/**
+ * The base implementation of `_.keys` which doesn't treat sparse arrays as dense.
+ *
+ * @private
+ * @param {Object} object The object to query.
+ * @returns {Array} Returns the array of property names.
+ */
+function baseKeys(object) {
+  if (!isPrototype(object)) {
+    return nativeKeys(object);
+  }
+  var result = [];
+  for (var key in Object(object)) {
+    if (hasOwnProperty.call(object, key) && key != 'constructor') {
+      result.push(key);
+    }
+  }
+  return result;
+}
+
+/**
+ * Creates a clone of  `buffer`.
+ *
+ * @private
+ * @param {Buffer} buffer The buffer to clone.
+ * @param {boolean} [isDeep] Specify a deep clone.
+ * @returns {Buffer} Returns the cloned buffer.
+ */
+function cloneBuffer(buffer, isDeep) {
+  if (isDeep) {
+    return buffer.slice();
+  }
+  var result = new buffer.constructor(buffer.length);
+  buffer.copy(result);
+  return result;
+}
+
+/**
+ * Creates a clone of `arrayBuffer`.
+ *
+ * @private
+ * @param {ArrayBuffer} arrayBuffer The array buffer to clone.
+ * @returns {ArrayBuffer} Returns the cloned array buffer.
+ */
+function cloneArrayBuffer(arrayBuffer) {
+  var result = new arrayBuffer.constructor(arrayBuffer.byteLength);
+  new Uint8Array(result).set(new Uint8Array(arrayBuffer));
+  return result;
+}
+
+/**
+ * Creates a clone of `dataView`.
+ *
+ * @private
+ * @param {Object} dataView The data view to clone.
+ * @param {boolean} [isDeep] Specify a deep clone.
+ * @returns {Object} Returns the cloned data view.
+ */
+function cloneDataView(dataView, isDeep) {
+  var buffer = isDeep ? cloneArrayBuffer(dataView.buffer) : dataView.buffer;
+  return new dataView.constructor(buffer, dataView.byteOffset, dataView.byteLength);
+}
+
+/**
+ * Creates a clone of `map`.
+ *
+ * @private
+ * @param {Object} map The map to clone.
+ * @param {Function} cloneFunc The function to clone values.
+ * @param {boolean} [isDeep] Specify a deep clone.
+ * @returns {Object} Returns the cloned map.
+ */
+function cloneMap(map, isDeep, cloneFunc) {
+  var array = isDeep ? cloneFunc(mapToArray(map), true) : mapToArray(map);
+  return arrayReduce(array, addMapEntry, new map.constructor);
+}
+
+/**
+ * Creates a clone of `regexp`.
+ *
+ * @private
+ * @param {Object} regexp The regexp to clone.
+ * @returns {Object} Returns the cloned regexp.
+ */
+function cloneRegExp(regexp) {
+  var result = new regexp.constructor(regexp.source, reFlags.exec(regexp));
+  result.lastIndex = regexp.lastIndex;
+  return result;
+}
+
+/**
+ * Creates a clone of `set`.
+ *
+ * @private
+ * @param {Object} set The set to clone.
+ * @param {Function} cloneFunc The function to clone values.
+ * @param {boolean} [isDeep] Specify a deep clone.
+ * @returns {Object} Returns the cloned set.
+ */
+function cloneSet(set, isDeep, cloneFunc) {
+  var array = isDeep ? cloneFunc(setToArray(set), true) : setToArray(set);
+  return arrayReduce(array, addSetEntry, new set.constructor);
+}
+
+/**
+ * Creates a clone of the `symbol` object.
+ *
+ * @private
+ * @param {Object} symbol The symbol object to clone.
+ * @returns {Object} Returns the cloned symbol object.
+ */
+function cloneSymbol(symbol) {
+  return symbolValueOf ? Object(symbolValueOf.call(symbol)) : {};
+}
+
+/**
+ * Creates a clone of `typedArray`.
+ *
+ * @private
+ * @param {Object} typedArray The typed array to clone.
+ * @param {boolean} [isDeep] Specify a deep clone.
+ * @returns {Object} Returns the cloned typed array.
+ */
+function cloneTypedArray(typedArray, isDeep) {
+  var buffer = isDeep ? cloneArrayBuffer(typedArray.buffer) : typedArray.buffer;
+  return new typedArray.constructor(buffer, typedArray.byteOffset, typedArray.length);
+}
+
+/**
+ * Copies the values of `source` to `array`.
+ *
+ * @private
+ * @param {Array} source The array to copy values from.
+ * @param {Array} [array=[]] The array to copy values to.
+ * @returns {Array} Returns `array`.
+ */
+function copyArray(source, array) {
+  var index = -1,
+      length = source.length;
+
+  array || (array = Array(length));
+  while (++index < length) {
+    array[index] = source[index];
+  }
+  return array;
+}
+
+/**
+ * Copies properties of `source` to `object`.
+ *
+ * @private
+ * @param {Object} source The object to copy properties from.
+ * @param {Array} props The property identifiers to copy.
+ * @param {Object} [object={}] The object to copy properties to.
+ * @param {Function} [customizer] The function to customize copied values.
+ * @returns {Object} Returns `object`.
+ */
+function copyObject(source, props, object, customizer) {
+  object || (object = {});
+
+  var index = -1,
+      length = props.length;
+
+  while (++index < length) {
+    var key = props[index];
+
+    var newValue = customizer
+      ? customizer(object[key], source[key], key, object, source)
+      : undefined;
+
+    assignValue(object, key, newValue === undefined ? source[key] : newValue);
+  }
+  return object;
+}
+
+/**
+ * Copies own symbol properties of `source` to `object`.
+ *
+ * @private
+ * @param {Object} source The object to copy symbols from.
+ * @param {Object} [object={}] The object to copy symbols to.
+ * @returns {Object} Returns `object`.
+ */
+function copySymbols(source, object) {
+  return copyObject(source, getSymbols(source), object);
+}
+
+/**
+ * Creates an array of own enumerable property names and symbols of `object`.
+ *
+ * @private
+ * @param {Object} object The object to query.
+ * @returns {Array} Returns the array of property names and symbols.
+ */
+function getAllKeys(object) {
+  return baseGetAllKeys(object, keys, getSymbols);
+}
+
+/**
+ * Gets the data for `map`.
+ *
+ * @private
+ * @param {Object} map The map to query.
+ * @param {string} key The reference key.
+ * @returns {*} Returns the map data.
+ */
+function getMapData(map, key) {
+  var data = map.__data__;
+  return isKeyable(key)
+    ? data[typeof key == 'string' ? 'string' : 'hash']
+    : data.map;
+}
+
+/**
+ * Gets the native function at `key` of `object`.
+ *
+ * @private
+ * @param {Object} object The object to query.
+ * @param {string} key The key of the method to get.
+ * @returns {*} Returns the function if it's native, else `undefined`.
+ */
+function getNative(object, key) {
+  var value = getValue(object, key);
+  return baseIsNative(value) ? value : undefined;
+}
+
+/**
+ * Creates an array of the own enumerable symbol properties of `object`.
+ *
+ * @private
+ * @param {Object} object The object to query.
+ * @returns {Array} Returns the array of symbols.
+ */
+var getSymbols = nativeGetSymbols ? overArg(nativeGetSymbols, Object) : stubArray;
+
+/**
+ * Gets the `toStringTag` of `value`.
+ *
+ * @private
+ * @param {*} value The value to query.
+ * @returns {string} Returns the `toStringTag`.
+ */
+var getTag = baseGetTag;
+
+// Fallback for data views, maps, sets, and weak maps in IE 11,
+// for data views in Edge < 14, and promises in Node.js.
+if ((DataView && getTag(new DataView(new ArrayBuffer(1))) != dataViewTag) ||
+    (Map && getTag(new Map) != mapTag) ||
+    (Promise && getTag(Promise.resolve()) != promiseTag) ||
+    (Set && getTag(new Set) != setTag) ||
+    (WeakMap && getTag(new WeakMap) != weakMapTag)) {
+  getTag = function(value) {
+    var result = objectToString.call(value),
+        Ctor = result == objectTag ? value.constructor : undefined,
+        ctorString = Ctor ? toSource(Ctor) : undefined;
+
+    if (ctorString) {
+      switch (ctorString) {
+        case dataViewCtorString: return dataViewTag;
+        case mapCtorString: return mapTag;
+        case promiseCtorString: return promiseTag;
+        case setCtorString: return setTag;
+        case weakMapCtorString: return weakMapTag;
+      }
+    }
+    return result;
+  };
+}
+
+/**
+ * Initializes an array clone.
+ *
+ * @private
+ * @param {Array} array The array to clone.
+ * @returns {Array} Returns the initialized clone.
+ */
+function initCloneArray(array) {
+  var length = array.length,
+      result = array.constructor(length);
+
+  // Add properties assigned by `RegExp#exec`.
+  if (length && typeof array[0] == 'string' && hasOwnProperty.call(array, 'index')) {
+    result.index = array.index;
+    result.input = array.input;
+  }
+  return result;
+}
+
+/**
+ * Initializes an object clone.
+ *
+ * @private
+ * @param {Object} object The object to clone.
+ * @returns {Object} Returns the initialized clone.
+ */
+function initCloneObject(object) {
+  return (typeof object.constructor == 'function' && !isPrototype(object))
+    ? baseCreate(getPrototype(object))
+    : {};
+}
+
+/**
+ * Initializes an object clone based on its `toStringTag`.
+ *
+ * **Note:** This function only supports cloning values with tags of
+ * `Boolean`, `Date`, `Error`, `Number`, `RegExp`, or `String`.
+ *
+ * @private
+ * @param {Object} object The object to clone.
+ * @param {string} tag The `toStringTag` of the object to clone.
+ * @param {Function} cloneFunc The function to clone values.
+ * @param {boolean} [isDeep] Specify a deep clone.
+ * @returns {Object} Returns the initialized clone.
+ */
+function initCloneByTag(object, tag, cloneFunc, isDeep) {
+  var Ctor = object.constructor;
+  switch (tag) {
+    case arrayBufferTag:
+      return cloneArrayBuffer(object);
+
+    case boolTag:
+    case dateTag:
+      return new Ctor(+object);
+
+    case dataViewTag:
+      return cloneDataView(object, isDeep);
+
+    case float32Tag: case float64Tag:
+    case int8Tag: case int16Tag: case int32Tag:
+    case uint8Tag: case uint8ClampedTag: case uint16Tag: case uint32Tag:
+      return cloneTypedArray(object, isDeep);
+
+    case mapTag:
+      return cloneMap(object, isDeep, cloneFunc);
+
+    case numberTag:
+    case stringTag:
+      return new Ctor(object);
+
+    case regexpTag:
+      return cloneRegExp(object);
+
+    case setTag:
+      return cloneSet(object, isDeep, cloneFunc);
+
+    case symbolTag:
+      return cloneSymbol(object);
+  }
+}
+
+/**
+ * Checks if `value` is a valid array-like index.
+ *
+ * @private
+ * @param {*} value The value to check.
+ * @param {number} [length=MAX_SAFE_INTEGER] The upper bounds of a valid index.
+ * @returns {boolean} Returns `true` if `value` is a valid index, else `false`.
+ */
+function isIndex(value, length) {
+  length = length == null ? MAX_SAFE_INTEGER : length;
+  return !!length &&
+    (typeof value == 'number' || reIsUint.test(value)) &&
+    (value > -1 && value % 1 == 0 && value < length);
+}
+
+/**
+ * Checks if `value` is suitable for use as unique object key.
+ *
+ * @private
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is suitable, else `false`.
+ */
+function isKeyable(value) {
+  var type = typeof value;
+  return (type == 'string' || type == 'number' || type == 'symbol' || type == 'boolean')
+    ? (value !== '__proto__')
+    : (value === null);
+}
+
+/**
+ * Checks if `func` has its source masked.
+ *
+ * @private
+ * @param {Function} func The function to check.
+ * @returns {boolean} Returns `true` if `func` is masked, else `false`.
+ */
+function isMasked(func) {
+  return !!maskSrcKey && (maskSrcKey in func);
+}
+
+/**
+ * Checks if `value` is likely a prototype object.
+ *
+ * @private
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is a prototype, else `false`.
+ */
+function isPrototype(value) {
+  var Ctor = value && value.constructor,
+      proto = (typeof Ctor == 'function' && Ctor.prototype) || objectProto;
+
+  return value === proto;
+}
+
+/**
+ * Converts `func` to its source code.
+ *
+ * @private
+ * @param {Function} func The function to process.
+ * @returns {string} Returns the source code.
+ */
+function toSource(func) {
+  if (func != null) {
+    try {
+      return funcToString.call(func);
+    } catch (e) {}
+    try {
+      return (func + '');
+    } catch (e) {}
+  }
+  return '';
+}
+
+/**
+ * This method is like `_.clone` except that it recursively clones `value`.
+ *
+ * @static
+ * @memberOf _
+ * @since 1.0.0
+ * @category Lang
+ * @param {*} value The value to recursively clone.
+ * @returns {*} Returns the deep cloned value.
+ * @see _.clone
+ * @example
+ *
+ * var objects = [{ 'a': 1 }, { 'b': 2 }];
+ *
+ * var deep = _.cloneDeep(objects);
+ * console.log(deep[0] === objects[0]);
+ * // => false
+ */
+function cloneDeep(value) {
+  return baseClone(value, true, true);
+}
+
+/**
+ * Performs a
+ * [`SameValueZero`](http://ecma-international.org/ecma-262/7.0/#sec-samevaluezero)
+ * comparison between two values to determine if they are equivalent.
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to compare.
+ * @param {*} other The other value to compare.
+ * @returns {boolean} Returns `true` if the values are equivalent, else `false`.
+ * @example
+ *
+ * var object = { 'a': 1 };
+ * var other = { 'a': 1 };
+ *
+ * _.eq(object, object);
+ * // => true
+ *
+ * _.eq(object, other);
+ * // => false
+ *
+ * _.eq('a', 'a');
+ * // => true
+ *
+ * _.eq('a', Object('a'));
+ * // => false
+ *
+ * _.eq(NaN, NaN);
+ * // => true
+ */
+function eq(value, other) {
+  return value === other || (value !== value && other !== other);
+}
+
+/**
+ * Checks if `value` is likely an `arguments` object.
+ *
+ * @static
+ * @memberOf _
+ * @since 0.1.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is an `arguments` object,
+ *  else `false`.
+ * @example
+ *
+ * _.isArguments(function() { return arguments; }());
+ * // => true
+ *
+ * _.isArguments([1, 2, 3]);
+ * // => false
+ */
+function isArguments(value) {
+  // Safari 8.1 makes `arguments.callee` enumerable in strict mode.
+  return isArrayLikeObject(value) && hasOwnProperty.call(value, 'callee') &&
+    (!propertyIsEnumerable.call(value, 'callee') || objectToString.call(value) == argsTag);
+}
+
+/**
+ * Checks if `value` is classified as an `Array` object.
+ *
+ * @static
+ * @memberOf _
+ * @since 0.1.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is an array, else `false`.
+ * @example
+ *
+ * _.isArray([1, 2, 3]);
+ * // => true
+ *
+ * _.isArray(document.body.children);
+ * // => false
+ *
+ * _.isArray('abc');
+ * // => false
+ *
+ * _.isArray(_.noop);
+ * // => false
+ */
+var isArray = Array.isArray;
+
+/**
+ * Checks if `value` is array-like. A value is considered array-like if it's
+ * not a function and has a `value.length` that's an integer greater than or
+ * equal to `0` and less than or equal to `Number.MAX_SAFE_INTEGER`.
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is array-like, else `false`.
+ * @example
+ *
+ * _.isArrayLike([1, 2, 3]);
+ * // => true
+ *
+ * _.isArrayLike(document.body.children);
+ * // => true
+ *
+ * _.isArrayLike('abc');
+ * // => true
+ *
+ * _.isArrayLike(_.noop);
+ * // => false
+ */
+function isArrayLike(value) {
+  return value != null && isLength(value.length) && !isFunction(value);
+}
+
+/**
+ * This method is like `_.isArrayLike` except that it also checks if `value`
+ * is an object.
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is an array-like object,
+ *  else `false`.
+ * @example
+ *
+ * _.isArrayLikeObject([1, 2, 3]);
+ * // => true
+ *
+ * _.isArrayLikeObject(document.body.children);
+ * // => true
+ *
+ * _.isArrayLikeObject('abc');
+ * // => false
+ *
+ * _.isArrayLikeObject(_.noop);
+ * // => false
+ */
+function isArrayLikeObject(value) {
+  return isObjectLike(value) && isArrayLike(value);
+}
+
+/**
+ * Checks if `value` is a buffer.
+ *
+ * @static
+ * @memberOf _
+ * @since 4.3.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is a buffer, else `false`.
+ * @example
+ *
+ * _.isBuffer(new Buffer(2));
+ * // => true
+ *
+ * _.isBuffer(new Uint8Array(2));
+ * // => false
+ */
+var isBuffer = nativeIsBuffer || stubFalse;
+
+/**
+ * Checks if `value` is classified as a `Function` object.
+ *
+ * @static
+ * @memberOf _
+ * @since 0.1.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is a function, else `false`.
+ * @example
+ *
+ * _.isFunction(_);
+ * // => true
+ *
+ * _.isFunction(/abc/);
+ * // => false
+ */
+function isFunction(value) {
+  // The use of `Object#toString` avoids issues with the `typeof` operator
+  // in Safari 8-9 which returns 'object' for typed array and other constructors.
+  var tag = isObject(value) ? objectToString.call(value) : '';
+  return tag == funcTag || tag == genTag;
+}
+
+/**
+ * Checks if `value` is a valid array-like length.
+ *
+ * **Note:** This method is loosely based on
+ * [`ToLength`](http://ecma-international.org/ecma-262/7.0/#sec-tolength).
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is a valid length, else `false`.
+ * @example
+ *
+ * _.isLength(3);
+ * // => true
+ *
+ * _.isLength(Number.MIN_VALUE);
+ * // => false
+ *
+ * _.isLength(Infinity);
+ * // => false
+ *
+ * _.isLength('3');
+ * // => false
+ */
+function isLength(value) {
+  return typeof value == 'number' &&
+    value > -1 && value % 1 == 0 && value <= MAX_SAFE_INTEGER;
+}
+
+/**
+ * Checks if `value` is the
+ * [language type](http://www.ecma-international.org/ecma-262/7.0/#sec-ecmascript-language-types)
+ * of `Object`. (e.g. arrays, functions, objects, regexes, `new Number(0)`, and `new String('')`)
+ *
+ * @static
+ * @memberOf _
+ * @since 0.1.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is an object, else `false`.
+ * @example
+ *
+ * _.isObject({});
+ * // => true
+ *
+ * _.isObject([1, 2, 3]);
+ * // => true
+ *
+ * _.isObject(_.noop);
+ * // => true
+ *
+ * _.isObject(null);
+ * // => false
+ */
+function isObject(value) {
+  var type = typeof value;
+  return !!value && (type == 'object' || type == 'function');
+}
+
+/**
+ * Checks if `value` is object-like. A value is object-like if it's not `null`
+ * and has a `typeof` result of "object".
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is object-like, else `false`.
+ * @example
+ *
+ * _.isObjectLike({});
+ * // => true
+ *
+ * _.isObjectLike([1, 2, 3]);
+ * // => true
+ *
+ * _.isObjectLike(_.noop);
+ * // => false
+ *
+ * _.isObjectLike(null);
+ * // => false
+ */
+function isObjectLike(value) {
+  return !!value && typeof value == 'object';
+}
+
+/**
+ * Creates an array of the own enumerable property names of `object`.
+ *
+ * **Note:** Non-object values are coerced to objects. See the
+ * [ES spec](http://ecma-international.org/ecma-262/7.0/#sec-object.keys)
+ * for more details.
+ *
+ * @static
+ * @since 0.1.0
+ * @memberOf _
+ * @category Object
+ * @param {Object} object The object to query.
+ * @returns {Array} Returns the array of property names.
+ * @example
+ *
+ * function Foo() {
+ *   this.a = 1;
+ *   this.b = 2;
+ * }
+ *
+ * Foo.prototype.c = 3;
+ *
+ * _.keys(new Foo);
+ * // => ['a', 'b'] (iteration order is not guaranteed)
+ *
+ * _.keys('hi');
+ * // => ['0', '1']
+ */
+function keys(object) {
+  return isArrayLike(object) ? arrayLikeKeys(object) : baseKeys(object);
+}
+
+/**
+ * This method returns a new empty array.
+ *
+ * @static
+ * @memberOf _
+ * @since 4.13.0
+ * @category Util
+ * @returns {Array} Returns the new empty array.
+ * @example
+ *
+ * var arrays = _.times(2, _.stubArray);
+ *
+ * console.log(arrays);
+ * // => [[], []]
+ *
+ * console.log(arrays[0] === arrays[1]);
+ * // => false
+ */
+function stubArray() {
+  return [];
+}
+
+/**
+ * This method returns `false`.
+ *
+ * @static
+ * @memberOf _
+ * @since 4.13.0
+ * @category Util
+ * @returns {boolean} Returns `false`.
+ * @example
+ *
+ * _.times(2, _.stubFalse);
+ * // => [false, false]
+ */
+function stubFalse() {
+  return false;
+}
+
+module.exports = cloneDeep;
+
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{}],485:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -64516,7 +67372,7 @@ function toNumber(value) {
 module.exports = debounce;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],480:[function(require,module,exports){
+},{}],486:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -66886,7 +69742,7 @@ function property(path) {
 module.exports = filter;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],481:[function(require,module,exports){
+},{}],487:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -69343,7 +72199,7 @@ function property(path) {
 module.exports = find;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],482:[function(require,module,exports){
+},{}],488:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -71805,7 +74661,7 @@ function property(path) {
 module.exports = flatMap;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],483:[function(require,module,exports){
+},{}],489:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -72740,7 +75596,7 @@ function get(object, path, defaultValue) {
 module.exports = get;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],484:[function(require,module,exports){
+},{}],490:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -75113,7 +77969,7 @@ function property(path) {
 module.exports = groupBy;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],485:[function(require,module,exports){
+},{}],491:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -76206,7 +79062,7 @@ function has(object, path) {
 module.exports = has;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],486:[function(require,module,exports){
+},{}],492:[function(require,module,exports){
 /**
  * lodash (Custom Build) <https://lodash.com/>
  * Build: `lodash modularize exports="npm" -o ./`
@@ -76953,7 +79809,7 @@ function values(object) {
 
 module.exports = includes;
 
-},{}],487:[function(require,module,exports){
+},{}],493:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -78612,7 +81468,7 @@ function keys(object) {
 module.exports = isEqualWith;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],488:[function(require,module,exports){
+},{}],494:[function(require,module,exports){
 /**
  * lodash 3.0.8 (Custom Build) <https://lodash.com/>
  * Build: `lodash modularize exports="npm" -o ./`
@@ -78689,7 +81545,7 @@ function isObject(value) {
 
 module.exports = isFunction;
 
-},{}],489:[function(require,module,exports){
+},{}],495:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -81059,7 +83915,7 @@ function property(path) {
 module.exports = map;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],490:[function(require,module,exports){
+},{}],496:[function(require,module,exports){
 /**
  * lodash (Custom Build) <https://lodash.com/>
  * Build: `lodash modularize exports="npm" -o ./`
@@ -81276,7 +84132,1406 @@ function pullAllWith(array, values, comparator) {
 
 module.exports = pullAllWith;
 
-},{}],491:[function(require,module,exports){
+},{}],497:[function(require,module,exports){
+(function (global){
+/**
+ * lodash (Custom Build) <https://lodash.com/>
+ * Build: `lodash modularize exports="npm" -o ./`
+ * Copyright jQuery Foundation and other contributors <https://jquery.org/>
+ * Released under MIT license <https://lodash.com/license>
+ * Based on Underscore.js 1.8.3 <http://underscorejs.org/LICENSE>
+ * Copyright Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ */
+
+/** Used as the `TypeError` message for "Functions" methods. */
+var FUNC_ERROR_TEXT = 'Expected a function';
+
+/** Used to stand-in for `undefined` hash values. */
+var HASH_UNDEFINED = '__lodash_hash_undefined__';
+
+/** Used as references for various `Number` constants. */
+var INFINITY = 1 / 0,
+    MAX_SAFE_INTEGER = 9007199254740991;
+
+/** `Object#toString` result references. */
+var argsTag = '[object Arguments]',
+    funcTag = '[object Function]',
+    genTag = '[object GeneratorFunction]',
+    symbolTag = '[object Symbol]';
+
+/** Used to match property names within property paths. */
+var reIsDeepProp = /\.|\[(?:[^[\]]*|(["'])(?:(?!\1)[^\\]|\\.)*?\1)\]/,
+    reIsPlainProp = /^\w*$/,
+    reLeadingDot = /^\./,
+    rePropName = /[^.[\]]+|\[(?:(-?\d+(?:\.\d+)?)|(["'])((?:(?!\2)[^\\]|\\.)*?)\2)\]|(?=(?:\.|\[\])(?:\.|\[\]|$))/g;
+
+/**
+ * Used to match `RegExp`
+ * [syntax characters](http://ecma-international.org/ecma-262/7.0/#sec-patterns).
+ */
+var reRegExpChar = /[\\^$.*+?()[\]{}|]/g;
+
+/** Used to match backslashes in property paths. */
+var reEscapeChar = /\\(\\)?/g;
+
+/** Used to detect host constructors (Safari). */
+var reIsHostCtor = /^\[object .+?Constructor\]$/;
+
+/** Used to detect unsigned integer values. */
+var reIsUint = /^(?:0|[1-9]\d*)$/;
+
+/** Detect free variable `global` from Node.js. */
+var freeGlobal = typeof global == 'object' && global && global.Object === Object && global;
+
+/** Detect free variable `self`. */
+var freeSelf = typeof self == 'object' && self && self.Object === Object && self;
+
+/** Used as a reference to the global object. */
+var root = freeGlobal || freeSelf || Function('return this')();
+
+/**
+ * A faster alternative to `Function#apply`, this function invokes `func`
+ * with the `this` binding of `thisArg` and the arguments of `args`.
+ *
+ * @private
+ * @param {Function} func The function to invoke.
+ * @param {*} thisArg The `this` binding of `func`.
+ * @param {Array} args The arguments to invoke `func` with.
+ * @returns {*} Returns the result of `func`.
+ */
+function apply(func, thisArg, args) {
+  switch (args.length) {
+    case 0: return func.call(thisArg);
+    case 1: return func.call(thisArg, args[0]);
+    case 2: return func.call(thisArg, args[0], args[1]);
+    case 3: return func.call(thisArg, args[0], args[1], args[2]);
+  }
+  return func.apply(thisArg, args);
+}
+
+/**
+ * A specialized version of `_.map` for arrays without support for iteratee
+ * shorthands.
+ *
+ * @private
+ * @param {Array} [array] The array to iterate over.
+ * @param {Function} iteratee The function invoked per iteration.
+ * @returns {Array} Returns the new mapped array.
+ */
+function arrayMap(array, iteratee) {
+  var index = -1,
+      length = array ? array.length : 0,
+      result = Array(length);
+
+  while (++index < length) {
+    result[index] = iteratee(array[index], index, array);
+  }
+  return result;
+}
+
+/**
+ * Appends the elements of `values` to `array`.
+ *
+ * @private
+ * @param {Array} array The array to modify.
+ * @param {Array} values The values to append.
+ * @returns {Array} Returns `array`.
+ */
+function arrayPush(array, values) {
+  var index = -1,
+      length = values.length,
+      offset = array.length;
+
+  while (++index < length) {
+    array[offset + index] = values[index];
+  }
+  return array;
+}
+
+/**
+ * Gets the value at `key` of `object`.
+ *
+ * @private
+ * @param {Object} [object] The object to query.
+ * @param {string} key The key of the property to get.
+ * @returns {*} Returns the property value.
+ */
+function getValue(object, key) {
+  return object == null ? undefined : object[key];
+}
+
+/**
+ * Checks if `value` is a host object in IE < 9.
+ *
+ * @private
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is a host object, else `false`.
+ */
+function isHostObject(value) {
+  // Many host objects are `Object` objects that can coerce to strings
+  // despite having improperly defined `toString` methods.
+  var result = false;
+  if (value != null && typeof value.toString != 'function') {
+    try {
+      result = !!(value + '');
+    } catch (e) {}
+  }
+  return result;
+}
+
+/** Used for built-in method references. */
+var arrayProto = Array.prototype,
+    funcProto = Function.prototype,
+    objectProto = Object.prototype;
+
+/** Used to detect overreaching core-js shims. */
+var coreJsData = root['__core-js_shared__'];
+
+/** Used to detect methods masquerading as native. */
+var maskSrcKey = (function() {
+  var uid = /[^.]+$/.exec(coreJsData && coreJsData.keys && coreJsData.keys.IE_PROTO || '');
+  return uid ? ('Symbol(src)_1.' + uid) : '';
+}());
+
+/** Used to resolve the decompiled source of functions. */
+var funcToString = funcProto.toString;
+
+/** Used to check objects for own properties. */
+var hasOwnProperty = objectProto.hasOwnProperty;
+
+/**
+ * Used to resolve the
+ * [`toStringTag`](http://ecma-international.org/ecma-262/7.0/#sec-object.prototype.tostring)
+ * of values.
+ */
+var objectToString = objectProto.toString;
+
+/** Used to detect if a method is native. */
+var reIsNative = RegExp('^' +
+  funcToString.call(hasOwnProperty).replace(reRegExpChar, '\\$&')
+  .replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, '$1.*?') + '$'
+);
+
+/** Built-in value references. */
+var Symbol = root.Symbol,
+    propertyIsEnumerable = objectProto.propertyIsEnumerable,
+    splice = arrayProto.splice,
+    spreadableSymbol = Symbol ? Symbol.isConcatSpreadable : undefined;
+
+/* Built-in method references for those with the same name as other `lodash` methods. */
+var nativeMax = Math.max;
+
+/* Built-in method references that are verified to be native. */
+var Map = getNative(root, 'Map'),
+    nativeCreate = getNative(Object, 'create');
+
+/** Used to convert symbols to primitives and strings. */
+var symbolProto = Symbol ? Symbol.prototype : undefined,
+    symbolToString = symbolProto ? symbolProto.toString : undefined;
+
+/**
+ * Creates a hash object.
+ *
+ * @private
+ * @constructor
+ * @param {Array} [entries] The key-value pairs to cache.
+ */
+function Hash(entries) {
+  var index = -1,
+      length = entries ? entries.length : 0;
+
+  this.clear();
+  while (++index < length) {
+    var entry = entries[index];
+    this.set(entry[0], entry[1]);
+  }
+}
+
+/**
+ * Removes all key-value entries from the hash.
+ *
+ * @private
+ * @name clear
+ * @memberOf Hash
+ */
+function hashClear() {
+  this.__data__ = nativeCreate ? nativeCreate(null) : {};
+}
+
+/**
+ * Removes `key` and its value from the hash.
+ *
+ * @private
+ * @name delete
+ * @memberOf Hash
+ * @param {Object} hash The hash to modify.
+ * @param {string} key The key of the value to remove.
+ * @returns {boolean} Returns `true` if the entry was removed, else `false`.
+ */
+function hashDelete(key) {
+  return this.has(key) && delete this.__data__[key];
+}
+
+/**
+ * Gets the hash value for `key`.
+ *
+ * @private
+ * @name get
+ * @memberOf Hash
+ * @param {string} key The key of the value to get.
+ * @returns {*} Returns the entry value.
+ */
+function hashGet(key) {
+  var data = this.__data__;
+  if (nativeCreate) {
+    var result = data[key];
+    return result === HASH_UNDEFINED ? undefined : result;
+  }
+  return hasOwnProperty.call(data, key) ? data[key] : undefined;
+}
+
+/**
+ * Checks if a hash value for `key` exists.
+ *
+ * @private
+ * @name has
+ * @memberOf Hash
+ * @param {string} key The key of the entry to check.
+ * @returns {boolean} Returns `true` if an entry for `key` exists, else `false`.
+ */
+function hashHas(key) {
+  var data = this.__data__;
+  return nativeCreate ? data[key] !== undefined : hasOwnProperty.call(data, key);
+}
+
+/**
+ * Sets the hash `key` to `value`.
+ *
+ * @private
+ * @name set
+ * @memberOf Hash
+ * @param {string} key The key of the value to set.
+ * @param {*} value The value to set.
+ * @returns {Object} Returns the hash instance.
+ */
+function hashSet(key, value) {
+  var data = this.__data__;
+  data[key] = (nativeCreate && value === undefined) ? HASH_UNDEFINED : value;
+  return this;
+}
+
+// Add methods to `Hash`.
+Hash.prototype.clear = hashClear;
+Hash.prototype['delete'] = hashDelete;
+Hash.prototype.get = hashGet;
+Hash.prototype.has = hashHas;
+Hash.prototype.set = hashSet;
+
+/**
+ * Creates an list cache object.
+ *
+ * @private
+ * @constructor
+ * @param {Array} [entries] The key-value pairs to cache.
+ */
+function ListCache(entries) {
+  var index = -1,
+      length = entries ? entries.length : 0;
+
+  this.clear();
+  while (++index < length) {
+    var entry = entries[index];
+    this.set(entry[0], entry[1]);
+  }
+}
+
+/**
+ * Removes all key-value entries from the list cache.
+ *
+ * @private
+ * @name clear
+ * @memberOf ListCache
+ */
+function listCacheClear() {
+  this.__data__ = [];
+}
+
+/**
+ * Removes `key` and its value from the list cache.
+ *
+ * @private
+ * @name delete
+ * @memberOf ListCache
+ * @param {string} key The key of the value to remove.
+ * @returns {boolean} Returns `true` if the entry was removed, else `false`.
+ */
+function listCacheDelete(key) {
+  var data = this.__data__,
+      index = assocIndexOf(data, key);
+
+  if (index < 0) {
+    return false;
+  }
+  var lastIndex = data.length - 1;
+  if (index == lastIndex) {
+    data.pop();
+  } else {
+    splice.call(data, index, 1);
+  }
+  return true;
+}
+
+/**
+ * Gets the list cache value for `key`.
+ *
+ * @private
+ * @name get
+ * @memberOf ListCache
+ * @param {string} key The key of the value to get.
+ * @returns {*} Returns the entry value.
+ */
+function listCacheGet(key) {
+  var data = this.__data__,
+      index = assocIndexOf(data, key);
+
+  return index < 0 ? undefined : data[index][1];
+}
+
+/**
+ * Checks if a list cache value for `key` exists.
+ *
+ * @private
+ * @name has
+ * @memberOf ListCache
+ * @param {string} key The key of the entry to check.
+ * @returns {boolean} Returns `true` if an entry for `key` exists, else `false`.
+ */
+function listCacheHas(key) {
+  return assocIndexOf(this.__data__, key) > -1;
+}
+
+/**
+ * Sets the list cache `key` to `value`.
+ *
+ * @private
+ * @name set
+ * @memberOf ListCache
+ * @param {string} key The key of the value to set.
+ * @param {*} value The value to set.
+ * @returns {Object} Returns the list cache instance.
+ */
+function listCacheSet(key, value) {
+  var data = this.__data__,
+      index = assocIndexOf(data, key);
+
+  if (index < 0) {
+    data.push([key, value]);
+  } else {
+    data[index][1] = value;
+  }
+  return this;
+}
+
+// Add methods to `ListCache`.
+ListCache.prototype.clear = listCacheClear;
+ListCache.prototype['delete'] = listCacheDelete;
+ListCache.prototype.get = listCacheGet;
+ListCache.prototype.has = listCacheHas;
+ListCache.prototype.set = listCacheSet;
+
+/**
+ * Creates a map cache object to store key-value pairs.
+ *
+ * @private
+ * @constructor
+ * @param {Array} [entries] The key-value pairs to cache.
+ */
+function MapCache(entries) {
+  var index = -1,
+      length = entries ? entries.length : 0;
+
+  this.clear();
+  while (++index < length) {
+    var entry = entries[index];
+    this.set(entry[0], entry[1]);
+  }
+}
+
+/**
+ * Removes all key-value entries from the map.
+ *
+ * @private
+ * @name clear
+ * @memberOf MapCache
+ */
+function mapCacheClear() {
+  this.__data__ = {
+    'hash': new Hash,
+    'map': new (Map || ListCache),
+    'string': new Hash
+  };
+}
+
+/**
+ * Removes `key` and its value from the map.
+ *
+ * @private
+ * @name delete
+ * @memberOf MapCache
+ * @param {string} key The key of the value to remove.
+ * @returns {boolean} Returns `true` if the entry was removed, else `false`.
+ */
+function mapCacheDelete(key) {
+  return getMapData(this, key)['delete'](key);
+}
+
+/**
+ * Gets the map value for `key`.
+ *
+ * @private
+ * @name get
+ * @memberOf MapCache
+ * @param {string} key The key of the value to get.
+ * @returns {*} Returns the entry value.
+ */
+function mapCacheGet(key) {
+  return getMapData(this, key).get(key);
+}
+
+/**
+ * Checks if a map value for `key` exists.
+ *
+ * @private
+ * @name has
+ * @memberOf MapCache
+ * @param {string} key The key of the entry to check.
+ * @returns {boolean} Returns `true` if an entry for `key` exists, else `false`.
+ */
+function mapCacheHas(key) {
+  return getMapData(this, key).has(key);
+}
+
+/**
+ * Sets the map `key` to `value`.
+ *
+ * @private
+ * @name set
+ * @memberOf MapCache
+ * @param {string} key The key of the value to set.
+ * @param {*} value The value to set.
+ * @returns {Object} Returns the map cache instance.
+ */
+function mapCacheSet(key, value) {
+  getMapData(this, key).set(key, value);
+  return this;
+}
+
+// Add methods to `MapCache`.
+MapCache.prototype.clear = mapCacheClear;
+MapCache.prototype['delete'] = mapCacheDelete;
+MapCache.prototype.get = mapCacheGet;
+MapCache.prototype.has = mapCacheHas;
+MapCache.prototype.set = mapCacheSet;
+
+/**
+ * Gets the index at which the `key` is found in `array` of key-value pairs.
+ *
+ * @private
+ * @param {Array} array The array to inspect.
+ * @param {*} key The key to search for.
+ * @returns {number} Returns the index of the matched value, else `-1`.
+ */
+function assocIndexOf(array, key) {
+  var length = array.length;
+  while (length--) {
+    if (eq(array[length][0], key)) {
+      return length;
+    }
+  }
+  return -1;
+}
+
+/**
+ * The base implementation of `_.at` without support for individual paths.
+ *
+ * @private
+ * @param {Object} object The object to iterate over.
+ * @param {string[]} paths The property paths of elements to pick.
+ * @returns {Array} Returns the picked elements.
+ */
+function baseAt(object, paths) {
+  var index = -1,
+      isNil = object == null,
+      length = paths.length,
+      result = Array(length);
+
+  while (++index < length) {
+    result[index] = isNil ? undefined : get(object, paths[index]);
+  }
+  return result;
+}
+
+/**
+ * The base implementation of `_.flatten` with support for restricting flattening.
+ *
+ * @private
+ * @param {Array} array The array to flatten.
+ * @param {number} depth The maximum recursion depth.
+ * @param {boolean} [predicate=isFlattenable] The function invoked per iteration.
+ * @param {boolean} [isStrict] Restrict to values that pass `predicate` checks.
+ * @param {Array} [result=[]] The initial result value.
+ * @returns {Array} Returns the new flattened array.
+ */
+function baseFlatten(array, depth, predicate, isStrict, result) {
+  var index = -1,
+      length = array.length;
+
+  predicate || (predicate = isFlattenable);
+  result || (result = []);
+
+  while (++index < length) {
+    var value = array[index];
+    if (depth > 0 && predicate(value)) {
+      if (depth > 1) {
+        // Recursively flatten arrays (susceptible to call stack limits).
+        baseFlatten(value, depth - 1, predicate, isStrict, result);
+      } else {
+        arrayPush(result, value);
+      }
+    } else if (!isStrict) {
+      result[result.length] = value;
+    }
+  }
+  return result;
+}
+
+/**
+ * The base implementation of `_.get` without support for default values.
+ *
+ * @private
+ * @param {Object} object The object to query.
+ * @param {Array|string} path The path of the property to get.
+ * @returns {*} Returns the resolved value.
+ */
+function baseGet(object, path) {
+  path = isKey(path, object) ? [path] : castPath(path);
+
+  var index = 0,
+      length = path.length;
+
+  while (object != null && index < length) {
+    object = object[toKey(path[index++])];
+  }
+  return (index && index == length) ? object : undefined;
+}
+
+/**
+ * The base implementation of `_.isNative` without bad shim checks.
+ *
+ * @private
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is a native function,
+ *  else `false`.
+ */
+function baseIsNative(value) {
+  if (!isObject(value) || isMasked(value)) {
+    return false;
+  }
+  var pattern = (isFunction(value) || isHostObject(value)) ? reIsNative : reIsHostCtor;
+  return pattern.test(toSource(value));
+}
+
+/**
+ * The base implementation of `_.pullAt` without support for individual
+ * indexes or capturing the removed elements.
+ *
+ * @private
+ * @param {Array} array The array to modify.
+ * @param {number[]} indexes The indexes of elements to remove.
+ * @returns {Array} Returns `array`.
+ */
+function basePullAt(array, indexes) {
+  var length = array ? indexes.length : 0,
+      lastIndex = length - 1;
+
+  while (length--) {
+    var index = indexes[length];
+    if (length == lastIndex || index !== previous) {
+      var previous = index;
+      if (isIndex(index)) {
+        splice.call(array, index, 1);
+      }
+      else if (!isKey(index, array)) {
+        var path = castPath(index),
+            object = parent(array, path);
+
+        if (object != null) {
+          delete object[toKey(last(path))];
+        }
+      }
+      else {
+        delete array[toKey(index)];
+      }
+    }
+  }
+  return array;
+}
+
+/**
+ * The base implementation of `_.rest` which doesn't validate or coerce arguments.
+ *
+ * @private
+ * @param {Function} func The function to apply a rest parameter to.
+ * @param {number} [start=func.length-1] The start position of the rest parameter.
+ * @returns {Function} Returns the new function.
+ */
+function baseRest(func, start) {
+  start = nativeMax(start === undefined ? (func.length - 1) : start, 0);
+  return function() {
+    var args = arguments,
+        index = -1,
+        length = nativeMax(args.length - start, 0),
+        array = Array(length);
+
+    while (++index < length) {
+      array[index] = args[start + index];
+    }
+    index = -1;
+    var otherArgs = Array(start + 1);
+    while (++index < start) {
+      otherArgs[index] = args[index];
+    }
+    otherArgs[start] = array;
+    return apply(func, this, otherArgs);
+  };
+}
+
+/**
+ * The base implementation of `_.slice` without an iteratee call guard.
+ *
+ * @private
+ * @param {Array} array The array to slice.
+ * @param {number} [start=0] The start position.
+ * @param {number} [end=array.length] The end position.
+ * @returns {Array} Returns the slice of `array`.
+ */
+function baseSlice(array, start, end) {
+  var index = -1,
+      length = array.length;
+
+  if (start < 0) {
+    start = -start > length ? 0 : (length + start);
+  }
+  end = end > length ? length : end;
+  if (end < 0) {
+    end += length;
+  }
+  length = start > end ? 0 : ((end - start) >>> 0);
+  start >>>= 0;
+
+  var result = Array(length);
+  while (++index < length) {
+    result[index] = array[index + start];
+  }
+  return result;
+}
+
+/**
+ * The base implementation of `_.toString` which doesn't convert nullish
+ * values to empty strings.
+ *
+ * @private
+ * @param {*} value The value to process.
+ * @returns {string} Returns the string.
+ */
+function baseToString(value) {
+  // Exit early for strings to avoid a performance hit in some environments.
+  if (typeof value == 'string') {
+    return value;
+  }
+  if (isSymbol(value)) {
+    return symbolToString ? symbolToString.call(value) : '';
+  }
+  var result = (value + '');
+  return (result == '0' && (1 / value) == -INFINITY) ? '-0' : result;
+}
+
+/**
+ * Casts `value` to a path array if it's not one.
+ *
+ * @private
+ * @param {*} value The value to inspect.
+ * @returns {Array} Returns the cast property path array.
+ */
+function castPath(value) {
+  return isArray(value) ? value : stringToPath(value);
+}
+
+/**
+ * Compares values to sort them in ascending order.
+ *
+ * @private
+ * @param {*} value The value to compare.
+ * @param {*} other The other value to compare.
+ * @returns {number} Returns the sort order indicator for `value`.
+ */
+function compareAscending(value, other) {
+  if (value !== other) {
+    var valIsDefined = value !== undefined,
+        valIsNull = value === null,
+        valIsReflexive = value === value,
+        valIsSymbol = isSymbol(value);
+
+    var othIsDefined = other !== undefined,
+        othIsNull = other === null,
+        othIsReflexive = other === other,
+        othIsSymbol = isSymbol(other);
+
+    if ((!othIsNull && !othIsSymbol && !valIsSymbol && value > other) ||
+        (valIsSymbol && othIsDefined && othIsReflexive && !othIsNull && !othIsSymbol) ||
+        (valIsNull && othIsDefined && othIsReflexive) ||
+        (!valIsDefined && othIsReflexive) ||
+        !valIsReflexive) {
+      return 1;
+    }
+    if ((!valIsNull && !valIsSymbol && !othIsSymbol && value < other) ||
+        (othIsSymbol && valIsDefined && valIsReflexive && !valIsNull && !valIsSymbol) ||
+        (othIsNull && valIsDefined && valIsReflexive) ||
+        (!othIsDefined && valIsReflexive) ||
+        !othIsReflexive) {
+      return -1;
+    }
+  }
+  return 0;
+}
+
+/**
+ * Gets the data for `map`.
+ *
+ * @private
+ * @param {Object} map The map to query.
+ * @param {string} key The reference key.
+ * @returns {*} Returns the map data.
+ */
+function getMapData(map, key) {
+  var data = map.__data__;
+  return isKeyable(key)
+    ? data[typeof key == 'string' ? 'string' : 'hash']
+    : data.map;
+}
+
+/**
+ * Gets the native function at `key` of `object`.
+ *
+ * @private
+ * @param {Object} object The object to query.
+ * @param {string} key The key of the method to get.
+ * @returns {*} Returns the function if it's native, else `undefined`.
+ */
+function getNative(object, key) {
+  var value = getValue(object, key);
+  return baseIsNative(value) ? value : undefined;
+}
+
+/**
+ * Checks if `value` is a flattenable `arguments` object or array.
+ *
+ * @private
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is flattenable, else `false`.
+ */
+function isFlattenable(value) {
+  return isArray(value) || isArguments(value) ||
+    !!(spreadableSymbol && value && value[spreadableSymbol]);
+}
+
+/**
+ * Checks if `value` is a valid array-like index.
+ *
+ * @private
+ * @param {*} value The value to check.
+ * @param {number} [length=MAX_SAFE_INTEGER] The upper bounds of a valid index.
+ * @returns {boolean} Returns `true` if `value` is a valid index, else `false`.
+ */
+function isIndex(value, length) {
+  length = length == null ? MAX_SAFE_INTEGER : length;
+  return !!length &&
+    (typeof value == 'number' || reIsUint.test(value)) &&
+    (value > -1 && value % 1 == 0 && value < length);
+}
+
+/**
+ * Checks if `value` is a property name and not a property path.
+ *
+ * @private
+ * @param {*} value The value to check.
+ * @param {Object} [object] The object to query keys on.
+ * @returns {boolean} Returns `true` if `value` is a property name, else `false`.
+ */
+function isKey(value, object) {
+  if (isArray(value)) {
+    return false;
+  }
+  var type = typeof value;
+  if (type == 'number' || type == 'symbol' || type == 'boolean' ||
+      value == null || isSymbol(value)) {
+    return true;
+  }
+  return reIsPlainProp.test(value) || !reIsDeepProp.test(value) ||
+    (object != null && value in Object(object));
+}
+
+/**
+ * Checks if `value` is suitable for use as unique object key.
+ *
+ * @private
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is suitable, else `false`.
+ */
+function isKeyable(value) {
+  var type = typeof value;
+  return (type == 'string' || type == 'number' || type == 'symbol' || type == 'boolean')
+    ? (value !== '__proto__')
+    : (value === null);
+}
+
+/**
+ * Checks if `func` has its source masked.
+ *
+ * @private
+ * @param {Function} func The function to check.
+ * @returns {boolean} Returns `true` if `func` is masked, else `false`.
+ */
+function isMasked(func) {
+  return !!maskSrcKey && (maskSrcKey in func);
+}
+
+/**
+ * Gets the parent value at `path` of `object`.
+ *
+ * @private
+ * @param {Object} object The object to query.
+ * @param {Array} path The path to get the parent value of.
+ * @returns {*} Returns the parent value.
+ */
+function parent(object, path) {
+  return path.length == 1 ? object : baseGet(object, baseSlice(path, 0, -1));
+}
+
+/**
+ * Converts `string` to a property path array.
+ *
+ * @private
+ * @param {string} string The string to convert.
+ * @returns {Array} Returns the property path array.
+ */
+var stringToPath = memoize(function(string) {
+  string = toString(string);
+
+  var result = [];
+  if (reLeadingDot.test(string)) {
+    result.push('');
+  }
+  string.replace(rePropName, function(match, number, quote, string) {
+    result.push(quote ? string.replace(reEscapeChar, '$1') : (number || match));
+  });
+  return result;
+});
+
+/**
+ * Converts `value` to a string key if it's not a string or symbol.
+ *
+ * @private
+ * @param {*} value The value to inspect.
+ * @returns {string|symbol} Returns the key.
+ */
+function toKey(value) {
+  if (typeof value == 'string' || isSymbol(value)) {
+    return value;
+  }
+  var result = (value + '');
+  return (result == '0' && (1 / value) == -INFINITY) ? '-0' : result;
+}
+
+/**
+ * Converts `func` to its source code.
+ *
+ * @private
+ * @param {Function} func The function to process.
+ * @returns {string} Returns the source code.
+ */
+function toSource(func) {
+  if (func != null) {
+    try {
+      return funcToString.call(func);
+    } catch (e) {}
+    try {
+      return (func + '');
+    } catch (e) {}
+  }
+  return '';
+}
+
+/**
+ * Gets the last element of `array`.
+ *
+ * @static
+ * @memberOf _
+ * @since 0.1.0
+ * @category Array
+ * @param {Array} array The array to query.
+ * @returns {*} Returns the last element of `array`.
+ * @example
+ *
+ * _.last([1, 2, 3]);
+ * // => 3
+ */
+function last(array) {
+  var length = array ? array.length : 0;
+  return length ? array[length - 1] : undefined;
+}
+
+/**
+ * Removes elements from `array` corresponding to `indexes` and returns an
+ * array of removed elements.
+ *
+ * **Note:** Unlike `_.at`, this method mutates `array`.
+ *
+ * @static
+ * @memberOf _
+ * @since 3.0.0
+ * @category Array
+ * @param {Array} array The array to modify.
+ * @param {...(number|number[])} [indexes] The indexes of elements to remove.
+ * @returns {Array} Returns the new array of removed elements.
+ * @example
+ *
+ * var array = ['a', 'b', 'c', 'd'];
+ * var pulled = _.pullAt(array, [1, 3]);
+ *
+ * console.log(array);
+ * // => ['a', 'c']
+ *
+ * console.log(pulled);
+ * // => ['b', 'd']
+ */
+var pullAt = baseRest(function(array, indexes) {
+  indexes = baseFlatten(indexes, 1);
+
+  var length = array ? array.length : 0,
+      result = baseAt(array, indexes);
+
+  basePullAt(array, arrayMap(indexes, function(index) {
+    return isIndex(index, length) ? +index : index;
+  }).sort(compareAscending));
+
+  return result;
+});
+
+/**
+ * Creates a function that memoizes the result of `func`. If `resolver` is
+ * provided, it determines the cache key for storing the result based on the
+ * arguments provided to the memoized function. By default, the first argument
+ * provided to the memoized function is used as the map cache key. The `func`
+ * is invoked with the `this` binding of the memoized function.
+ *
+ * **Note:** The cache is exposed as the `cache` property on the memoized
+ * function. Its creation may be customized by replacing the `_.memoize.Cache`
+ * constructor with one whose instances implement the
+ * [`Map`](http://ecma-international.org/ecma-262/7.0/#sec-properties-of-the-map-prototype-object)
+ * method interface of `delete`, `get`, `has`, and `set`.
+ *
+ * @static
+ * @memberOf _
+ * @since 0.1.0
+ * @category Function
+ * @param {Function} func The function to have its output memoized.
+ * @param {Function} [resolver] The function to resolve the cache key.
+ * @returns {Function} Returns the new memoized function.
+ * @example
+ *
+ * var object = { 'a': 1, 'b': 2 };
+ * var other = { 'c': 3, 'd': 4 };
+ *
+ * var values = _.memoize(_.values);
+ * values(object);
+ * // => [1, 2]
+ *
+ * values(other);
+ * // => [3, 4]
+ *
+ * object.a = 2;
+ * values(object);
+ * // => [1, 2]
+ *
+ * // Modify the result cache.
+ * values.cache.set(object, ['a', 'b']);
+ * values(object);
+ * // => ['a', 'b']
+ *
+ * // Replace `_.memoize.Cache`.
+ * _.memoize.Cache = WeakMap;
+ */
+function memoize(func, resolver) {
+  if (typeof func != 'function' || (resolver && typeof resolver != 'function')) {
+    throw new TypeError(FUNC_ERROR_TEXT);
+  }
+  var memoized = function() {
+    var args = arguments,
+        key = resolver ? resolver.apply(this, args) : args[0],
+        cache = memoized.cache;
+
+    if (cache.has(key)) {
+      return cache.get(key);
+    }
+    var result = func.apply(this, args);
+    memoized.cache = cache.set(key, result);
+    return result;
+  };
+  memoized.cache = new (memoize.Cache || MapCache);
+  return memoized;
+}
+
+// Assign cache to `_.memoize`.
+memoize.Cache = MapCache;
+
+/**
+ * Performs a
+ * [`SameValueZero`](http://ecma-international.org/ecma-262/7.0/#sec-samevaluezero)
+ * comparison between two values to determine if they are equivalent.
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to compare.
+ * @param {*} other The other value to compare.
+ * @returns {boolean} Returns `true` if the values are equivalent, else `false`.
+ * @example
+ *
+ * var object = { 'a': 1 };
+ * var other = { 'a': 1 };
+ *
+ * _.eq(object, object);
+ * // => true
+ *
+ * _.eq(object, other);
+ * // => false
+ *
+ * _.eq('a', 'a');
+ * // => true
+ *
+ * _.eq('a', Object('a'));
+ * // => false
+ *
+ * _.eq(NaN, NaN);
+ * // => true
+ */
+function eq(value, other) {
+  return value === other || (value !== value && other !== other);
+}
+
+/**
+ * Checks if `value` is likely an `arguments` object.
+ *
+ * @static
+ * @memberOf _
+ * @since 0.1.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is an `arguments` object,
+ *  else `false`.
+ * @example
+ *
+ * _.isArguments(function() { return arguments; }());
+ * // => true
+ *
+ * _.isArguments([1, 2, 3]);
+ * // => false
+ */
+function isArguments(value) {
+  // Safari 8.1 makes `arguments.callee` enumerable in strict mode.
+  return isArrayLikeObject(value) && hasOwnProperty.call(value, 'callee') &&
+    (!propertyIsEnumerable.call(value, 'callee') || objectToString.call(value) == argsTag);
+}
+
+/**
+ * Checks if `value` is classified as an `Array` object.
+ *
+ * @static
+ * @memberOf _
+ * @since 0.1.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is an array, else `false`.
+ * @example
+ *
+ * _.isArray([1, 2, 3]);
+ * // => true
+ *
+ * _.isArray(document.body.children);
+ * // => false
+ *
+ * _.isArray('abc');
+ * // => false
+ *
+ * _.isArray(_.noop);
+ * // => false
+ */
+var isArray = Array.isArray;
+
+/**
+ * Checks if `value` is array-like. A value is considered array-like if it's
+ * not a function and has a `value.length` that's an integer greater than or
+ * equal to `0` and less than or equal to `Number.MAX_SAFE_INTEGER`.
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is array-like, else `false`.
+ * @example
+ *
+ * _.isArrayLike([1, 2, 3]);
+ * // => true
+ *
+ * _.isArrayLike(document.body.children);
+ * // => true
+ *
+ * _.isArrayLike('abc');
+ * // => true
+ *
+ * _.isArrayLike(_.noop);
+ * // => false
+ */
+function isArrayLike(value) {
+  return value != null && isLength(value.length) && !isFunction(value);
+}
+
+/**
+ * This method is like `_.isArrayLike` except that it also checks if `value`
+ * is an object.
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is an array-like object,
+ *  else `false`.
+ * @example
+ *
+ * _.isArrayLikeObject([1, 2, 3]);
+ * // => true
+ *
+ * _.isArrayLikeObject(document.body.children);
+ * // => true
+ *
+ * _.isArrayLikeObject('abc');
+ * // => false
+ *
+ * _.isArrayLikeObject(_.noop);
+ * // => false
+ */
+function isArrayLikeObject(value) {
+  return isObjectLike(value) && isArrayLike(value);
+}
+
+/**
+ * Checks if `value` is classified as a `Function` object.
+ *
+ * @static
+ * @memberOf _
+ * @since 0.1.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is a function, else `false`.
+ * @example
+ *
+ * _.isFunction(_);
+ * // => true
+ *
+ * _.isFunction(/abc/);
+ * // => false
+ */
+function isFunction(value) {
+  // The use of `Object#toString` avoids issues with the `typeof` operator
+  // in Safari 8-9 which returns 'object' for typed array and other constructors.
+  var tag = isObject(value) ? objectToString.call(value) : '';
+  return tag == funcTag || tag == genTag;
+}
+
+/**
+ * Checks if `value` is a valid array-like length.
+ *
+ * **Note:** This method is loosely based on
+ * [`ToLength`](http://ecma-international.org/ecma-262/7.0/#sec-tolength).
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is a valid length, else `false`.
+ * @example
+ *
+ * _.isLength(3);
+ * // => true
+ *
+ * _.isLength(Number.MIN_VALUE);
+ * // => false
+ *
+ * _.isLength(Infinity);
+ * // => false
+ *
+ * _.isLength('3');
+ * // => false
+ */
+function isLength(value) {
+  return typeof value == 'number' &&
+    value > -1 && value % 1 == 0 && value <= MAX_SAFE_INTEGER;
+}
+
+/**
+ * Checks if `value` is the
+ * [language type](http://www.ecma-international.org/ecma-262/7.0/#sec-ecmascript-language-types)
+ * of `Object`. (e.g. arrays, functions, objects, regexes, `new Number(0)`, and `new String('')`)
+ *
+ * @static
+ * @memberOf _
+ * @since 0.1.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is an object, else `false`.
+ * @example
+ *
+ * _.isObject({});
+ * // => true
+ *
+ * _.isObject([1, 2, 3]);
+ * // => true
+ *
+ * _.isObject(_.noop);
+ * // => true
+ *
+ * _.isObject(null);
+ * // => false
+ */
+function isObject(value) {
+  var type = typeof value;
+  return !!value && (type == 'object' || type == 'function');
+}
+
+/**
+ * Checks if `value` is object-like. A value is object-like if it's not `null`
+ * and has a `typeof` result of "object".
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is object-like, else `false`.
+ * @example
+ *
+ * _.isObjectLike({});
+ * // => true
+ *
+ * _.isObjectLike([1, 2, 3]);
+ * // => true
+ *
+ * _.isObjectLike(_.noop);
+ * // => false
+ *
+ * _.isObjectLike(null);
+ * // => false
+ */
+function isObjectLike(value) {
+  return !!value && typeof value == 'object';
+}
+
+/**
+ * Checks if `value` is classified as a `Symbol` primitive or object.
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is a symbol, else `false`.
+ * @example
+ *
+ * _.isSymbol(Symbol.iterator);
+ * // => true
+ *
+ * _.isSymbol('abc');
+ * // => false
+ */
+function isSymbol(value) {
+  return typeof value == 'symbol' ||
+    (isObjectLike(value) && objectToString.call(value) == symbolTag);
+}
+
+/**
+ * Converts `value` to a string. An empty string is returned for `null`
+ * and `undefined` values. The sign of `-0` is preserved.
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to process.
+ * @returns {string} Returns the string.
+ * @example
+ *
+ * _.toString(null);
+ * // => ''
+ *
+ * _.toString(-0);
+ * // => '-0'
+ *
+ * _.toString([1, 2, 3]);
+ * // => '1,2,3'
+ */
+function toString(value) {
+  return value == null ? '' : baseToString(value);
+}
+
+/**
+ * Gets the value at `path` of `object`. If the resolved value is
+ * `undefined`, the `defaultValue` is returned in its place.
+ *
+ * @static
+ * @memberOf _
+ * @since 3.7.0
+ * @category Object
+ * @param {Object} object The object to query.
+ * @param {Array|string} path The path of the property to get.
+ * @param {*} [defaultValue] The value returned for `undefined` resolved values.
+ * @returns {*} Returns the resolved value.
+ * @example
+ *
+ * var object = { 'a': [{ 'b': { 'c': 3 } }] };
+ *
+ * _.get(object, 'a[0].b.c');
+ * // => 3
+ *
+ * _.get(object, ['a', '0', 'b', 'c']);
+ * // => 3
+ *
+ * _.get(object, 'a.b.c', 'default');
+ * // => 'default'
+ */
+function get(object, path, defaultValue) {
+  var result = object == null ? undefined : baseGet(object, path);
+  return result === undefined ? defaultValue : result;
+}
+
+module.exports = pullAt;
+
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{}],498:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -82270,7 +86525,7 @@ function set(object, path, value) {
 module.exports = set;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],492:[function(require,module,exports){
+},{}],499:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -84904,7 +89159,7 @@ function property(path) {
 module.exports = sortBy;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],493:[function(require,module,exports){
+},{}],500:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -85347,7 +89602,7 @@ function toNumber(value) {
 module.exports = throttle;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],494:[function(require,module,exports){
+},{}],501:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -87765,7 +92020,7 @@ function property(path) {
 module.exports = uniqBy;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],495:[function(require,module,exports){
+},{}],502:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -88667,7 +92922,7 @@ function noop() {
 module.exports = uniqWith;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],496:[function(require,module,exports){
+},{}],503:[function(require,module,exports){
 /**
  * lodash (Custom Build) <https://lodash.com/>
  * Build: `lodash modularize exports="npm" -o ./`
@@ -89136,7 +93391,7 @@ function values(object) {
 
 module.exports = values;
 
-},{}],497:[function(require,module,exports){
+},{}],504:[function(require,module,exports){
 var root = require('./_root');
 
 /** Built-in value references. */
@@ -89144,7 +93399,7 @@ var Symbol = root.Symbol;
 
 module.exports = Symbol;
 
-},{"./_root":518}],498:[function(require,module,exports){
+},{"./_root":525}],505:[function(require,module,exports){
 var baseTimes = require('./_baseTimes'),
     isArguments = require('./isArguments'),
     isArray = require('./isArray'),
@@ -89195,7 +93450,7 @@ function arrayLikeKeys(value, inherited) {
 
 module.exports = arrayLikeKeys;
 
-},{"./_baseTimes":508,"./_isIndex":512,"./isArguments":521,"./isArray":522,"./isBuffer":524,"./isTypedArray":529}],499:[function(require,module,exports){
+},{"./_baseTimes":515,"./_isIndex":519,"./isArguments":528,"./isArray":529,"./isBuffer":531,"./isTypedArray":536}],506:[function(require,module,exports){
 /**
  * A specialized version of `_.map` for arrays without support for iteratee
  * shorthands.
@@ -89218,7 +93473,7 @@ function arrayMap(array, iteratee) {
 
 module.exports = arrayMap;
 
-},{}],500:[function(require,module,exports){
+},{}],507:[function(require,module,exports){
 /**
  * The base implementation of `_.findIndex` and `_.findLastIndex` without
  * support for iteratee shorthands.
@@ -89244,7 +93499,7 @@ function baseFindIndex(array, predicate, fromIndex, fromRight) {
 
 module.exports = baseFindIndex;
 
-},{}],501:[function(require,module,exports){
+},{}],508:[function(require,module,exports){
 var Symbol = require('./_Symbol'),
     getRawTag = require('./_getRawTag'),
     objectToString = require('./_objectToString');
@@ -89274,7 +93529,7 @@ function baseGetTag(value) {
 
 module.exports = baseGetTag;
 
-},{"./_Symbol":497,"./_getRawTag":511,"./_objectToString":516}],502:[function(require,module,exports){
+},{"./_Symbol":504,"./_getRawTag":518,"./_objectToString":523}],509:[function(require,module,exports){
 var baseFindIndex = require('./_baseFindIndex'),
     baseIsNaN = require('./_baseIsNaN'),
     strictIndexOf = require('./_strictIndexOf');
@@ -89296,7 +93551,7 @@ function baseIndexOf(array, value, fromIndex) {
 
 module.exports = baseIndexOf;
 
-},{"./_baseFindIndex":500,"./_baseIsNaN":504,"./_strictIndexOf":519}],503:[function(require,module,exports){
+},{"./_baseFindIndex":507,"./_baseIsNaN":511,"./_strictIndexOf":526}],510:[function(require,module,exports){
 var baseGetTag = require('./_baseGetTag'),
     isObjectLike = require('./isObjectLike');
 
@@ -89316,7 +93571,7 @@ function baseIsArguments(value) {
 
 module.exports = baseIsArguments;
 
-},{"./_baseGetTag":501,"./isObjectLike":528}],504:[function(require,module,exports){
+},{"./_baseGetTag":508,"./isObjectLike":535}],511:[function(require,module,exports){
 /**
  * The base implementation of `_.isNaN` without support for number objects.
  *
@@ -89330,7 +93585,7 @@ function baseIsNaN(value) {
 
 module.exports = baseIsNaN;
 
-},{}],505:[function(require,module,exports){
+},{}],512:[function(require,module,exports){
 var baseGetTag = require('./_baseGetTag'),
     isLength = require('./isLength'),
     isObjectLike = require('./isObjectLike');
@@ -89392,7 +93647,7 @@ function baseIsTypedArray(value) {
 
 module.exports = baseIsTypedArray;
 
-},{"./_baseGetTag":501,"./isLength":526,"./isObjectLike":528}],506:[function(require,module,exports){
+},{"./_baseGetTag":508,"./isLength":533,"./isObjectLike":535}],513:[function(require,module,exports){
 var isPrototype = require('./_isPrototype'),
     nativeKeys = require('./_nativeKeys');
 
@@ -89424,7 +93679,7 @@ function baseKeys(object) {
 
 module.exports = baseKeys;
 
-},{"./_isPrototype":513,"./_nativeKeys":514}],507:[function(require,module,exports){
+},{"./_isPrototype":520,"./_nativeKeys":521}],514:[function(require,module,exports){
 /**
  * The base implementation of `_.property` without support for deep paths.
  *
@@ -89440,7 +93695,7 @@ function baseProperty(key) {
 
 module.exports = baseProperty;
 
-},{}],508:[function(require,module,exports){
+},{}],515:[function(require,module,exports){
 /**
  * The base implementation of `_.times` without support for iteratee shorthands
  * or max array length checks.
@@ -89462,7 +93717,7 @@ function baseTimes(n, iteratee) {
 
 module.exports = baseTimes;
 
-},{}],509:[function(require,module,exports){
+},{}],516:[function(require,module,exports){
 /**
  * The base implementation of `_.unary` without support for storing metadata.
  *
@@ -89478,7 +93733,7 @@ function baseUnary(func) {
 
 module.exports = baseUnary;
 
-},{}],510:[function(require,module,exports){
+},{}],517:[function(require,module,exports){
 (function (global){
 /** Detect free variable `global` from Node.js. */
 var freeGlobal = typeof global == 'object' && global && global.Object === Object && global;
@@ -89486,7 +93741,7 @@ var freeGlobal = typeof global == 'object' && global && global.Object === Object
 module.exports = freeGlobal;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],511:[function(require,module,exports){
+},{}],518:[function(require,module,exports){
 var Symbol = require('./_Symbol');
 
 /** Used for built-in method references. */
@@ -89534,7 +93789,7 @@ function getRawTag(value) {
 
 module.exports = getRawTag;
 
-},{"./_Symbol":497}],512:[function(require,module,exports){
+},{"./_Symbol":504}],519:[function(require,module,exports){
 /** Used as references for various `Number` constants. */
 var MAX_SAFE_INTEGER = 9007199254740991;
 
@@ -89558,7 +93813,7 @@ function isIndex(value, length) {
 
 module.exports = isIndex;
 
-},{}],513:[function(require,module,exports){
+},{}],520:[function(require,module,exports){
 /** Used for built-in method references. */
 var objectProto = Object.prototype;
 
@@ -89578,7 +93833,7 @@ function isPrototype(value) {
 
 module.exports = isPrototype;
 
-},{}],514:[function(require,module,exports){
+},{}],521:[function(require,module,exports){
 var overArg = require('./_overArg');
 
 /* Built-in method references for those with the same name as other `lodash` methods. */
@@ -89586,7 +93841,7 @@ var nativeKeys = overArg(Object.keys, Object);
 
 module.exports = nativeKeys;
 
-},{"./_overArg":517}],515:[function(require,module,exports){
+},{"./_overArg":524}],522:[function(require,module,exports){
 var freeGlobal = require('./_freeGlobal');
 
 /** Detect free variable `exports`. */
@@ -89610,7 +93865,7 @@ var nodeUtil = (function() {
 
 module.exports = nodeUtil;
 
-},{"./_freeGlobal":510}],516:[function(require,module,exports){
+},{"./_freeGlobal":517}],523:[function(require,module,exports){
 /** Used for built-in method references. */
 var objectProto = Object.prototype;
 
@@ -89634,7 +93889,7 @@ function objectToString(value) {
 
 module.exports = objectToString;
 
-},{}],517:[function(require,module,exports){
+},{}],524:[function(require,module,exports){
 /**
  * Creates a unary function that invokes `func` with its argument transformed.
  *
@@ -89651,7 +93906,7 @@ function overArg(func, transform) {
 
 module.exports = overArg;
 
-},{}],518:[function(require,module,exports){
+},{}],525:[function(require,module,exports){
 var freeGlobal = require('./_freeGlobal');
 
 /** Detect free variable `self`. */
@@ -89662,7 +93917,7 @@ var root = freeGlobal || freeSelf || Function('return this')();
 
 module.exports = root;
 
-},{"./_freeGlobal":510}],519:[function(require,module,exports){
+},{"./_freeGlobal":517}],526:[function(require,module,exports){
 /**
  * A specialized version of `_.indexOf` which performs strict equality
  * comparisons of values, i.e. `===`.
@@ -89687,7 +93942,7 @@ function strictIndexOf(array, value, fromIndex) {
 
 module.exports = strictIndexOf;
 
-},{}],520:[function(require,module,exports){
+},{}],527:[function(require,module,exports){
 /**
  * This method returns the first argument it receives.
  *
@@ -89710,7 +93965,7 @@ function identity(value) {
 
 module.exports = identity;
 
-},{}],521:[function(require,module,exports){
+},{}],528:[function(require,module,exports){
 var baseIsArguments = require('./_baseIsArguments'),
     isObjectLike = require('./isObjectLike');
 
@@ -89748,7 +94003,7 @@ var isArguments = baseIsArguments(function() { return arguments; }()) ? baseIsAr
 
 module.exports = isArguments;
 
-},{"./_baseIsArguments":503,"./isObjectLike":528}],522:[function(require,module,exports){
+},{"./_baseIsArguments":510,"./isObjectLike":535}],529:[function(require,module,exports){
 /**
  * Checks if `value` is classified as an `Array` object.
  *
@@ -89776,7 +94031,7 @@ var isArray = Array.isArray;
 
 module.exports = isArray;
 
-},{}],523:[function(require,module,exports){
+},{}],530:[function(require,module,exports){
 var isFunction = require('./isFunction'),
     isLength = require('./isLength');
 
@@ -89811,7 +94066,7 @@ function isArrayLike(value) {
 
 module.exports = isArrayLike;
 
-},{"./isFunction":525,"./isLength":526}],524:[function(require,module,exports){
+},{"./isFunction":532,"./isLength":533}],531:[function(require,module,exports){
 var root = require('./_root'),
     stubFalse = require('./stubFalse');
 
@@ -89851,7 +94106,7 @@ var isBuffer = nativeIsBuffer || stubFalse;
 
 module.exports = isBuffer;
 
-},{"./_root":518,"./stubFalse":532}],525:[function(require,module,exports){
+},{"./_root":525,"./stubFalse":539}],532:[function(require,module,exports){
 var baseGetTag = require('./_baseGetTag'),
     isObject = require('./isObject');
 
@@ -89890,7 +94145,7 @@ function isFunction(value) {
 
 module.exports = isFunction;
 
-},{"./_baseGetTag":501,"./isObject":527}],526:[function(require,module,exports){
+},{"./_baseGetTag":508,"./isObject":534}],533:[function(require,module,exports){
 /** Used as references for various `Number` constants. */
 var MAX_SAFE_INTEGER = 9007199254740991;
 
@@ -89927,7 +94182,7 @@ function isLength(value) {
 
 module.exports = isLength;
 
-},{}],527:[function(require,module,exports){
+},{}],534:[function(require,module,exports){
 /**
  * Checks if `value` is the
  * [language type](http://www.ecma-international.org/ecma-262/7.0/#sec-ecmascript-language-types)
@@ -89960,7 +94215,7 @@ function isObject(value) {
 
 module.exports = isObject;
 
-},{}],528:[function(require,module,exports){
+},{}],535:[function(require,module,exports){
 /**
  * Checks if `value` is object-like. A value is object-like if it's not `null`
  * and has a `typeof` result of "object".
@@ -89991,7 +94246,7 @@ function isObjectLike(value) {
 
 module.exports = isObjectLike;
 
-},{}],529:[function(require,module,exports){
+},{}],536:[function(require,module,exports){
 var baseIsTypedArray = require('./_baseIsTypedArray'),
     baseUnary = require('./_baseUnary'),
     nodeUtil = require('./_nodeUtil');
@@ -90020,7 +94275,7 @@ var isTypedArray = nodeIsTypedArray ? baseUnary(nodeIsTypedArray) : baseIsTypedA
 
 module.exports = isTypedArray;
 
-},{"./_baseIsTypedArray":505,"./_baseUnary":509,"./_nodeUtil":515}],530:[function(require,module,exports){
+},{"./_baseIsTypedArray":512,"./_baseUnary":516,"./_nodeUtil":522}],537:[function(require,module,exports){
 var arrayLikeKeys = require('./_arrayLikeKeys'),
     baseKeys = require('./_baseKeys'),
     isArrayLike = require('./isArrayLike');
@@ -90059,7 +94314,7 @@ function keys(object) {
 
 module.exports = keys;
 
-},{"./_arrayLikeKeys":498,"./_baseKeys":506,"./isArrayLike":523}],531:[function(require,module,exports){
+},{"./_arrayLikeKeys":505,"./_baseKeys":513,"./isArrayLike":530}],538:[function(require,module,exports){
 /**
  * This method returns `undefined`.
  *
@@ -90078,7 +94333,7 @@ function noop() {
 
 module.exports = noop;
 
-},{}],532:[function(require,module,exports){
+},{}],539:[function(require,module,exports){
 /**
  * This method returns `false`.
  *
@@ -90098,7 +94353,7 @@ function stubFalse() {
 
 module.exports = stubFalse;
 
-},{}],533:[function(require,module,exports){
+},{}],540:[function(require,module,exports){
 
 var looper = module.exports = function (fun) {
   (function next () {
@@ -90114,7 +94369,7 @@ var looper = module.exports = function (fun) {
   })()
 }
 
-},{}],534:[function(require,module,exports){
+},{}],541:[function(require,module,exports){
 (function (Buffer){
 
 exports.compare = function (a, b) {
@@ -90287,7 +94542,7 @@ exports.filter = function (range, compare) {
 
 
 }).call(this,{"isBuffer":require("../is-buffer/index.js")})
-},{"../is-buffer/index.js":372}],535:[function(require,module,exports){
+},{"../is-buffer/index.js":377}],542:[function(require,module,exports){
 'use strict'
 
 const multiaddr = require('multiaddr')
@@ -90501,7 +94756,7 @@ function base (n) {
   }
 }
 
-},{"multiaddr":543}],536:[function(require,module,exports){
+},{"multiaddr":550}],543:[function(require,module,exports){
 (function (Buffer){
 const rlp = require('rlp')
 const ethUtil = require('ethereumjs-util')
@@ -90760,7 +95015,7 @@ function isRawNode (node) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"ethereumjs-util":213,"rlp":705}],537:[function(require,module,exports){
+},{"buffer":128,"ethereumjs-util":213,"rlp":712}],544:[function(require,module,exports){
 var bn = require('bn.js');
 var brorand = require('brorand');
 
@@ -90875,7 +95130,7 @@ MillerRabin.prototype.getDivisor = function getDivisor(n, k) {
   return false;
 };
 
-},{"bn.js":85,"brorand":95}],538:[function(require,module,exports){
+},{"bn.js":85,"brorand":95}],545:[function(require,module,exports){
 module.exports = assert;
 
 function assert(val, msg) {
@@ -90888,7 +95143,7 @@ assert.equal = function assertEqual(l, r, msg) {
     throw new Error(msg || ('Assertion failed: ' + l + ' != ' + r));
 };
 
-},{}],539:[function(require,module,exports){
+},{}],546:[function(require,module,exports){
 'use strict';
 
 var utils = exports;
@@ -90948,7 +95203,7 @@ utils.encode = function encode(arr, enc) {
     return arr;
 };
 
-},{}],540:[function(require,module,exports){
+},{}],547:[function(require,module,exports){
 /**
  * Helpers.
  */
@@ -91102,7 +95357,7 @@ function plural(ms, n, name) {
   return Math.ceil(ms / n) + ' ' + name + 's';
 }
 
-},{}],541:[function(require,module,exports){
+},{}],548:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -91317,7 +95572,7 @@ function protoFromTuple (tup) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./convert":542,"./protocols-table":544,"buffer":128,"lodash.filter":480,"lodash.map":489,"varint":763}],542:[function(require,module,exports){
+},{"./convert":549,"./protocols-table":551,"buffer":128,"lodash.filter":486,"lodash.map":495,"varint":771}],549:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -91433,7 +95688,7 @@ function buf2mh (buf) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./protocols-table":544,"bs58":125,"buffer":128,"ip":249,"varint":763}],543:[function(require,module,exports){
+},{"./protocols-table":551,"bs58":125,"buffer":128,"ip":251,"varint":771}],550:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -91896,7 +96151,7 @@ Multiaddr.resolve = function resolve (addr, callback) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./codec":541,"./protocols-table":544,"bs58":125,"buffer":128,"lodash.map":489,"varint":763,"xtend":769}],544:[function(require,module,exports){
+},{"./codec":548,"./protocols-table":551,"bs58":125,"buffer":128,"lodash.map":495,"varint":771,"xtend":777}],551:[function(require,module,exports){
 'use strict'
 
 const map = require('lodash.map')
@@ -91968,7 +96223,7 @@ function p (code, size, name, resolvable) {
 
 module.exports = Protocols
 
-},{"lodash.map":489}],545:[function(require,module,exports){
+},{"lodash.map":495}],552:[function(require,module,exports){
 'use strict'
 
 class Base {
@@ -91996,7 +96251,7 @@ class Base {
 
 module.exports = Base
 
-},{}],546:[function(require,module,exports){
+},{}],553:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -92020,7 +96275,7 @@ module.exports = function base16 (alphabet) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128}],547:[function(require,module,exports){
+},{"buffer":128}],554:[function(require,module,exports){
 'use strict'
 
 const Base = require('./base.js')
@@ -92058,7 +96313,7 @@ module.exports = {
   codes: codes
 }
 
-},{"./base.js":545,"./base16":546,"base-x":74}],548:[function(require,module,exports){
+},{"./base.js":552,"./base16":553,"base-x":74}],555:[function(require,module,exports){
 (function (Buffer){
 /**
  * Implementation of the [multibase](https://github.com/multiformats/multibase) specification.
@@ -92198,7 +96453,7 @@ function getBase (nameOrCode) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./constants":547,"buffer":128}],549:[function(require,module,exports){
+},{"./constants":554,"buffer":128}],556:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -92291,7 +96546,7 @@ exports['torrent-info'] = new Buffer('7b', 'hex')
 exports['torrent-file'] = new Buffer('7c', 'hex')
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128}],550:[function(require,module,exports){
+},{"buffer":128}],557:[function(require,module,exports){
 (function (Buffer){
 /**
  * Implementation of the multicodec specification.
@@ -92358,7 +96613,7 @@ exports.getCodec = (prefixedData) => {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./name-table":551,"./util":552,"./varint-table":553,"buffer":128,"varint":763}],551:[function(require,module,exports){
+},{"./name-table":558,"./util":559,"./varint-table":560,"buffer":128,"varint":771}],558:[function(require,module,exports){
 'use strict'
 const baseTable = require('./base-table')
 
@@ -92372,7 +96627,7 @@ for (let encodingName in baseTable) {
   nameTable[code.toString('hex')] = encodingName
 }
 
-},{"./base-table":549}],552:[function(require,module,exports){
+},{"./base-table":556}],559:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 const varint = require('varint')
@@ -92405,7 +96660,7 @@ function varintBufferDecode (input) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"varint":763}],553:[function(require,module,exports){
+},{"buffer":128,"varint":771}],560:[function(require,module,exports){
 'use strict'
 const baseTable = require('./base-table')
 const varintBufferEncode = require('./util').varintBufferEncode
@@ -92420,7 +96675,7 @@ for (let encodingName in baseTable) {
   varintTable[encodingName] = varintBufferEncode(code)
 }
 
-},{"./base-table":549,"./util":552}],554:[function(require,module,exports){
+},{"./base-table":556,"./util":559}],561:[function(require,module,exports){
 /* eslint quote-props: off */
 /* eslint key-spacing: off */
 'use strict'
@@ -92769,7 +97024,7 @@ exports.defaultLengths = {
   0xb260: 0x20
 }
 
-},{}],555:[function(require,module,exports){
+},{}],562:[function(require,module,exports){
 (function (Buffer){
 /**
  * Multihash implementation in JavaScript.
@@ -92993,7 +97248,7 @@ exports.prefix = function prefix (multihash) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./constants":554,"bs58":125,"buffer":128,"varint":763}],556:[function(require,module,exports){
+},{"./constants":561,"bs58":125,"buffer":128,"varint":771}],563:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -93032,7 +97287,7 @@ module.exports = (table) => {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./utils":560,"blakejs":82,"buffer":128}],557:[function(require,module,exports){
+},{"./utils":567,"blakejs":82,"buffer":128}],564:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -93094,7 +97349,7 @@ module.exports = {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"nodeify":579}],558:[function(require,module,exports){
+},{"buffer":128,"nodeify":586}],565:[function(require,module,exports){
 'use strict'
 
 const sha3 = require('js-sha3')
@@ -93127,7 +97382,7 @@ module.exports = {
   addBlake: require('./blake')
 }
 
-},{"./blake":556,"./crypto-sha1-2":557,"./utils":560,"js-sha3":379,"murmurhash3js":577}],559:[function(require,module,exports){
+},{"./blake":563,"./crypto-sha1-2":564,"./utils":567,"js-sha3":384,"murmurhash3js":584}],566:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -93270,7 +97525,7 @@ Multihashing.functions = {
 crypto.addBlake(Multihashing.functions)
 
 }).call(this,require("buffer").Buffer)
-},{"./crypto":558,"buffer":128,"multihashes":555}],560:[function(require,module,exports){
+},{"./crypto":565,"buffer":128,"multihashes":562}],567:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -93317,7 +97572,7 @@ exports.fromNumberTo32BitBuf = (doWork, other) => (input) => {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"async/setImmediate":68,"buffer":128}],561:[function(require,module,exports){
+},{"async/setImmediate":68,"buffer":128}],568:[function(require,module,exports){
 module.exports = read
 
 var MSB = 0x80
@@ -93349,7 +97604,7 @@ function read(buf, offset) {
   return res
 }
 
-},{}],562:[function(require,module,exports){
+},{}],569:[function(require,module,exports){
 module.exports = encode
 
 var MSB = 0x80
@@ -93377,14 +97632,14 @@ function encode(num, out, offset) {
   return out
 }
 
-},{}],563:[function(require,module,exports){
+},{}],570:[function(require,module,exports){
 module.exports = {
     encode: require('./encode.js')
   , decode: require('./decode.js')
   , encodingLength: require('./length.js')
 }
 
-},{"./decode.js":561,"./encode.js":562,"./length.js":564}],564:[function(require,module,exports){
+},{"./decode.js":568,"./encode.js":569,"./length.js":571}],571:[function(require,module,exports){
 
 var N1 = Math.pow(2,  7)
 var N2 = Math.pow(2, 14)
@@ -93411,7 +97666,7 @@ module.exports = function (value) {
   )
 }
 
-},{}],565:[function(require,module,exports){
+},{}],572:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 /* @flow */
@@ -93609,7 +97864,7 @@ class Channel extends stream.Duplex {
 module.exports = Channel
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"debug":151,"events":215,"readable-stream":700}],566:[function(require,module,exports){
+},{"buffer":128,"debug":151,"events":215,"readable-stream":707}],573:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 /* @flow */
@@ -94098,13 +98353,13 @@ class Multiplex extends stream.Duplex {
 module.exports = Multiplex
 
 }).call(this,require("buffer").Buffer)
-},{"./channel":565,"buffer":128,"debug":151,"duplexify":173,"readable-stream":700,"varint":563}],567:[function(require,module,exports){
+},{"./channel":572,"buffer":128,"debug":151,"duplexify":173,"readable-stream":707,"varint":570}],574:[function(require,module,exports){
 'use strict'
 
 exports = module.exports
 exports.PROTOCOL_ID = '/multistream/1.0.0'
 
-},{}],568:[function(require,module,exports){
+},{}],575:[function(require,module,exports){
 'use strict'
 
 const varint = require('varint')
@@ -94253,7 +98508,7 @@ function collectLs (conn) {
 
 module.exports = Dialer
 
-},{"../select":575,"../util":576,"./../constants":567,"interface-connection":244,"once":580,"pull-length-prefixed":631,"pull-stream":642,"varint":763}],569:[function(require,module,exports){
+},{"../select":582,"../util":583,"./../constants":574,"interface-connection":246,"once":587,"pull-length-prefixed":638,"pull-stream":649,"varint":771}],576:[function(require,module,exports){
 'use strict'
 
 exports.Listener = exports.listener = require('./listener')
@@ -94261,7 +98516,7 @@ exports.Dialer = exports.dialer = require('./dialer')
 exports.matchSemver = require('./listener/match-semver')
 exports.matchExact = require('./listener/match-exact')
 
-},{"./dialer":568,"./listener":570,"./listener/match-exact":572,"./listener/match-semver":573}],570:[function(require,module,exports){
+},{"./dialer":575,"./listener":577,"./listener/match-exact":579,"./listener/match-semver":580}],577:[function(require,module,exports){
 'use strict'
 
 const pull = require('pull-stream')
@@ -94374,7 +98629,7 @@ class Listener {
 
 module.exports = Listener
 
-},{"../select":575,"./../constants":567,"./../util":576,"./ls-handler":571,"./match-exact":572,"./select-handler":574,"assert":31,"interface-connection":244,"lodash.isfunction":488,"pull-stream":642}],571:[function(require,module,exports){
+},{"../select":582,"./../constants":574,"./../util":583,"./ls-handler":578,"./match-exact":579,"./select-handler":581,"assert":31,"interface-connection":246,"lodash.isfunction":494,"pull-stream":649}],578:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -94415,7 +98670,7 @@ function lsHandler (self, conn) {
 module.exports = lsHandler
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"pull-length-prefixed":631,"pull-stream":642,"varint":763}],572:[function(require,module,exports){
+},{"buffer":128,"pull-length-prefixed":638,"pull-stream":649,"varint":771}],579:[function(require,module,exports){
 'use strict'
 
 /**
@@ -94434,7 +98689,7 @@ function matchExact (myProtocol, senderProtocol, callback) {
 
 module.exports = matchExact
 
-},{}],573:[function(require,module,exports){
+},{}],580:[function(require,module,exports){
 'use strict'
 
 const semver = require('semver')
@@ -94468,7 +98723,7 @@ function matchSemver (myProtocol, senderProtocol, callback) {
 
 module.exports = matchSemver
 
-},{"semver":720}],574:[function(require,module,exports){
+},{"semver":727}],581:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -94548,7 +98803,7 @@ function matcher (protocol, handlers, callback) {
 module.exports = selectHandler
 
 }).call(this,require("buffer").Buffer)
-},{"../util.js":576,"async/some":69,"buffer":128,"interface-connection":244,"pull-handshake":628,"pull-length-prefixed":631}],575:[function(require,module,exports){
+},{"../util.js":583,"async/some":69,"buffer":128,"interface-connection":246,"pull-handshake":635,"pull-length-prefixed":638}],582:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -94587,7 +98842,7 @@ function select (multicodec, callback, log) {
 module.exports = select
 
 }).call(this,require("buffer").Buffer)
-},{"./util":576,"buffer":128,"pull-handshake":628,"pull-length-prefixed":631}],576:[function(require,module,exports){
+},{"./util":583,"buffer":128,"pull-handshake":635,"pull-length-prefixed":638}],583:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -94655,10 +98910,10 @@ exports.log.listener = () => {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"debug":151,"pull-length-prefixed":631,"pull-stream":642}],577:[function(require,module,exports){
+},{"buffer":128,"debug":151,"pull-length-prefixed":638,"pull-stream":649}],584:[function(require,module,exports){
 module.exports = require('./lib/murmurHash3js');
 
-},{"./lib/murmurHash3js":578}],578:[function(require,module,exports){
+},{"./lib/murmurHash3js":585}],585:[function(require,module,exports){
 /* jshint -W086: true */
 // +----------------------------------------------------------------------+
 // | murmurHash3js.js v3.0.1 // https://github.com/pid/murmurHash3js
@@ -95222,7 +99477,7 @@ module.exports = require('./lib/murmurHash3js');
     }
 })(this);
 
-},{}],579:[function(require,module,exports){
+},{}],586:[function(require,module,exports){
 (function (process){
 var Promise = require('promise');
 var isPromise = require('is-promise');
@@ -95279,7 +99534,7 @@ function NodeifyPromise(fn) {
 NodeifyPromise.prototype = Object.create(Promise.prototype);
 NodeifyPromise.prototype.constructor = NodeifyPromise;
 }).call(this,require('_process'))
-},{"_process":602,"is-promise":375,"promise":603}],580:[function(require,module,exports){
+},{"_process":609,"is-promise":380,"promise":610}],587:[function(require,module,exports){
 var wrappy = require('wrappy')
 module.exports = wrappy(once)
 module.exports.strict = wrappy(onceStrict)
@@ -95323,7 +99578,7 @@ function onceStrict (fn) {
   return f
 }
 
-},{"wrappy":768}],581:[function(require,module,exports){
+},{"wrappy":776}],588:[function(require,module,exports){
 exports.endianness = function () { return 'LE' };
 
 exports.hostname = function () {
@@ -95370,7 +99625,7 @@ exports.tmpdir = exports.tmpDir = function () {
 
 exports.EOL = '\n';
 
-},{}],582:[function(require,module,exports){
+},{}],589:[function(require,module,exports){
 module.exports={"2.16.840.1.101.3.4.1.1": "aes-128-ecb",
 "2.16.840.1.101.3.4.1.2": "aes-128-cbc",
 "2.16.840.1.101.3.4.1.3": "aes-128-ofb",
@@ -95384,7 +99639,7 @@ module.exports={"2.16.840.1.101.3.4.1.1": "aes-128-ecb",
 "2.16.840.1.101.3.4.1.43": "aes-256-ofb",
 "2.16.840.1.101.3.4.1.44": "aes-256-cfb"
 }
-},{}],583:[function(require,module,exports){
+},{}],590:[function(require,module,exports){
 // from https://github.com/indutny/self-signed/blob/gh-pages/lib/asn1.js
 // Fedor, you are amazing.
 'use strict'
@@ -95508,7 +99763,7 @@ exports.signature = asn1.define('signature', function () {
   )
 })
 
-},{"./certificate":584,"asn1.js":17}],584:[function(require,module,exports){
+},{"./certificate":591,"asn1.js":17}],591:[function(require,module,exports){
 // from https://github.com/Rantanen/node-dtls/blob/25a7dc861bda38cfeac93a723500eea4f0ac2e86/Certificate.js
 // thanks to @Rantanen
 
@@ -95598,7 +99853,7 @@ var X509Certificate = asn.define('X509Certificate', function () {
 
 module.exports = X509Certificate
 
-},{"asn1.js":17}],585:[function(require,module,exports){
+},{"asn1.js":17}],592:[function(require,module,exports){
 (function (Buffer){
 // adapted from https://github.com/apatil/pemstrip
 var findProc = /Proc-Type: 4,ENCRYPTED\n\r?DEK-Info: AES-((?:128)|(?:192)|(?:256))-CBC,([0-9A-H]+)\n\r?\n\r?([0-9A-z\n\r\+\/\=]+)\n\r?/m
@@ -95632,7 +99887,7 @@ module.exports = function (okey, password) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"browserify-aes":99,"buffer":128,"evp_bytestokey":216}],586:[function(require,module,exports){
+},{"browserify-aes":99,"buffer":128,"evp_bytestokey":216}],593:[function(require,module,exports){
 (function (Buffer){
 var asn1 = require('./asn1')
 var aesid = require('./aesid.json')
@@ -95742,7 +99997,7 @@ function decrypt (data, password) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./aesid.json":582,"./asn1":583,"./fixProc":585,"browserify-aes":99,"buffer":128,"pbkdf2":591}],587:[function(require,module,exports){
+},{"./aesid.json":589,"./asn1":590,"./fixProc":592,"browserify-aes":99,"buffer":128,"pbkdf2":598}],594:[function(require,module,exports){
 (function (global){
 /**
  * JSON parse.
@@ -95777,7 +100032,7 @@ module.exports = function parsejson(data) {
   }
 };
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],588:[function(require,module,exports){
+},{}],595:[function(require,module,exports){
 /**
  * Compiles a querystring
  * Returns string representation of the object
@@ -95816,7 +100071,7 @@ exports.decode = function(qs){
   return qry;
 };
 
-},{}],589:[function(require,module,exports){
+},{}],596:[function(require,module,exports){
 /**
  * Parses an URI
  *
@@ -95857,7 +100112,7 @@ module.exports = function parseuri(str) {
     return uri;
 };
 
-},{}],590:[function(require,module,exports){
+},{}],597:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -96085,13 +100340,13 @@ var substr = 'ab'.substr(-1) === 'b'
 ;
 
 }).call(this,require('_process'))
-},{"_process":602}],591:[function(require,module,exports){
+},{"_process":609}],598:[function(require,module,exports){
 
 exports.pbkdf2 = require('./lib/async')
 
 exports.pbkdf2Sync = require('./lib/sync')
 
-},{"./lib/async":592,"./lib/sync":595}],592:[function(require,module,exports){
+},{"./lib/async":599,"./lib/sync":602}],599:[function(require,module,exports){
 (function (process,global){
 var checkParameters = require('./precondition')
 var defaultEncoding = require('./default-encoding')
@@ -96193,7 +100448,7 @@ module.exports = function (password, salt, iterations, keylen, digest, callback)
 }
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./default-encoding":593,"./precondition":594,"./sync":595,"_process":602,"safe-buffer":706}],593:[function(require,module,exports){
+},{"./default-encoding":600,"./precondition":601,"./sync":602,"_process":609,"safe-buffer":713}],600:[function(require,module,exports){
 (function (process){
 var defaultEncoding
 /* istanbul ignore next */
@@ -96207,7 +100462,7 @@ if (process.browser) {
 module.exports = defaultEncoding
 
 }).call(this,require('_process'))
-},{"_process":602}],594:[function(require,module,exports){
+},{"_process":609}],601:[function(require,module,exports){
 var MAX_ALLOC = Math.pow(2, 30) - 1 // default in iojs
 module.exports = function (iterations, keylen) {
   if (typeof iterations !== 'number') {
@@ -96227,7 +100482,7 @@ module.exports = function (iterations, keylen) {
   }
 }
 
-},{}],595:[function(require,module,exports){
+},{}],602:[function(require,module,exports){
 var md5 = require('create-hash/md5')
 var rmd160 = require('ripemd160')
 var sha = require('sha.js')
@@ -96330,7 +100585,7 @@ function pbkdf2 (password, salt, iterations, keylen, digest) {
 
 module.exports = pbkdf2
 
-},{"./default-encoding":593,"./precondition":594,"create-hash/md5":138,"ripemd160":704,"safe-buffer":706,"sha.js":722}],596:[function(require,module,exports){
+},{"./default-encoding":600,"./precondition":601,"create-hash/md5":138,"ripemd160":711,"safe-buffer":713,"sha.js":729}],603:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -96449,7 +100704,7 @@ class PeerBook {
 module.exports = PeerBook
 
 }).call(this,{"isBuffer":require("../../is-buffer/index.js")})
-},{"../../is-buffer/index.js":372,"bs58":125,"peer-id":597,"peer-info":598}],597:[function(require,module,exports){
+},{"../../is-buffer/index.js":377,"bs58":125,"peer-id":604,"peer-info":605}],604:[function(require,module,exports){
 /*
  * Id is an object representation of a peer Id. a peer Id is a multihash
  */
@@ -96716,7 +100971,7 @@ function toB64Opt (val) {
   }
 }
 
-},{"assert":31,"async/waterfall":71,"libp2p-crypto":416,"multihashes":555,"safe-buffer":706}],598:[function(require,module,exports){
+},{"assert":31,"async/waterfall":71,"libp2p-crypto":421,"multihashes":562,"safe-buffer":713}],605:[function(require,module,exports){
 'use strict'
 
 const Id = require('peer-id')
@@ -96779,7 +101034,7 @@ PeerInfo.isPeerInfo = (peerInfo) => {
 
 module.exports = PeerInfo
 
-},{"./multiaddr-set":599,"./utils":600,"assert":31,"peer-id":597}],599:[function(require,module,exports){
+},{"./multiaddr-set":606,"./utils":607,"assert":31,"peer-id":604}],606:[function(require,module,exports){
 'use strict'
 
 const ensureMultiaddr = require('./utils').ensureMultiaddr
@@ -96879,7 +101134,7 @@ class MultiaddrSet {
 
 module.exports = MultiaddrSet
 
-},{"./utils":600,"lodash.uniqby":494}],600:[function(require,module,exports){
+},{"./utils":607,"lodash.uniqby":501}],607:[function(require,module,exports){
 'use strict'
 
 const multiaddr = require('multiaddr')
@@ -96896,7 +101151,7 @@ module.exports = {
   ensureMultiaddr: ensureMultiaddr
 }
 
-},{"multiaddr":543}],601:[function(require,module,exports){
+},{"multiaddr":550}],608:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -96943,7 +101198,7 @@ function nextTick(fn, arg1, arg2, arg3) {
 }
 
 }).call(this,require('_process'))
-},{"_process":602}],602:[function(require,module,exports){
+},{"_process":609}],609:[function(require,module,exports){
 // shim for using process in browser
 var process = module.exports = {};
 
@@ -97129,7 +101384,7 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],603:[function(require,module,exports){
+},{}],610:[function(require,module,exports){
 (function (process){
 var isPromise = require('is-promise')
 
@@ -97230,7 +101485,7 @@ Promise.use = function (extension) {
   extensions.push(extension);
 };
 }).call(this,require('_process'))
-},{"_process":602,"is-promise":375}],604:[function(require,module,exports){
+},{"_process":609,"is-promise":380}],611:[function(require,module,exports){
 /** PROMISIFY CALLBACK-STYLE FUNCTIONS TO ES6 PROMISES
 *
 * EXAMPLE:
@@ -97298,7 +101553,7 @@ if (typeof exports === "undefined") {
     this["promisify"] = module.exports;
 }
 
-},{}],605:[function(require,module,exports){
+},{}],612:[function(require,module,exports){
 var parse = require('./parse')
 var stringify = require('./stringify')
 
@@ -97306,7 +101561,7 @@ module.exports = parse
 module.exports.parse = parse
 module.exports.stringify = stringify
 
-},{"./parse":606,"./stringify":607}],606:[function(require,module,exports){
+},{"./parse":613,"./stringify":614}],613:[function(require,module,exports){
 var tokenize = require('./tokenize')
 var MAX_RANGE = 0x1FFFFFFF
 
@@ -98012,7 +102267,7 @@ var parse = function (buf) {
 
 module.exports = parse
 
-},{"./tokenize":608}],607:[function(require,module,exports){
+},{"./tokenize":615}],614:[function(require,module,exports){
 var onfield = function (f, result) {
   var prefix = f.repeated ? 'repeated' : f.required ? 'required' : 'optional'
   if (f.type === 'map') prefix = 'map<' + f.map.from + ',' + f.map.to + '>'
@@ -98206,7 +102461,7 @@ module.exports = function (schema) {
   return result.map(indent('')).join('\n')
 }
 
-},{}],608:[function(require,module,exports){
+},{}],615:[function(require,module,exports){
 module.exports = function (sch) {
   var noComments = function (line) {
     var i = line.indexOf('//')
@@ -98245,7 +102500,7 @@ module.exports = function (sch) {
     .filter(noMultilineComments())
 }
 
-},{}],609:[function(require,module,exports){
+},{}],616:[function(require,module,exports){
 (function (Buffer){
 /* eslint-disable no-spaced-func */
 /* eslint-disable no-unexpected-multiline */
@@ -98766,7 +103021,7 @@ module.exports = function (schema, extraEncodings) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./encodings":610,"buffer":128,"generate-function":219,"generate-object-property":220,"varint":763}],610:[function(require,module,exports){
+},{"./encodings":617,"buffer":128,"generate-function":220,"generate-object-property":221,"varint":771}],617:[function(require,module,exports){
 (function (Buffer){
 var varint = require('varint')
 var svarint = require('signed-varint')
@@ -99060,7 +103315,7 @@ exports.float = (function () {
 })()
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"signed-varint":729,"varint":763}],611:[function(require,module,exports){
+},{"buffer":128,"signed-varint":736,"varint":771}],618:[function(require,module,exports){
 (function (Buffer){
 var schema = require('protocol-buffers-schema')
 var compile = require('./compile')
@@ -99101,9 +103356,9 @@ module.exports = function (proto, opts) {
 }
 
 }).call(this,{"isBuffer":require("../is-buffer/index.js")})
-},{"../is-buffer/index.js":372,"./compile":609,"protocol-buffers-schema":605}],612:[function(require,module,exports){
+},{"../is-buffer/index.js":377,"./compile":616,"protocol-buffers-schema":612}],619:[function(require,module,exports){
 arguments[4][206][0].apply(exports,arguments)
-},{"dup":206}],613:[function(require,module,exports){
+},{"dup":206}],620:[function(require,module,exports){
 exports.publicEncrypt = require('./publicEncrypt');
 exports.privateDecrypt = require('./privateDecrypt');
 
@@ -99114,7 +103369,7 @@ exports.privateEncrypt = function privateEncrypt(key, buf) {
 exports.publicDecrypt = function publicDecrypt(key, buf) {
   return exports.privateDecrypt(key, buf, true);
 };
-},{"./privateDecrypt":615,"./publicEncrypt":616}],614:[function(require,module,exports){
+},{"./privateDecrypt":622,"./publicEncrypt":623}],621:[function(require,module,exports){
 (function (Buffer){
 var createHash = require('create-hash');
 module.exports = function (seed, len) {
@@ -99133,7 +103388,7 @@ function i2ops(c) {
   return out;
 }
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"create-hash":136}],615:[function(require,module,exports){
+},{"buffer":128,"create-hash":136}],622:[function(require,module,exports){
 (function (Buffer){
 var parseKeys = require('parse-asn1');
 var mgf = require('./mgf');
@@ -99244,7 +103499,7 @@ function compare(a, b){
   return dif;
 }
 }).call(this,require("buffer").Buffer)
-},{"./mgf":614,"./withPublic":617,"./xor":618,"bn.js":85,"browserify-rsa":115,"buffer":128,"create-hash":136,"parse-asn1":586}],616:[function(require,module,exports){
+},{"./mgf":621,"./withPublic":624,"./xor":625,"bn.js":85,"browserify-rsa":115,"buffer":128,"create-hash":136,"parse-asn1":593}],623:[function(require,module,exports){
 (function (Buffer){
 var parseKeys = require('parse-asn1');
 var randomBytes = require('randombytes');
@@ -99342,7 +103597,7 @@ function nonZero(len, crypto) {
   return out;
 }
 }).call(this,require("buffer").Buffer)
-},{"./mgf":614,"./withPublic":617,"./xor":618,"bn.js":85,"browserify-rsa":115,"buffer":128,"create-hash":136,"parse-asn1":586,"randombytes":689}],617:[function(require,module,exports){
+},{"./mgf":621,"./withPublic":624,"./xor":625,"bn.js":85,"browserify-rsa":115,"buffer":128,"create-hash":136,"parse-asn1":593,"randombytes":696}],624:[function(require,module,exports){
 (function (Buffer){
 var bn = require('bn.js');
 function withPublic(paddedMsg, key) {
@@ -99355,7 +103610,7 @@ function withPublic(paddedMsg, key) {
 
 module.exports = withPublic;
 }).call(this,require("buffer").Buffer)
-},{"bn.js":85,"buffer":128}],618:[function(require,module,exports){
+},{"bn.js":85,"buffer":128}],625:[function(require,module,exports){
 module.exports = function xor(a, b) {
   var len = a.length;
   var i = -1;
@@ -99364,7 +103619,7 @@ module.exports = function xor(a, b) {
   }
   return a
 };
-},{}],619:[function(require,module,exports){
+},{}],626:[function(require,module,exports){
 'use strict'
 
 const through = require('pull-through')
@@ -99398,7 +103653,7 @@ module.exports = function block (_maxLength) {
   )
 }
 
-},{"pull-through":673}],620:[function(require,module,exports){
+},{"pull-through":680}],627:[function(require,module,exports){
 'use strict'
 
 var through = require('pull-through')
@@ -99454,7 +103709,7 @@ module.exports = function block (size, opts) {
   })
 }
 
-},{"pull-through":673,"safe-buffer":706}],621:[function(require,module,exports){
+},{"pull-through":680,"safe-buffer":713}],628:[function(require,module,exports){
 var noop = function () {}
 
 function abortAll(ary, abort, cb) {
@@ -99497,7 +103752,7 @@ module.exports = function (streams) {
 
 
 
-},{}],622:[function(require,module,exports){
+},{}],629:[function(require,module,exports){
 module.exports = function Catch (onError) {
     onError = onError || function noop () {}
     var errd
@@ -99520,7 +103775,7 @@ module.exports = function Catch (onError) {
     }
 }
 
-},{}],623:[function(require,module,exports){
+},{}],630:[function(require,module,exports){
 
 var Source = require('./source')
 var Sink = require('./sink')
@@ -99543,14 +103798,14 @@ module.exports = function () {
 
 }
 
-},{"./sink":625,"./source":626}],624:[function(require,module,exports){
+},{"./sink":632,"./source":633}],631:[function(require,module,exports){
 
 exports.source = require('./source')
 exports.through = require('./through')
 exports.sink = require('./sink')
 exports.duplex = require('./duplex')
 
-},{"./duplex":623,"./sink":625,"./source":626,"./through":627}],625:[function(require,module,exports){
+},{"./duplex":630,"./sink":632,"./source":633,"./through":634}],632:[function(require,module,exports){
 module.exports = function (stream) {
   var read, started = false, id = Math.random()
 
@@ -99571,7 +103826,7 @@ module.exports = function (stream) {
   return consume
 }
 
-},{}],626:[function(require,module,exports){
+},{}],633:[function(require,module,exports){
 
 module.exports = function () {
   var _read, _cb, abortCb, _end
@@ -99603,7 +103858,7 @@ module.exports = function () {
 }
 
 
-},{}],627:[function(require,module,exports){
+},{}],634:[function(require,module,exports){
 
 module.exports = function () {
   var read, reader, cb, abort, stream
@@ -99633,7 +103888,7 @@ module.exports = function () {
   return delayed
 }
 
-},{}],628:[function(require,module,exports){
+},{}],635:[function(require,module,exports){
 var Reader = require('pull-reader')
 var Writer = require('pull-pushable')
 var cat = require('pull-cat')
@@ -99684,7 +103939,7 @@ module.exports = function (opts, _cb) {
   }
 }
 
-},{"pull-cat":621,"pull-pair":633,"pull-pushable":637,"pull-reader":638}],629:[function(require,module,exports){
+},{"pull-cat":628,"pull-pair":640,"pull-pushable":644,"pull-reader":645}],636:[function(require,module,exports){
 'use strict'
 
 const varint = require('varint')
@@ -99809,7 +104064,7 @@ function readMessage (reader, size, cb) {
   })
 }
 
-},{"pull-pushable":637,"pull-reader":638,"safe-buffer":706,"varint":763}],630:[function(require,module,exports){
+},{"pull-pushable":644,"pull-reader":645,"safe-buffer":713,"varint":771}],637:[function(require,module,exports){
 'use strict'
 
 const Buffer = require('safe-buffer').Buffer
@@ -99871,7 +104126,7 @@ function createPool () {
   return Buffer.alloc(poolSize)
 }
 
-},{"safe-buffer":706,"varint":763}],631:[function(require,module,exports){
+},{"safe-buffer":713,"varint":771}],638:[function(require,module,exports){
 'use strict'
 
 const encode = require('./encode')
@@ -99881,7 +104136,7 @@ exports.encode = encode
 exports.decode = d.decode
 exports.decodeFromReader = d.decodeFromReader
 
-},{"./decode":629,"./encode":630}],632:[function(require,module,exports){
+},{"./decode":636,"./encode":637}],639:[function(require,module,exports){
 
 
 /*
@@ -100017,7 +104272,7 @@ module.exports = function (ary) {
 }
 
 
-},{}],633:[function(require,module,exports){
+},{}],640:[function(require,module,exports){
 'use strict'
 
 //a pair of pull streams where one drains from the other
@@ -100049,7 +104304,7 @@ module.exports = function () {
 }
 
 
-},{}],634:[function(require,module,exports){
+},{}],641:[function(require,module,exports){
 var looper = require('looper')
 module.exports = function (map, width, inOrder) {
   inOrder = inOrder === undefined ? true : inOrder
@@ -100119,7 +104374,7 @@ module.exports = function (map, width, inOrder) {
 }
 
 
-},{"looper":635}],635:[function(require,module,exports){
+},{"looper":642}],642:[function(require,module,exports){
 
 
 module.exports = function (fn) {
@@ -100145,7 +104400,7 @@ module.exports = function (fn) {
 
 
 
-},{}],636:[function(require,module,exports){
+},{}],643:[function(require,module,exports){
 
 
 module.exports = function (onPause) {
@@ -100182,7 +104437,7 @@ module.exports = function (onPause) {
 
 
 
-},{}],637:[function(require,module,exports){
+},{}],644:[function(require,module,exports){
 module.exports = pullPushable
 
 function pullPushable (separated, onClose) {
@@ -100271,7 +104526,7 @@ function pullPushable (separated, onClose) {
   }
 }
 
-},{}],638:[function(require,module,exports){
+},{}],645:[function(require,module,exports){
 'use strict'
 var State = require('./state')
 
@@ -100395,7 +104650,7 @@ module.exports = function (timeout) {
 
 
 
-},{"./state":639}],639:[function(require,module,exports){
+},{"./state":646}],646:[function(require,module,exports){
 (function (Buffer){
 
 module.exports = function () {
@@ -100472,7 +104727,7 @@ module.exports = function () {
 
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128}],640:[function(require,module,exports){
+},{"buffer":128}],647:[function(require,module,exports){
 
 var Source = require('pull-defer/source')
 var pull = require('pull-stream')
@@ -100492,7 +104747,7 @@ module.exports = function (compare) {
 
 }
 
-},{"pull-defer/source":626,"pull-stream":642}],641:[function(require,module,exports){
+},{"pull-defer/source":633,"pull-stream":649}],648:[function(require,module,exports){
 (function (process){
 
 var Stream = require('stream')
@@ -100646,7 +104901,7 @@ function duplex (reader, read) {
 }
 
 }).call(this,require('_process'))
-},{"_process":602,"stream":742}],642:[function(require,module,exports){
+},{"_process":609,"stream":749}],649:[function(require,module,exports){
 'use strict'
 
 var sources  = require('./sources')
@@ -100667,7 +104922,7 @@ for(var k in sinks)
   exports[k] = sinks[k]
 
 
-},{"./pull":643,"./sinks":648,"./sources":655,"./throughs":664}],643:[function(require,module,exports){
+},{"./pull":650,"./sinks":655,"./sources":662,"./throughs":671}],650:[function(require,module,exports){
 'use strict'
 
 module.exports = function pull (a) {
@@ -100718,7 +104973,7 @@ module.exports = function pull (a) {
   return read
 }
 
-},{}],644:[function(require,module,exports){
+},{}],651:[function(require,module,exports){
 'use strict'
 
 var reduce = require('./reduce')
@@ -100730,7 +104985,7 @@ module.exports = function collect (cb) {
   }, [], cb)
 }
 
-},{"./reduce":651}],645:[function(require,module,exports){
+},{"./reduce":658}],652:[function(require,module,exports){
 'use strict'
 
 var reduce = require('./reduce')
@@ -100741,7 +104996,7 @@ module.exports = function concat (cb) {
   }, '', cb)
 }
 
-},{"./reduce":651}],646:[function(require,module,exports){
+},{"./reduce":658}],653:[function(require,module,exports){
 'use strict'
 
 module.exports = function drain (op, done) {
@@ -100791,7 +105046,7 @@ module.exports = function drain (op, done) {
   return sink
 }
 
-},{}],647:[function(require,module,exports){
+},{}],654:[function(require,module,exports){
 'use strict'
 
 function id (e) { return e }
@@ -100821,7 +105076,7 @@ module.exports = function find (test, cb) {
 
 
 
-},{"../util/prop":671,"./drain":646}],648:[function(require,module,exports){
+},{"../util/prop":678,"./drain":653}],655:[function(require,module,exports){
 'use strict'
 
 module.exports = {
@@ -100835,7 +105090,7 @@ module.exports = {
 }
 
 
-},{"./collect":644,"./concat":645,"./drain":646,"./find":647,"./log":649,"./on-end":650,"./reduce":651}],649:[function(require,module,exports){
+},{"./collect":651,"./concat":652,"./drain":653,"./find":654,"./log":656,"./on-end":657,"./reduce":658}],656:[function(require,module,exports){
 'use strict'
 
 var drain = require('./drain')
@@ -100846,7 +105101,7 @@ module.exports = function log (done) {
   }, done)
 }
 
-},{"./drain":646}],650:[function(require,module,exports){
+},{"./drain":653}],657:[function(require,module,exports){
 'use strict'
 
 var drain = require('./drain')
@@ -100855,7 +105110,7 @@ module.exports = function onEnd (done) {
   return drain(null, done)
 }
 
-},{"./drain":646}],651:[function(require,module,exports){
+},{"./drain":653}],658:[function(require,module,exports){
 'use strict'
 
 var drain = require('./drain')
@@ -100879,7 +105134,7 @@ module.exports = function reduce (reducer, acc, cb ) {
     return sink
 }
 
-},{"./drain":646}],652:[function(require,module,exports){
+},{"./drain":653}],659:[function(require,module,exports){
 'use strict'
 
 module.exports = function count (max) {
@@ -100894,7 +105149,7 @@ module.exports = function count (max) {
 
 
 
-},{}],653:[function(require,module,exports){
+},{}],660:[function(require,module,exports){
 'use strict'
 //a stream that ends immediately.
 module.exports = function empty () {
@@ -100903,7 +105158,7 @@ module.exports = function empty () {
   }
 }
 
-},{}],654:[function(require,module,exports){
+},{}],661:[function(require,module,exports){
 'use strict'
 //a stream that errors immediately.
 module.exports = function error (err) {
@@ -100913,7 +105168,7 @@ module.exports = function error (err) {
 }
 
 
-},{}],655:[function(require,module,exports){
+},{}],662:[function(require,module,exports){
 'use strict'
 module.exports = {
   keys: require('./keys'),
@@ -100925,7 +105180,7 @@ module.exports = {
   error: require('./error')
 }
 
-},{"./count":652,"./empty":653,"./error":654,"./infinite":656,"./keys":657,"./once":658,"./values":659}],656:[function(require,module,exports){
+},{"./count":659,"./empty":660,"./error":661,"./infinite":663,"./keys":664,"./once":665,"./values":666}],663:[function(require,module,exports){
 'use strict'
 module.exports = function infinite (generate) {
   generate = generate || Math.random
@@ -100937,7 +105192,7 @@ module.exports = function infinite (generate) {
 
 
 
-},{}],657:[function(require,module,exports){
+},{}],664:[function(require,module,exports){
 'use strict'
 var values = require('./values')
 module.exports = function (object) {
@@ -100946,7 +105201,7 @@ module.exports = function (object) {
 
 
 
-},{"./values":659}],658:[function(require,module,exports){
+},{"./values":666}],665:[function(require,module,exports){
 'use strict'
 var abortCb = require('../util/abort-cb')
 
@@ -100964,7 +105219,7 @@ module.exports = function once (value, onAbort) {
 
 
 
-},{"../util/abort-cb":670}],659:[function(require,module,exports){
+},{"../util/abort-cb":677}],666:[function(require,module,exports){
 'use strict'
 var abortCb = require('../util/abort-cb')
 
@@ -100989,7 +105244,7 @@ module.exports = function values (array, onAbort) {
   }
 }
 
-},{"../util/abort-cb":670}],660:[function(require,module,exports){
+},{"../util/abort-cb":677}],667:[function(require,module,exports){
 'use strict'
 
 function id (e) { return e }
@@ -101034,7 +105289,7 @@ module.exports = function asyncMap (map) {
 
 
 
-},{"../util/prop":671}],661:[function(require,module,exports){
+},{"../util/prop":678}],668:[function(require,module,exports){
 'use strict'
 
 var tester = require('../util/tester')
@@ -101045,7 +105300,7 @@ module.exports = function filterNot (test) {
   return filter(function (data) { return !test(data) })
 }
 
-},{"../util/tester":672,"./filter":662}],662:[function(require,module,exports){
+},{"../util/tester":679,"./filter":669}],669:[function(require,module,exports){
 'use strict'
 
 var tester = require('../util/tester')
@@ -101071,7 +105326,7 @@ module.exports = function filter (test) {
 }
 
 
-},{"../util/tester":672}],663:[function(require,module,exports){
+},{"../util/tester":679}],670:[function(require,module,exports){
 'use strict'
 
 var values = require('../sources/values')
@@ -101120,7 +105375,7 @@ module.exports = function flatten () {
 }
 
 
-},{"../sources/once":658,"../sources/values":659}],664:[function(require,module,exports){
+},{"../sources/once":665,"../sources/values":666}],671:[function(require,module,exports){
 'use strict'
 
 module.exports = {
@@ -101138,7 +105393,7 @@ module.exports = {
 
 
 
-},{"./async-map":660,"./filter":662,"./filter-not":661,"./flatten":663,"./map":665,"./non-unique":666,"./take":667,"./through":668,"./unique":669}],665:[function(require,module,exports){
+},{"./async-map":667,"./filter":669,"./filter-not":668,"./flatten":670,"./map":672,"./non-unique":673,"./take":674,"./through":675,"./unique":676}],672:[function(require,module,exports){
 'use strict'
 
 function id (e) { return e }
@@ -101163,7 +105418,7 @@ module.exports = function map (mapper) {
   }
 }
 
-},{"../util/prop":671}],666:[function(require,module,exports){
+},{"../util/prop":678}],673:[function(require,module,exports){
 'use strict'
 
 var unique = require('./unique')
@@ -101173,7 +105428,7 @@ module.exports = function nonUnique (field) {
   return unique(field, true)
 }
 
-},{"./unique":669}],667:[function(require,module,exports){
+},{"./unique":676}],674:[function(require,module,exports){
 'use strict'
 
 //read a number of items and then stop.
@@ -101216,7 +105471,7 @@ module.exports = function take (test, opts) {
   }
 }
 
-},{}],668:[function(require,module,exports){
+},{}],675:[function(require,module,exports){
 'use strict'
 
 //a pass through stream that doesn't change the value.
@@ -101241,7 +105496,7 @@ module.exports = function through (op, onEnd) {
   }
 }
 
-},{}],669:[function(require,module,exports){
+},{}],676:[function(require,module,exports){
 'use strict'
 
 function id (e) { return e }
@@ -101261,7 +105516,7 @@ module.exports = function unique (field, invert) {
 }
 
 
-},{"../util/prop":671,"./filter":662}],670:[function(require,module,exports){
+},{"../util/prop":678,"./filter":669}],677:[function(require,module,exports){
 module.exports = function abortCb(cb, abort, onAbort) {
   cb(abort)
   onAbort && onAbort(abort === true ? null: abort)
@@ -101269,7 +105524,7 @@ module.exports = function abortCb(cb, abort, onAbort) {
 }
 
 
-},{}],671:[function(require,module,exports){
+},{}],678:[function(require,module,exports){
 module.exports = function prop (key) {
   return key && (
     'string' == typeof key
@@ -101280,7 +105535,7 @@ module.exports = function prop (key) {
   )
 }
 
-},{}],672:[function(require,module,exports){
+},{}],679:[function(require,module,exports){
 var prop = require('./prop')
 
 function id (e) { return e }
@@ -101293,7 +105548,7 @@ module.exports = function tester (test) {
   )
 }
 
-},{"./prop":671}],673:[function(require,module,exports){
+},{"./prop":678}],680:[function(require,module,exports){
 var looper = require('looper')
 
 module.exports = function (writer, ender) {
@@ -101364,7 +105619,7 @@ module.exports = function (writer, ender) {
 }
 
 
-},{"looper":533}],674:[function(require,module,exports){
+},{"looper":540}],681:[function(require,module,exports){
 
 var once = exports.once =
 function (value) {
@@ -101457,7 +105712,7 @@ function (start, createStream) {
 }
 
 
-},{}],675:[function(require,module,exports){
+},{}],682:[function(require,module,exports){
 //another idea: buffer 2* the max, but only call write with half of that,
 //this could manage cases where the read ahead is latent. Hmm, we probably
 //shouldn't guess at that here, just handle write latency.
@@ -101549,9 +105804,9 @@ module.exports = function (write, reduce, max, cb) {
 }
 
 
-},{"looper":676}],676:[function(require,module,exports){
-arguments[4][635][0].apply(exports,arguments)
-},{"dup":635}],677:[function(require,module,exports){
+},{"looper":683}],683:[function(require,module,exports){
+arguments[4][642][0].apply(exports,arguments)
+},{"dup":642}],684:[function(require,module,exports){
 'use strict';
 
 //load websocket library if we are not in the browser
@@ -101591,7 +105846,7 @@ module.exports = function (addr, opts) {
 
 module.exports.connect = module.exports
 
-},{"./duplex":678,"./web-socket":682,"./ws-url":683}],678:[function(require,module,exports){
+},{"./duplex":685,"./web-socket":689,"./ws-url":690}],685:[function(require,module,exports){
 var source = require('./source')
 var sink = require('./sink')
 
@@ -101616,7 +105871,7 @@ function duplex (ws, opts) {
 };
 
 
-},{"./sink":680,"./source":681}],679:[function(require,module,exports){
+},{"./sink":687,"./source":688}],686:[function(require,module,exports){
 module.exports = function(socket, callback) {
   var remove = socket && (socket.removeEventListener || socket.removeListener);
 
@@ -101649,7 +105904,7 @@ module.exports = function(socket, callback) {
   socket.addEventListener('error', handleErr);
 };
 
-},{}],680:[function(require,module,exports){
+},{}],687:[function(require,module,exports){
 (function (process){
 var ready = require('./ready');
 
@@ -101707,7 +105962,7 @@ module.exports = function(socket, opts) {
 }
 
 }).call(this,require('_process'))
-},{"./ready":679,"_process":602}],681:[function(require,module,exports){
+},{"./ready":686,"_process":609}],688:[function(require,module,exports){
 (function (Buffer){
 /**
   ### `source(socket)`
@@ -101789,11 +106044,11 @@ module.exports = function(socket, cb) {
 };
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128}],682:[function(require,module,exports){
+},{"buffer":128}],689:[function(require,module,exports){
 
 module.exports = 'undefined' === typeof WebSocket ? require('ws') : WebSocket
 
-},{"ws":96}],683:[function(require,module,exports){
+},{"ws":96}],690:[function(require,module,exports){
 var rurl = require('relative-url')
 var map = {http:'ws', https:'wss'}
 var def = 'ws'
@@ -101803,7 +106058,7 @@ module.exports = function (url, location) {
 
 
 
-},{"relative-url":703}],684:[function(require,module,exports){
+},{"relative-url":710}],691:[function(require,module,exports){
 var once = require('once')
 var eos = require('end-of-stream')
 var fs = require('fs') // we only need fs to get the ReadStream and WriteStream prototypes
@@ -101885,7 +106140,7 @@ var pump = function () {
 
 module.exports = pump
 
-},{"end-of-stream":190,"fs":96,"once":580}],685:[function(require,module,exports){
+},{"end-of-stream":190,"fs":96,"once":587}],692:[function(require,module,exports){
 (function (global){
 /*! https://mths.be/punycode v1.4.1 by @mathias */
 ;(function(root) {
@@ -102422,7 +106677,7 @@ module.exports = pump
 }(this));
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],686:[function(require,module,exports){
+},{}],693:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -102508,7 +106763,7 @@ var isArray = Array.isArray || function (xs) {
   return Object.prototype.toString.call(xs) === '[object Array]';
 };
 
-},{}],687:[function(require,module,exports){
+},{}],694:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -102595,13 +106850,13 @@ var objectKeys = Object.keys || function (obj) {
   return res;
 };
 
-},{}],688:[function(require,module,exports){
+},{}],695:[function(require,module,exports){
 'use strict';
 
 exports.decode = exports.parse = require('./decode');
 exports.encode = exports.stringify = require('./encode');
 
-},{"./decode":686,"./encode":687}],689:[function(require,module,exports){
+},{"./decode":693,"./encode":694}],696:[function(require,module,exports){
 (function (process,global){
 'use strict'
 
@@ -102643,10 +106898,10 @@ function randomBytes (size, cb) {
 }
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"_process":602,"safe-buffer":706}],690:[function(require,module,exports){
+},{"_process":609,"safe-buffer":713}],697:[function(require,module,exports){
 module.exports = require('./lib/_stream_duplex.js');
 
-},{"./lib/_stream_duplex.js":691}],691:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":698}],698:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -102771,7 +107026,7 @@ function forEach(xs, f) {
     f(xs[i], i);
   }
 }
-},{"./_stream_readable":693,"./_stream_writable":695,"core-util-is":134,"inherits":242,"process-nextick-args":601}],692:[function(require,module,exports){
+},{"./_stream_readable":700,"./_stream_writable":702,"core-util-is":134,"inherits":244,"process-nextick-args":608}],699:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -102819,7 +107074,7 @@ function PassThrough(options) {
 PassThrough.prototype._transform = function (chunk, encoding, cb) {
   cb(null, chunk);
 };
-},{"./_stream_transform":694,"core-util-is":134,"inherits":242}],693:[function(require,module,exports){
+},{"./_stream_transform":701,"core-util-is":134,"inherits":244}],700:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -103829,7 +108084,7 @@ function indexOf(xs, x) {
   return -1;
 }
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./_stream_duplex":691,"./internal/streams/BufferList":696,"./internal/streams/destroy":697,"./internal/streams/stream":698,"_process":602,"core-util-is":134,"events":215,"inherits":242,"isarray":378,"process-nextick-args":601,"safe-buffer":706,"string_decoder/":745,"util":96}],694:[function(require,module,exports){
+},{"./_stream_duplex":698,"./internal/streams/BufferList":703,"./internal/streams/destroy":704,"./internal/streams/stream":705,"_process":609,"core-util-is":134,"events":215,"inherits":244,"isarray":383,"process-nextick-args":608,"safe-buffer":713,"string_decoder/":752,"util":96}],701:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -104044,7 +108299,7 @@ function done(stream, er, data) {
 
   return stream.push(null);
 }
-},{"./_stream_duplex":691,"core-util-is":134,"inherits":242}],695:[function(require,module,exports){
+},{"./_stream_duplex":698,"core-util-is":134,"inherits":244}],702:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -104711,7 +108966,7 @@ Writable.prototype._destroy = function (err, cb) {
   cb(err);
 };
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./_stream_duplex":691,"./internal/streams/destroy":697,"./internal/streams/stream":698,"_process":602,"core-util-is":134,"inherits":242,"process-nextick-args":601,"safe-buffer":706,"util-deprecate":753}],696:[function(require,module,exports){
+},{"./_stream_duplex":698,"./internal/streams/destroy":704,"./internal/streams/stream":705,"_process":609,"core-util-is":134,"inherits":244,"process-nextick-args":608,"safe-buffer":713,"util-deprecate":761}],703:[function(require,module,exports){
 'use strict';
 
 /*<replacement>*/
@@ -104786,7 +109041,7 @@ module.exports = function () {
 
   return BufferList;
 }();
-},{"safe-buffer":706}],697:[function(require,module,exports){
+},{"safe-buffer":713}],704:[function(require,module,exports){
 'use strict';
 
 /*<replacement>*/
@@ -104859,13 +109114,13 @@ module.exports = {
   destroy: destroy,
   undestroy: undestroy
 };
-},{"process-nextick-args":601}],698:[function(require,module,exports){
+},{"process-nextick-args":608}],705:[function(require,module,exports){
 module.exports = require('events').EventEmitter;
 
-},{"events":215}],699:[function(require,module,exports){
+},{"events":215}],706:[function(require,module,exports){
 module.exports = require('./readable').PassThrough
 
-},{"./readable":700}],700:[function(require,module,exports){
+},{"./readable":707}],707:[function(require,module,exports){
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = exports;
 exports.Readable = exports;
@@ -104874,13 +109129,13 @@ exports.Duplex = require('./lib/_stream_duplex.js');
 exports.Transform = require('./lib/_stream_transform.js');
 exports.PassThrough = require('./lib/_stream_passthrough.js');
 
-},{"./lib/_stream_duplex.js":691,"./lib/_stream_passthrough.js":692,"./lib/_stream_readable.js":693,"./lib/_stream_transform.js":694,"./lib/_stream_writable.js":695}],701:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":698,"./lib/_stream_passthrough.js":699,"./lib/_stream_readable.js":700,"./lib/_stream_transform.js":701,"./lib/_stream_writable.js":702}],708:[function(require,module,exports){
 module.exports = require('./readable').Transform
 
-},{"./readable":700}],702:[function(require,module,exports){
+},{"./readable":707}],709:[function(require,module,exports){
 module.exports = require('./lib/_stream_writable.js');
 
-},{"./lib/_stream_writable.js":695}],703:[function(require,module,exports){
+},{"./lib/_stream_writable.js":702}],710:[function(require,module,exports){
 
 //normalize a ws url.
 var URL = require('url')
@@ -104978,7 +109233,7 @@ module.exports = function (url, location, protocolMap, defaultProtocol) {
 
 
 
-},{"url":751}],704:[function(require,module,exports){
+},{"url":759}],711:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 var inherits = require('inherits')
@@ -105273,7 +109528,7 @@ function fn5 (a, b, c, d, e, m, k, s) {
 module.exports = RIPEMD160
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"hash-base":225,"inherits":242}],705:[function(require,module,exports){
+},{"buffer":128,"hash-base":226,"inherits":244}],712:[function(require,module,exports){
 (function (Buffer){
 const assert = require('assert')
 /**
@@ -105506,7 +109761,7 @@ function toBuffer (v) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"assert":31,"buffer":128}],706:[function(require,module,exports){
+},{"assert":31,"buffer":128}],713:[function(require,module,exports){
 /* eslint-disable node/no-deprecated-api */
 var buffer = require('buffer')
 var Buffer = buffer.Buffer
@@ -105570,15 +109825,15 @@ SafeBuffer.allocUnsafeSlow = function (size) {
   return buffer.SlowBuffer(size)
 }
 
-},{"buffer":128}],707:[function(require,module,exports){
+},{"buffer":128}],714:[function(require,module,exports){
 'use strict'
 module.exports = require('./lib')(require('./lib/elliptic'))
 
-},{"./lib":712,"./lib/elliptic":711}],708:[function(require,module,exports){
+},{"./lib":719,"./lib/elliptic":718}],715:[function(require,module,exports){
 'use strict'
 module.exports = require('./lib')(require('./lib/js'))
 
-},{"./lib":712,"./lib/js":718}],709:[function(require,module,exports){
+},{"./lib":719,"./lib/js":725}],716:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 var toString = Object.prototype.toString
@@ -105626,7 +109881,7 @@ exports.isNumberInInterval = function (number, x, y, message) {
 }
 
 }).call(this,{"isBuffer":require("../../is-buffer/index.js")})
-},{"../../is-buffer/index.js":372}],710:[function(require,module,exports){
+},{"../../is-buffer/index.js":377}],717:[function(require,module,exports){
 'use strict'
 var Buffer = require('safe-buffer').Buffer
 var bip66 = require('bip66')
@@ -105826,7 +110081,7 @@ exports.signatureImportLax = function (sig) {
   return { r: r, s: s }
 }
 
-},{"bip66":79,"safe-buffer":706}],711:[function(require,module,exports){
+},{"bip66":79,"safe-buffer":713}],718:[function(require,module,exports){
 'use strict'
 var Buffer = require('safe-buffer').Buffer
 var createHash = require('create-hash')
@@ -106076,7 +110331,7 @@ exports.ecdhUnsafe = function (publicKey, privateKey, compressed) {
   return Buffer.from(pair.pub.mul(scalar).encode(true, compressed))
 }
 
-},{"../messages.json":719,"bn.js":85,"create-hash":136,"elliptic":174,"safe-buffer":706}],712:[function(require,module,exports){
+},{"../messages.json":726,"bn.js":85,"create-hash":136,"elliptic":174,"safe-buffer":713}],719:[function(require,module,exports){
 'use strict'
 var assert = require('./assert')
 var der = require('./der')
@@ -106309,7 +110564,7 @@ module.exports = function (secp256k1) {
   }
 }
 
-},{"./assert":709,"./der":710,"./messages.json":719}],713:[function(require,module,exports){
+},{"./assert":716,"./der":717,"./messages.json":726}],720:[function(require,module,exports){
 'use strict'
 var Buffer = require('safe-buffer').Buffer
 var optimized = require('./optimized')
@@ -106973,7 +111228,7 @@ BN.tmp.words = new Array(10)
 
 module.exports = BN
 
-},{"./optimized":714,"safe-buffer":706}],714:[function(require,module,exports){
+},{"./optimized":721,"safe-buffer":713}],721:[function(require,module,exports){
 'use strict'
 exports.umulTo10x10 = function (num1, num2, out) {
   var a = num1.words
@@ -107547,7 +111802,7 @@ exports.umulTo10x10 = function (num1, num2, out) {
   return out
 }
 
-},{}],715:[function(require,module,exports){
+},{}],722:[function(require,module,exports){
 'use strict'
 var BN = require('./bn')
 
@@ -107728,7 +111983,7 @@ Object.defineProperty(ECJPoint.prototype, 'inf', {
 
 module.exports = ECJPoint
 
-},{"./bn":713}],716:[function(require,module,exports){
+},{"./bn":720}],723:[function(require,module,exports){
 'use strict'
 var Buffer = require('safe-buffer').Buffer
 var BN = require('./bn')
@@ -107912,7 +112167,7 @@ ECPoint.prototype._getNAFPoints = function (wnd) {
 
 module.exports = ECPoint
 
-},{"./bn":713,"./ecjpoint":715,"safe-buffer":706}],717:[function(require,module,exports){
+},{"./bn":720,"./ecjpoint":722,"safe-buffer":713}],724:[function(require,module,exports){
 'use strict'
 var Buffer = require('safe-buffer').Buffer
 var BN = require('./bn')
@@ -108030,7 +112285,7 @@ ECPointG.prototype.mulAdd = function (k1, p2, k2) {
 
 module.exports = new ECPointG()
 
-},{"./bn":713,"./ecjpoint":715,"./ecpoint":716,"safe-buffer":706}],718:[function(require,module,exports){
+},{"./bn":720,"./ecjpoint":722,"./ecpoint":723,"safe-buffer":713}],725:[function(require,module,exports){
 'use strict'
 var Buffer = require('safe-buffer').Buffer
 var createHash = require('create-hash')
@@ -108257,7 +112512,7 @@ exports.ecdhUnsafe = function (publicKey, privateKey, compressed) {
   return point.mul(scalar).toPublicKey(compressed)
 }
 
-},{"../messages.json":719,"./bn":713,"./ecpoint":716,"./ecpointg":717,"create-hash":136,"drbg.js/hmac":171,"safe-buffer":706}],719:[function(require,module,exports){
+},{"../messages.json":726,"./bn":720,"./ecpoint":723,"./ecpointg":724,"create-hash":136,"drbg.js/hmac":171,"safe-buffer":713}],726:[function(require,module,exports){
 module.exports={
   "COMPRESSED_TYPE_INVALID": "compressed should be a boolean",
   "EC_PRIVATE_KEY_TYPE_INVALID": "private key should be a Buffer",
@@ -108295,7 +112550,7 @@ module.exports={
   "TWEAK_LENGTH_INVALID": "tweak length is invalid"
 }
 
-},{}],720:[function(require,module,exports){
+},{}],727:[function(require,module,exports){
 (function (process){
 exports = module.exports = SemVer;
 
@@ -109595,7 +113850,7 @@ function intersects(r1, r2, loose) {
 }
 
 }).call(this,require('_process'))
-},{"_process":602}],721:[function(require,module,exports){
+},{"_process":609}],728:[function(require,module,exports){
 (function (Buffer){
 // prototype class for hash functions
 function Hash (blockSize, finalSize) {
@@ -109668,7 +113923,7 @@ Hash.prototype._update = function () {
 module.exports = Hash
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128}],722:[function(require,module,exports){
+},{"buffer":128}],729:[function(require,module,exports){
 var exports = module.exports = function SHA (algorithm) {
   algorithm = algorithm.toLowerCase()
 
@@ -109685,7 +113940,7 @@ exports.sha256 = require('./sha256')
 exports.sha384 = require('./sha384')
 exports.sha512 = require('./sha512')
 
-},{"./sha":723,"./sha1":724,"./sha224":725,"./sha256":726,"./sha384":727,"./sha512":728}],723:[function(require,module,exports){
+},{"./sha":730,"./sha1":731,"./sha224":732,"./sha256":733,"./sha384":734,"./sha512":735}],730:[function(require,module,exports){
 (function (Buffer){
 /*
  * A JavaScript implementation of the Secure Hash Algorithm, SHA-0, as defined
@@ -109782,7 +114037,7 @@ Sha.prototype._hash = function () {
 module.exports = Sha
 
 }).call(this,require("buffer").Buffer)
-},{"./hash":721,"buffer":128,"inherits":242}],724:[function(require,module,exports){
+},{"./hash":728,"buffer":128,"inherits":244}],731:[function(require,module,exports){
 (function (Buffer){
 /*
  * A JavaScript implementation of the Secure Hash Algorithm, SHA-1, as defined
@@ -109884,7 +114139,7 @@ Sha1.prototype._hash = function () {
 module.exports = Sha1
 
 }).call(this,require("buffer").Buffer)
-},{"./hash":721,"buffer":128,"inherits":242}],725:[function(require,module,exports){
+},{"./hash":728,"buffer":128,"inherits":244}],732:[function(require,module,exports){
 (function (Buffer){
 /**
  * A JavaScript implementation of the Secure Hash Algorithm, SHA-256, as defined
@@ -109940,7 +114195,7 @@ Sha224.prototype._hash = function () {
 module.exports = Sha224
 
 }).call(this,require("buffer").Buffer)
-},{"./hash":721,"./sha256":726,"buffer":128,"inherits":242}],726:[function(require,module,exports){
+},{"./hash":728,"./sha256":733,"buffer":128,"inherits":244}],733:[function(require,module,exports){
 (function (Buffer){
 /**
  * A JavaScript implementation of the Secure Hash Algorithm, SHA-256, as defined
@@ -110078,7 +114333,7 @@ Sha256.prototype._hash = function () {
 module.exports = Sha256
 
 }).call(this,require("buffer").Buffer)
-},{"./hash":721,"buffer":128,"inherits":242}],727:[function(require,module,exports){
+},{"./hash":728,"buffer":128,"inherits":244}],734:[function(require,module,exports){
 (function (Buffer){
 var inherits = require('inherits')
 var SHA512 = require('./sha512')
@@ -110138,7 +114393,7 @@ Sha384.prototype._hash = function () {
 module.exports = Sha384
 
 }).call(this,require("buffer").Buffer)
-},{"./hash":721,"./sha512":728,"buffer":128,"inherits":242}],728:[function(require,module,exports){
+},{"./hash":728,"./sha512":735,"buffer":128,"inherits":244}],735:[function(require,module,exports){
 (function (Buffer){
 var inherits = require('inherits')
 var Hash = require('./hash')
@@ -110401,7 +114656,7 @@ Sha512.prototype._hash = function () {
 module.exports = Sha512
 
 }).call(this,require("buffer").Buffer)
-},{"./hash":721,"buffer":128,"inherits":242}],729:[function(require,module,exports){
+},{"./hash":728,"buffer":128,"inherits":244}],736:[function(require,module,exports){
 var varint = require('varint')
 exports.encode = function encode (v, b, o) {
   v = v >= 0 ? v*2 : v*-2 - 1
@@ -110419,7 +114674,7 @@ exports.encodingLength = function (v) {
   return varint.encodingLength(v >= 0 ? v*2 : v*-2 - 1)
 }
 
-},{"varint":763}],730:[function(require,module,exports){
+},{"varint":771}],737:[function(require,module,exports){
 (function (Buffer){
 module.exports = Peer
 
@@ -111225,7 +115480,7 @@ Peer.prototype._transformConstraints = function (constraints) {
 function noop () {}
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"debug":151,"get-browser-rtc":221,"inherits":242,"randombytes":689,"readable-stream":700}],731:[function(require,module,exports){
+},{"buffer":128,"debug":151,"get-browser-rtc":222,"inherits":244,"randombytes":696,"readable-stream":707}],738:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -111321,7 +115576,7 @@ exports.connect = lookup;
 exports.Manager = require('./manager');
 exports.Socket = require('./socket');
 
-},{"./manager":732,"./socket":734,"./url":735,"debug":151,"socket.io-parser":737}],732:[function(require,module,exports){
+},{"./manager":739,"./socket":741,"./url":742,"debug":151,"socket.io-parser":744}],739:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -111896,7 +116151,7 @@ Manager.prototype.onreconnect = function () {
   this.emitAll('reconnect', attempt);
 };
 
-},{"./on":733,"./socket":734,"backo2":73,"component-bind":131,"component-emitter":132,"debug":151,"engine.io-client":191,"indexof":241,"socket.io-parser":737}],733:[function(require,module,exports){
+},{"./on":740,"./socket":741,"backo2":73,"component-bind":131,"component-emitter":132,"debug":151,"engine.io-client":191,"indexof":243,"socket.io-parser":744}],740:[function(require,module,exports){
 
 /**
  * Module exports.
@@ -111922,7 +116177,7 @@ function on (obj, ev, fn) {
   };
 }
 
-},{}],734:[function(require,module,exports){
+},{}],741:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -112342,7 +116597,7 @@ Socket.prototype.compress = function (compress) {
   return this;
 };
 
-},{"./on":733,"component-bind":131,"component-emitter":132,"debug":151,"parseqs":588,"socket.io-parser":737,"to-array":748}],735:[function(require,module,exports){
+},{"./on":740,"component-bind":131,"component-emitter":132,"debug":151,"parseqs":595,"socket.io-parser":744,"to-array":756}],742:[function(require,module,exports){
 (function (global){
 
 /**
@@ -112421,7 +116676,7 @@ function url (uri, loc) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"debug":151,"parseuri":589}],736:[function(require,module,exports){
+},{"debug":151,"parseuri":596}],743:[function(require,module,exports){
 (function (global){
 /*global Blob,File*/
 
@@ -112566,7 +116821,7 @@ exports.removeBlobs = function(data, callback) {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./is-buffer":738,"isarray":739}],737:[function(require,module,exports){
+},{"./is-buffer":745,"isarray":746}],744:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -112968,7 +117223,7 @@ function error() {
   };
 }
 
-},{"./binary":736,"./is-buffer":738,"component-emitter":132,"debug":151,"has-binary2":222}],738:[function(require,module,exports){
+},{"./binary":743,"./is-buffer":745,"component-emitter":132,"debug":151,"has-binary2":223}],745:[function(require,module,exports){
 (function (global){
 
 module.exports = isBuf;
@@ -112985,9 +117240,9 @@ function isBuf(obj) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],739:[function(require,module,exports){
-arguments[4][223][0].apply(exports,arguments)
-},{"dup":223}],740:[function(require,module,exports){
+},{}],746:[function(require,module,exports){
+arguments[4][224][0].apply(exports,arguments)
+},{"dup":224}],747:[function(require,module,exports){
 'use strict'
 
 // JS treats subjects of bitwise operators as SIGNED 32 bit numbers,
@@ -113236,7 +117491,7 @@ function sortInternal (a, b) {
 function valueOnly (elem) {
   return elem[1]
 }
-},{}],741:[function(require,module,exports){
+},{}],748:[function(require,module,exports){
 //! stable.js 0.1.6, https://github.com/Two-Screen/stable
 //! © 2017 Angry Bytes and contributors. MIT licensed.
 
@@ -113349,7 +117604,7 @@ else {
 
 })();
 
-},{}],742:[function(require,module,exports){
+},{}],749:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -113478,7 +117733,7 @@ Stream.prototype.pipe = function(dest, options) {
   return dest;
 };
 
-},{"events":215,"inherits":242,"readable-stream/duplex.js":690,"readable-stream/passthrough.js":699,"readable-stream/readable.js":700,"readable-stream/transform.js":701,"readable-stream/writable.js":702}],743:[function(require,module,exports){
+},{"events":215,"inherits":244,"readable-stream/duplex.js":697,"readable-stream/passthrough.js":706,"readable-stream/readable.js":707,"readable-stream/transform.js":708,"readable-stream/writable.js":709}],750:[function(require,module,exports){
 module.exports = shift
 
 function shift (stream) {
@@ -113500,7 +117755,7 @@ function getStateLength (state) {
   return state.length
 }
 
-},{}],744:[function(require,module,exports){
+},{}],751:[function(require,module,exports){
 (function (process){
 var pull = require('pull-stream/pull')
 var looper = require('looper')
@@ -113741,7 +117996,7 @@ exports.transform = function (stream) {
 
 
 }).call(this,require('_process'))
-},{"_process":602,"looper":533,"pull-stream/pull":643}],745:[function(require,module,exports){
+},{"_process":609,"looper":540,"pull-stream/pull":650}],752:[function(require,module,exports){
 'use strict';
 
 var Buffer = require('safe-buffer').Buffer;
@@ -114014,7 +118269,7 @@ function simpleWrite(buf) {
 function simpleEnd(buf) {
   return buf && buf.length ? this.write(buf) : '';
 }
-},{"safe-buffer":706}],746:[function(require,module,exports){
+},{"safe-buffer":713}],753:[function(require,module,exports){
 var isHexPrefixed = require('is-hex-prefixed');
 
 /**
@@ -114030,7 +118285,7 @@ module.exports = function stripHexPrefix(str) {
   return isHexPrefixed(str) ? str.slice(2) : str;
 }
 
-},{"is-hex-prefixed":374}],747:[function(require,module,exports){
+},{"is-hex-prefixed":379}],754:[function(require,module,exports){
 'use strict'
 
 const throttle = require('lodash.throttle')
@@ -114089,7 +118344,84 @@ function getTimeElapsed (prevTime) {
   return Math.floor(a / 1000)
 }
 
-},{"lodash.throttle":493}],748:[function(require,module,exports){
+},{"lodash.throttle":500}],755:[function(require,module,exports){
+var nextTick = require('process/browser.js').nextTick;
+var apply = Function.prototype.apply;
+var slice = Array.prototype.slice;
+var immediateIds = {};
+var nextImmediateId = 0;
+
+// DOM APIs, for completeness
+
+exports.setTimeout = function() {
+  return new Timeout(apply.call(setTimeout, window, arguments), clearTimeout);
+};
+exports.setInterval = function() {
+  return new Timeout(apply.call(setInterval, window, arguments), clearInterval);
+};
+exports.clearTimeout =
+exports.clearInterval = function(timeout) { timeout.close(); };
+
+function Timeout(id, clearFn) {
+  this._id = id;
+  this._clearFn = clearFn;
+}
+Timeout.prototype.unref = Timeout.prototype.ref = function() {};
+Timeout.prototype.close = function() {
+  this._clearFn.call(window, this._id);
+};
+
+// Does not start the time, just sets up the members needed.
+exports.enroll = function(item, msecs) {
+  clearTimeout(item._idleTimeoutId);
+  item._idleTimeout = msecs;
+};
+
+exports.unenroll = function(item) {
+  clearTimeout(item._idleTimeoutId);
+  item._idleTimeout = -1;
+};
+
+exports._unrefActive = exports.active = function(item) {
+  clearTimeout(item._idleTimeoutId);
+
+  var msecs = item._idleTimeout;
+  if (msecs >= 0) {
+    item._idleTimeoutId = setTimeout(function onTimeout() {
+      if (item._onTimeout)
+        item._onTimeout();
+    }, msecs);
+  }
+};
+
+// That's not how node.js implements it but the exposed api is the same.
+exports.setImmediate = typeof setImmediate === "function" ? setImmediate : function(fn) {
+  var id = nextImmediateId++;
+  var args = arguments.length < 2 ? false : slice.call(arguments, 1);
+
+  immediateIds[id] = true;
+
+  nextTick(function onNextTick() {
+    if (immediateIds[id]) {
+      // fn.call() is faster so we optimize for the common use-case
+      // @see http://jsperf.com/call-apply-segu
+      if (args) {
+        fn.apply(null, args);
+      } else {
+        fn.call(null);
+      }
+      // Prevent ids from leaking
+      exports.clearImmediate(id);
+    }
+  });
+
+  return id;
+};
+
+exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate : function(id) {
+  delete immediateIds[id];
+};
+},{"process/browser.js":609}],756:[function(require,module,exports){
 module.exports = toArray
 
 function toArray(list, index) {
@@ -114104,7 +118436,7 @@ function toArray(list, index) {
     return array
 }
 
-},{}],749:[function(require,module,exports){
+},{}],757:[function(require,module,exports){
 var traverse = module.exports = function (obj) {
     return new Traverse(obj);
 };
@@ -114420,7 +118752,7 @@ var hasOwnProperty = Object.hasOwnProperty || function (obj, key) {
     return key in obj;
 };
 
-},{}],750:[function(require,module,exports){
+},{}],758:[function(require,module,exports){
 (function(nacl) {
 'use strict';
 
@@ -116799,7 +121131,7 @@ nacl.setPRNG = function(fn) {
 
 })(typeof module !== 'undefined' && module.exports ? module.exports : (self.nacl = self.nacl || {}));
 
-},{"crypto":96}],751:[function(require,module,exports){
+},{"crypto":96}],759:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -117533,7 +121865,7 @@ Url.prototype.parseHost = function() {
   if (host) this.hostname = host;
 };
 
-},{"./util":752,"punycode":685,"querystring":688}],752:[function(require,module,exports){
+},{"./util":760,"punycode":692,"querystring":695}],760:[function(require,module,exports){
 'use strict';
 
 module.exports = {
@@ -117551,7 +121883,7 @@ module.exports = {
   }
 };
 
-},{}],753:[function(require,module,exports){
+},{}],761:[function(require,module,exports){
 (function (global){
 
 /**
@@ -117622,16 +121954,16 @@ function config (name) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],754:[function(require,module,exports){
-arguments[4][242][0].apply(exports,arguments)
-},{"dup":242}],755:[function(require,module,exports){
+},{}],762:[function(require,module,exports){
+arguments[4][244][0].apply(exports,arguments)
+},{"dup":244}],763:[function(require,module,exports){
 module.exports = function isBuffer(arg) {
   return arg && typeof arg === 'object'
     && typeof arg.copy === 'function'
     && typeof arg.fill === 'function'
     && typeof arg.readUInt8 === 'function';
 }
-},{}],756:[function(require,module,exports){
+},{}],764:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -118221,7 +122553,7 @@ function hasOwnProperty(obj, prop) {
 }
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./support/isBuffer":755,"_process":602,"inherits":754}],757:[function(require,module,exports){
+},{"./support/isBuffer":763,"_process":609,"inherits":762}],765:[function(require,module,exports){
 /**
  * Convert array of 16 byte values to UUID string format of the form:
  * XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
@@ -118246,7 +122578,7 @@ function bytesToUuid(buf, offset) {
 
 module.exports = bytesToUuid;
 
-},{}],758:[function(require,module,exports){
+},{}],766:[function(require,module,exports){
 (function (global){
 // Unique ID creation requires a high quality random # generator.  In the
 // browser this is a little complicated due to unknown quality of Math.random()
@@ -118283,7 +122615,7 @@ if (!rng) {
 module.exports = rng;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],759:[function(require,module,exports){
+},{}],767:[function(require,module,exports){
 var rng = require('./lib/rng');
 var bytesToUuid = require('./lib/bytesToUuid');
 
@@ -118314,7 +122646,7 @@ function v4(options, buf, offset) {
 
 module.exports = v4;
 
-},{"./lib/bytesToUuid":757,"./lib/rng":758}],760:[function(require,module,exports){
+},{"./lib/bytesToUuid":765,"./lib/rng":766}],768:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -118337,7 +122669,7 @@ module.exports = (buf) => {
 }
 
 }).call(this,{"isBuffer":require("../../is-buffer/index.js")})
-},{"../../is-buffer/index.js":372,"varint":763}],761:[function(require,module,exports){
+},{"../../is-buffer/index.js":377,"varint":771}],769:[function(require,module,exports){
 module.exports = read
 
 var MSB = 0x80
@@ -118368,13 +122700,13 @@ function read(buf, offset) {
   return res
 }
 
-},{}],762:[function(require,module,exports){
-arguments[4][562][0].apply(exports,arguments)
-},{"dup":562}],763:[function(require,module,exports){
-arguments[4][563][0].apply(exports,arguments)
-},{"./decode.js":761,"./encode.js":762,"./length.js":764,"dup":563}],764:[function(require,module,exports){
-arguments[4][564][0].apply(exports,arguments)
-},{"dup":564}],765:[function(require,module,exports){
+},{}],770:[function(require,module,exports){
+arguments[4][569][0].apply(exports,arguments)
+},{"dup":569}],771:[function(require,module,exports){
+arguments[4][570][0].apply(exports,arguments)
+},{"./decode.js":769,"./encode.js":770,"./length.js":772,"dup":570}],772:[function(require,module,exports){
+arguments[4][571][0].apply(exports,arguments)
+},{"dup":571}],773:[function(require,module,exports){
 var indexOf = require('indexof');
 
 var Object_keys = function (obj) {
@@ -118514,7 +122846,7 @@ exports.createContext = Script.createContext = function (context) {
     return copy;
 };
 
-},{"indexof":241}],766:[function(require,module,exports){
+},{"indexof":243}],774:[function(require,module,exports){
 /**
  * @file Web Cryptography API shim
  * @author Artem S Vybornov <vybornov@gmail.com>
@@ -119114,7 +123446,7 @@ module.exports = function webcryptoShim (global) {
     }
 }
 
-},{}],767:[function(require,module,exports){
+},{}],775:[function(require,module,exports){
 /* global self */
 
 // created by @HenrikJoreteg
@@ -119163,7 +123495,7 @@ module.exports = {
   getUserMedia: getUserMedia
 }
 
-},{}],768:[function(require,module,exports){
+},{}],776:[function(require,module,exports){
 // Returns a wrapper function that returns a wrapped callback
 // The wrapper function should do some stuff, and return a
 // presumably different callback function.
@@ -119198,7 +123530,7 @@ function wrappy (fn, cb) {
   }
 }
 
-},{}],769:[function(require,module,exports){
+},{}],777:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -119219,7 +123551,1736 @@ function extend() {
     return target
 }
 
-},{}],770:[function(require,module,exports){
+},{}],778:[function(require,module,exports){
+/* global Y */
+'use strict'
+
+function extend (Y) {
+  class YArray extends Y.utils.CustomType {
+    constructor (os, _model, _content) {
+      super()
+      this.os = os
+      this._model = _model
+      // Array of all the neccessary content
+      this._content = _content
+
+      // the parent of this type
+      this._parent = null
+      this._deepEventHandler = new Y.utils.EventListenerHandler()
+
+      // this._debugEvents = [] // TODO: remove!!
+      this.eventHandler = new Y.utils.EventHandler((op) => {
+        // this._debugEvents.push(JSON.parse(JSON.stringify(op)))
+        if (op.struct === 'Insert') {
+          // when using indexeddb db adapter, the op could already exist (see y-js/y-indexeddb#2)
+          if (this._content.some(function (c) { return Y.utils.compareIds(c.id, op.id) })) {
+            // op exists
+            return
+          }
+          let pos
+          // we check op.left only!,
+          // because op.right might not be defined when this is called
+          if (op.left === null) {
+            pos = 0
+          } else {
+            pos = 1 + this._content.findIndex(function (c) {
+              return Y.utils.compareIds(c.id, op.left)
+            })
+            if (pos <= 0) {
+              throw new Error('Unexpected operation!')
+            }
+          }
+          /* (see above for new approach)
+          var _e = this._content[pos]
+          // when using indexeddb db adapter, the op could already exist (see y-js/y-indexeddb#2)
+          // If the algorithm works correctly, the double should always exist on the correct position (pos - the computed destination)
+          if (_e != null && Y.utils.compareIds(_e.id, op.id)) {
+            // is already defined
+            return
+          }*/
+          var values
+          var length
+          if (op.hasOwnProperty('opContent')) {
+            this._content.splice(pos, 0, {
+              id: op.id,
+              type: op.opContent
+            })
+            length = 1
+            let type = this.os.getType(op.opContent)
+            type._parent = this._model
+            values = [type]
+          } else {
+            var contents = op.content.map(function (c, i) {
+              return {
+                id: [op.id[0], op.id[1] + i],
+                val: c
+              }
+            })
+            // insert value in _content
+            // It is not possible to insert more than ~2^16 elements in an Array (see #5). We handle this case explicitly
+            if (contents.length < 30000) {
+              this._content.splice.apply(this._content, [pos, 0].concat(contents))
+            } else {
+              this._content = this._content.slice(0, pos).concat(contents).concat(this._content.slice(pos))
+            }
+            values = op.content
+            length = op.content.length
+          }
+          Y.utils.bubbleEvent(this, {
+            type: 'insert',
+            object: this,
+            index: pos,
+            values: values,
+            length: length
+          })
+        } else if (op.struct === 'Delete') {
+          var i = 0 // current position in _content
+          for (; i < this._content.length && op.length > 0; i++) {
+            var c = this._content[i]
+            if (Y.utils.inDeletionRange(op, c.id)) {
+              // is in deletion range!
+              var delLength
+              // check how many character to delete in one flush
+              for (delLength = 1;
+                    delLength < op.length && i + delLength < this._content.length && Y.utils.inDeletionRange(op, this._content[i + delLength].id);
+                    delLength++) {}
+              // last operation that will be deleted
+              c = this._content[i + delLength - 1]
+              // update delete operation
+              op.length -= c.id[1] - op.target[1] + 1
+              op.target = [c.id[0], c.id[1] + 1]
+              // apply deletion & find send event
+              let content = this._content.splice(i, delLength)
+              let values = content.map((c) => {
+                if (c.val != null) {
+                  return c.val
+                } else {
+                  return this.os.getType(c.type)
+                }
+              })
+              Y.utils.bubbleEvent(this, {
+                type: 'delete',
+                object: this,
+                index: i,
+                values: values,
+                _content: content,
+                length: delLength
+              })
+              // with the fresh delete op, we can continue
+              // note: we don't have to increment i, because the i-th content was deleted
+              // but on the other had, the (i+delLength)-th was not in deletion range
+              // So we don't do i--
+            }
+          }
+        } else {
+          throw new Error('Unexpected struct!')
+        }
+      })
+    }
+    _getPathToChild (childId) {
+      return this._content.findIndex(c =>
+        c.type != null && Y.utils.compareIds(c.type, childId)
+      )
+    }
+    _destroy () {
+      this.eventHandler.destroy()
+      this.eventHandler = null
+      this._content = null
+      this._model = null
+      this._parent = null
+      this.os = null
+    }
+    get length () {
+      return this._content.length
+    }
+    get (pos) {
+      if (pos == null || typeof pos !== 'number') {
+        throw new Error('pos must be a number!')
+      }
+      if (pos >= this._content.length) {
+        return undefined
+      }
+      if (this._content[pos].type == null) {
+        return this._content[pos].val
+      } else {
+        return this.os.getType(this._content[pos].type)
+      }
+    }
+    toArray () {
+      return this._content.map((x, i) => {
+        if (x.type != null) {
+          return this.os.getType(x.type)
+        } else {
+          return x.val
+        }
+      })
+    }
+    push (contents) {
+      return this.insert(this._content.length, contents)
+    }
+    insert (pos, contents) {
+      if (typeof pos !== 'number') {
+        throw new Error('pos must be a number!')
+      }
+      if (!Array.isArray(contents)) {
+        throw new Error('contents must be an Array of objects!')
+      }
+      if (contents.length === 0) {
+        return
+      }
+      if (pos > this._content.length || pos < 0) {
+        throw new Error('This position exceeds the range of the array!')
+      }
+      var mostLeft = pos === 0 ? null : this._content[pos - 1].id
+
+      var ops = []
+      var prevId = mostLeft
+      for (var i = 0; i < contents.length;) {
+        var op = {
+          left: prevId,
+          origin: prevId,
+          // right: mostRight,
+          // NOTE: I intentionally do not define right here, because it could be deleted
+          // at the time of inserting this operation (when we get the transaction),
+          // and would therefore not defined in this._content
+          parent: this._model,
+          struct: 'Insert'
+        }
+        var _content = []
+        var typeDefinition
+        while (i < contents.length) {
+          var val = contents[i++]
+          typeDefinition = Y.utils.isTypeDefinition(val)
+          if (!typeDefinition) {
+            _content.push(val)
+          } else if (_content.length > 0) {
+            i-- // come back again later
+            break
+          } else {
+            break
+          }
+        }
+        if (_content.length > 0) {
+          // content is defined
+          op.content = _content
+          op.id = this.os.getNextOpId(_content.length)
+        } else {
+          // otherwise its a type
+          var typeid = this.os.getNextOpId(1)
+          this.os.createType(typeDefinition, typeid)
+          op.opContent = typeid
+          op.id = this.os.getNextOpId(1)
+        }
+        ops.push(op)
+        prevId = op.id
+      }
+      var eventHandler = this.eventHandler
+      this.os.requestTransaction(function *() {
+        // now we can set the right reference.
+        var mostRight
+        if (mostLeft != null) {
+          var ml = yield* this.getInsertionCleanEnd(mostLeft)
+          mostRight = ml.right
+        } else {
+          mostRight = (yield* this.getOperation(ops[0].parent)).start
+        }
+        for (var j = 0; j < ops.length; j++) {
+          var op = ops[j]
+          op.right = mostRight
+        }
+        yield* eventHandler.awaitOps(this, this.applyCreatedOperations, [ops])
+      })
+      // always remember to do that after this.os.requestTransaction
+      // (otherwise values might contain a undefined reference to type)
+      eventHandler.awaitAndPrematurelyCall(ops)
+    }
+    delete (pos, length) {
+      if (length == null) { length = 1 }
+      if (typeof length !== 'number') {
+        throw new Error('length must be a number!')
+      }
+      if (typeof pos !== 'number') {
+        throw new Error('pos must be a number!')
+      }
+      if (pos + length > this._content.length || pos < 0 || length < 0) {
+        throw new Error('The deletion range exceeds the range of the array!')
+      }
+      if (length === 0) {
+        return
+      }
+      var eventHandler = this.eventHandler
+      var dels = []
+      for (var i = 0; i < length; i = i + delLength) {
+        var targetId = this._content[pos + i].id
+        var delLength
+        // how many insertions can we delete in one deletion?
+        for (delLength = 1; i + delLength < length; delLength++) {
+          if (!Y.utils.compareIds(this._content[pos + i + delLength].id, [targetId[0], targetId[1] + delLength])) {
+            break
+          }
+        }
+        dels.push({
+          target: targetId,
+          struct: 'Delete',
+          length: delLength
+        })
+      }
+      this.os.requestTransaction(function *() {
+        yield* eventHandler.awaitOps(this, this.applyCreatedOperations, [dels])
+      })
+      // always remember to do that after this.os.requestTransaction
+      // (otherwise values might contain a undefined reference to type)
+      eventHandler.awaitAndPrematurelyCall(dels)
+    }
+    observe (f) {
+      this.eventHandler.addEventListener(f)
+    }
+    observeDeep (f) {
+      this._deepEventHandler.addEventListener(f)
+    }
+    unobserve (f) {
+      this.eventHandler.removeEventListener(f)
+    }
+    unobserveDeep (f) {
+      this._deepEventHandler.removeEventListener(f)
+    }
+    * _changed (transaction, op) {
+      if (!op.deleted) {
+        if (op.struct === 'Insert') {
+          // update left
+          var l = op.left
+          var left
+          while (l != null) {
+            left = yield* transaction.getInsertion(l)
+            if (!left.deleted) {
+              break
+            }
+            l = left.left
+          }
+          op.left = l
+          // if op contains opContent, initialize it
+          if (op.opContent != null) {
+            yield* transaction.store.initType.call(transaction, op.opContent)
+          }
+        }
+        this.eventHandler.receivedOp(op)
+      }
+    }
+  }
+
+  Y.extend('Array', new Y.utils.CustomTypeDefinition({
+    name: 'Array',
+    class: YArray,
+    struct: 'List',
+    initType: function * YArrayInitializer (os, model) {
+      var _content = []
+      var _types = []
+      yield* Y.Struct.List.map.call(this, model, function (op) {
+        if (op.hasOwnProperty('opContent')) {
+          _content.push({
+            id: op.id,
+            type: op.opContent
+          })
+          _types.push(op.opContent)
+        } else {
+          op.content.forEach(function (c, i) {
+            _content.push({
+              id: [op.id[0], op.id[1] + i],
+              val: op.content[i]
+            })
+          })
+        }
+      })
+      for (var i = 0; i < _types.length; i++) {
+        var type = yield* this.store.initType.call(this, _types[i])
+        type._parent = model.id
+      }
+      return new YArray(os, model.id, _content)
+    },
+    createType: function YArrayCreateType (os, model) {
+      return new YArray(os, model.id, [])
+    }
+  }))
+}
+
+module.exports = extend
+if (typeof Y !== 'undefined') {
+  extend(Y)
+}
+
+},{}],779:[function(require,module,exports){
+'use strict'
+
+module.exports = (data) => JSON.parse(data.toString())
+
+},{}],780:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+module.exports = (message) => Buffer.from(JSON.stringify(message))
+
+}).call(this,require("buffer").Buffer)
+},{"buffer":128}],781:[function(require,module,exports){
+/* global Y */
+'use strict'
+
+const log = require('debug')('y-ipfs-connector')
+const EventEmitter = require('events')
+const Room = require('ipfs-pubsub-room')
+const Queue = require('async/queue')
+const setImmediate = require('async/setImmediate')
+const Buffer = require('safe-buffer').Buffer
+const encode = require('./encode')
+const decode = require('./decode')
+
+function extend (Y) {
+  class YIpfsConnector extends Y.AbstractConnector {
+    constructor (y, options) {
+      if (options === undefined) {
+        throw new Error('Options must not be undefined!')
+      }
+      if (options.room == null) {
+        throw new Error('You must define a room name!')
+      }
+      if (!options.ipfs) {
+        throw new Error('You must define a started IPFS object inside options')
+      }
+
+      if (!options.role) { options.role = 'master' }
+      super(y, options)
+
+      this._yConnectorOptions = options
+
+      this.ipfs = options.ipfs
+
+      const topic = this.ipfsPubSubTopic = 'y-ipfs:rooms:' + options.room
+
+      this.roomEmitter = options.roomEmitter || new EventEmitter()
+      this.roomEmitter.peers = () => this._room.getPeers()
+      this.roomEmitter.id = () => topic
+
+      this._receiveQueue = Queue(this._processQueue.bind(this), 1)
+
+      this._room = Room(this.ipfs, topic)
+      this._room.setMaxListeners(Infinity)
+
+      this._room.on('error', (err) => {
+        console.error(err)
+      })
+
+      this._room.on('message', (msg) => {
+        const processMessage = () => {
+          const message = decode(msg.data)
+
+          const proceed = () => {
+            const yMessage = decode(message.payload)
+            if (yMessage.type === null) { return }
+            this._queueReceiveMessage(msg.from, yMessage)
+          }
+
+          if (options.verifySignature) {
+            const sig = message.signature && Buffer.from(message.signature, 'base64')
+            options.verifySignature.call(
+              null,
+              msg.from,
+              Buffer.from(message.payload),
+              sig,
+              (err, valid) => {
+                if (err) {
+                  console.error(
+                    'Error verifying signature from peer ' + msg.from +
+                    '. Discarding message.', err)
+                  return
+                }
+
+                if (!valid) {
+                  console.error(
+                    'Invalid signature from peer ' + msg.from +
+                    '. Discarding message.')
+                  return
+                }
+                proceed()
+              }
+            )
+          } else {
+            proceed()
+          }
+        }
+
+        if (!this._room.hasPeer(msg.from)) {
+          const joinedListener = (peer) => {
+            if (peer === msg.from) {
+              this._room.removeListener('peer joined', joinedListener)
+              processMessage()
+            }
+          }
+          this._room.on('peer joined', joinedListener)
+        } else {
+          processMessage()
+        }
+      })
+
+      this._room.on('peer joined', (peer) => {
+        this.roomEmitter.emit('peer joined', peer)
+        this.userJoined(peer, 'master')
+      })
+
+      this._room.on('peer left', (peer) => {
+        this.roomEmitter.emit('peer left', peer)
+        this.userLeft(peer)
+      })
+
+      if (this.ipfs.isOnline()) {
+        this._start()
+      } else {
+        this.ipfs.once('ready', this._start.bind(this))
+      }
+    }
+
+    _queueReceiveMessage (from, message) {
+      this._receiveQueue.push({
+        from: from,
+        message: message
+      })
+    }
+
+    _processQueue (item, callback) {
+      const from = item.from
+      const message = item.message
+
+      if (from === this._ipfsUserId) {
+        // ignore message from self
+        callback()
+      } else if (this._room.hasPeer(from)) {
+        this.receiveMessage(from, message)
+        callback()
+      } else {
+        this._receiveQueue.unshift(item)
+        setTimeout(callback, 500)
+      }
+    }
+
+    _start () {
+      const id = this.ipfs._peerInfo.id.toB58String()
+      this._ipfsUserId = id
+      this.setUserId(id)
+    }
+
+    disconnect () {
+      log('disconnect')
+      this._room.leave()
+      super.disconnect()
+    }
+    send (peer, message) {
+      this._encodeMessage(message, (err, encodedMessage) => {
+        if (err) {
+          throw err
+        }
+        this._room.sendTo(peer, encodedMessage)
+      })
+    }
+    broadcast (message) {
+      this._encodeMessage(message, (err, encodedMessage) => {
+        if (err) {
+          throw err
+        }
+        this._room.broadcast(encodedMessage)
+      })
+    }
+    isDisconnected () {
+      return false
+    }
+
+    _encodeMessage (_message, callback) {
+      const message = localEncode(_message)
+      if (this._yConnectorOptions.sign) {
+        this._yConnectorOptions.sign(Buffer.from(message), (err, signature) => {
+          if (err) { return callback(err) }
+          const sig = signature.toString('base64')
+          callback(null, encode({
+            signature: sig,
+            payload: message
+          }))
+        })
+      } else {
+        callback(null, encode({
+          payload: message
+        }))
+      }
+    }
+  }
+  Y.extend('ipfs', YIpfsConnector)
+}
+
+module.exports = extend
+if (typeof Y !== 'undefined') {
+  extend(Y)
+}
+
+function localEncode (m) {
+  return JSON.stringify(m)
+}
+
+},{"./decode":779,"./encode":780,"async/queue":65,"async/setImmediate":68,"debug":151,"events":215,"ipfs-pubsub-room":272,"safe-buffer":713}],782:[function(require,module,exports){
+/* global Y */
+'use strict'
+
+function extend (Y) {
+  require('./RedBlackTree.js')(Y)
+  class Transaction extends Y.Transaction {
+    constructor (store) {
+      super(store)
+      this.store = store
+      this.ss = store.ss
+      this.os = store.os
+      this.ds = store.ds
+    }
+  }
+  var Store = Y.utils.RBTree
+  var BufferedStore = Y.utils.createSmallLookupBuffer(Store)
+
+  class Database extends Y.AbstractDatabase {
+    constructor (y, opts) {
+      super(y, opts)
+      this.os = new BufferedStore()
+      this.ds = new Store()
+      this.ss = new BufferedStore()
+    }
+    logTable () {
+      var self = this
+      self.requestTransaction(function * () {
+        console.log('User: ', this.store.y.connector.userId, "==============================") // eslint-disable-line
+        console.log("State Set (SS):", yield* this.getStateSet()) // eslint-disable-line
+        console.log("Operation Store (OS):") // eslint-disable-line
+        yield* this.os.logTable() // eslint-disable-line
+        console.log("Deletion Store (DS):") //eslint-disable-line
+        yield* this.ds.logTable() // eslint-disable-line
+        if (this.store.gc1.length > 0 || this.store.gc2.length > 0) {
+          console.warn('GC1|2 not empty!', this.store.gc1, this.store.gc2)
+        }
+        if (JSON.stringify(this.store.listenersById) !== '{}') {
+          console.warn('listenersById not empty!')
+        }
+        if (JSON.stringify(this.store.listenersByIdExecuteNow) !== '[]') {
+          console.warn('listenersByIdExecuteNow not empty!')
+        }
+        if (this.store.transactionInProgress) {
+          console.warn('Transaction still in progress!')
+        }
+      }, true)
+    }
+    transact (makeGen) {
+      var t = new Transaction(this)
+      while (makeGen !== null) {
+        var gen = makeGen.call(t)
+        var res = gen.next()
+        while (!res.done) {
+          res = gen.next(res.value)
+        }
+        makeGen = this.getNextRequest()
+      }
+    }
+    * destroy () {
+      yield* super.destroy()
+      delete this.os
+      delete this.ss
+      delete this.ds
+    }
+  }
+  Y.extend('memory', Database)
+}
+
+module.exports = extend
+if (typeof Y !== 'undefined') {
+  extend(Y)
+}
+
+},{"./RedBlackTree.js":783}],783:[function(require,module,exports){
+'use strict'
+
+/*
+  This file contains a not so fancy implemantion of a Red Black Tree.
+*/
+module.exports = function (Y) {
+  class N {
+    // A created node is always red!
+    constructor (val) {
+      this.val = val
+      this.color = true
+      this._left = null
+      this._right = null
+      this._parent = null
+      if (val.id === null) {
+        throw new Error('You must define id!')
+      }
+    }
+    isRed () { return this.color }
+    isBlack () { return !this.color }
+    redden () { this.color = true; return this }
+    blacken () { this.color = false; return this }
+    get grandparent () {
+      return this.parent.parent
+    }
+    get parent () {
+      return this._parent
+    }
+    get sibling () {
+      return (this === this.parent.left)
+        ? this.parent.right : this.parent.left
+    }
+    get left () {
+      return this._left
+    }
+    get right () {
+      return this._right
+    }
+    set left (n) {
+      if (n !== null) {
+        n._parent = this
+      }
+      this._left = n
+    }
+    set right (n) {
+      if (n !== null) {
+        n._parent = this
+      }
+      this._right = n
+    }
+    rotateLeft (tree) {
+      var parent = this.parent
+      var newParent = this.right
+      var newRight = this.right.left
+      newParent.left = this
+      this.right = newRight
+      if (parent === null) {
+        tree.root = newParent
+        newParent._parent = null
+      } else if (parent.left === this) {
+        parent.left = newParent
+      } else if (parent.right === this) {
+        parent.right = newParent
+      } else {
+        throw new Error('The elements are wrongly connected!')
+      }
+    }
+    next () {
+      if (this.right !== null) {
+        // search the most left node in the right tree
+        var o = this.right
+        while (o.left !== null) {
+          o = o.left
+        }
+        return o
+      } else {
+        var p = this
+        while (p.parent !== null && p !== p.parent.left) {
+          p = p.parent
+        }
+        return p.parent
+      }
+    }
+    prev () {
+      if (this.left !== null) {
+        // search the most right node in the left tree
+        var o = this.left
+        while (o.right !== null) {
+          o = o.right
+        }
+        return o
+      } else {
+        var p = this
+        while (p.parent !== null && p !== p.parent.right) {
+          p = p.parent
+        }
+        return p.parent
+      }
+    }
+    rotateRight (tree) {
+      var parent = this.parent
+      var newParent = this.left
+      var newLeft = this.left.right
+      newParent.right = this
+      this.left = newLeft
+      if (parent === null) {
+        tree.root = newParent
+        newParent._parent = null
+      } else if (parent.left === this) {
+        parent.left = newParent
+      } else if (parent.right === this) {
+        parent.right = newParent
+      } else {
+        throw new Error('The elements are wrongly connected!')
+      }
+    }
+    getUncle () {
+      // we can assume that grandparent exists when this is called!
+      if (this.parent === this.parent.parent.left) {
+        return this.parent.parent.right
+      } else {
+        return this.parent.parent.left
+      }
+    }
+  }
+
+  class RBTree {
+    constructor () {
+      this.root = null
+      this.length = 0
+    }
+    * findNext (id) {
+      return yield* this.findWithLowerBound([id[0], id[1] + 1])
+    }
+    * findPrev (id) {
+      return yield* this.findWithUpperBound([id[0], id[1] - 1])
+    }
+    findNodeWithLowerBound (from) {
+      if (from === void 0) {
+        throw new Error('You must define from!')
+      }
+      var o = this.root
+      if (o === null) {
+        return null
+      } else {
+        while (true) {
+          if ((from === null || Y.utils.smaller(from, o.val.id)) && o.left !== null) {
+            // o is included in the bound
+            // try to find an element that is closer to the bound
+            o = o.left
+          } else if (from !== null && Y.utils.smaller(o.val.id, from)) {
+            // o is not within the bound, maybe one of the right elements is..
+            if (o.right !== null) {
+              o = o.right
+            } else {
+              // there is no right element. Search for the next bigger element,
+              // this should be within the bounds
+              return o.next()
+            }
+          } else {
+            return o
+          }
+        }
+      }
+    }
+    findNodeWithUpperBound (to) {
+      if (to === void 0) {
+        throw new Error('You must define from!')
+      }
+      var o = this.root
+      if (o === null) {
+        return null
+      } else {
+        while (true) {
+          if ((to === null || Y.utils.smaller(o.val.id, to)) && o.right !== null) {
+            // o is included in the bound
+            // try to find an element that is closer to the bound
+            o = o.right
+          } else if (to !== null && Y.utils.smaller(to, o.val.id)) {
+            // o is not within the bound, maybe one of the left elements is..
+            if (o.left !== null) {
+              o = o.left
+            } else {
+              // there is no left element. Search for the prev smaller element,
+              // this should be within the bounds
+              return o.prev()
+            }
+          } else {
+            return o
+          }
+        }
+      }
+    }
+    findSmallestNode () {
+      var o = this.root
+      while (o != null && o.left != null) {
+        o = o.left
+      }
+      return o
+    }
+    * findWithLowerBound (from) {
+      var n = this.findNodeWithLowerBound(from)
+      return n == null ? null : n.val
+    }
+    * findWithUpperBound (to) {
+      var n = this.findNodeWithUpperBound(to)
+      return n == null ? null : n.val
+    }
+    * iterate (t, from, to, f) {
+      var o
+      if (from === null) {
+        o = this.findSmallestNode()
+      } else {
+        o = this.findNodeWithLowerBound(from)
+      }
+      while (o !== null && (to === null || Y.utils.smaller(o.val.id, to) || Y.utils.compareIds(o.val.id, to))) {
+        yield* f.call(t, o.val)
+        o = o.next()
+      }
+      return true
+    }
+    * logTable (from, to, filter) {
+      if (filter == null) {
+        filter = function () {
+          return true
+        }
+      }
+      if (from == null) { from = null }
+      if (to == null) { to = null }
+      var os = []
+      yield* this.iterate(this, from, to, function * (o) {
+        if (filter(o)) {
+          var o_ = {}
+          for (var key in o) {
+            if (typeof o[key] === 'object') {
+              o_[key] = JSON.stringify(o[key])
+            } else {
+              o_[key] = o[key]
+            }
+          }
+          os.push(o_)
+        }
+      })
+      if (console.table != null) {
+        console.table(os)
+      }
+    }
+    * find (id) {
+      var n
+      return (n = this.findNode(id)) ? n.val : null
+    }
+    findNode (id) {
+      if (id == null || id.constructor !== Array) {
+        throw new Error('Expect id to be an array!')
+      }
+      var o = this.root
+      if (o === null) {
+        return false
+      } else {
+        while (true) {
+          if (o === null) {
+            return false
+          }
+          if (Y.utils.smaller(id, o.val.id)) {
+            o = o.left
+          } else if (Y.utils.smaller(o.val.id, id)) {
+            o = o.right
+          } else {
+            return o
+          }
+        }
+      }
+    }
+    * delete (id) {
+      if (id == null || id.constructor !== Array) {
+        throw new Error('id is expected to be an Array!')
+      }
+      var d = this.findNode(id)
+      if (d == null) {
+        // throw new Error('Element does not exist!')
+        return
+      }
+      this.length--
+      if (d.left !== null && d.right !== null) {
+        // switch d with the greates element in the left subtree.
+        // o should have at most one child.
+        var o = d.left
+        // find
+        while (o.right !== null) {
+          o = o.right
+        }
+        // switch
+        d.val = o.val
+        d = o
+      }
+      // d has at most one child
+      // let n be the node that replaces d
+      var isFakeChild
+      var child = d.left || d.right
+      if (child === null) {
+        isFakeChild = true
+        child = new N({id: 0})
+        child.blacken()
+        d.right = child
+      } else {
+        isFakeChild = false
+      }
+
+      if (d.parent === null) {
+        if (!isFakeChild) {
+          this.root = child
+          child.blacken()
+          child._parent = null
+        } else {
+          this.root = null
+        }
+        return
+      } else if (d.parent.left === d) {
+        d.parent.left = child
+      } else if (d.parent.right === d) {
+        d.parent.right = child
+      } else {
+        throw new Error('Impossible!')
+      }
+      if (d.isBlack()) {
+        if (child.isRed()) {
+          child.blacken()
+        } else {
+          this._fixDelete(child)
+        }
+      }
+      this.root.blacken()
+      if (isFakeChild) {
+        if (child.parent.left === child) {
+          child.parent.left = null
+        } else if (child.parent.right === child) {
+          child.parent.right = null
+        } else {
+          throw new Error('Impossible #3')
+        }
+      }
+    }
+    _fixDelete (n) {
+      function isBlack (node) {
+        return node !== null ? node.isBlack() : true
+      }
+      function isRed (node) {
+        return node !== null ? node.isRed() : false
+      }
+      if (n.parent === null) {
+        // this can only be called after the first iteration of fixDelete.
+        return
+      }
+      // d was already replaced by the child
+      // d is not the root
+      // d and child are black
+      var sibling = n.sibling
+      if (isRed(sibling)) {
+        // make sibling the grandfather
+        n.parent.redden()
+        sibling.blacken()
+        if (n === n.parent.left) {
+          n.parent.rotateLeft(this)
+        } else if (n === n.parent.right) {
+          n.parent.rotateRight(this)
+        } else {
+          throw new Error('Impossible #2')
+        }
+        sibling = n.sibling
+      }
+      // parent, sibling, and children of n are black
+      if (n.parent.isBlack() &&
+        sibling.isBlack() &&
+        isBlack(sibling.left) &&
+        isBlack(sibling.right)
+      ) {
+        sibling.redden()
+        this._fixDelete(n.parent)
+      } else if (n.parent.isRed() &&
+        sibling.isBlack() &&
+        isBlack(sibling.left) &&
+        isBlack(sibling.right)
+      ) {
+        sibling.redden()
+        n.parent.blacken()
+      } else {
+        if (n === n.parent.left &&
+          sibling.isBlack() &&
+          isRed(sibling.left) &&
+          isBlack(sibling.right)
+        ) {
+          sibling.redden()
+          sibling.left.blacken()
+          sibling.rotateRight(this)
+          sibling = n.sibling
+        } else if (n === n.parent.right &&
+          sibling.isBlack() &&
+          isRed(sibling.right) &&
+          isBlack(sibling.left)
+        ) {
+          sibling.redden()
+          sibling.right.blacken()
+          sibling.rotateLeft(this)
+          sibling = n.sibling
+        }
+        sibling.color = n.parent.color
+        n.parent.blacken()
+        if (n === n.parent.left) {
+          sibling.right.blacken()
+          n.parent.rotateLeft(this)
+        } else {
+          sibling.left.blacken()
+          n.parent.rotateRight(this)
+        }
+      }
+    }
+    * put (v) {
+      if (v == null || v.id == null || v.id.constructor !== Array) {
+        throw new Error('v is expected to have an id property which is an Array!')
+      }
+      var node = new N(v)
+      if (this.root !== null) {
+        var p = this.root // p abbrev. parent
+        while (true) {
+          if (Y.utils.smaller(node.val.id, p.val.id)) {
+            if (p.left === null) {
+              p.left = node
+              break
+            } else {
+              p = p.left
+            }
+          } else if (Y.utils.smaller(p.val.id, node.val.id)) {
+            if (p.right === null) {
+              p.right = node
+              break
+            } else {
+              p = p.right
+            }
+          } else {
+            p.val = node.val
+            return p
+          }
+        }
+        this._fixInsert(node)
+      } else {
+        this.root = node
+      }
+      this.length++
+      this.root.blacken()
+      return node
+    }
+    _fixInsert (n) {
+      if (n.parent === null) {
+        n.blacken()
+        return
+      } else if (n.parent.isBlack()) {
+        return
+      }
+      var uncle = n.getUncle()
+      if (uncle !== null && uncle.isRed()) {
+        // Note: parent: red, uncle: red
+        n.parent.blacken()
+        uncle.blacken()
+        n.grandparent.redden()
+        this._fixInsert(n.grandparent)
+      } else {
+        // Note: parent: red, uncle: black or null
+        // Now we transform the tree in such a way that
+        // either of these holds:
+        //   1) grandparent.left.isRed
+        //     and grandparent.left.left.isRed
+        //   2) grandparent.right.isRed
+        //     and grandparent.right.right.isRed
+        if (n === n.parent.right && n.parent === n.grandparent.left) {
+          n.parent.rotateLeft(this)
+          // Since we rotated and want to use the previous
+          // cases, we need to set n in such a way that
+          // n.parent.isRed again
+          n = n.left
+        } else if (n === n.parent.left && n.parent === n.grandparent.right) {
+          n.parent.rotateRight(this)
+          // see above
+          n = n.right
+        }
+        // Case 1) or 2) hold from here on.
+        // Now traverse grandparent, make parent a black node
+        // on the highest level which holds two red nodes.
+        n.parent.blacken()
+        n.grandparent.redden()
+        if (n === n.parent.left) {
+          // Case 1
+          n.grandparent.rotateRight(this)
+        } else {
+          // Case 2
+          n.grandparent.rotateLeft(this)
+        }
+      }
+    }
+    * flush () {}
+  }
+
+  Y.utils.RBTree = RBTree
+}
+
+},{}],784:[function(require,module,exports){
+/* global Y, Element */
+'use strict'
+
+var diff = require('fast-diff')
+var monacoIdentifierTemplate = { major: 0, minor: 0 }
+
+function extend (Y) {
+  Y.requestModules(['Array']).then(function () {
+    class YText extends Y.Array.typeDefinition['class'] {
+      constructor (os, _model, _content) {
+        super(os, _model, _content)
+        this.textfields = []
+        this.aceInstances = []
+        this.codeMirrorInstances = []
+        this.monacoInstances = []
+      }
+      toString () {
+        return this._content.map(function (c) {
+          return c.val
+        }).join('')
+      }
+      insert (pos, content) {
+        var arr = content.split('')
+        for (var i = 0; i < arr.length; i++) {
+          if (/[\uD800-\uDFFF]/.test(arr[i])) {
+            // is surrogate pair
+            arr[i] = arr[i] + arr[i + 1]
+            arr[i + 1] = ''
+            i++
+          }
+        }
+        super.insert(pos, arr)
+      }
+      delete (pos, length) {
+        if (length == null) { length = 1 }
+        if (typeof length !== 'number') {
+          throw new Error('length must be a number!')
+        }
+        if (typeof pos !== 'number') {
+          throw new Error('pos must be a number!')
+        }
+        if (pos + length > this._content.length || pos < 0 || length < 0) {
+          throw new Error('The deletion range exceeds the range of the array!')
+        }
+        if (length === 0) {
+          return
+        }
+        // This is for the case that part of a surrogate pair is deleted
+        // we store surrogate pairs like this: [.., '🐇', '', ..] (string, code)
+        if (this._content.length > pos + length && this._content[pos + length].val === '' && this._content[pos + length - 1].val.length === 2) {
+          // case one. first part of the surrogate pair is deleted
+          let token = this._content[pos + length - 1].val[0]
+          super.delete(pos, length + 1)
+          super.insert(pos, [token])
+        } else if (pos > 0 && this._content[pos].val === '' && this._content[pos - 1].val.length === 2) {
+          // case two. second part of the surrogate pair is deleted
+          let token = this._content[pos - 1].val[1]
+          super.delete(pos - 1, length + 1)
+          super.insert(pos - 1, [token])
+        } else {
+          super.delete(pos, length)
+        }
+      }
+      unbindAll () {
+        this.unbindTextareaAll()
+        this.unbindAceAll()
+        this.unbindCodeMirrorAll()
+        this.unbindMonacoAll()
+      }
+      // Monaco implementation
+      unbindMonaco (monacoInstance) {
+        var i = this.monacoInstances.findIndex(function (binding) {
+          return binding.editor === monacoInstance
+        })
+        if (i >= 0) {
+          var binding = this.monacoInstances[i]
+          this.unobserve(binding.yCallback)
+          binding.disposeBinding()
+          this.monacoInstances.splice(i, 1)
+        }
+      }
+      unbindMonacoAll () {
+        for (let i = this.monacoInstances.length - 1; i >= 0; i--) {
+          this.unbindMonaco(this.monacoInstances[i].editor)
+        }
+      }
+      bindMonaco (monacoInstance, options) {
+        var self = this
+        options = options || {}
+
+        // this function makes sure that either the
+        // monaco event is executed, or the yjs observer is executed
+        var token = true
+        function mutualExcluse (f) {
+          if (token) {
+            token = false
+            try {
+              f()
+            } catch (e) {
+              token = true
+              throw new Error(e)
+            }
+            token = true
+          }
+        }
+        monacoInstance.setValue(this.toString())
+
+        function monacoCallback (event) {
+          mutualExcluse(function () {
+            // compute start.. (col+row -> index position)
+            // We shouldn't compute the offset on the old model..
+            //    var start = monacoInstance.model.getOffsetAt({column: event.range.startColumn, lineNumber: event.range.startLineNumber})
+            // So we compute the offset using the _content of this type
+            for (var i = 0, line = 1; line < event.range.startLineNumber; i++) {
+              if (self._content[i].val === '\n') {
+                line++
+              }
+            }
+            var start = i + event.range.startColumn - 1
+
+            // apply the delete operation first
+            if (event.rangeLength > 0) {
+              self.delete(start, event.rangeLength)
+            }
+            // apply insert operation
+            self.insert(start, event.text)
+          })
+        }
+        var disposeBinding = monacoInstance.onDidChangeModelContent(monacoCallback).dispose
+
+        function yCallback (event) {
+          mutualExcluse(function () {
+            let start = monacoInstance.model.getPositionAt(event.index)
+            var end, text
+            if (event.type === 'insert') {
+              end = start
+              text = event.values.join('')
+            } else if (event.type === 'delete') {
+              end = monacoInstance.model.modifyPosition(start, event.length)
+              text = ''
+            }
+            var range = {
+              startLineNumber: start.lineNumber,
+              startColumn: start.column,
+              endLineNumber: end.lineNumber,
+              endColumn: end.column
+            }
+            var id = {
+              major: monacoIdentifierTemplate.major,
+              minor: monacoIdentifierTemplate.minor++
+            }
+            monacoInstance.executeEdits('Yjs', [{
+              id: id,
+              range: range,
+              text: text,
+              forceMoveMarkers: true
+            }])
+          })
+        }
+        this.observe(yCallback)
+        this.monacoInstances.push({
+          editor: monacoInstance,
+          yCallback: yCallback,
+          monacoCallback: monacoCallback,
+          disposeBinding: disposeBinding
+        })
+      }
+      // CodeMirror implementation..
+      unbindCodeMirror (codeMirrorInstance) {
+        var i = this.codeMirrorInstances.findIndex(function (binding) {
+          return binding.editor === codeMirrorInstance
+        })
+        if (i >= 0) {
+          var binding = this.codeMirrorInstances[i]
+          this.unobserve(binding.yCallback)
+          binding.editor.off('changes', binding.codeMirrorCallback)
+          this.codeMirrorInstances.splice(i, 1)
+        }
+      }
+      unbindCodeMirrorAll () {
+        for (let i = this.codeMirrorInstances.length - 1; i >= 0; i--) {
+          this.unbindCodeMirror(this.codeMirrorInstances[i].editor)
+        }
+      }
+      bindCodeMirror (codeMirrorInstance, options) {
+        var self = this
+        options = options || {}
+
+        // this function makes sure that either the
+        // codemirror event is executed, or the yjs observer is executed
+        var token = true
+        function mutualExcluse (f) {
+          if (token) {
+            token = false
+            try {
+              f()
+            } catch (e) {
+              token = true
+              throw new Error(e)
+            }
+            token = true
+          }
+        }
+        codeMirrorInstance.setValue(this.toString())
+
+        function codeMirrorCallback (cm, deltas) {
+          mutualExcluse(function () {
+            for (var i = 0; i < deltas.length; i++) {
+              var delta = deltas[i]
+              var start = codeMirrorInstance.indexFromPos(delta.from)
+              // apply the delete operation first
+              if (delta.removed.length > 0) {
+                var delLength = 0
+                for (var j = 0; j < delta.removed.length; j++) {
+                  delLength += delta.removed[j].length
+                }
+                // "enter" is also a character in our case
+                delLength += delta.removed.length - 1
+                self.delete(start, delLength)
+              }
+              // apply insert operation
+              self.insert(start, delta.text.join('\n'))
+            }
+          })
+        }
+        codeMirrorInstance.on('changes', codeMirrorCallback)
+
+        function yCallback (event) {
+          mutualExcluse(function () {
+            let from = codeMirrorInstance.posFromIndex(event.index)
+            if (event.type === 'insert') {
+              let to = from
+              codeMirrorInstance.replaceRange(event.values.join(''), from, to)
+            } else if (event.type === 'delete') {
+              let to = codeMirrorInstance.posFromIndex(event.index + event.length)
+              codeMirrorInstance.replaceRange('', from, to)
+            }
+          })
+        }
+        this.observe(yCallback)
+        this.codeMirrorInstances.push({
+          editor: codeMirrorInstance,
+          yCallback: yCallback,
+          codeMirrorCallback: codeMirrorCallback
+        })
+      }
+      unbindAce (aceInstance) {
+        var i = this.aceInstances.findIndex(function (binding) {
+          return binding.editor === aceInstance
+        })
+        if (i >= 0) {
+          var binding = this.aceInstances[i]
+          this.unobserve(binding.yCallback)
+          binding.editor.off('change', binding.aceCallback)
+          this.aceInstances.splice(i, 1)
+        }
+      }
+      unbindAceAll () {
+        for (let i = this.aceInstances.length - 1; i >= 0; i--) {
+          this.unbindAce(this.aceInstances[i].editor)
+        }
+      }
+      bindAce (aceInstance, options) {
+        var self = this
+        options = options || {}
+
+        // this function makes sure that either the
+        // ace event is executed, or the yjs observer is executed
+        var token = true
+        function mutualExcluse (f) {
+          if (token) {
+            token = false
+            try {
+              f()
+            } catch (e) {
+              token = true
+              throw new Error(e)
+            }
+            token = true
+          }
+        }
+        aceInstance.setValue(this.toString())
+
+        function aceCallback (delta) {
+          mutualExcluse(function () {
+            var start
+            var length
+
+            var aceDocument = aceInstance.getSession().getDocument()
+            if (delta.action === 'insert') {
+              start = aceDocument.positionToIndex(delta.start, 0)
+              self.insert(start, delta.lines.join('\n'))
+            } else if (delta.action === 'remove') {
+              start = aceDocument.positionToIndex(delta.start, 0)
+              length = delta.lines.join('\n').length
+              self.delete(start, length)
+            }
+          })
+        }
+        aceInstance.on('change', aceCallback)
+
+        aceInstance.selection.clearSelection()
+
+        // We don't that ace is a global variable
+        // see #2
+        var aceClass
+        if (typeof ace !== 'undefined' && options.aceClass == null) {
+          aceClass = ace // eslint-disable-line
+        } else {
+          aceClass = options.aceClass
+        }
+        var aceRequire = options.aceRequire || aceClass.require
+        var Range = aceRequire('ace/range').Range
+
+        function yCallback (event) {
+          var aceDocument = aceInstance.getSession().getDocument()
+          mutualExcluse(function () {
+            if (event.type === 'insert') {
+              let start = aceDocument.indexToPosition(event.index, 0)
+              aceDocument.insert(start, event.values.join(''))
+            } else if (event.type === 'delete') {
+              let start = aceDocument.indexToPosition(event.index, 0)
+              let end = aceDocument.indexToPosition(event.index + event.length, 0)
+              var range = new Range(start.row, start.column, end.row, end.column)
+              aceDocument.remove(range)
+            }
+          })
+        }
+        this.observe(yCallback)
+        this.aceInstances.push({
+          editor: aceInstance,
+          yCallback: yCallback,
+          aceCallback: aceCallback
+        })
+      }
+      bind () {
+        var e = arguments[0]
+        if (e instanceof Element) {
+          this.bindTextarea.apply(this, arguments)
+        } else if (e != null && e.session != null && e.getSession != null && e.setValue != null) {
+          this.bindAce.apply(this, arguments)
+        } else if (e != null && e.posFromIndex != null && e.replaceRange != null) {
+          this.bindCodeMirror.apply(this, arguments)
+        } else if (e != null && e.onDidChangeModelContent != null) {
+          this.bindMonaco.apply(this, arguments)
+        } else {
+          console.error('Cannot bind, unsupported editor!')
+        }
+      }
+      unbindTextarea (textarea) {
+        var i = this.textfields.findIndex(function (binding) {
+          return binding.editor === textarea
+        })
+        if (i >= 0) {
+          var binding = this.textfields[i]
+          this.unobserve(binding.yCallback)
+          var e = binding.editor
+          e.removeEventListener('input', binding.eventListener)
+          this.textfields.splice(i, 1)
+        }
+      }
+      unbindTextareaAll () {
+        for (let i = this.textfields.length - 1; i >= 0; i--) {
+          this.unbindTextarea(this.textfields[i].editor)
+        }
+      }
+      bindTextarea (textfield, domRoot) {
+        domRoot = domRoot || window; // eslint-disable-line
+        if (domRoot.getSelection == null) {
+          domRoot = window; // eslint-disable-line
+        }
+
+        // don't duplicate!
+        for (var t = 0; t < this.textfields.length; t++) {
+          if (this.textfields[t].editor === textfield) {
+            return
+          }
+        }
+        // this function makes sure that either the
+        // textfieldt event is executed, or the yjs observer is executed
+        var token = true
+        function mutualExcluse (f) {
+          if (token) {
+            token = false
+            try {
+              f()
+            } catch (e) {
+              token = true
+              throw new Error(e)
+            }
+            token = true
+          }
+        }
+
+        var self = this
+        textfield.value = this.toString()
+
+        var createRange, writeRange, writeContent, getContent
+        if (textfield.selectionStart != null && textfield.setSelectionRange != null) {
+          createRange = function (fix) {
+            var left = textfield.selectionStart
+            var right = textfield.selectionEnd
+            if (fix != null) {
+              left = fix(left)
+              right = fix(right)
+            }
+            return {
+              left: left,
+              right: right
+            }
+          }
+          writeRange = function (range) {
+            writeContent(self.toString())
+            textfield.setSelectionRange(range.left, range.right)
+          }
+          writeContent = function (content) {
+            textfield.value = content
+          }
+          getContent = function () {
+            return textfield.value
+          }
+        } else {
+          createRange = function (fix) {
+            var range = {}
+            var s = domRoot.getSelection()
+            var clength = textfield.textContent.length
+            range.left = Math.min(s.anchorOffset, clength)
+            range.right = Math.min(s.focusOffset, clength)
+            if (fix != null) {
+              range.left = fix(range.left)
+              range.right = fix(range.right)
+            }
+            var editedElement = s.focusNode
+            if (editedElement === textfield || editedElement === textfield.childNodes[0]) {
+              range.isReal = true
+            } else {
+              range.isReal = false
+            }
+            return range
+          }
+
+          writeRange = function (range) {
+            writeContent(self.toString())
+            var textnode = textfield.childNodes[0]
+            if (range.isReal && textnode != null) {
+              if (range.left < 0) {
+                range.left = 0
+              }
+              range.right = Math.max(range.left, range.right)
+              if (range.right > textnode.length) {
+                range.right = textnode.length
+              }
+              range.left = Math.min(range.left, range.right)
+              var r = document.createRange(); // eslint-disable-line
+              r.setStart(textnode, range.left)
+              r.setEnd(textnode, range.right)
+              var s = domRoot.getSelection(); // eslint-disable-line
+              s.removeAllRanges()
+              s.addRange(r)
+            }
+          }
+          writeContent = function (content) {
+            textfield.innerText = content
+            /*
+            var contentArray = content.replace(new RegExp('\n', 'g'), ' ').split(' '); // eslint-disable-line
+            textfield.innerText = ''
+            for (var i = 0; i < contentArray.length; i++) {
+              var c = contentArray[i]
+              textfield.innerText += c
+              if (i !== contentArray.length - 1) {
+                textfield.innerHTML += '&nbsp;'
+              }
+            }
+            */
+          }
+          getContent = function () {
+            return textfield.innerText
+          }
+        }
+        writeContent(this.toString())
+
+        function yCallback (event) {
+          mutualExcluse(() => {
+            var oPos, fix
+            if (event.type === 'insert') {
+              oPos = event.index
+              fix = function (cursor) { // eslint-disable-line
+                if (cursor <= oPos) {
+                  return cursor
+                } else {
+                  cursor += 1
+                  return cursor
+                }
+              }
+              var r = createRange(fix)
+              writeRange(r)
+            } else if (event.type === 'delete') {
+              oPos = event.index
+              fix = function (cursor) { // eslint-disable-line
+                if (cursor < oPos) {
+                  return cursor
+                } else {
+                  cursor -= 1
+                  return cursor
+                }
+              }
+              r = createRange(fix)
+              writeRange(r)
+            }
+          })
+        }
+        this.observe(yCallback)
+
+        var textfieldObserver = function textfieldObserver () {
+          mutualExcluse(function () {
+            var r = createRange(function (x) { return x })
+            var oldContent = self.toString()
+            var content = getContent()
+            var diffs = diff(oldContent, content, r.left)
+            var pos = 0
+            for (var i = 0; i < diffs.length; i++) {
+              var d = diffs[i]
+              if (d[0] === 0) { // EQUAL
+                pos += d[1].length
+              } else if (d[0] === -1) { // DELETE
+                self.delete(pos, d[1].length)
+              } else { // INSERT
+                self.insert(pos, d[1])
+                pos += d[1].length
+              }
+            }
+          })
+        }
+        textfield.addEventListener('input', textfieldObserver)
+        this.textfields.push({
+          editor: textfield,
+          yCallback: yCallback,
+          eventListener: textfieldObserver
+        })
+      }
+      _destroy () {
+        this.unbindAll()
+        this.textfields = null
+        this.aceInstances = null
+        super._destroy()
+      }
+    }
+    Y.extend('Text', new Y.utils.CustomTypeDefinition({
+      name: 'Text',
+      class: YText,
+      struct: 'List',
+      initType: function * YTextInitializer (os, model) {
+        var _content = []
+        yield * Y.Struct.List.map.call(this, model, function (op) {
+          if (op.hasOwnProperty('opContent')) {
+            throw new Error('Text must not contain types!')
+          } else {
+            op.content.forEach(function (c, i) {
+              _content.push({
+                id: [op.id[0], op.id[1] + i],
+                val: op.content[i]
+              })
+            })
+          }
+        })
+        return new YText(os, model.id, _content)
+      },
+      createType: function YTextCreator (os, model) {
+        return new YText(os, model.id, [])
+      }
+    }))
+  })
+}
+
+module.exports = extend
+if (typeof Y !== 'undefined') {
+  extend(Y)
+}
+
+},{"fast-diff":217}],785:[function(require,module,exports){
 'use strict';
 
 var alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_'.split('')
@@ -119289,4 +125350,3829 @@ yeast.encode = encode;
 yeast.decode = decode;
 module.exports = yeast;
 
-},{}]},{},[14]);
+},{}],786:[function(require,module,exports){
+function canRead (auth) { return auth === 'read' || auth === 'write' }
+function canWrite (auth) { return auth === 'write' }
+
+module.exports = function (Y/* :any */) {
+  class AbstractConnector {
+    /* ::
+    y: YConfig;
+    role: SyncRole;
+    connections: Object;
+    isSynced: boolean;
+    userEventListeners: Array<Function>;
+    whenSyncedListeners: Array<Function>;
+    currentSyncTarget: ?UserId;
+    syncingClients: Array<UserId>;
+    forwardToSyncingClients: boolean;
+    debug: boolean;
+    syncStep2: Promise;
+    userId: UserId;
+    send: Function;
+    broadcast: Function;
+    broadcastOpBuffer: Array<Operation>;
+    protocolVersion: number;
+    */
+    /*
+      opts contains the following information:
+       role : String Role of this client ("master" or "slave")
+       userId : String Uniquely defines the user.
+       debug: Boolean Whether to print debug messages (optional)
+    */
+    constructor (y, opts) {
+      this.y = y
+      if (opts == null) {
+        opts = {}
+      }
+      // Prefer to receive untransformed operations. This does only work if
+      // this client receives operations from only one other client.
+      // In particular, this does not work with y-webrtc.
+      // It will work with y-websockets-client
+      if (opts.role == null || opts.role === 'master') {
+        this.role = 'master'
+      } else if (opts.role === 'slave') {
+        this.role = 'slave'
+      } else {
+        throw new Error("Role must be either 'master' or 'slave'!")
+      }
+      this.log = Y.debug('y:connector')
+      this.logMessage = Y.debug('y:connector-message')
+      this.y.db.forwardAppliedOperations = opts.forwardAppliedOperations || false
+      this.role = opts.role
+      this.connections = {}
+      this.isSynced = false
+      this.userEventListeners = []
+      this.whenSyncedListeners = []
+      this.currentSyncTarget = null
+      this.syncingClients = []
+      this.forwardToSyncingClients = opts.forwardToSyncingClients !== false
+      this.debug = opts.debug === true
+      this.syncStep2 = Promise.resolve()
+      this.broadcastOpBuffer = []
+      this.protocolVersion = 11
+      this.authInfo = opts.auth || null
+      this.checkAuth = opts.checkAuth || function () { return Promise.resolve('write') } // default is everyone has write access
+      if (opts.generateUserId === true) {
+        this.setUserId(Y.utils.generateGuid())
+      }
+    }
+    resetAuth (auth) {
+      if (this.authInfo !== auth) {
+        this.authInfo = auth
+        this.broadcast({
+          type: 'auth',
+          auth: this.authInfo
+        })
+      }
+    }
+    reconnect () {
+      this.log('reconnecting..')
+      return this.y.db.startGarbageCollector()
+    }
+    disconnect () {
+      this.log('discronnecting..')
+      this.connections = {}
+      this.isSynced = false
+      this.currentSyncTarget = null
+      this.syncingClients = []
+      this.whenSyncedListeners = []
+      this.y.db.stopGarbageCollector()
+      return this.y.db.whenTransactionsFinished()
+    }
+    repair () {
+      this.log('Repairing the state of Yjs. This can happen if messages get lost, and Yjs detects that something is wrong. If this happens often, please report an issue here: https://github.com/y-js/yjs/issues')
+      for (var name in this.connections) {
+        this.connections[name].isSynced = false
+      }
+      this.isSynced = false
+      this.currentSyncTarget = null
+      this.findNextSyncTarget()
+    }
+    setUserId (userId) {
+      if (this.userId == null) {
+        this.log('Set userId to "%s"', userId)
+        this.userId = userId
+        return this.y.db.setUserId(userId)
+      } else {
+        return null
+      }
+    }
+    onUserEvent (f) {
+      this.userEventListeners.push(f)
+    }
+    removeUserEventListener (f) {
+      this.userEventListeners = this.userEventListeners.filter(g => { f !== g })
+    }
+    userLeft (user) {
+      if (this.connections[user] != null) {
+        this.log('User left: %s', user)
+        delete this.connections[user]
+        if (user === this.currentSyncTarget) {
+          this.currentSyncTarget = null
+          this.findNextSyncTarget()
+        }
+        this.syncingClients = this.syncingClients.filter(function (cli) {
+          return cli !== user
+        })
+        for (var f of this.userEventListeners) {
+          f({
+            action: 'userLeft',
+            user: user
+          })
+        }
+      }
+    }
+    userJoined (user, role) {
+      if (role == null) {
+        throw new Error('You must specify the role of the joined user!')
+      }
+      if (this.connections[user] != null) {
+        throw new Error('This user already joined!')
+      }
+      this.log('User joined: %s', user)
+      this.connections[user] = {
+        isSynced: false,
+        role: role
+      }
+      for (var f of this.userEventListeners) {
+        f({
+          action: 'userJoined',
+          user: user,
+          role: role
+        })
+      }
+      if (this.currentSyncTarget == null) {
+        this.findNextSyncTarget()
+      }
+    }
+    // Execute a function _when_ we are connected.
+    // If not connected, wait until connected
+    whenSynced (f) {
+      if (this.isSynced) {
+        f()
+      } else {
+        this.whenSyncedListeners.push(f)
+      }
+    }
+    findNextSyncTarget () {
+      if (this.currentSyncTarget != null) {
+        return // "The current sync has not finished!"
+      }
+
+      var syncUser = null
+      for (var uid in this.connections) {
+        if (!this.connections[uid].isSynced) {
+          syncUser = uid
+          break
+        }
+      }
+      var conn = this
+      if (syncUser != null) {
+        this.currentSyncTarget = syncUser
+        this.y.db.requestTransaction(function *() {
+          var stateSet = yield* this.getStateSet()
+          var deleteSet = yield* this.getDeleteSet()
+          var answer = {
+            type: 'sync step 1',
+            stateSet: stateSet,
+            deleteSet: deleteSet,
+            protocolVersion: conn.protocolVersion,
+            auth: conn.authInfo
+          }
+          conn.send(syncUser, answer)
+        })
+      } else {
+        if (!conn.isSynced) {
+          this.y.db.requestTransaction(function *() {
+            if (!conn.isSynced) {
+              // it is crucial that isSynced is set at the time garbageCollectAfterSync is called
+              conn.isSynced = true
+              yield* this.garbageCollectAfterSync()
+              // call whensynced listeners
+              for (var f of conn.whenSyncedListeners) {
+                f()
+              }
+              conn.whenSyncedListeners = []
+            }
+          })
+        }
+      }
+    }
+    send (uid, message) {
+      this.log('Send \'%s\' to %s', message.type, uid)
+      this.logMessage('Message: %j', message)
+    }
+    broadcast (message) {
+      this.log('Broadcast \'%s\'', message.type)
+      this.logMessage('Message: %j', message)
+    }
+    /*
+      Buffer operations, and broadcast them when ready.
+    */
+    broadcastOps (ops) {
+      ops = ops.map(function (op) {
+        return Y.Struct[op.struct].encode(op)
+      })
+      var self = this
+      function broadcastOperations () {
+        if (self.broadcastOpBuffer.length > 0) {
+          self.broadcast({
+            type: 'update',
+            ops: self.broadcastOpBuffer
+          })
+          self.broadcastOpBuffer = []
+        }
+      }
+      if (this.broadcastOpBuffer.length === 0) {
+        this.broadcastOpBuffer = ops
+        if (this.y.db.transactionInProgress) {
+          this.y.db.whenTransactionsFinished().then(broadcastOperations)
+        } else {
+          setTimeout(broadcastOperations, 0)
+        }
+      } else {
+        this.broadcastOpBuffer = this.broadcastOpBuffer.concat(ops)
+      }
+    }
+    /*
+      You received a raw message, and you know that it is intended for Yjs. Then call this function.
+    */
+    receiveMessage (sender/* :UserId */, message/* :Message */) {
+      if (sender === this.userId) {
+        return Promise.resolve()
+      }
+      this.log('Receive \'%s\' from %s', message.type, sender)
+      this.logMessage('Message: %j', message)
+      if (message.protocolVersion != null && message.protocolVersion !== this.protocolVersion) {
+        this.log(
+          `You tried to sync with a yjs instance that has a different protocol version
+          (You: ${this.protocolVersion}, Client: ${message.protocolVersion}).
+          The sync was stopped. You need to upgrade your dependencies (especially Yjs & the Connector)!
+          `)
+        this.send(sender, {
+          type: 'sync stop',
+          protocolVersion: this.protocolVersion
+        })
+        return Promise.reject('Incompatible protocol version')
+      }
+      if (message.auth != null && this.connections[sender] != null) {
+        // authenticate using auth in message
+        var auth = this.checkAuth(message.auth, this.y, sender)
+        this.connections[sender].auth = auth
+        auth.then(auth => {
+          for (var f of this.userEventListeners) {
+            f({
+              action: 'userAuthenticated',
+              user: sender,
+              auth: auth
+            })
+          }
+        })
+      } else if (this.connections[sender] != null && this.connections[sender].auth == null) {
+        // authenticate without otherwise
+        this.connections[sender].auth = this.checkAuth(null, this.y, sender)
+      }
+      if (this.connections[sender] != null && this.connections[sender].auth != null) {
+        return this.connections[sender].auth.then((auth) => {
+          if (message.type === 'sync step 1' && canRead(auth)) {
+            let conn = this
+            let m = message
+
+            this.y.db.requestTransaction(function *() {
+              var currentStateSet = yield* this.getStateSet()
+              if (canWrite(auth)) {
+                yield* this.applyDeleteSet(m.deleteSet)
+              }
+
+              var ds = yield* this.getDeleteSet()
+              var answer = {
+                type: 'sync step 2',
+                stateSet: currentStateSet,
+                deleteSet: ds,
+                protocolVersion: this.protocolVersion,
+                auth: this.authInfo
+              }
+              answer.os = yield* this.getOperations(m.stateSet)
+              conn.send(sender, answer)
+              if (this.forwardToSyncingClients) {
+                conn.syncingClients.push(sender)
+                setTimeout(function () {
+                  conn.syncingClients = conn.syncingClients.filter(function (cli) {
+                    return cli !== sender
+                  })
+                  conn.send(sender, {
+                    type: 'sync done'
+                  })
+                }, 5000) // TODO: conn.syncingClientDuration)
+              } else {
+                conn.send(sender, {
+                  type: 'sync done'
+                })
+              }
+            })
+          } else if (message.type === 'sync step 2' && canWrite(auth)) {
+            var db = this.y.db
+            var defer = {}
+            defer.promise = new Promise(function (resolve) {
+              defer.resolve = resolve
+            })
+            this.syncStep2 = defer.promise
+            let m /* :MessageSyncStep2 */ = message
+            db.requestTransaction(function * () {
+              yield* this.applyDeleteSet(m.deleteSet)
+              if (m.osUntransformed != null) {
+                yield* this.applyOperationsUntransformed(m.osUntransformed, m.stateSet)
+              } else {
+                this.store.apply(m.os)
+              }
+              /*
+               * This just sends the complete hb after some time
+               * Mostly for debugging..
+               *
+              db.requestTransaction(function * () {
+                var ops = yield* this.getOperations(m.stateSet)
+                if (ops.length > 0) {
+                  if (!broadcastHB) { // TODO: consider to broadcast here..
+                    conn.send(sender, {
+                      type: 'update',
+                      ops: ops
+                    })
+                  } else {
+                    // broadcast only once!
+                    conn.broadcastOps(ops)
+                  }
+                }
+              })
+              */
+              defer.resolve()
+            })
+          } else if (message.type === 'sync done') {
+            var self = this
+            this.syncStep2.then(function () {
+              self._setSyncedWith(sender)
+            })
+          } else if (message.type === 'update' && canWrite(auth)) {
+            if (this.forwardToSyncingClients) {
+              for (var client of this.syncingClients) {
+                this.send(client, message)
+              }
+            }
+            if (this.y.db.forwardAppliedOperations) {
+              var delops = message.ops.filter(function (o) {
+                return o.struct === 'Delete'
+              })
+              if (delops.length > 0) {
+                this.broadcastOps(delops)
+              }
+            }
+            this.y.db.apply(message.ops)
+          }
+        })
+      } else {
+        return Promise.reject('Unable to deliver message')
+      }
+    }
+    _setSyncedWith (user) {
+      var conn = this.connections[user]
+      if (conn != null) {
+        conn.isSynced = true
+      }
+      if (user === this.currentSyncTarget) {
+        this.currentSyncTarget = null
+        this.findNextSyncTarget()
+      }
+    }
+    /*
+      Currently, the HB encodes operations as JSON. For the moment I want to keep it
+      that way. Maybe we support encoding in the HB as XML in the future, but for now I don't want
+      too much overhead. Y is very likely to get changed a lot in the future
+
+      Because we don't want to encode JSON as string (with character escaping, wich makes it pretty much unreadable)
+      we encode the JSON as XML.
+
+      When the HB support encoding as XML, the format should look pretty much like this.
+
+      does not support primitive values as array elements
+      expects an ltx (less than xml) object
+    */
+    parseMessageFromXml (m/* :any */) {
+      function parseArray (node) {
+        for (var n of node.children) {
+          if (n.getAttribute('isArray') === 'true') {
+            return parseArray(n)
+          } else {
+            return parseObject(n)
+          }
+        }
+      }
+      function parseObject (node/* :any */) {
+        var json = {}
+        for (var attrName in node.attrs) {
+          var value = node.attrs[attrName]
+          var int = parseInt(value, 10)
+          if (isNaN(int) || ('' + int) !== value) {
+            json[attrName] = value
+          } else {
+            json[attrName] = int
+          }
+        }
+        for (var n/* :any */ in node.children) {
+          var name = n.name
+          if (n.getAttribute('isArray') === 'true') {
+            json[name] = parseArray(n)
+          } else {
+            json[name] = parseObject(n)
+          }
+        }
+        return json
+      }
+      parseObject(m)
+    }
+    /*
+      encode message in xml
+      we use string because Strophe only accepts an "xml-string"..
+      So {a:4,b:{c:5}} will look like
+      <y a="4">
+        <b c="5"></b>
+      </y>
+      m - ltx element
+      json - Object
+    */
+    encodeMessageToXml (msg, obj) {
+      // attributes is optional
+      function encodeObject (m, json) {
+        for (var name in json) {
+          var value = json[name]
+          if (name == null) {
+            // nop
+          } else if (value.constructor === Object) {
+            encodeObject(m.c(name), value)
+          } else if (value.constructor === Array) {
+            encodeArray(m.c(name), value)
+          } else {
+            m.setAttribute(name, value)
+          }
+        }
+      }
+      function encodeArray (m, array) {
+        m.setAttribute('isArray', 'true')
+        for (var e of array) {
+          if (e.constructor === Object) {
+            encodeObject(m.c('array-element'), e)
+          } else {
+            encodeArray(m.c('array-element'), e)
+          }
+        }
+      }
+      if (obj.constructor === Object) {
+        encodeObject(msg.c('y', { xmlns: 'http://y.ninja/connector-stanza' }), obj)
+      } else if (obj.constructor === Array) {
+        encodeArray(msg.c('y', { xmlns: 'http://y.ninja/connector-stanza' }), obj)
+      } else {
+        throw new Error("I can't encode this json!")
+      }
+    }
+  }
+  Y.AbstractConnector = AbstractConnector
+}
+
+},{}],787:[function(require,module,exports){
+/* global getRandom, async */
+'use strict'
+
+module.exports = function (Y) {
+  var globalRoom = {
+    users: {},
+    buffers: {},
+    removeUser: function (user) {
+      for (var i in this.users) {
+        this.users[i].userLeft(user)
+      }
+      delete this.users[user]
+      delete this.buffers[user]
+    },
+    addUser: function (connector) {
+      this.users[connector.userId] = connector
+      this.buffers[connector.userId] = {}
+      for (var uname in this.users) {
+        if (uname !== connector.userId) {
+          var u = this.users[uname]
+          u.userJoined(connector.userId, 'master')
+          connector.userJoined(u.userId, 'master')
+        }
+      }
+    },
+    whenTransactionsFinished: function () {
+      var self = this
+      return new Promise(function (resolve, reject) {
+        // The connector first has to send the messages to the db.
+        // Wait for the checkAuth-function to resolve
+        // The test lib only has a simple checkAuth function: `() => Promise.resolve()`
+        // Just add a function to the event-queue, in order to wait for the event.
+        // TODO: this may be buggy in test applications (but it isn't be for real-life apps)
+        setTimeout(function () {
+          var ps = []
+          for (var name in self.users) {
+            ps.push(self.users[name].y.db.whenTransactionsFinished())
+          }
+          Promise.all(ps).then(resolve, reject)
+        }, 10)
+      })
+    },
+    flushOne: function flushOne () {
+      var bufs = []
+      for (var receiver in globalRoom.buffers) {
+        let buff = globalRoom.buffers[receiver]
+        var push = false
+        for (let sender in buff) {
+          if (buff[sender].length > 0) {
+            push = true
+            break
+          }
+        }
+        if (push) {
+          bufs.push(receiver)
+        }
+      }
+      if (bufs.length > 0) {
+        var userId = getRandom(bufs)
+        let buff = globalRoom.buffers[userId]
+        let sender = getRandom(Object.keys(buff))
+        var m = buff[sender].shift()
+        if (buff[sender].length === 0) {
+          delete buff[sender]
+        }
+        var user = globalRoom.users[userId]
+        return user.receiveMessage(m[0], m[1]).then(function () {
+          return user.y.db.whenTransactionsFinished()
+        }, function () {})
+      } else {
+        return false
+      }
+    },
+    flushAll: function () {
+      return new Promise(function (resolve) {
+        // flushes may result in more created operations,
+        // flush until there is nothing more to flush
+        function nextFlush () {
+          var c = globalRoom.flushOne()
+          if (c) {
+            while (c) {
+              c = globalRoom.flushOne()
+            }
+            globalRoom.whenTransactionsFinished().then(nextFlush)
+          } else {
+            c = globalRoom.flushOne()
+            if (c) {
+              c.then(function () {
+                globalRoom.whenTransactionsFinished().then(nextFlush)
+              })
+            } else {
+              resolve()
+            }
+          }
+        }
+        globalRoom.whenTransactionsFinished().then(nextFlush)
+      })
+    }
+  }
+  Y.utils.globalRoom = globalRoom
+
+  var userIdCounter = 0
+
+  class Test extends Y.AbstractConnector {
+    constructor (y, options) {
+      if (options === undefined) {
+        throw new Error('Options must not be undefined!')
+      }
+      options.role = 'master'
+      options.forwardToSyncingClients = false
+      super(y, options)
+      this.setUserId((userIdCounter++) + '').then(() => {
+        globalRoom.addUser(this)
+      })
+      this.globalRoom = globalRoom
+      this.syncingClientDuration = 0
+    }
+    receiveMessage (sender, m) {
+      return super.receiveMessage(sender, JSON.parse(JSON.stringify(m)))
+    }
+    send (userId, message) {
+      var buffer = globalRoom.buffers[userId]
+      if (buffer != null) {
+        if (buffer[this.userId] == null) {
+          buffer[this.userId] = []
+        }
+        buffer[this.userId].push(JSON.parse(JSON.stringify([this.userId, message])))
+      }
+    }
+    broadcast (message) {
+      for (var key in globalRoom.buffers) {
+        var buff = globalRoom.buffers[key]
+        if (buff[this.userId] == null) {
+          buff[this.userId] = []
+        }
+        buff[this.userId].push(JSON.parse(JSON.stringify([this.userId, message])))
+      }
+    }
+    isDisconnected () {
+      return globalRoom.users[this.userId] == null
+    }
+    reconnect () {
+      if (this.isDisconnected()) {
+        globalRoom.addUser(this)
+        super.reconnect()
+      }
+      return Y.utils.globalRoom.flushAll()
+    }
+    disconnect () {
+      var waitForMe = Promise.resolve()
+      if (!this.isDisconnected()) {
+        globalRoom.removeUser(this.userId)
+        waitForMe = super.disconnect()
+      }
+      var self = this
+      return waitForMe.then(function () {
+        return self.y.db.whenTransactionsFinished()
+      })
+    }
+    flush () {
+      var self = this
+      return async(function * () {
+        var buff = globalRoom.buffers[self.userId]
+        while (Object.keys(buff).length > 0) {
+          var sender = getRandom(Object.keys(buff))
+          var m = buff[sender].shift()
+          if (buff[sender].length === 0) {
+            delete buff[sender]
+          }
+          yield this.receiveMessage(m[0], m[1])
+        }
+        yield self.whenTransactionsFinished()
+      })
+    }
+  }
+
+  Y.Test = Test
+}
+
+},{}],788:[function(require,module,exports){
+/* @flow */
+'use strict'
+
+module.exports = function (Y /* :any */) {
+  /*
+    Partial definition of an OperationStore.
+    TODO: name it Database, operation store only holds operations.
+
+    A database definition must alse define the following methods:
+    * logTable() (optional)
+      - show relevant information information in a table
+    * requestTransaction(makeGen)
+      - request a transaction
+    * destroy()
+      - destroy the database
+  */
+  class AbstractDatabase {
+    /* ::
+    y: YConfig;
+    forwardAppliedOperations: boolean;
+    listenersById: Object;
+    listenersByIdExecuteNow: Array<Object>;
+    listenersByIdRequestPending: boolean;
+    initializedTypes: Object;
+    whenUserIdSetListener: ?Function;
+    waitingTransactions: Array<Transaction>;
+    transactionInProgress: boolean;
+    executeOrder: Array<Object>;
+    gc1: Array<Struct>;
+    gc2: Array<Struct>;
+    gcTimeout: number;
+    gcInterval: any;
+    garbageCollect: Function;
+    executeOrder: Array<any>; // for debugging only
+    userId: UserId;
+    opClock: number;
+    transactionsFinished: ?{promise: Promise, resolve: any};
+    transact: (x: ?Generator) => any;
+    */
+    constructor (y, opts) {
+      this.y = y
+      this.dbOpts = opts
+      var os = this
+      this.userId = null
+      var resolve
+      this.userIdPromise = new Promise(function (r) {
+        resolve = r
+      })
+      this.userIdPromise.resolve = resolve
+      // whether to broadcast all applied operations (insert & delete hook)
+      this.forwardAppliedOperations = false
+      // E.g. this.listenersById[id] : Array<Listener>
+      this.listenersById = {}
+      // Execute the next time a transaction is requested
+      this.listenersByIdExecuteNow = []
+      // A transaction is requested
+      this.listenersByIdRequestPending = false
+      /* To make things more clear, the following naming conventions:
+         * ls : we put this.listenersById on ls
+         * l : Array<Listener>
+         * id : Id (can't use as property name)
+         * sid : String (converted from id via JSON.stringify
+                         so we can use it as a property name)
+
+        Always remember to first overwrite
+        a property before you iterate over it!
+      */
+      // TODO: Use ES7 Weak Maps. This way types that are no longer user,
+      // wont be kept in memory.
+      this.initializedTypes = {}
+      this.waitingTransactions = []
+      this.transactionInProgress = false
+      this.transactionIsFlushed = false
+      if (typeof YConcurrency_TestingMode !== 'undefined') {
+        this.executeOrder = []
+      }
+      this.gc1 = [] // first stage
+      this.gc2 = [] // second stage -> after that, remove the op
+
+      function garbageCollect () {
+        return os.whenTransactionsFinished().then(function () {
+          if (os.gc1.length > 0 || os.gc2.length > 0) {
+            if (!os.y.connector.isSynced) {
+              console.warn('gc should be empty when not synced!')
+            }
+            return new Promise((resolve) => {
+              os.requestTransaction(function * () {
+                if (os.y.connector != null && os.y.connector.isSynced) {
+                  for (var i = 0; i < os.gc2.length; i++) {
+                    var oid = os.gc2[i]
+                    yield* this.garbageCollectOperation(oid)
+                  }
+                  os.gc2 = os.gc1
+                  os.gc1 = []
+                }
+                // TODO: Use setInterval here instead (when garbageCollect is called several times there will be several timeouts..)
+                if (os.gcTimeout > 0) {
+                  os.gcInterval = setTimeout(garbageCollect, os.gcTimeout)
+                }
+                resolve()
+              })
+            })
+          } else {
+            // TODO: see above
+            if (os.gcTimeout > 0) {
+              os.gcInterval = setTimeout(garbageCollect, os.gcTimeout)
+            }
+            return Promise.resolve()
+          }
+        })
+      }
+      this.garbageCollect = garbageCollect
+      this.startGarbageCollector()
+
+      this.repairCheckInterval = !opts.repairCheckInterval ? 6000 : opts.repairCheckInterval
+      this.opsReceivedTimestamp = new Date()
+      this.startRepairCheck()
+    }
+    startGarbageCollector () {
+      this.gc = this.dbOpts.gc == null || this.dbOpts.gc
+      if (this.gc) {
+        this.gcTimeout = !this.dbOpts.gcTimeout ? 50000 : this.dbOpts.gcTimeout
+      } else {
+        this.gcTimeout = -1
+      }
+      if (this.gcTimeout > 0) {
+        this.garbageCollect()
+      }
+    }
+    startRepairCheck () {
+      var os = this
+      if (this.repairCheckInterval > 0) {
+        this.repairCheckIntervalHandler = setInterval(function repairOnMissingOperations () {
+          /*
+            Case 1. No ops have been received in a while (new Date() - os.opsReceivedTimestamp > os.repairCheckInterval)
+              - 1.1 os.listenersById is empty. Then the state was correct the whole time. -> Nothing to do (nor to update)
+              - 1.2 os.listenersById is not empty.
+                      * Then the state was incorrect for at least {os.repairCheckInterval} seconds.
+                      * -> Remove everything in os.listenersById and sync again (connector.repair())
+            Case 2. An op has been received in the last {os.repairCheckInterval } seconds.
+                    It is not yet necessary to check for faulty behavior. Everything can still resolve itself. Wait for more messages.
+                    If nothing was received for a while and os.listenersById is still not emty, we are in case 1.2
+                    -> Do nothing
+
+            Baseline here is: we really only have to catch case 1.2..
+          */
+          if (
+            new Date() - os.opsReceivedTimestamp > os.repairCheckInterval &&
+            Object.keys(os.listenersById).length > 0 // os.listenersById is not empty
+          ) {
+            // haven't received operations for over {os.repairCheckInterval} seconds, resend state vector
+            os.listenersById = {}
+            os.opsReceivedTimestamp = new Date() // update so you don't send repair several times in a row
+            os.y.connector.repair()
+          }
+        }, this.repairCheckInterval)
+      }
+    }
+    stopRepairCheck () {
+      clearInterval(this.repairCheckIntervalHandler)
+    }
+    queueGarbageCollector (id) {
+      if (this.y.connector.isSynced && this.gc) {
+        this.gc1.push(id)
+      }
+    }
+    emptyGarbageCollector () {
+      return new Promise(resolve => {
+        var check = () => {
+          if (this.gc1.length > 0 || this.gc2.length > 0) {
+            this.garbageCollect().then(check)
+          } else {
+            resolve()
+          }
+        }
+        setTimeout(check, 0)
+      })
+    }
+    addToDebug () {
+      if (typeof YConcurrency_TestingMode !== 'undefined') {
+        var command /* :string */ = Array.prototype.map.call(arguments, function (s) {
+          if (typeof s === 'string') {
+            return s
+          } else {
+            return JSON.stringify(s)
+          }
+        }).join('').replace(/"/g, "'").replace(/,/g, ', ').replace(/:/g, ': ')
+        this.executeOrder.push(command)
+      }
+    }
+    getDebugData () {
+      console.log(this.executeOrder.join('\n'))
+    }
+    stopGarbageCollector () {
+      var self = this
+      this.gc = false
+      this.gcTimeout = -1
+      return new Promise(function (resolve) {
+        self.requestTransaction(function * () {
+          var ungc /* :Array<Struct> */ = self.gc1.concat(self.gc2)
+          self.gc1 = []
+          self.gc2 = []
+          for (var i = 0; i < ungc.length; i++) {
+            var op = yield* this.getOperation(ungc[i])
+            if (op != null) {
+              delete op.gc
+              yield* this.setOperation(op)
+            }
+          }
+          resolve()
+        })
+      })
+    }
+    /*
+      Try to add to GC.
+
+      TODO: rename this function
+
+      Rulez:
+      * Only gc if this user is online & gc turned on
+      * The most left element in a list must not be gc'd.
+        => There is at least one element in the list
+
+      returns true iff op was added to GC
+    */
+    * addToGarbageCollector (op, left) {
+      if (
+        op.gc == null &&
+        op.deleted === true &&
+        this.store.gc &&
+        this.store.y.connector.isSynced
+      ) {
+        var gc = false
+        if (left != null && left.deleted === true) {
+          gc = true
+        } else if (op.content != null && op.content.length > 1) {
+          op = yield* this.getInsertionCleanStart([op.id[0], op.id[1] + 1])
+          gc = true
+        }
+        if (gc) {
+          op.gc = true
+          yield* this.setOperation(op)
+          this.store.queueGarbageCollector(op.id)
+          return true
+        }
+      }
+      return false
+    }
+    removeFromGarbageCollector (op) {
+      function filter (o) {
+        return !Y.utils.compareIds(o, op.id)
+      }
+      this.gc1 = this.gc1.filter(filter)
+      this.gc2 = this.gc2.filter(filter)
+      delete op.gc
+    }
+    destroyTypes () {
+      for (var key in this.initializedTypes) {
+        var type = this.initializedTypes[key]
+        if (type._destroy != null) {
+          type._destroy()
+        } else {
+          console.error('The type you included does not provide destroy functionality, it will remain in memory (updating your packages will help).')
+        }
+      }
+    }
+    * destroy () {
+      clearInterval(this.gcInterval)
+      this.gcInterval = null
+      this.stopRepairCheck()
+    }
+    setUserId (userId) {
+      if (!this.userIdPromise.inProgress) {
+        this.userIdPromise.inProgress = true
+        var self = this
+        self.requestTransaction(function * () {
+          self.userId = userId
+          var state = yield* this.getState(userId)
+          self.opClock = state.clock
+          self.userIdPromise.resolve(userId)
+        })
+      }
+      return this.userIdPromise
+    }
+    whenUserIdSet (f) {
+      this.userIdPromise.then(f)
+    }
+    getNextOpId (numberOfIds) {
+      if (numberOfIds == null) {
+        throw new Error('getNextOpId expects the number of created ids to create!')
+      } else if (this.userId == null) {
+        throw new Error('OperationStore not yet initialized!')
+      } else {
+        var id = [this.userId, this.opClock]
+        this.opClock += numberOfIds
+        return id
+      }
+    }
+    /*
+      Apply a list of operations.
+
+      * we save a timestamp, because we received new operations that could resolve ops in this.listenersById (see this.startRepairCheck)
+      * get a transaction
+      * check whether all Struct.*.requiredOps are in the OS
+      * check if it is an expected op (otherwise wait for it)
+      * check if was deleted, apply a delete operation after op was applied
+    */
+    apply (ops) {
+      this.opsReceivedTimestamp = new Date()
+      for (var i = 0; i < ops.length; i++) {
+        var o = ops[i]
+        if (o.id == null || o.id[0] !== this.y.connector.userId) {
+          var required = Y.Struct[o.struct].requiredOps(o)
+          if (o.requires != null) {
+            required = required.concat(o.requires)
+          }
+          this.whenOperationsExist(required, o)
+        }
+      }
+    }
+    /*
+      op is executed as soon as every operation requested is available.
+      Note that Transaction can (and should) buffer requests.
+    */
+    whenOperationsExist (ids, op) {
+      if (ids.length > 0) {
+        let listener = {
+          op: op,
+          missing: ids.length
+        }
+
+        for (let i = 0; i < ids.length; i++) {
+          let id = ids[i]
+          let sid = JSON.stringify(id)
+          let l = this.listenersById[sid]
+          if (l == null) {
+            l = []
+            this.listenersById[sid] = l
+          }
+          l.push(listener)
+        }
+      } else {
+        this.listenersByIdExecuteNow.push({
+          op: op
+        })
+      }
+
+      if (this.listenersByIdRequestPending) {
+        return
+      }
+
+      this.listenersByIdRequestPending = true
+      var store = this
+
+      this.requestTransaction(function * () {
+        var exeNow = store.listenersByIdExecuteNow
+        store.listenersByIdExecuteNow = []
+
+        var ls = store.listenersById
+        store.listenersById = {}
+
+        store.listenersByIdRequestPending = false
+
+        for (let key = 0; key < exeNow.length; key++) {
+          let o = exeNow[key].op
+          yield* store.tryExecute.call(this, o)
+        }
+
+        for (var sid in ls) {
+          var l = ls[sid]
+          var id = JSON.parse(sid)
+          var op
+          if (typeof id[1] === 'string') {
+            op = yield* this.getOperation(id)
+          } else {
+            op = yield* this.getInsertion(id)
+          }
+          if (op == null) {
+            store.listenersById[sid] = l
+          } else {
+            for (let i = 0; i < l.length; i++) {
+              let listener = l[i]
+              let o = listener.op
+              if (--listener.missing === 0) {
+                yield* store.tryExecute.call(this, o)
+              }
+            }
+          }
+        }
+      })
+    }
+    /*
+      Actually execute an operation, when all expected operations are available.
+    */
+    /* :: // TODO: this belongs somehow to transaction
+    store: Object;
+    getOperation: any;
+    isGarbageCollected: any;
+    addOperation: any;
+    whenOperationsExist: any;
+    */
+    * tryExecute (op) {
+      this.store.addToDebug('yield* this.store.tryExecute.call(this, ', JSON.stringify(op), ')')
+      if (op.struct === 'Delete') {
+        yield* Y.Struct.Delete.execute.call(this, op)
+        // this is now called in Transaction.deleteOperation!
+        // yield* this.store.operationAdded(this, op)
+      } else {
+        // check if this op was defined
+        var defined = yield* this.getInsertion(op.id)
+        while (defined != null && defined.content != null) {
+          // check if this op has a longer content in the case it is defined
+          if (defined.id[1] + defined.content.length < op.id[1] + op.content.length) {
+            var overlapSize = defined.content.length - (op.id[1] - defined.id[1])
+            op.content.splice(0, overlapSize)
+            op.id = [op.id[0], op.id[1] + overlapSize]
+            op.left = Y.utils.getLastId(defined)
+            op.origin = op.left
+            defined = yield* this.getOperation(op.id) // getOperation suffices here
+          } else {
+            break
+          }
+        }
+        if (defined == null) {
+          var opid = op.id
+          var isGarbageCollected = yield* this.isGarbageCollected(opid)
+          if (!isGarbageCollected) {
+            // TODO: reduce number of get / put calls for op ..
+            yield* Y.Struct[op.struct].execute.call(this, op)
+            yield* this.addOperation(op)
+            yield* this.store.operationAdded(this, op)
+            // operationAdded can change op..
+            op = yield* this.getOperation(opid)
+            // if insertion, try to combine with left
+            yield* this.tryCombineWithLeft(op)
+          }
+        }
+      }
+    }
+    /*
+     * Called by a transaction when an operation is added.
+     * This function is especially important for y-indexeddb, where several instances may share a single database.
+     * Every time an operation is created by one instance, it is send to all other instances and operationAdded is called
+     *
+     * If it's not a Delete operation:
+     *   * Checks if another operation is executable (listenersById)
+     *   * Update state, if possible
+     *
+     * Always:
+     *   * Call type
+     */
+    * operationAdded (transaction, op) {
+      if (op.struct === 'Delete') {
+        var type = this.initializedTypes[JSON.stringify(op.targetParent)]
+        if (type != null) {
+          yield* type._changed(transaction, op)
+        }
+      } else {
+        // increase SS
+        yield* transaction.updateState(op.id[0])
+        var opLen = op.content != null ? op.content.length : 1
+        for (let i = 0; i < opLen; i++) {
+          // notify whenOperation listeners (by id)
+          var sid = JSON.stringify([op.id[0], op.id[1] + i])
+          var l = this.listenersById[sid]
+          delete this.listenersById[sid]
+          if (l != null) {
+            for (var key in l) {
+              var listener = l[key]
+              if (--listener.missing === 0) {
+                this.whenOperationsExist([], listener.op)
+              }
+            }
+          }
+        }
+        var t = this.initializedTypes[JSON.stringify(op.parent)]
+
+        // if parent is deleted, mark as gc'd and return
+        if (op.parent != null) {
+          var parentIsDeleted = yield* transaction.isDeleted(op.parent)
+          if (parentIsDeleted) {
+            yield* transaction.deleteList(op.id)
+            return
+          }
+        }
+
+        // notify parent, if it was instanciated as a custom type
+        if (t != null) {
+          let o = Y.utils.copyOperation(op)
+          yield* t._changed(transaction, o)
+        }
+        if (!op.deleted) {
+          // Delete if DS says this is actually deleted
+          var len = op.content != null ? op.content.length : 1
+          var startId = op.id // You must not use op.id in the following loop, because op will change when deleted
+            // TODO: !! console.log('TODO: change this before commiting')
+          for (let i = 0; i < len; i++) {
+            var id = [startId[0], startId[1] + i]
+            var opIsDeleted = yield* transaction.isDeleted(id)
+            if (opIsDeleted) {
+              var delop = {
+                struct: 'Delete',
+                target: id
+              }
+              yield* this.tryExecute.call(transaction, delop)
+            }
+          }
+        }
+      }
+    }
+    whenTransactionsFinished () {
+      if (this.transactionInProgress) {
+        if (this.transactionsFinished == null) {
+          var resolve
+          var promise = new Promise(function (r) {
+            resolve = r
+          })
+          this.transactionsFinished = {
+            resolve: resolve,
+            promise: promise
+          }
+        }
+        return this.transactionsFinished.promise
+      } else {
+        return Promise.resolve()
+      }
+    }
+    // Check if there is another transaction request.
+    // * the last transaction is always a flush :)
+    getNextRequest () {
+      if (this.waitingTransactions.length === 0) {
+        if (this.transactionIsFlushed) {
+          this.transactionInProgress = false
+          this.transactionIsFlushed = false
+          if (this.transactionsFinished != null) {
+            this.transactionsFinished.resolve()
+            this.transactionsFinished = null
+          }
+          return null
+        } else {
+          this.transactionIsFlushed = true
+          return function * () {
+            yield* this.flush()
+          }
+        }
+      } else {
+        this.transactionIsFlushed = false
+        return this.waitingTransactions.shift()
+      }
+    }
+    requestTransaction (makeGen/* :any */, callImmediately) {
+      this.waitingTransactions.push(makeGen)
+      if (!this.transactionInProgress) {
+        this.transactionInProgress = true
+        setTimeout(() => {
+          this.transact(this.getNextRequest())
+        }, 0)
+      }
+    }
+    /*
+      Get a created/initialized type.
+    */
+    getType (id) {
+      return this.initializedTypes[JSON.stringify(id)]
+    }
+    /*
+      Init type. This is called when a remote operation is retrieved, and transformed to a type
+      TODO: delete type from store.initializedTypes[id] when corresponding id was deleted!
+    */
+    * initType (id, args) {
+      var sid = JSON.stringify(id)
+      var t = this.store.initializedTypes[sid]
+      if (t == null) {
+        var op/* :MapStruct | ListStruct */ = yield* this.getOperation(id)
+        if (op != null) {
+          t = yield* Y[op.type].typeDefinition.initType.call(this, this.store, op, args)
+          this.store.initializedTypes[sid] = t
+        }
+      }
+      return t
+    }
+    /*
+     Create type. This is called when the local user creates a type (which is a synchronous action)
+    */
+    createType (typedefinition, id) {
+      var structname = typedefinition[0].struct
+      id = id || this.getNextOpId(1)
+      var op = Y.Struct[structname].create(id)
+      op.type = typedefinition[0].name
+
+      this.requestTransaction(function * () {
+        if (op.id[0] === '_') {
+          yield* this.setOperation(op)
+        } else {
+          yield* this.applyCreatedOperations([op])
+        }
+      })
+      var t = Y[op.type].typeDefinition.createType(this, op, typedefinition[1])
+      this.initializedTypes[JSON.stringify(op.id)] = t
+      return t
+    }
+  }
+  Y.AbstractDatabase = AbstractDatabase
+}
+
+},{}],789:[function(require,module,exports){
+/* @flow */
+'use strict'
+
+/*
+ An operation also defines the structure of a type. This is why operation and
+ structure are used interchangeably here.
+
+ It must be of the type Object. I hope to achieve some performance
+ improvements when working on databases that support the json format.
+
+ An operation must have the following properties:
+
+ * encode
+     - Encode the structure in a readable format (preferably string- todo)
+ * decode (todo)
+     - decode structure to json
+ * execute
+     - Execute the semantics of an operation.
+ * requiredOps
+     - Operations that are required to execute this operation.
+*/
+module.exports = function (Y/* :any */) {
+  var Struct = {
+    /* This is the only operation that is actually not a structure, because
+    it is not stored in the OS. This is why it _does not_ have an id
+
+    op = {
+      target: Id
+    }
+    */
+    Delete: {
+      encode: function (op) {
+        return {
+          target: op.target,
+          length: op.length || 0,
+          struct: 'Delete'
+        }
+      },
+      requiredOps: function (op) {
+        return [] // [op.target]
+      },
+      execute: function * (op) {
+        return yield* this.deleteOperation(op.target, op.length || 1)
+      }
+    },
+    Insert: {
+      /* {
+          content: [any],
+          opContent: Id,
+          id: Id,
+          left: Id,
+          origin: Id,
+          right: Id,
+          parent: Id,
+          parentSub: string (optional), // child of Map type
+        }
+      */
+      encode: function (op/* :Insertion */) /* :Insertion */ {
+        // TODO: you could not send the "left" property, then you also have to
+        // "op.left = null" in $execute or $decode
+        var e/* :any */ = {
+          id: op.id,
+          left: op.left,
+          right: op.right,
+          origin: op.origin,
+          parent: op.parent,
+          struct: op.struct
+        }
+        if (op.parentSub != null) {
+          e.parentSub = op.parentSub
+        }
+        if (op.hasOwnProperty('opContent')) {
+          e.opContent = op.opContent
+        } else {
+          e.content = op.content.slice()
+        }
+
+        return e
+      },
+      requiredOps: function (op) {
+        var ids = []
+        if (op.left != null) {
+          ids.push(op.left)
+        }
+        if (op.right != null) {
+          ids.push(op.right)
+        }
+        if (op.origin != null && !Y.utils.compareIds(op.left, op.origin)) {
+          ids.push(op.origin)
+        }
+        // if (op.right == null && op.left == null) {
+        ids.push(op.parent)
+
+        if (op.opContent != null) {
+          ids.push(op.opContent)
+        }
+        return ids
+      },
+      getDistanceToOrigin: function * (op) {
+        if (op.left == null) {
+          return 0
+        } else {
+          var d = 0
+          var o = yield* this.getInsertion(op.left)
+          while (!Y.utils.matchesId(o, op.origin)) {
+            d++
+            if (o.left == null) {
+              break
+            } else {
+              o = yield* this.getInsertion(o.left)
+            }
+          }
+          return d
+        }
+      },
+      /*
+      # $this has to find a unique position between origin and the next known character
+      # case 1: $origin equals $o.origin: the $creator parameter decides if left or right
+      #         let $OL= [o1,o2,o3,o4], whereby $this is to be inserted between o1 and o4
+      #         o2,o3 and o4 origin is 1 (the position of o2)
+      #         there is the case that $this.creator < o2.creator, but o3.creator < $this.creator
+      #         then o2 knows o3. Since on another client $OL could be [o1,o3,o4] the problem is complex
+      #         therefore $this would be always to the right of o3
+      # case 2: $origin < $o.origin
+      #         if current $this insert_position > $o origin: $this ins
+      #         else $insert_position will not change
+      #         (maybe we encounter case 1 later, then this will be to the right of $o)
+      # case 3: $origin > $o.origin
+      #         $this insert_position is to the left of $o (forever!)
+      */
+      execute: function * (op) {
+        var i // loop counter
+
+        // during this function some ops may get split into two pieces (e.g. with getInsertionCleanEnd)
+        // We try to merge them later, if possible
+        var tryToRemergeLater = []
+
+        if (op.origin != null) { // TODO: !== instead of !=
+          // we save in origin that op originates in it
+          // we need that later when we eventually garbage collect origin (see transaction)
+          var origin = yield* this.getInsertionCleanEnd(op.origin)
+          if (origin.originOf == null) {
+            origin.originOf = []
+          }
+          origin.originOf.push(op.id)
+          yield* this.setOperation(origin)
+          if (origin.right != null) {
+            tryToRemergeLater.push(origin.right)
+          }
+        }
+        var distanceToOrigin = i = yield* Struct.Insert.getDistanceToOrigin.call(this, op) // most cases: 0 (starts from 0)
+
+        // now we begin to insert op in the list of insertions..
+        var o
+        var parent
+        var start
+
+        // find o. o is the first conflicting operation
+        if (op.left != null) {
+          o = yield* this.getInsertionCleanEnd(op.left)
+          if (!Y.utils.compareIds(op.left, op.origin) && o.right != null) {
+            // only if not added previously
+            tryToRemergeLater.push(o.right)
+          }
+          o = (o.right == null) ? null : yield* this.getOperation(o.right)
+        } else { // left == null
+          parent = yield* this.getOperation(op.parent)
+          let startId = op.parentSub ? parent.map[op.parentSub] : parent.start
+          start = startId == null ? null : yield* this.getOperation(startId)
+          o = start
+        }
+
+        // make sure to split op.right if necessary (also add to tryCombineWithLeft)
+        if (op.right != null) {
+          tryToRemergeLater.push(op.right)
+          yield* this.getInsertionCleanStart(op.right)
+        }
+
+        // handle conflicts
+        while (true) {
+          if (o != null && !Y.utils.compareIds(o.id, op.right)) {
+            var oOriginDistance = yield* Struct.Insert.getDistanceToOrigin.call(this, o)
+            if (oOriginDistance === i) {
+              // case 1
+              if (o.id[0] < op.id[0]) {
+                op.left = Y.utils.getLastId(o)
+                distanceToOrigin = i + 1 // just ignore o.content.length, doesn't make a difference
+              }
+            } else if (oOriginDistance < i) {
+              // case 2
+              if (i - distanceToOrigin <= oOriginDistance) {
+                op.left = Y.utils.getLastId(o)
+                distanceToOrigin = i + 1 // just ignore o.content.length, doesn't make a difference
+              }
+            } else {
+              break
+            }
+            i++
+            if (o.right != null) {
+              o = yield* this.getInsertion(o.right)
+            } else {
+              o = null
+            }
+          } else {
+            break
+          }
+        }
+
+        // reconnect..
+        var left = null
+        var right = null
+        if (parent == null) {
+          parent = yield* this.getOperation(op.parent)
+        }
+
+        // reconnect left and set right of op
+        if (op.left != null) {
+          left = yield* this.getInsertion(op.left)
+          // link left
+          op.right = left.right
+          left.right = op.id
+
+          yield* this.setOperation(left)
+        } else {
+          // set op.right from parent, if necessary
+          op.right = op.parentSub ? parent.map[op.parentSub] || null : parent.start
+        }
+        // reconnect right
+        if (op.right != null) {
+          // TODO: wanna connect right too?
+          right = yield* this.getOperation(op.right)
+          right.left = Y.utils.getLastId(op)
+
+          // if right exists, and it is supposed to be gc'd. Remove it from the gc
+          if (right.gc != null) {
+            if (right.content != null && right.content.length > 1) {
+              right = yield* this.getInsertionCleanEnd(right.id)
+            }
+            this.store.removeFromGarbageCollector(right)
+          }
+          yield* this.setOperation(right)
+        }
+
+        // update parents .map/start/end properties
+        if (op.parentSub != null) {
+          if (left == null) {
+            parent.map[op.parentSub] = op.id
+            yield* this.setOperation(parent)
+          }
+          // is a child of a map struct.
+          // Then also make sure that only the most left element is not deleted
+          // We do not call the type in this case (this is what the third parameter is for)
+          if (op.right != null) {
+            yield* this.deleteOperation(op.right, 1, true)
+          }
+          if (op.left != null) {
+            yield* this.deleteOperation(op.id, 1, true)
+          }
+        } else {
+          if (right == null || left == null) {
+            if (right == null) {
+              parent.end = Y.utils.getLastId(op)
+            }
+            if (left == null) {
+              parent.start = op.id
+            }
+            yield* this.setOperation(parent)
+          }
+        }
+
+        // try to merge original op.left and op.origin
+        for (i = 0; i < tryToRemergeLater.length; i++) {
+          var m = yield* this.getOperation(tryToRemergeLater[i])
+          yield* this.tryCombineWithLeft(m)
+        }
+      }
+    },
+    List: {
+      /*
+      {
+        start: null,
+        end: null,
+        struct: "List",
+        type: "",
+        id: this.os.getNextOpId(1)
+      }
+      */
+      create: function (id) {
+        return {
+          start: null,
+          end: null,
+          struct: 'List',
+          id: id
+        }
+      },
+      encode: function (op) {
+        var e = {
+          struct: 'List',
+          id: op.id,
+          type: op.type
+        }
+        if (op.requires != null) {
+          e.requires = op.requires
+        }
+        if (op.info != null) {
+          e.info = op.info
+        }
+        return e
+      },
+      requiredOps: function () {
+        /*
+        var ids = []
+        if (op.start != null) {
+          ids.push(op.start)
+        }
+        if (op.end != null){
+          ids.push(op.end)
+        }
+        return ids
+        */
+        return []
+      },
+      execute: function * (op) {
+        op.start = null
+        op.end = null
+      },
+      ref: function * (op, pos) {
+        if (op.start == null) {
+          return null
+        }
+        var res = null
+        var o = yield* this.getOperation(op.start)
+
+        while (true) {
+          if (!o.deleted) {
+            res = o
+            pos--
+          }
+          if (pos >= 0 && o.right != null) {
+            o = yield* this.getOperation(o.right)
+          } else {
+            break
+          }
+        }
+        return res
+      },
+      map: function * (o, f) {
+        o = o.start
+        var res = []
+        while (o != null) { // TODO: change to != (at least some convention)
+          var operation = yield* this.getOperation(o)
+          if (!operation.deleted) {
+            res.push(f(operation))
+          }
+          o = operation.right
+        }
+        return res
+      }
+    },
+    Map: {
+      /*
+        {
+          map: {},
+          struct: "Map",
+          type: "",
+          id: this.os.getNextOpId(1)
+        }
+      */
+      create: function (id) {
+        return {
+          id: id,
+          map: {},
+          struct: 'Map'
+        }
+      },
+      encode: function (op) {
+        var e = {
+          struct: 'Map',
+          type: op.type,
+          id: op.id,
+          map: {} // overwrite map!!
+        }
+        if (op.requires != null) {
+          e.requires = op.requires
+        }
+        if (op.info != null) {
+          e.info = op.info
+        }
+        return e
+      },
+      requiredOps: function () {
+        return []
+      },
+      execute: function * () {},
+      /*
+        Get a property by name
+      */
+      get: function * (op, name) {
+        var oid = op.map[name]
+        if (oid != null) {
+          var res = yield* this.getOperation(oid)
+          if (res == null || res.deleted) {
+            return void 0
+          } else if (res.opContent == null) {
+            return res.content[0]
+          } else {
+            return yield* this.getType(res.opContent)
+          }
+        }
+      }
+    }
+  }
+  Y.Struct = Struct
+}
+
+},{}],790:[function(require,module,exports){
+/* @flow */
+'use strict'
+
+/*
+  Partial definition of a transaction
+
+  A transaction provides all the the async functionality on a database.
+
+  By convention, a transaction has the following properties:
+  * ss for StateSet
+  * os for OperationStore
+  * ds for DeleteStore
+
+  A transaction must also define the following methods:
+  * checkDeleteStoreForState(state)
+    - When increasing the state of a user, an operation with an higher id
+      may already be garbage collected, and therefore it will never be received.
+      update the state to reflect this knowledge. This won't call a method to save the state!
+  * getDeleteSet(id)
+    - Get the delete set in a readable format:
+      {
+        "userX": [
+          [5,1], // starting from position 5, one operations is deleted
+          [9,4]  // starting from position 9, four operations are deleted
+        ],
+        "userY": ...
+      }
+  * getOpsFromDeleteSet(ds) -- TODO: just call this.deleteOperation(id) here
+    - get a set of deletions that need to be applied in order to get to
+      achieve the state of the supplied ds
+  * setOperation(op)
+    - write `op` to the database.
+      Note: this is allowed to return an in-memory object.
+      E.g. the Memory adapter returns the object that it has in-memory.
+      Changing values on this object will be stored directly in the database
+      without calling this function. Therefore,
+      setOperation may have no functionality in some adapters. This also has
+      implications on the way we use operations that were served from the database.
+      We try not to call copyObject, if not necessary.
+  * addOperation(op)
+    - add an operation to the database.
+      This may only be called once for every op.id
+      Must return a function that returns the next operation in the database (ordered by id)
+  * getOperation(id)
+  * removeOperation(id)
+    - remove an operation from the database. This is called when an operation
+      is garbage collected.
+  * setState(state)
+    - `state` is of the form
+      {
+        user: "1",
+        clock: 4
+      } <- meaning that we have four operations from user "1"
+           (with these id's respectively: 0, 1, 2, and 3)
+  * getState(user)
+  * getStateVector()
+    - Get the state of the OS in the form
+    [{
+      user: "userX",
+      clock: 11
+    },
+     ..
+    ]
+  * getStateSet()
+    - Get the state of the OS in the form
+    {
+      "userX": 11,
+      "userY": 22
+    }
+   * getOperations(startSS)
+     - Get the all the operations that are necessary in order to achive the
+       stateSet of this user, starting from a stateSet supplied by another user
+   * makeOperationReady(ss, op)
+     - this is called only by `getOperations(startSS)`. It makes an operation
+       applyable on a given SS.
+*/
+module.exports = function (Y/* :any */) {
+  class TransactionInterface {
+    /* ::
+    store: Y.AbstractDatabase;
+    ds: Store;
+    os: Store;
+    ss: Store;
+    */
+    /*
+      Apply operations that this user created (no remote ones!)
+        * does not check for Struct.*.requiredOps()
+        * also broadcasts it through the connector
+    */
+    * applyCreatedOperations (ops) {
+      var send = []
+      for (var i = 0; i < ops.length; i++) {
+        var op = ops[i]
+        yield* this.store.tryExecute.call(this, op)
+        if (op.id == null || typeof op.id[1] !== 'string') {
+          send.push(Y.Struct[op.struct].encode(op))
+        }
+      }
+      if (send.length > 0) { // TODO: && !this.store.forwardAppliedOperations (but then i don't send delete ops)
+        // is connected, and this is not going to be send in addOperation
+        this.store.y.connector.broadcastOps(send)
+      }
+    }
+
+    * deleteList (start) {
+      while (start != null) {
+        start = yield* this.getOperation(start)
+        if (!start.gc) {
+          start.gc = true
+          start.deleted = true
+          yield* this.setOperation(start)
+          var delLength = start.content != null ? start.content.length : 1
+          yield* this.markDeleted(start.id, delLength)
+          if (start.opContent != null) {
+            yield* this.deleteOperation(start.opContent)
+          }
+          this.store.queueGarbageCollector(start.id)
+        }
+        start = start.right
+      }
+    }
+
+    /*
+      Mark an operation as deleted, and add it to the GC, if possible.
+    */
+    * deleteOperation (targetId, length, preventCallType) /* :Generator<any, any, any> */ {
+      if (length == null) {
+        length = 1
+      }
+      yield* this.markDeleted(targetId, length)
+      while (length > 0) {
+        var callType = false
+        var target = yield* this.os.findWithUpperBound([targetId[0], targetId[1] + length - 1])
+        var targetLength = target != null && target.content != null ? target.content.length : 1
+        if (target == null || target.id[0] !== targetId[0] || target.id[1] + targetLength <= targetId[1]) {
+          // does not exist or is not in the range of the deletion
+          target = null
+          length = 0
+        } else {
+          // does exist, check if it is too long
+          if (!target.deleted) {
+            if (target.id[1] < targetId[1]) {
+              // starts to the left of the deletion range
+              target = yield* this.getInsertionCleanStart(targetId)
+              targetLength = target.content.length // must have content property!
+            }
+            if (target.id[1] + targetLength > targetId[1] + length) {
+              // ends to the right of the deletion range
+              target = yield* this.getInsertionCleanEnd([targetId[0], targetId[1] + length - 1])
+              targetLength = target.content.length
+            }
+          }
+          length = target.id[1] - targetId[1]
+        }
+
+        if (target != null) {
+          if (!target.deleted) {
+            callType = true
+            // set deleted & notify type
+            target.deleted = true
+            // delete containing lists
+            if (target.start != null) {
+              // TODO: don't do it like this .. -.-
+              yield* this.deleteList(target.start)
+              // yield* this.deleteList(target.id) -- do not gc itself because this may still get referenced
+            }
+            if (target.map != null) {
+              for (var name in target.map) {
+                yield* this.deleteList(target.map[name])
+              }
+              // TODO: here to..  (see above)
+              // yield* this.deleteList(target.id) -- see above
+            }
+            if (target.opContent != null) {
+              yield* this.deleteOperation(target.opContent)
+              // target.opContent = null
+            }
+            if (target.requires != null) {
+              for (var i = 0; i < target.requires.length; i++) {
+                yield* this.deleteOperation(target.requires[i])
+              }
+            }
+          }
+          var left
+          if (target.left != null) {
+            left = yield* this.getInsertion(target.left)
+          } else {
+            left = null
+          }
+
+          // set here because it was deleted and/or gc'd
+          yield* this.setOperation(target)
+
+          /*
+            Check if it is possible to add right to the gc.
+            Because this delete can't be responsible for left being gc'd,
+            we don't have to add left to the gc..
+          */
+          var right
+          if (target.right != null) {
+            right = yield* this.getOperation(target.right)
+          } else {
+            right = null
+          }
+          if (callType && !preventCallType) {
+            yield* this.store.operationAdded(this, {
+              struct: 'Delete',
+              target: target.id,
+              length: targetLength,
+              targetParent: target.parent
+            })
+          }
+          // need to gc in the end!
+          yield* this.store.addToGarbageCollector.call(this, target, left)
+          if (right != null) {
+            yield* this.store.addToGarbageCollector.call(this, right, target)
+          }
+        }
+      }
+    }
+    /*
+      Mark an operation as deleted&gc'd
+    */
+    * markGarbageCollected (id, len) {
+      // this.mem.push(["gc", id]);
+      this.store.addToDebug('yield* this.markGarbageCollected(', id, ', ', len, ')')
+      var n = yield* this.markDeleted(id, len)
+      if (n.id[1] < id[1] && !n.gc) {
+        // un-extend left
+        var newlen = n.len - (id[1] - n.id[1])
+        n.len -= newlen
+        yield* this.ds.put(n)
+        n = {id: id, len: newlen, gc: false}
+        yield* this.ds.put(n)
+      }
+      // get prev&next before adding a new operation
+      var prev = yield* this.ds.findPrev(id)
+      var next = yield* this.ds.findNext(id)
+
+      if (id[1] + len < n.id[1] + n.len && !n.gc) {
+        // un-extend right
+        yield* this.ds.put({id: [id[0], id[1] + len], len: n.len - len, gc: false})
+        n.len = len
+      }
+      // set gc'd
+      n.gc = true
+      // can extend left?
+      if (
+        prev != null &&
+        prev.gc &&
+        Y.utils.compareIds([prev.id[0], prev.id[1] + prev.len], n.id)
+      ) {
+        prev.len += n.len
+        yield* this.ds.delete(n.id)
+        n = prev
+        // ds.put n here?
+      }
+      // can extend right?
+      if (
+        next != null &&
+        next.gc &&
+        Y.utils.compareIds([n.id[0], n.id[1] + n.len], next.id)
+      ) {
+        n.len += next.len
+        yield* this.ds.delete(next.id)
+      }
+      yield* this.ds.put(n)
+      yield* this.updateState(n.id[0])
+    }
+    /*
+      Mark an operation as deleted.
+
+      returns the delete node
+    */
+    * markDeleted (id, length) {
+      if (length == null) {
+        length = 1
+      }
+      // this.mem.push(["del", id]);
+      var n = yield* this.ds.findWithUpperBound(id)
+      if (n != null && n.id[0] === id[0]) {
+        if (n.id[1] <= id[1] && id[1] <= n.id[1] + n.len) {
+          // id is in n's range
+          var diff = id[1] + length - (n.id[1] + n.len) // overlapping right
+          if (diff > 0) {
+            // id+length overlaps n
+            if (!n.gc) {
+              n.len += diff
+            } else {
+              diff = n.id[1] + n.len - id[1] // overlapping left (id till n.end)
+              if (diff < length) {
+                // a partial deletion
+                n = {id: [id[0], id[1] + diff], len: length - diff, gc: false}
+                yield* this.ds.put(n)
+              } else {
+                // already gc'd
+                throw new Error('Cannot happen! (it dit though.. :()')
+                // return n
+              }
+            }
+          } else {
+            // no overlapping, already deleted
+            return n
+          }
+        } else {
+          // cannot extend left (there is no left!)
+          n = {id: id, len: length, gc: false}
+          yield* this.ds.put(n) // TODO: you double-put !!
+        }
+      } else {
+        // cannot extend left
+        n = {id: id, len: length, gc: false}
+        yield* this.ds.put(n)
+      }
+      // can extend right?
+      var next = yield* this.ds.findNext(n.id)
+      if (
+        next != null &&
+        n.id[0] === next.id[0] &&
+        n.id[1] + n.len >= next.id[1]
+      ) {
+        diff = n.id[1] + n.len - next.id[1] // from next.start to n.end
+        while (diff >= 0) {
+          // n overlaps with next
+          if (next.gc) {
+            // gc is stronger, so reduce length of n
+            n.len -= diff
+            if (diff >= next.len) {
+              // delete the missing range after next
+              diff = diff - next.len // missing range after next
+              if (diff > 0) {
+                yield* this.ds.put(n) // unneccessary? TODO!
+                yield* this.markDeleted([next.id[0], next.id[1] + next.len], diff)
+              }
+            }
+            break
+          } else {
+            // we can extend n with next
+            if (diff > next.len) {
+              // n is even longer than next
+              // get next.next, and try to extend it
+              var _next = yield* this.ds.findNext(next.id)
+              yield* this.ds.delete(next.id)
+              if (_next == null || n.id[0] !== _next.id[0]) {
+                break
+              } else {
+                next = _next
+                diff = n.id[1] + n.len - next.id[1] // from next.start to n.end
+                // continue!
+              }
+            } else {
+              // n just partially overlaps with next. extend n, delete next, and break this loop
+              n.len += next.len - diff
+              yield* this.ds.delete(next.id)
+              break
+            }
+          }
+        }
+      }
+      yield* this.ds.put(n)
+      return n
+    }
+    /*
+      Call this method when the client is connected&synced with the
+      other clients (e.g. master). This will query the database for
+      operations that can be gc'd and add them to the garbage collector.
+    */
+    * garbageCollectAfterSync () {
+      if (this.store.gc1.length > 0 || this.store.gc2.length > 0) {
+        console.warn('gc should be empty after sync')
+      }
+      if (!this.store.gc) {
+        return
+      }
+      yield* this.os.iterate(this, null, null, function * (op) {
+        if (op.gc) {
+          delete op.gc
+          yield* this.setOperation(op)
+        }
+        if (op.parent != null) {
+          var parentDeleted = yield* this.isDeleted(op.parent)
+          if (parentDeleted) {
+            op.gc = true
+            if (!op.deleted) {
+              yield* this.markDeleted(op.id, op.content != null ? op.content.length : 1)
+              op.deleted = true
+              if (op.opContent != null) {
+                yield* this.deleteOperation(op.opContent)
+              }
+              if (op.requires != null) {
+                for (var i = 0; i < op.requires.length; i++) {
+                  yield* this.deleteOperation(op.requires[i])
+                }
+              }
+            }
+            yield* this.setOperation(op)
+            this.store.gc1.push(op.id) // this is ok becaues its shortly before sync (otherwise use queueGarbageCollector!)
+            return
+          }
+        }
+        if (op.deleted) {
+          var left = null
+          if (op.left != null) {
+            left = yield* this.getInsertion(op.left)
+          }
+          yield* this.store.addToGarbageCollector.call(this, op, left)
+        }
+      })
+    }
+    /*
+      Really remove an op and all its effects.
+      The complicated case here is the Insert operation:
+      * reset left
+      * reset right
+      * reset parent.start
+      * reset parent.end
+      * reset origins of all right ops
+    */
+    * garbageCollectOperation (id) {
+      this.store.addToDebug('yield* this.garbageCollectOperation(', id, ')')
+      var o = yield* this.getOperation(id)
+      yield* this.markGarbageCollected(id, (o != null && o.content != null) ? o.content.length : 1) // always mark gc'd
+      // if op exists, then clean that mess up..
+      if (o != null) {
+        var deps = []
+        if (o.opContent != null) {
+          deps.push(o.opContent)
+        }
+        if (o.requires != null) {
+          deps = deps.concat(o.requires)
+        }
+        for (var i = 0; i < deps.length; i++) {
+          var dep = yield* this.getOperation(deps[i])
+          if (dep != null) {
+            if (!dep.deleted) {
+              yield* this.deleteOperation(dep.id)
+              dep = yield* this.getOperation(dep.id)
+            }
+            dep.gc = true
+            yield* this.setOperation(dep)
+            this.store.queueGarbageCollector(dep.id)
+          } else {
+            yield* this.markGarbageCollected(deps[i], 1)
+          }
+        }
+
+        // remove gc'd op from the left op, if it exists
+        if (o.left != null) {
+          var left = yield* this.getInsertion(o.left)
+          left.right = o.right
+          yield* this.setOperation(left)
+        }
+        // remove gc'd op from the right op, if it exists
+        // also reset origins of right ops
+        if (o.right != null) {
+          var right = yield* this.getOperation(o.right)
+          right.left = o.left
+          yield* this.setOperation(right)
+
+          if (o.originOf != null && o.originOf.length > 0) {
+            // find new origin of right ops
+            // origin is the first left deleted operation
+            var neworigin = o.left
+            var neworigin_ = null
+            while (neworigin != null) {
+              neworigin_ = yield* this.getInsertion(neworigin)
+              if (neworigin_.deleted) {
+                break
+              }
+              neworigin = neworigin_.left
+            }
+
+            // reset origin of all right ops (except first right - duh!),
+
+            /* ** The following code does not rely on the the originOf property **
+                  I recently added originOf to all Insert Operations (see Struct.Insert.execute),
+                  which saves which operations originate in a Insert operation.
+                  Garbage collecting without originOf is more memory efficient, but is nearly impossible for large texts, or lists!
+                  But I keep this code for now
+            ```
+            // reset origin of right
+            right.origin = neworigin
+            // search until you find origin pointer to the left of o
+            if (right.right != null) {
+              var i = yield* this.getOperation(right.right)
+              var ids = [o.id, o.right]
+              while (ids.some(function (id) {
+                return Y.utils.compareIds(id, i.origin)
+              })) {
+                if (Y.utils.compareIds(i.origin, o.id)) {
+                  // reset origin of i
+                  i.origin = neworigin
+                  yield* this.setOperation(i)
+                }
+                // get next i
+                if (i.right == null) {
+                  break
+                } else {
+                  ids.push(i.id)
+                  i = yield* this.getOperation(i.right)
+                }
+              }
+            }
+            ```
+            */
+            // ** Now the new implementation starts **
+            // reset neworigin of all originOf[*]
+            for (var _i in o.originOf) {
+              var originsIn = yield* this.getOperation(o.originOf[_i])
+              if (originsIn != null) {
+                originsIn.origin = neworigin
+                yield* this.setOperation(originsIn)
+              }
+            }
+            if (neworigin != null) {
+              if (neworigin_.originOf == null) {
+                neworigin_.originOf = o.originOf
+              } else {
+                neworigin_.originOf = o.originOf.concat(neworigin_.originOf)
+              }
+              yield* this.setOperation(neworigin_)
+            }
+            // we don't need to set right here, because
+            // right should be in o.originOf => it is set it the previous for loop
+          }
+        }
+        // o may originate in another operation.
+        // Since o is deleted, we have to reset o.origin's `originOf` property
+        if (o.origin != null) {
+          var origin = yield* this.getInsertion(o.origin)
+          origin.originOf = origin.originOf.filter(function (_id) {
+            return !Y.utils.compareIds(id, _id)
+          })
+          yield* this.setOperation(origin)
+        }
+        var parent
+        if (o.parent != null) {
+          parent = yield* this.getOperation(o.parent)
+        }
+        // remove gc'd op from parent, if it exists
+        if (parent != null) {
+          var setParent = false // whether to save parent to the os
+          if (o.parentSub != null) {
+            if (Y.utils.compareIds(parent.map[o.parentSub], o.id)) {
+              setParent = true
+              if (o.right != null) {
+                parent.map[o.parentSub] = o.right
+              } else {
+                delete parent.map[o.parentSub]
+              }
+            }
+          } else {
+            if (Y.utils.compareIds(parent.start, o.id)) {
+              // gc'd op is the start
+              setParent = true
+              parent.start = o.right
+            }
+            if (Y.utils.matchesId(o, parent.end)) {
+              // gc'd op is the end
+              setParent = true
+              parent.end = o.left
+            }
+          }
+          if (setParent) {
+            yield* this.setOperation(parent)
+          }
+        }
+        // finally remove it from the os
+        yield* this.removeOperation(o.id)
+      }
+    }
+    * checkDeleteStoreForState (state) {
+      var n = yield* this.ds.findWithUpperBound([state.user, state.clock])
+      if (n != null && n.id[0] === state.user && n.gc) {
+        state.clock = Math.max(state.clock, n.id[1] + n.len)
+      }
+    }
+    * updateState (user) {
+      var state = yield* this.getState(user)
+      yield* this.checkDeleteStoreForState(state)
+      var o = yield* this.getInsertion([user, state.clock])
+      var oLength = (o != null && o.content != null) ? o.content.length : 1
+      while (o != null && user === o.id[0] && o.id[1] <= state.clock && o.id[1] + oLength > state.clock) {
+        // either its a new operation (1. case), or it is an operation that was deleted, but is not yet in the OS
+        state.clock += oLength
+        yield* this.checkDeleteStoreForState(state)
+        o = yield* this.os.findNext(o.id)
+        oLength = (o != null && o.content != null) ? o.content.length : 1
+      }
+      yield* this.setState(state)
+    }
+    /*
+      apply a delete set in order to get
+      the state of the supplied ds
+    */
+    * applyDeleteSet (ds) {
+      var deletions = []
+
+      for (var user in ds) {
+        var dv = ds[user]
+        var pos = 0
+        var d = dv[pos]
+        yield* this.ds.iterate(this, [user, 0], [user, Number.MAX_VALUE], function * (n) {
+          // cases:
+          // 1. d deletes something to the right of n
+          //  => go to next n (break)
+          // 2. d deletes something to the left of n
+          //  => create deletions
+          //  => reset d accordingly
+          //  *)=> if d doesn't delete anything anymore, go to next d (continue)
+          // 3. not 2) and d deletes something that also n deletes
+          //  => reset d so that it doesn't contain n's deletion
+          //  *)=> if d does not delete anything anymore, go to next d (continue)
+          while (d != null) {
+            var diff = 0 // describe the diff of length in 1) and 2)
+            if (n.id[1] + n.len <= d[0]) {
+              // 1)
+              break
+            } else if (d[0] < n.id[1]) {
+              // 2)
+              // delete maximum the len of d
+              // else delete as much as possible
+              diff = Math.min(n.id[1] - d[0], d[1])
+              deletions.push([user, d[0], diff, d[2]])
+            } else {
+              // 3)
+              diff = n.id[1] + n.len - d[0] // never null (see 1)
+              if (d[2] && !n.gc) {
+                // d marks as gc'd but n does not
+                // then delete either way
+                deletions.push([user, d[0], Math.min(diff, d[1]), d[2]])
+              }
+            }
+            if (d[1] <= diff) {
+              // d doesn't delete anything anymore
+              d = dv[++pos]
+            } else {
+              d[0] = d[0] + diff // reset pos
+              d[1] = d[1] - diff // reset length
+            }
+          }
+        })
+        // for the rest.. just apply it
+        for (; pos < dv.length; pos++) {
+          d = dv[pos]
+          deletions.push([user, d[0], d[1], d[2]])
+        }
+      }
+      for (var i = 0; i < deletions.length; i++) {
+        var del = deletions[i]
+        // always try to delete..
+        yield* this.deleteOperation([del[0], del[1]], del[2])
+        if (del[3]) {
+          // gc..
+          yield* this.markGarbageCollected([del[0], del[1]], del[2]) // always mark gc'd
+          // remove operation..
+          var counter = del[1] + del[2]
+          while (counter >= del[1]) {
+            var o = yield* this.os.findWithUpperBound([del[0], counter - 1])
+            if (o == null) {
+              break
+            }
+            var oLen = o.content != null ? o.content.length : 1
+            if (o.id[0] !== del[0] || o.id[1] + oLen <= del[1]) {
+              // not in range
+              break
+            }
+            if (o.id[1] + oLen > del[1] + del[2]) {
+              // overlaps right
+              o = yield* this.getInsertionCleanEnd([del[0], del[1] + del[2] - 1])
+            }
+            if (o.id[1] < del[1]) {
+              // overlaps left
+              o = yield* this.getInsertionCleanStart([del[0], del[1]])
+            }
+            counter = o.id[1]
+            yield* this.garbageCollectOperation(o.id)
+          }
+        }
+        if (this.store.forwardAppliedOperations) {
+          var ops = []
+          ops.push({struct: 'Delete', target: [del[0], del[1]], length: del[2]})
+          this.store.y.connector.broadcastOps(ops)
+        }
+      }
+    }
+    * isGarbageCollected (id) {
+      var n = yield* this.ds.findWithUpperBound(id)
+      return n != null && n.id[0] === id[0] && id[1] < n.id[1] + n.len && n.gc
+    }
+    /*
+      A DeleteSet (ds) describes all the deleted ops in the OS
+    */
+    * getDeleteSet () {
+      var ds = {}
+      yield* this.ds.iterate(this, null, null, function * (n) {
+        var user = n.id[0]
+        var counter = n.id[1]
+        var len = n.len
+        var gc = n.gc
+        var dv = ds[user]
+        if (dv === void 0) {
+          dv = []
+          ds[user] = dv
+        }
+        dv.push([counter, len, gc])
+      })
+      return ds
+    }
+    * isDeleted (id) {
+      var n = yield* this.ds.findWithUpperBound(id)
+      return n != null && n.id[0] === id[0] && id[1] < n.id[1] + n.len
+    }
+    * setOperation (op) {
+      yield* this.os.put(op)
+      return op
+    }
+    * addOperation (op) {
+      yield* this.os.put(op)
+      if (this.store.forwardAppliedOperations && typeof op.id[1] !== 'string') {
+        // is connected, and this is not going to be send in addOperation
+        this.store.y.connector.broadcastOps([op])
+      }
+    }
+    // if insertion, try to combine with left insertion (if both have content property)
+    * tryCombineWithLeft (op) {
+      if (
+        op != null &&
+        op.left != null &&
+        op.content != null &&
+        op.left[0] === op.id[0] &&
+        Y.utils.compareIds(op.left, op.origin)
+      ) {
+        var left = yield* this.getInsertion(op.left)
+        if (left.content != null &&
+            left.id[1] + left.content.length === op.id[1] &&
+            left.originOf.length === 1 &&
+            !left.gc && !left.deleted &&
+            !op.gc && !op.deleted
+        ) {
+          // combine!
+          if (op.originOf != null) {
+            left.originOf = op.originOf
+          } else {
+            delete left.originOf
+          }
+          left.content = left.content.concat(op.content)
+          left.right = op.right
+          yield* this.os.delete(op.id)
+          yield* this.setOperation(left)
+        }
+      }
+    }
+    * getInsertion (id) {
+      var ins = yield* this.os.findWithUpperBound(id)
+      if (ins == null) {
+        return null
+      } else {
+        var len = ins.content != null ? ins.content.length : 1 // in case of opContent
+        if (id[0] === ins.id[0] && id[1] < ins.id[1] + len) {
+          return ins
+        } else {
+          return null
+        }
+      }
+    }
+    * getInsertionCleanStartEnd (id) {
+      yield* this.getInsertionCleanStart(id)
+      return yield* this.getInsertionCleanEnd(id)
+    }
+    // Return an insertion such that id is the first element of content
+    // This function manipulates an operation, if necessary
+    * getInsertionCleanStart (id) {
+      var ins = yield* this.getInsertion(id)
+      if (ins != null) {
+        if (ins.id[1] === id[1]) {
+          return ins
+        } else {
+          var left = Y.utils.copyObject(ins)
+          ins.content = left.content.splice(id[1] - ins.id[1])
+          ins.id = id
+          var leftLid = Y.utils.getLastId(left)
+          ins.origin = leftLid
+          left.originOf = [ins.id]
+          left.right = ins.id
+          ins.left = leftLid
+          // debugger // check
+          yield* this.setOperation(left)
+          yield* this.setOperation(ins)
+          if (left.gc) {
+            this.store.queueGarbageCollector(ins.id)
+          }
+          return ins
+        }
+      } else {
+        return null
+      }
+    }
+    // Return an insertion such that id is the last element of content
+    // This function manipulates an operation, if necessary
+    * getInsertionCleanEnd (id) {
+      var ins = yield* this.getInsertion(id)
+      if (ins != null) {
+        if (ins.content == null || (ins.id[1] + ins.content.length - 1 === id[1])) {
+          return ins
+        } else {
+          var right = Y.utils.copyObject(ins)
+          right.content = ins.content.splice(id[1] - ins.id[1] + 1) // cut off remainder
+          right.id = [id[0], id[1] + 1]
+          var insLid = Y.utils.getLastId(ins)
+          right.origin = insLid
+          ins.originOf = [right.id]
+          ins.right = right.id
+          right.left = insLid
+          // debugger // check
+          yield* this.setOperation(right)
+          yield* this.setOperation(ins)
+          if (ins.gc) {
+            this.store.queueGarbageCollector(right.id)
+          }
+          return ins
+        }
+      } else {
+        return null
+      }
+    }
+    * getOperation (id/* :any */)/* :Transaction<any> */ {
+      var o = yield* this.os.find(id)
+      if (id[0] !== '_' || o != null) {
+        return o
+      } else { // type is string
+        // generate this operation?
+        var comp = id[1].split('_')
+        if (comp.length > 1) {
+          var struct = comp[0]
+          var op = Y.Struct[struct].create(id)
+          op.type = comp[1]
+          yield* this.setOperation(op)
+          return op
+        } else {
+          // won't be called. but just in case..
+          console.error('Unexpected case. How can this happen?')
+          debugger // eslint-disable-line
+          return null
+        }
+      }
+    }
+    * removeOperation (id) {
+      yield* this.os.delete(id)
+    }
+    * setState (state) {
+      var val = {
+        id: [state.user],
+        clock: state.clock
+      }
+      yield* this.ss.put(val)
+    }
+    * getState (user) {
+      var n = yield* this.ss.find([user])
+      var clock = n == null ? null : n.clock
+      if (clock == null) {
+        clock = 0
+      }
+      return {
+        user: user,
+        clock: clock
+      }
+    }
+    * getStateVector () {
+      var stateVector = []
+      yield* this.ss.iterate(this, null, null, function * (n) {
+        stateVector.push({
+          user: n.id[0],
+          clock: n.clock
+        })
+      })
+      return stateVector
+    }
+    * getStateSet () {
+      var ss = {}
+      yield* this.ss.iterate(this, null, null, function * (n) {
+        ss[n.id[0]] = n.clock
+      })
+      return ss
+    }
+    /*
+      Here, we make all missing operations executable for the receiving user.
+
+      Notes:
+        startSS: denotes to the SV that the remote user sent
+        currSS:  denotes to the state vector that the user should have if he
+                 applies all already sent operations (increases is each step)
+
+      We face several problems:
+      * Execute op as is won't work because ops depend on each other
+       -> find a way so that they do not anymore
+      * When changing left, must not go more to the left than the origin
+      * When changing right, you have to consider that other ops may have op
+        as their origin, this means that you must not set one of these ops
+        as the new right (interdependencies of ops)
+      * can't just go to the right until you find the first known operation,
+        With currSS
+          -> interdependency of ops is a problem
+        With startSS
+          -> leads to inconsistencies when two users join at the same time.
+             Then the position depends on the order of execution -> error!
+
+        Solution:
+        -> re-create originial situation
+          -> set op.left = op.origin (which never changes)
+          -> set op.right
+               to the first operation that is known (according to startSS)
+               or to the first operation that has an origin that is not to the
+               right of op.
+          -> Enforces unique execution order -> happy user
+
+        Improvements: TODO
+          * Could set left to origin, or the first known operation
+            (startSS or currSS.. ?)
+            -> Could be necessary when I turn GC again.
+            -> Is a bad(ish) idea because it requires more computation
+
+      What we do:
+      * Iterate over all missing operations.
+      * When there is an operation, where the right op is known, send this op all missing ops to the left to the user
+      * I explained above what we have to do with each operation. Here is how we do it efficiently:
+        1. Go to the left until you find either op.origin, or a known operation (let o denote current operation in the iteration)
+        2. Found a known operation -> set op.left = o, and send it to the user. stop
+        3. Found o = op.origin -> set op.left = op.origin, and send it to the user. start again from 1. (set op = o)
+        4. Found some o -> set o.right = op, o.left = o.origin, send it to the user, continue
+    */
+    * getOperations (startSS) {
+      // TODO: use bounds here!
+      if (startSS == null) {
+        startSS = {}
+      }
+      var send = []
+
+      var endSV = yield* this.getStateVector()
+      for (var endState of endSV) {
+        var user = endState.user
+        if (user === '_') {
+          continue
+        }
+        var startPos = startSS[user] || 0
+        if (startPos > 0) {
+          // There is a change that [user, startPos] is in a composed Insertion (with a smaller counter)
+          // find out if that is the case
+          var firstMissing = yield* this.getInsertion([user, startPos])
+          if (firstMissing != null) {
+            // update startPos
+            startPos = firstMissing.id[1]
+            startSS[user] = startPos
+          }
+        }
+        yield* this.os.iterate(this, [user, startPos], [user, Number.MAX_VALUE], function * (op) {
+          op = Y.Struct[op.struct].encode(op)
+          if (op.struct !== 'Insert') {
+            send.push(op)
+          } else if (op.right == null || op.right[1] < (startSS[op.right[0]] || 0)) {
+            // case 1. op.right is known
+            var o = op
+            // Remember: ?
+            // -> set op.right
+            //    1. to the first operation that is known (according to startSS)
+            //    2. or to the first operation that has an origin that is not to the
+            //      right of op.
+            // For this we maintain a list of ops which origins are not found yet.
+            var missing_origins = [op]
+            var newright = op.right
+            while (true) {
+              if (o.left == null) {
+                op.left = null
+                send.push(op)
+                if (!Y.utils.compareIds(o.id, op.id)) {
+                  o = Y.Struct[op.struct].encode(o)
+                  o.right = missing_origins[missing_origins.length - 1].id
+                  send.push(o)
+                }
+                break
+              }
+              o = yield* this.getInsertion(o.left)
+              // we set another o, check if we can reduce $missing_origins
+              while (missing_origins.length > 0 && Y.utils.matchesId(o, missing_origins[missing_origins.length - 1].origin)) {
+                missing_origins.pop()
+              }
+              if (o.id[1] < (startSS[o.id[0]] || 0)) {
+                // case 2. o is known
+                op.left = Y.utils.getLastId(o)
+                send.push(op)
+                break
+              } else if (Y.utils.matchesId(o, op.origin)) {
+                // case 3. o is op.origin
+                op.left = op.origin
+                send.push(op)
+                op = Y.Struct[op.struct].encode(o)
+                op.right = newright
+                if (missing_origins.length > 0) {
+                  console.log('This should not happen .. :( please report this')
+                }
+                missing_origins = [op]
+              } else {
+                // case 4. send o, continue to find op.origin
+                var s = Y.Struct[op.struct].encode(o)
+                s.right = missing_origins[missing_origins.length - 1].id
+                s.left = s.origin
+                send.push(s)
+                missing_origins.push(o)
+              }
+            }
+          }
+        })
+      }
+      return send.reverse()
+    }
+    /*
+     * Get the plain untransformed operations from the database.
+     * You can apply these operations using .applyOperationsUntransformed(ops)
+     *
+     */
+    * getOperationsUntransformed () {
+      var ops = []
+      yield* this.os.iterate(this, null, null, function * (op) {
+        if (op.id[0] !== '_') {
+          ops.push(op)
+        }
+      })
+      return {
+        untransformed: ops
+      }
+    }
+    * applyOperationsUntransformed (m, stateSet) {
+      var ops = m.untransformed
+      for (var i = 0; i < ops.length; i++) {
+        var op = ops[i]
+        // create, and modify parent, if it is created implicitly
+        if (op.parent != null && op.parent[0] === '_') {
+          if (op.struct === 'Insert') {
+            // update parents .map/start/end properties
+            if (op.parentSub != null && op.left == null) {
+              // op is child of Map
+              let parent = yield* this.getOperation(op.parent)
+              parent.map[op.parentSub] = op.id
+              yield* this.setOperation(parent)
+            } else if (op.right == null || op.left == null) {
+              let parent = yield* this.getOperation(op.parent)
+              if (op.right == null) {
+                parent.end = Y.utils.getLastId(op)
+              }
+              if (op.left == null) {
+                parent.start = op.id
+              }
+              yield* this.setOperation(parent)
+            }
+          }
+        }
+        yield* this.os.put(op)
+      }
+      for (var user in stateSet) {
+        yield* this.ss.put({
+          id: [user],
+          clock: stateSet[user]
+        })
+      }
+    }
+    /* this is what we used before.. use this as a reference..
+    * makeOperationReady (startSS, op) {
+      op = Y.Struct[op.struct].encode(op)
+      op = Y.utils.copyObject(op) -- use copyoperation instead now!
+      var o = op
+      var ids = [op.id]
+      // search for the new op.right
+      // it is either the first known op (according to startSS)
+      // or the o that has no origin to the right of op
+      // (this is why we use the ids array)
+      while (o.right != null) {
+        var right = yield* this.getOperation(o.right)
+        if (o.right[1] < (startSS[o.right[0]] || 0) || !ids.some(function (id) {
+          return Y.utils.compareIds(id, right.origin)
+        })) {
+          break
+        }
+        ids.push(o.right)
+        o = right
+      }
+      op.right = o.right
+      op.left = op.origin
+      return op
+    }
+    */
+    * flush () {
+      yield* this.os.flush()
+      yield* this.ss.flush()
+      yield* this.ds.flush()
+    }
+  }
+  Y.Transaction = TransactionInterface
+}
+
+},{}],791:[function(require,module,exports){
+/* @flow */
+'use strict'
+
+/*
+  EventHandler is an helper class for constructing custom types.
+
+  Why: When constructing custom types, you sometimes want your types to work
+  synchronous: E.g.
+  ``` Synchronous
+    mytype.setSomething("yay")
+    mytype.getSomething() === "yay"
+  ```
+  versus
+  ``` Asynchronous
+    mytype.setSomething("yay")
+    mytype.getSomething() === undefined
+    mytype.waitForSomething().then(function(){
+      mytype.getSomething() === "yay"
+    })
+  ```
+
+  The structures usually work asynchronously (you have to wait for the
+  database request to finish). EventHandler helps you to make your type
+  synchronous.
+*/
+module.exports = function (Y /* : any*/) {
+  Y.utils = {}
+
+  Y.utils.bubbleEvent = function (type, event) {
+    type.eventHandler.callEventListeners(event)
+    event.path = []
+    while (type != null && type._deepEventHandler != null) {
+      type._deepEventHandler.callEventListeners(event)
+      var parent = null
+      if (type._parent != null) {
+        parent = type.os.getType(type._parent)
+      }
+      if (parent != null && parent._getPathToChild != null) {
+        event.path = [parent._getPathToChild(type._model)].concat(event.path)
+        type = parent
+      } else {
+        type = null
+      }
+    }
+  }
+
+  class EventListenerHandler {
+    constructor () {
+      this.eventListeners = []
+    }
+    destroy () {
+      this.eventListeners = null
+    }
+     /*
+      Basic event listener boilerplate...
+    */
+    addEventListener (f) {
+      this.eventListeners.push(f)
+    }
+    removeEventListener (f) {
+      this.eventListeners = this.eventListeners.filter(function (g) {
+        return f !== g
+      })
+    }
+    removeAllEventListeners () {
+      this.eventListeners = []
+    }
+    callEventListeners (event) {
+      for (var i = 0; i < this.eventListeners.length; i++) {
+        try {
+          var _event = {}
+          for (var name in event) {
+            _event[name] = event[name]
+          }
+          this.eventListeners[i](_event)
+        } catch (e) {
+          console.error('Your observer threw an error. This error was caught so that Yjs still can ensure data consistency! In order to debug this error you have to check "Pause On Caught Exceptions"', e)
+        }
+      }
+    }
+  }
+  Y.utils.EventListenerHandler = EventListenerHandler
+
+  class EventHandler extends EventListenerHandler {
+    /* ::
+    waiting: Array<Insertion | Deletion>;
+    awaiting: number;
+    onevent: Function;
+    eventListeners: Array<Function>;
+    */
+    /*
+      onevent: is called when the structure changes.
+
+      Note: "awaiting opertations" is used to denote operations that were
+      prematurely called. Events for received operations can not be executed until
+      all prematurely called operations were executed ("waiting operations")
+    */
+    constructor (onevent /* : Function */) {
+      super()
+      this.waiting = []
+      this.awaiting = 0
+      this.onevent = onevent
+    }
+    destroy () {
+      super.destroy()
+      this.waiting = null
+      this.onevent = null
+    }
+    /*
+      Call this when a new operation arrives. It will be executed right away if
+      there are no waiting operations, that you prematurely executed
+    */
+    receivedOp (op) {
+      if (this.awaiting <= 0) {
+        this.onevent(op)
+      } else if (op.struct === 'Delete') {
+        var self = this
+        var checkDelete = function checkDelete (d) {
+          if (d.length == null) {
+            throw new Error('This shouldn\'t happen! d.length must be defined!')
+          }
+          // we check if o deletes something in self.waiting
+          // if so, we remove the deleted operation
+          for (var w = 0; w < self.waiting.length; w++) {
+            var i = self.waiting[w]
+            if (i.struct === 'Insert' && i.id[0] === d.target[0]) {
+              var iLength = i.hasOwnProperty('content') ? i.content.length : 1
+              var dStart = d.target[1]
+              var dEnd = d.target[1] + (d.length || 1)
+              var iStart = i.id[1]
+              var iEnd = i.id[1] + iLength
+              // Check if they don't overlap
+              if (iEnd <= dStart || dEnd <= iStart) {
+                // no overlapping
+                continue
+              }
+              // we check all overlapping cases. All cases:
+              /*
+                1)  iiiii
+                      ddddd
+                    --> modify i and d
+                2)  iiiiiii
+                      ddddd
+                    --> modify i, remove d
+                3)  iiiiiii
+                      ddd
+                    --> remove d, modify i, and create another i (for the right hand side)
+                4)  iiiii
+                    ddddddd
+                    --> remove i, modify d
+                5)  iiiiiii
+                    ddddddd
+                    --> remove both i and d (**)
+                6)  iiiiiii
+                    ddddd
+                    --> modify i, remove d
+                7)    iii
+                    ddddddd
+                    --> remove i, create and apply two d with checkDelete(d) (**)
+                8)    iiiii
+                    ddddddd
+                    --> remove i, modify d (**)
+                9)    iiiii
+                    ddddd
+                    --> modify i and d
+                (**) (also check if i contains content or type)
+              */
+              // TODO: I left some debugger statements, because I want to debug all cases once in production. REMEMBER END TODO
+              if (iStart < dStart) {
+                if (dStart < iEnd) {
+                  if (iEnd < dEnd) {
+                    // Case 1
+                    // remove the right part of i's content
+                    i.content.splice(dStart - iStart)
+                    // remove the start of d's deletion
+                    d.length = dEnd - iEnd
+                    d.target = [d.target[0], iEnd]
+                    continue
+                  } else if (iEnd === dEnd) {
+                    // Case 2
+                    i.content.splice(dStart - iStart)
+                    // remove d, we do that by simply ending this function
+                    return
+                  } else { // (dEnd < iEnd)
+                    // Case 3
+                    var newI = {
+                      id: [i.id[0], dEnd],
+                      content: i.content.slice(dEnd - iStart),
+                      struct: 'Insert'
+                    }
+                    self.waiting.push(newI)
+                    i.content.splice(dStart - iStart)
+                    return
+                  }
+                }
+              } else if (dStart === iStart) {
+                if (iEnd < dEnd) {
+                  // Case 4
+                  d.length = dEnd - iEnd
+                  d.target = [d.target[0], iEnd]
+                  i.content = []
+                  continue
+                } else if (iEnd === dEnd) {
+                  // Case 5
+                  self.waiting.splice(w, 1)
+                  return
+                } else { // (dEnd < iEnd)
+                  // Case 6
+                  i.content = i.content.slice(dEnd - iStart)
+                  i.id = [i.id[0], dEnd]
+                  return
+                }
+              } else { // (dStart < iStart)
+                if (iStart < dEnd) {
+                  // they overlap
+                  /*
+                  7)    iii
+                      ddddddd
+                      --> remove i, create and apply two d with checkDelete(d) (**)
+                  8)    iiiii
+                      ddddddd
+                      --> remove i, modify d (**)
+                  9)    iiiii
+                      ddddd
+                      --> modify i and d
+                  */
+                  if (iEnd < dEnd) {
+                    // Case 7
+                    // debugger // TODO: You did not test this case yet!!!! (add the debugger here)
+                    self.waiting.splice(w, 1)
+                    checkDelete({
+                      target: [d.target[0], dStart],
+                      length: iStart - dStart,
+                      struct: 'Delete'
+                    })
+                    checkDelete({
+                      target: [d.target[0], iEnd],
+                      length: iEnd - dEnd,
+                      struct: 'Delete'
+                    })
+                    return
+                  } else if (iEnd === dEnd) {
+                    // Case 8
+                    self.waiting.splice(w, 1)
+                    w--
+                    d.length -= iLength
+                    continue
+                  } else { // dEnd < iEnd
+                    // Case 9
+                    d.length = iStart - dStart
+                    i.content.splice(0, dEnd - iStart)
+                    i.id = [i.id[0], dEnd]
+                    continue
+                  }
+                }
+              }
+            }
+          }
+          // finished with remaining operations
+          self.waiting.push(d)
+        }
+        if (op.key == null) {
+          // deletes in list
+          checkDelete(op)
+        } else {
+          // deletes in map
+          this.waiting.push(op)
+        }
+      } else {
+        this.waiting.push(op)
+      }
+    }
+    /*
+      You created some operations, and you want the `onevent` function to be
+      called right away. Received operations will not be executed untill all
+      prematurely called operations are executed
+    */
+    awaitAndPrematurelyCall (ops) {
+      this.awaiting++
+      ops.map(Y.utils.copyOperation).forEach(this.onevent)
+    }
+    * awaitOps (transaction, f, args) {
+      function notSoSmartSort (array) {
+        // this function sorts insertions in a executable order
+        var result = []
+        while (array.length > 0) {
+          for (var i = 0; i < array.length; i++) {
+            var independent = true
+            for (var j = 0; j < array.length; j++) {
+              if (Y.utils.matchesId(array[j], array[i].left)) {
+                // array[i] depends on array[j]
+                independent = false
+                break
+              }
+            }
+            if (independent) {
+              result.push(array.splice(i, 1)[0])
+              i--
+            }
+          }
+        }
+        return result
+      }
+      var before = this.waiting.length
+      // somehow create new operations
+      yield* f.apply(transaction, args)
+      // remove all appended ops / awaited ops
+      this.waiting.splice(before)
+      if (this.awaiting > 0) this.awaiting--
+      // if there are no awaited ops anymore, we can update all waiting ops, and send execute them (if there are still no awaited ops)
+      if (this.awaiting === 0 && this.waiting.length > 0) {
+        // update all waiting ops
+        for (let i = 0; i < this.waiting.length; i++) {
+          var o = this.waiting[i]
+          if (o.struct === 'Insert') {
+            var _o = yield* transaction.getInsertion(o.id)
+            if (_o.parentSub != null && _o.left != null) {
+              // if o is an insertion of a map struc (parentSub is defined), then it shouldn't be necessary to compute left
+              this.waiting.splice(i, 1)
+              i-- // update index
+            } else if (!Y.utils.compareIds(_o.id, o.id)) {
+              // o got extended
+              o.left = [o.id[0], o.id[1] - 1]
+            } else if (_o.left == null) {
+              o.left = null
+            } else {
+              // find next undeleted op
+              var left = yield* transaction.getInsertion(_o.left)
+              while (left.deleted != null) {
+                if (left.left != null) {
+                  left = yield* transaction.getInsertion(left.left)
+                } else {
+                  left = null
+                  break
+                }
+              }
+              o.left = left != null ? Y.utils.getLastId(left) : null
+            }
+          }
+        }
+        // the previous stuff was async, so we have to check again!
+        // We also pull changes from the bindings, if there exists such a method, this could increase awaiting too
+        if (this._pullChanges != null) {
+          this._pullChanges()
+        }
+        if (this.awaiting === 0) {
+          // sort by type, execute inserts first
+          var ins = []
+          var dels = []
+          this.waiting.forEach(function (o) {
+            if (o.struct === 'Delete') {
+              dels.push(o)
+            } else {
+              ins.push(o)
+            }
+          })
+          this.waiting = []
+          // put in executable order
+          ins = notSoSmartSort(ins)
+          // this.onevent can trigger the creation of another operation
+          // -> check if this.awaiting increased & stop computation if it does
+          for (var i = 0; i < ins.length; i++) {
+            if (this.awaiting === 0) {
+              this.onevent(ins[i])
+            } else {
+              this.waiting = this.waiting.concat(ins.slice(i))
+              break
+            }
+          }
+          for (i = 0; i < dels.length; i++) {
+            if (this.awaiting === 0) {
+              this.onevent(dels[i])
+            } else {
+              this.waiting = this.waiting.concat(dels.slice(i))
+              break
+            }
+          }
+        }
+      }
+    }
+    // TODO: Remove awaitedInserts and awaitedDeletes in favor of awaitedOps, as they are deprecated and do not always work
+    // Do this in one of the coming releases that are breaking anyway
+    /*
+      Call this when you successfully awaited the execution of n Insert operations
+    */
+    awaitedInserts (n) {
+      var ops = this.waiting.splice(this.waiting.length - n)
+      for (var oid = 0; oid < ops.length; oid++) {
+        var op = ops[oid]
+        if (op.struct === 'Insert') {
+          for (var i = this.waiting.length - 1; i >= 0; i--) {
+            let w = this.waiting[i]
+            // TODO: do I handle split operations correctly here? Super unlikely, but yeah..
+            // Also: can this case happen? Can op be inserted in the middle of a larger op that is in $waiting?
+            if (w.struct === 'Insert') {
+              if (Y.utils.matchesId(w, op.left)) {
+                // include the effect of op in w
+                w.right = op.id
+                // exclude the effect of w in op
+                op.left = w.left
+              } else if (Y.utils.compareIds(w.id, op.right)) {
+                // similar..
+                w.left = Y.utils.getLastId(op)
+                op.right = w.right
+              }
+            }
+          }
+        } else {
+          throw new Error('Expected Insert Operation!')
+        }
+      }
+      this._tryCallEvents(n)
+    }
+    /*
+      Call this when you successfully awaited the execution of n Delete operations
+    */
+    awaitedDeletes (n, newLeft) {
+      var ops = this.waiting.splice(this.waiting.length - n)
+      for (var j = 0; j < ops.length; j++) {
+        var del = ops[j]
+        if (del.struct === 'Delete') {
+          if (newLeft != null) {
+            for (var i = 0; i < this.waiting.length; i++) {
+              let w = this.waiting[i]
+              // We will just care about w.left
+              if (w.struct === 'Insert' && Y.utils.compareIds(del.target, w.left)) {
+                w.left = newLeft
+              }
+            }
+          }
+        } else {
+          throw new Error('Expected Delete Operation!')
+        }
+      }
+      this._tryCallEvents(n)
+    }
+    /* (private)
+      Try to execute the events for the waiting operations
+    */
+    _tryCallEvents () {
+      function notSoSmartSort (array) {
+        var result = []
+        while (array.length > 0) {
+          for (var i = 0; i < array.length; i++) {
+            var independent = true
+            for (var j = 0; j < array.length; j++) {
+              if (Y.utils.matchesId(array[j], array[i].left)) {
+                // array[i] depends on array[j]
+                independent = false
+                break
+              }
+            }
+            if (independent) {
+              result.push(array.splice(i, 1)[0])
+              i--
+            }
+          }
+        }
+        return result
+      }
+      if (this.awaiting > 0) this.awaiting--
+      if (this.awaiting === 0 && this.waiting.length > 0) {
+        var ins = []
+        var dels = []
+        this.waiting.forEach(function (o) {
+          if (o.struct === 'Delete') {
+            dels.push(o)
+          } else {
+            ins.push(o)
+          }
+        })
+        ins = notSoSmartSort(ins)
+        ins.forEach(this.onevent)
+        dels.forEach(this.onevent)
+        this.waiting = []
+      }
+    }
+  }
+  Y.utils.EventHandler = EventHandler
+
+  /*
+    Default class of custom types!
+  */
+  class CustomType {
+    getPath () {
+      var parent = null
+      if (this._parent != null) {
+        parent = this.os.getType(this._parent)
+      }
+      if (parent != null && parent._getPathToChild != null) {
+        var firstKey = parent._getPathToChild(this._model)
+        var parentKeys = parent.getPath()
+        parentKeys.push(firstKey)
+        return parentKeys
+      } else {
+        return []
+      }
+    }
+  }
+  Y.utils.CustomType = CustomType
+
+  /*
+    A wrapper for the definition of a custom type.
+    Every custom type must have three properties:
+
+    * struct
+      - Structname of this type
+    * initType
+      - Given a model, creates a custom type
+    * class
+      - the constructor of the custom type (e.g. in order to inherit from a type)
+  */
+  class CustomTypeDefinition { // eslint-disable-line
+    /* ::
+    struct: any;
+    initType: any;
+    class: Function;
+    name: String;
+    */
+    constructor (def) {
+      if (def.struct == null ||
+        def.initType == null ||
+        def.class == null ||
+        def.name == null ||
+        def.createType == null
+      ) {
+        throw new Error('Custom type was not initialized correctly!')
+      }
+      this.struct = def.struct
+      this.initType = def.initType
+      this.createType = def.createType
+      this.class = def.class
+      this.name = def.name
+      if (def.appendAdditionalInfo != null) {
+        this.appendAdditionalInfo = def.appendAdditionalInfo
+      }
+      this.parseArguments = (def.parseArguments || function () {
+        return [this]
+      }).bind(this)
+      this.parseArguments.typeDefinition = this
+    }
+  }
+  Y.utils.CustomTypeDefinition = CustomTypeDefinition
+
+  Y.utils.isTypeDefinition = function isTypeDefinition (v) {
+    if (v != null) {
+      if (v instanceof Y.utils.CustomTypeDefinition) return [v]
+      else if (v.constructor === Array && v[0] instanceof Y.utils.CustomTypeDefinition) return v
+      else if (v instanceof Function && v.typeDefinition instanceof Y.utils.CustomTypeDefinition) return [v.typeDefinition]
+    }
+    return false
+  }
+
+  /*
+    Make a flat copy of an object
+    (just copy properties)
+  */
+  function copyObject (o) {
+    var c = {}
+    for (var key in o) {
+      c[key] = o[key]
+    }
+    return c
+  }
+  Y.utils.copyObject = copyObject
+
+  /*
+    Copy an operation, so that it can be manipulated.
+    Note: You must not change subproperties (except o.content)!
+  */
+  function copyOperation (o) {
+    o = copyObject(o)
+    if (o.content != null) {
+      o.content = o.content.map(function (c) { return c })
+    }
+    return o
+  }
+
+  Y.utils.copyOperation = copyOperation
+
+  /*
+    Defines a smaller relation on Id's
+  */
+  function smaller (a, b) {
+    return a[0] < b[0] || (a[0] === b[0] && (a[1] < b[1] || typeof a[1] < typeof b[1]))
+  }
+  Y.utils.smaller = smaller
+
+  function inDeletionRange (del, ins) {
+    return del.target[0] === ins[0] && del.target[1] <= ins[1] && ins[1] < del.target[1] + (del.length || 1)
+  }
+  Y.utils.inDeletionRange = inDeletionRange
+
+  function compareIds (id1, id2) {
+    if (id1 == null || id2 == null) {
+      return id1 === id2
+    } else {
+      return id1[0] === id2[0] && id1[1] === id2[1]
+    }
+  }
+  Y.utils.compareIds = compareIds
+
+  function matchesId (op, id) {
+    if (id == null || op == null) {
+      return id === op
+    } else {
+      if (id[0] === op.id[0]) {
+        if (op.content == null) {
+          return id[1] === op.id[1]
+        } else {
+          return id[1] >= op.id[1] && id[1] < op.id[1] + op.content.length
+        }
+      }
+    }
+  }
+  Y.utils.matchesId = matchesId
+
+  function getLastId (op) {
+    if (op.content == null || op.content.length === 1) {
+      return op.id
+    } else {
+      return [op.id[0], op.id[1] + op.content.length - 1]
+    }
+  }
+  Y.utils.getLastId = getLastId
+
+  function createEmptyOpsArray (n) {
+    var a = new Array(n)
+    for (var i = 0; i < a.length; i++) {
+      a[i] = {
+        id: [null, null]
+      }
+    }
+    return a
+  }
+
+  function createSmallLookupBuffer (Store) {
+    /*
+      This buffer implements a very small buffer that temporarily stores operations
+      after they are read / before they are written.
+      The buffer basically implements FIFO. Often requested lookups will be re-queued every time they are looked up / written.
+
+      It can speed up lookups on Operation Stores and State Stores. But it does not require notable use of memory or processing power.
+
+      Good for os and ss, bot not for ds (because it often uses methods that require a flush)
+
+      I tried to optimize this for performance, therefore no highlevel operations.
+    */
+    class SmallLookupBuffer extends Store {
+      constructor (arg1, arg2) {
+        // super(...arguments) -- do this when this is supported by stable nodejs
+        super(arg1, arg2)
+        this.writeBuffer = createEmptyOpsArray(5)
+        this.readBuffer = createEmptyOpsArray(10)
+      }
+      * find (id, noSuperCall) {
+        var i, r
+        for (i = this.readBuffer.length - 1; i >= 0; i--) {
+          r = this.readBuffer[i]
+          // we don't have to use compareids, because id is always defined!
+          if (r.id[1] === id[1] && r.id[0] === id[0]) {
+            // found r
+            // move r to the end of readBuffer
+            for (; i < this.readBuffer.length - 1; i++) {
+              this.readBuffer[i] = this.readBuffer[i + 1]
+            }
+            this.readBuffer[this.readBuffer.length - 1] = r
+            return r
+          }
+        }
+        var o
+        for (i = this.writeBuffer.length - 1; i >= 0; i--) {
+          r = this.writeBuffer[i]
+          if (r.id[1] === id[1] && r.id[0] === id[0]) {
+            o = r
+            break
+          }
+        }
+        if (i < 0 && noSuperCall === undefined) {
+          // did not reach break in last loop
+          // read id and put it to the end of readBuffer
+          o = yield* super.find(id)
+        }
+        if (o != null) {
+          for (i = 0; i < this.readBuffer.length - 1; i++) {
+            this.readBuffer[i] = this.readBuffer[i + 1]
+          }
+          this.readBuffer[this.readBuffer.length - 1] = o
+        }
+        return o
+      }
+      * put (o) {
+        var id = o.id
+        var i, r // helper variables
+        for (i = this.writeBuffer.length - 1; i >= 0; i--) {
+          r = this.writeBuffer[i]
+          if (r.id[1] === id[1] && r.id[0] === id[0]) {
+            // is already in buffer
+            // forget r, and move o to the end of writeBuffer
+            for (; i < this.writeBuffer.length - 1; i++) {
+              this.writeBuffer[i] = this.writeBuffer[i + 1]
+            }
+            this.writeBuffer[this.writeBuffer.length - 1] = o
+            break
+          }
+        }
+        if (i < 0) {
+          // did not reach break in last loop
+          // write writeBuffer[0]
+          var write = this.writeBuffer[0]
+          if (write.id[0] !== null) {
+            yield* super.put(write)
+          }
+          // put o to the end of writeBuffer
+          for (i = 0; i < this.writeBuffer.length - 1; i++) {
+            this.writeBuffer[i] = this.writeBuffer[i + 1]
+          }
+          this.writeBuffer[this.writeBuffer.length - 1] = o
+        }
+        // check readBuffer for every occurence of o.id, overwrite if found
+        // whether found or not, we'll append o to the readbuffer
+        for (i = 0; i < this.readBuffer.length - 1; i++) {
+          r = this.readBuffer[i + 1]
+          if (r.id[1] === id[1] && r.id[0] === id[0]) {
+            this.readBuffer[i] = o
+          } else {
+            this.readBuffer[i] = r
+          }
+        }
+        this.readBuffer[this.readBuffer.length - 1] = o
+      }
+      * delete (id) {
+        var i, r
+        for (i = 0; i < this.readBuffer.length; i++) {
+          r = this.readBuffer[i]
+          if (r.id[1] === id[1] && r.id[0] === id[0]) {
+            this.readBuffer[i] = {
+              id: [null, null]
+            }
+          }
+        }
+        yield* this.flush()
+        yield* super.delete(id)
+      }
+      * findWithLowerBound (id) {
+        var o = yield* this.find(id, true)
+        if (o != null) {
+          return o
+        } else {
+          yield* this.flush()
+          return yield* super.findWithLowerBound.apply(this, arguments)
+        }
+      }
+      * findWithUpperBound (id) {
+        var o = yield* this.find(id, true)
+        if (o != null) {
+          return o
+        } else {
+          yield* this.flush()
+          return yield* super.findWithUpperBound.apply(this, arguments)
+        }
+      }
+      * findNext () {
+        yield* this.flush()
+        return yield* super.findNext.apply(this, arguments)
+      }
+      * findPrev () {
+        yield* this.flush()
+        return yield* super.findPrev.apply(this, arguments)
+      }
+      * iterate () {
+        yield* this.flush()
+        yield* super.iterate.apply(this, arguments)
+      }
+      * flush () {
+        for (var i = 0; i < this.writeBuffer.length; i++) {
+          var write = this.writeBuffer[i]
+          if (write.id[0] !== null) {
+            yield* super.put(write)
+            this.writeBuffer[i] = {
+              id: [null, null]
+            }
+          }
+        }
+      }
+    }
+    return SmallLookupBuffer
+  }
+  Y.utils.createSmallLookupBuffer = createSmallLookupBuffer
+
+  // Generates a unique id, for use as a user id.
+  // Thx to @jed for this script https://gist.github.com/jed/982883
+  function generateGuid(a){return a?(a^Math.random()*16>>a/4).toString(16):([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,generateGuid)} // eslint-disable-line
+  Y.utils.generateGuid = generateGuid
+}
+
+},{}],792:[function(require,module,exports){
+/* @flow */
+'use strict'
+
+require('./Connector.js')(Y)
+require('./Database.js')(Y)
+require('./Transaction.js')(Y)
+require('./Struct.js')(Y)
+require('./Utils.js')(Y)
+require('./Connectors/Test.js')(Y)
+
+Y.debug = require('debug')
+
+var requiringModules = {}
+
+module.exports = Y
+Y.requiringModules = requiringModules
+
+Y.extend = function (name, value) {
+  if (arguments.length === 2 && typeof name === 'string') {
+    if (value instanceof Y.utils.CustomTypeDefinition) {
+      Y[name] = value.parseArguments
+    } else {
+      Y[name] = value
+    }
+    if (requiringModules[name] != null) {
+      requiringModules[name].resolve()
+      delete requiringModules[name]
+    }
+  } else {
+    for (var i = 0; i < arguments.length; i++) {
+      var f = arguments[i]
+      if (typeof f === 'function') {
+        f(Y)
+      } else {
+        throw new Error('Expected function!')
+      }
+    }
+  }
+}
+
+Y.requestModules = requestModules
+function requestModules (modules) {
+  var sourceDir
+  if (Y.sourceDir === null) {
+    sourceDir = null
+  } else {
+    sourceDir = Y.sourceDir || '/bower_components'
+  }
+  // determine if this module was compiled for es5 or es6 (y.js vs. y.es6)
+  // if Insert.execute is a Function, then it isnt a generator..
+  // then load the es5(.js) files..
+  var extention = typeof regeneratorRuntime !== 'undefined' ? '.js' : '.es6'
+  var promises = []
+  for (var i = 0; i < modules.length; i++) {
+    var module = modules[i].split('(')[0]
+    var modulename = 'y-' + module.toLowerCase()
+    if (Y[module] == null) {
+      if (requiringModules[module] == null) {
+        // module does not exist
+        if (typeof window !== 'undefined' && window.Y !== 'undefined') {
+          if (sourceDir != null) {
+            var imported = document.createElement('script')
+            imported.src = sourceDir + '/' + modulename + '/' + modulename + extention
+            document.head.appendChild(imported)
+          }
+          let requireModule = {}
+          requiringModules[module] = requireModule
+          requireModule.promise = new Promise(function (resolve) {
+            requireModule.resolve = resolve
+          })
+          promises.push(requireModule.promise)
+        } else {
+          console.info('YJS: Please do not depend on automatic requiring of modules anymore! Extend modules as follows `require(\'y-modulename\')(Y)`')
+          require(modulename)(Y)
+        }
+      } else {
+        promises.push(requiringModules[modules[i]].promise)
+      }
+    }
+  }
+  return Promise.all(promises)
+}
+
+/* ::
+type MemoryOptions = {
+  name: 'memory'
+}
+type IndexedDBOptions = {
+  name: 'indexeddb',
+  namespace: string
+}
+type DbOptions = MemoryOptions | IndexedDBOptions
+
+type WebRTCOptions = {
+  name: 'webrtc',
+  room: string
+}
+type WebsocketsClientOptions = {
+  name: 'websockets-client',
+  room: string
+}
+type ConnectionOptions = WebRTCOptions | WebsocketsClientOptions
+
+type YOptions = {
+  connector: ConnectionOptions,
+  db: DbOptions,
+  types: Array<TypeName>,
+  sourceDir: string,
+  share: {[key: string]: TypeName}
+}
+*/
+
+function Y (opts/* :YOptions */) /* :Promise<YConfig> */ {
+  if (opts.hasOwnProperty('sourceDir')) {
+    Y.sourceDir = opts.sourceDir
+  }
+  opts.types = opts.types != null ? opts.types : []
+  var modules = [opts.db.name, opts.connector.name].concat(opts.types)
+  for (var name in opts.share) {
+    modules.push(opts.share[name])
+  }
+  return new Promise(function (resolve, reject) {
+    if (opts == null) reject('An options object is expected! ')
+    else if (opts.connector == null) reject('You must specify a connector! (missing connector property)')
+    else if (opts.connector.name == null) reject('You must specify connector name! (missing connector.name property)')
+    else if (opts.db == null) reject('You must specify a database! (missing db property)')
+    else if (opts.connector.name == null) reject('You must specify db name! (missing db.name property)')
+    else {
+      opts = Y.utils.copyObject(opts)
+      opts.connector = Y.utils.copyObject(opts.connector)
+      opts.db = Y.utils.copyObject(opts.db)
+      opts.share = Y.utils.copyObject(opts.share)
+      setTimeout(function () {
+        Y.requestModules(modules).then(function () {
+          var yconfig = new YConfig(opts)
+          yconfig.db.whenUserIdSet(function () {
+            yconfig.init(function () {
+              resolve(yconfig)
+            })
+          })
+        }).catch(reject)
+      }, 0)
+    }
+  })
+}
+
+class YConfig {
+  /* ::
+  db: Y.AbstractDatabase;
+  connector: Y.AbstractConnector;
+  share: {[key: string]: any};
+  options: Object;
+  */
+  constructor (opts, callback) {
+    this.options = opts
+    this.db = new Y[opts.db.name](this, opts.db)
+    this.connector = new Y[opts.connector.name](this, opts.connector)
+    this.connected = true
+  }
+  init (callback) {
+    var opts = this.options
+    var share = {}
+    this.share = share
+    this.db.requestTransaction(function * requestTransaction () {
+      // create shared object
+      for (var propertyname in opts.share) {
+        var typeConstructor = opts.share[propertyname].split('(')
+        var typeName = typeConstructor.splice(0, 1)
+        var type = Y[typeName]
+        var typedef = type.typeDefinition
+        var id = ['_', typedef.struct + '_' + typeName + '_' + propertyname + '_' + typeConstructor]
+        var args = []
+        if (typeConstructor.length === 1) {
+          try {
+            args = JSON.parse('[' + typeConstructor[0].split(')')[0] + ']')
+          } catch (e) {
+            throw new Error('Was not able to parse type definition! (share.' + propertyname + ')')
+          }
+          if (type.typeDefinition.parseArguments == null) {
+            throw new Error(typeName + ' does not expect arguments!')
+          } else {
+            args = typedef.parseArguments(args[0])[1]
+          }
+        }
+        share[propertyname] = yield* this.store.initType.call(this, id, args)
+      }
+      this.store.whenTransactionsFinished()
+        .then(callback)
+    })
+  }
+  isConnected () {
+    return this.connector.isSynced
+  }
+  disconnect () {
+    if (this.connected) {
+      this.connected = false
+      return this.connector.disconnect()
+    } else {
+      return Promise.resolve()
+    }
+  }
+  reconnect () {
+    if (!this.connected) {
+      this.connected = true
+      return this.connector.reconnect()
+    } else {
+      return Promise.resolve()
+    }
+  }
+  destroy () {
+    var self = this
+    return this.close().then(function () {
+      if (self.db.deleteDB != null) {
+        return self.db.deleteDB()
+      } else {
+        return Promise.resolve()
+      }
+    })
+  }
+  close () {
+    var self = this
+    this.share = null
+    if (this.connector.destroy != null) {
+      this.connector.destroy()
+    } else {
+      this.connector.disconnect()
+    }
+    return this.db.whenTransactionsFinished(function () {
+      this.db.destroyTypes()
+      // make sure to wait for all transactions before destroying the db
+      this.db.requestTransaction(function * () {
+        yield* self.db.destroy()
+      })
+      return this.db.whenTransactionsFinished()
+    })
+  }
+}
+
+},{"./Connector.js":786,"./Connectors/Test.js":787,"./Database.js":788,"./Struct.js":789,"./Transaction.js":790,"./Utils.js":791,"debug":151}]},{},[14]);

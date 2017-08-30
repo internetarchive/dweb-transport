@@ -80,6 +80,10 @@
 
             return kc.p_list_then_elements()                            // Retrieve the keys for the keylist
                 .then(() => kc._keys.map((key)=> _kclist_push(key)))    // And add to the HTML
+        		.then(() => kc.listmonitor(
+                    (sig) => sig.p_fetchdata(verbose)
+                            .then((obj) => _kclist_push(obj)),
+                    verbose));
         }
         function p_newkey() {
             let verbose = true; //copious debugging in console log
