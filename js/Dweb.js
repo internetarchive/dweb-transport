@@ -15,7 +15,7 @@ exports.MutableBlock = require("./MutableBlock");
 // The crypto uses https://github.com/jedisct1/libsodium.js but https://github.com/paixaop/node-sodium may also be suitable if we move to node
 
 exports.utils = {}; //utility functions
-exports.errors = {}; //Errors - as classes
+exports.errors = require("./Errors");
 
 /* Only applicable to HTTP...
     exports.dwebserver = 'localhost';
