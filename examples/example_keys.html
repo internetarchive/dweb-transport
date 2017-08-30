@@ -4,7 +4,8 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>DWEB KeyChains and Access Control List example</title>
     <link rel='stylesheet' href='example_styles.css'>
-    <script src="https://unpkg.com/ipfs-iiif-db/dist/browser.js"></script><!--or browser.min.js-->
+    <!-- Load IIIF - can be commented if using Y, needed for IIIF due to error in browserify/iiif interaction-->
+    <!--<script src="https://unpkg.com/ipfs-iiif-db/dist/browser.js"></script><!--or browser.min.js-->
     <!--<script src="https://unpkg.com/ipfs-iiif-db@2.4.0/dist/browser.min.js"></script><!--or browser.min.js-->
     <!--<script src="cached/browser.min.js"></script><!-- cached version of ipfs/iiif so can test offline-->
     <script type="text/javascript" src="dweb_transport_ipfs_bundled.js"></script><!-- Dwebbundle via local filesystem when testing without Dweb-->
@@ -12,7 +13,7 @@
     <!--<script src='http://cloud.tinymce.com/stable/tinymce.min.js'></script><!-- TinyMCE -->
     <!--<script src='/file/mb/BLAKE2.dfMoOqTdXvqKhoZo7HPvD5raBXfgH7chXsN2PElizs8=/tinymce.min.js'></script><!-- TinyMCE via relative URL-->
     <script type="text/javascript" src="objbrowser.js"></script><!--objectbrowser functionality for debugging-->
-    <script type="text/javascript" src="htmlutils.js"></script><!--Non Dweb specific utility functions for workign with HTML-->
+    <script type="text/javascript" src="htmlutils.js"></script><!--Non Dweb specific utility functions for working with HTML-->
     <script type="text/javascript">
 
     </script>
@@ -201,18 +202,17 @@
 
     <script type="text/javascript">
         <!--Start transport, and if passed a URL then open it-->
+        <!-- TODO-REL4-MULTITRANSPORT copy this to other examples -->
         var url = new URL(window.location.href).searchParams.get("url")
-        console.log("Loaded with url=", url);
+        console.log("Loaded with url=", url, "but ignored in this example");
 
         let verbose = false;
         let transportclass = TransportIPFS;
         setstatus("IPFS Starting");
-        //let transportclass = TransportHTTP    // Uncomment this to choose HTTP, but note p_setup below needs fixing
-        transportclass.p_setup(verbose, {iiif: {store: "indexeddb"}})
+        //let transportclass = TransportHTTP    // Uncomment this to choose HTTP
+        transportclass.p_setup(verbose)
             .then((t) => {
-                setstatus(t.ipfs.isOnline() ? "IPFS Online" : "IPFS Not online");
-                if (verbose) console.log("setup returned and transport set - including annotationList");
-                Dweb.transport = t;
+                setstatus(t.ipfs.isOnline() ? "IPFS Online" : "IPFS Not online");   //TODO status refactor to make common across transports
             })
             //.then(() => { if(url) fetchanddisplay(url)})
             .catch((err) => { console.log("ERROR:",err); alert(err.message); });

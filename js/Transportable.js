@@ -18,6 +18,16 @@ class Transportable {
         this._setdata(data); // The data being stored - note _setdata usually subclassed
     }
 
+    transport() { //TODO-REL4-API
+        /*
+        Find transport for this object,
+        if not yet stored this._url will be undefined and will return default transport
+
+        returns: instance of subclass of Transport
+        */
+        return Dweb.transport(this._url);
+    }
+
     _setdata(value) {
         this._data = value;  // Default behavior, assumes opaque bytes, and not a dict - note subclassed in SmartDict
     }
@@ -30,10 +40,10 @@ class Transportable {
             return new Promise((resolve, reject)=> resolve(this));  // Noop if already stored, use dirty() if change after retrieved
         let data = this._getdata();
         if (verbose) console.log("Transportable.p_store data=", data);
-        this._url = Dweb.transport.url(data); //store the url since the HTTP is async (has form "ipfs:/ipfs/xyz123" or "BLAKE2.xyz123"
+        this._url = this.transport().url(data); //store the url since the HTTP is async (has form "ipfs:/ipfs/xyz123" or "BLAKE2.xyz123"
         if (verbose) console.log("Transportable.p_store url=", this._url);
         let self = this;
-        return Dweb.transport.p_rawstore(data, verbose)
+        return this.transport().p_rawstore(data, verbose)
             .then((msg) => {
                 if (msg !== self._url) {
                     console.log("Transportable.p_store: ERROR URL returned ",msg,"doesnt match url expected",self._url);
@@ -48,7 +58,7 @@ class Transportable {
     }
 
     static p_fetch(url, verbose) {
-        return Dweb.transport.p_rawfetch(url, verbose) // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
+        return Dweb.transport(url).p_rawfetch(url, verbose) // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
     }
 
     file() { console.assert(false, "XXX Undefined function Transportable.file"); }

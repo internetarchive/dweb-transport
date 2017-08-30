@@ -119,7 +119,7 @@ class CommonList extends SmartDict {
         */
         let self = this;
         if (!this._publicurl) this._p_storepublic(verbose); // Async, but sets _publicurl immediately
-        return Dweb.transport.p_rawlist(this._publicurl, verbose)  //TODO modify to allow listmonitor
+        return this.transport().p_rawlist(this._publicurl, verbose)  //TODO modify to allow listmonitor
             .then((lines) => { // lines should be an array
                 if (verbose) console.log("CommonList:p_fetchlist.success", self._url, "len=", lines.length);
                 self._list = lines.map((l) => new Dweb.Signature(l, verbose));    // Turn each line into a Signature
@@ -212,11 +212,11 @@ class CommonList extends SmartDict {
         :resolves:  undefined
          */
         if (!sig) throw new Dweb.errors.CodingError("CommonList.p_add is meaningless without a sig");
-        return Dweb.transport.p_rawadd(sig.url, sig.date, sig.signature, sig.signedby, verbose);
+        return this.transport().p_rawadd(sig.url, sig.date, sig.signature, sig.signedby, verbose);
     }
 
     listmonitor(callback, verbose) {
-        Dweb.transport.listmonitor(this._publicurl, (obj) => {
+        this.transport().listmonitor(this._publicurl, (obj) => {
             if (verbose) console.log("CL.listmonitor",this._publicurl,"Added",obj);
             let sig = new Dweb.Signature(obj, verbose);
             this._list.push(sig);

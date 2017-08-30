@@ -68,11 +68,11 @@ class SmartDict extends Transportable {
             //noinspection JSUnfilteredForInLoop don't use "of" because want inherited attributes
             dd[i] = this[i];    // This just copies the attributes not functions
         }
-        let res = Dweb.transport.dumps(this.preflight(dd));
+        let res = this.transport().dumps(this.preflight(dd));
         if (this._acl) { //Need to encrypt
             let encdata = this._acl.encrypt(res, true);  // data, b64
             let dic = { "encrypted": encdata, "acl": this._acl._publicurl, "table": this.table};
-            res = Dweb.transport.dumps(dic);
+            res = this.transport().dumps(dic);
         }
         return res
     }    // Should be being called on outgoing _data includes dumps and encoding etc
@@ -81,7 +81,7 @@ class SmartDict extends Transportable {
         // Note SmartDict expects value to be a dictionary, which should be the case since the HTTP requester interprets as JSON
         // Call chain is ...  or constructor > _setdata > _setproperties > __setattr__
         // COPIED FROM PYTHON 2017-5-27
-        value = typeof(value) === "string" ? Dweb.transport.loads(value) : value; // If its a string, interpret as JSON
+        value = typeof(value) === "string" ? this.transport().loads(value) : value; // If its a string, interpret as JSON
         if (value && value.encrypted)
             throw new Dweb.errors.EncryptionError("Should have been decrypted in p_fetch");
         this._setproperties(value); // Note value should not contain a "_data" field, so wont recurse even if catch "_data" at __setattr__()
@@ -120,7 +120,7 @@ class SmartDict extends Transportable {
         let cls;
         return super.p_fetch(url, verbose) // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
             .then((data) => {
-                data = Dweb.transport.loads(data);      // Parse JSON //TODO-REL3 maybe function in Transportable
+                data = Dweb.transport(url).loads(data);      // Parse JSON //TODO-REL3 maybe function in Transportable
                 let table = data.table;              // Find the class it belongs to
                 cls = Dweb[table2class[table]];         // Gets class name, then looks up in Dweb - avoids dependency
                 if (!cls) throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: "+table+" isnt implemented in table2class");

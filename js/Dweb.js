@@ -11,11 +11,14 @@ exports.StructuredBlock = require('./StructuredBlock');
 exports.MutableBlock = require("./MutableBlock");
 //*/
 
+Url = require("url"); // Doesnt appear to be needed - also gets node interface which looks different
+
 // Javascript library for dweb
 // The crypto uses https://github.com/jedisct1/libsodium.js but https://github.com/paixaop/node-sodium may also be suitable if we move to node
 
 exports.utils = {}; //utility functions
 exports.errors = require("./Errors");
+exports.transports = {}; // Transports - instances NOT CLASSES of loaded transports
 
 /* Only applicable to HTTP...
     exports.dwebserver = 'localhost';
@@ -23,6 +26,7 @@ exports.errors = require("./Errors");
     exports.dwebport = '4243';
 */
 exports.keychains = [];
+exports.transportpriority = []; // First on list is top priority
 
 //TODO-ASYNC - fix objbrowser esp its path
 // ==== OBJECT ORIENTED JAVASCRIPT ===============
@@ -36,60 +40,6 @@ exports.utils.SecurityWarning = function(msg, self) {
 
 exports.utils.consolearr  = (arr) => ((arr && arr.length >0) ? [arr.length+" items inc:", arr[arr.length-1]] : arr );
 
-class ToBeImplementedError extends Error {
-    constructor(message) {
-        super("To be implemented: " + message);
-        this.name = "ToBeImplementedError"
-    }
-}
-exports.errors.ToBeImplementedError = ToBeImplementedError;
-
-//TODO TransportError is wanted in TransportHTTP but its out of scope there. Think about moving to Transport class
-class TransportError extends Error {
-    constructor(message) {
-        super(message || "Transport failure");
-        this.name = "TransportError"
-    }
-}
-exports.errors.TransportError = TransportError;
-
-// Use this when the code logic has been broken - e.g. something is called with an undefined parameter, its preferable to console.assert
-// Typically this is an error, that should have been caught higher up.
-class CodingError extends Error {
-    constructor(message) {
-        super(message || "Coding Error");
-        this.name = "CodingError"
-    }
-}
-exports.errors.CodingError = CodingError;
-
-// Use this when the logic of encryption wont let you do something, typically something higher should have stopped you trying.
-// Examples include signing something when you only have a public key.
-class EncryptionError extends Error {
-    constructor(message) {
-        super(message || "Encryption Error");
-        this.name = "EncryptionError"
-    }
-}
-exports.errors.EncryptionError = EncryptionError;
-
-class ForbiddenError extends Error {
-    constructor(message) {
-        super(message || "Forbidden failure");
-        this.name = "ForbiddenError"
-    }
-}
-exports.errors.ForbiddenError = ForbiddenError;
-
-class AuthenticationError extends Error {
-    constructor(message) {
-        super(message || "Authentication failure");
-        this.name = "AuthenticationError"
-    }
-}
-exports.errors.AuthenticationError = AuthenticationError;
-
-
 // Utility functions
 
 exports.utils.mergeTypedArraysUnsafe = function(a, b) { // Take care of inability to concatenate typed arrays
@@ -100,52 +50,16 @@ exports.utils.mergeTypedArraysUnsafe = function(a, b) { // Take care of inabilit
     return c;
 };
 
+exports.transport = function(url) {
+    /*
+    Pick between associated transports based on URL
 
-// ==== NON OBJECT ORIENTED FUNCTIONS ==============
-
-/*TODO: NOT PORTED OR TESTED WITH PROMISES
-exports.p_dwebfile = function(table, url, path, successmethod) {
-    // Simple utility function to load into a url without dealing with individual objects
-    // successmethod - see "path()" for definition.
-    let verbose = false;
-    if (path && (path.length > 0)) {
-        path = path.split('/');
+    url     URL or string that can be parsed into a URL
+    returns subclass of Transport that can support this kind of URL or undefined if none.
+    */
+    //TODO-efficiency, could parse URL once at higher level and pass URL down
+    if (url && (typeof url === 'string')) {
+        url = Url.parse(url);    // For efficiency, only parse once.
     }
-    if (verbose) { console.log("Dweb.p_dwebfile",table,url,path,successmethod);}
-    if (table === "mb") {
-        //(data, master, keypair, keygen, mnemonic,verbose)
-        const mb = new exports.MutableBlock(null, false, null, false, null, verbose, null);
-        // for dwebfile:mb, we want to apply the success function to the file - which is in the content after fetchlist
-        return mb.p_fetch_then_list_then_current(verbose)
-            .then(() => mb.p_path(path, verbose, successmethod))
-        // Note success is applied once after list is fetched, content isn't loaded before that.
-    } else if (table === "sb") {
-        const sb = new exports.StructuredBlock(url, null, verbose);
-        sb.p_fetch(verbose)
-            .then((msg) => sb.p_path(path, verbose, successmethod))
-    } else {
-        alert("dwebfile called with invalid table="+table);
-    }
-};
-*/
-
-
-/*TODO: NOT PORTED OR TESTED WITH PROMISES
-exports.p_dwebupdate = function(url, type, data, successmethod) {
-    let verbose = false;
-    //(data, master, keypair, keygen, mnemonic,  verbose)
-    let mbm = new exports.MutableBlock(null, true, null, false, null, verbose, null);
-    mbm.async_update( type, data, verbose,
-        function(msg){
-            if (successmethod) {
-                let methodname = successmethod.shift();
-                //if (verbose) console.log("p_elem",methodname, successmethod);
-                mbm[methodname](...successmethod); // Spreads successmethod into args, like *args in python
-            }
-        },
-        error);
-};
-*/
-
-
-
+    return exports.transportpriority.find((t) => t.supports(url))  // First transport that can support this URL
+}

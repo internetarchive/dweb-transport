@@ -65,6 +65,7 @@ class Transport {
         :param string url: URL of object being retrieved
         :param boolean verbose: True for debugging output
         :resolve string: Return the object being fetched, (note currently returned as a string, may refactor to return Buffer)
+        :throws:        TransportError if url invalid - note this happens immediately, not as a catch in the promise
          */
         console.assert(false, "Intentionally undefined  function Transport.p_rawfetch should have been subclassed");
     }
@@ -113,9 +114,39 @@ class Transport {
         console.assert(false, "XXX Undefined function Transport.p_rawreverse");
     }
 
+    listmonitor(url, callback, verbose) {
+        /*
+        Setup a callback called whenever an item is added to a list, typically it would be called immediately after a p_rawlist to get any more items not returned by p_rawlist.
+
+        :param url:         string Identifier of list (as used by p_rawlist and "signedby" parameter of p_rawadd
+        :param callback:    function(obj)  Callback for each new item added to the list
+               	obj is same format as p_rawlist or p_rawreverse
+        :param verbose:     boolean - True for debugging output
+         */
+        console.assert(false, "XXX Undefined function Transport.listmonitor");
+    }
+
     static _add_value(url, date, signature, signedby, verbose) {
         let store = {"url": url, "date": date, "signature": signature, "signedby": signedby};
-        return Dweb.transport.dumps(store);
+        return Dweb.transport(signedby).dumps(store);   // Note transport is that of signedby, not url
     }
+
+    static mergeoptions(a, b) {
+        /*
+        Deep merge options dictionaries
+         */
+        let c = Object.assign(a);
+        for (let key in b) {
+            let val = b[key];
+            if ((typeof val === "object") && ! Array.isArray(val) && a[key]) {
+                c[key] = Transport.mergeoptions(a[key], b[key]);
+            } else {
+                c[key] = b[key];
+            }
+        }
+        return c;
+    }
+
+
 }
 exports = module.exports = Transport;

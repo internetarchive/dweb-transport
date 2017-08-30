@@ -21,6 +21,7 @@ TODO-IPFS ComeBackFor: TransportHTTP & TransportHTTPBase (make use promises)
 // Library packages other than IPFS
 // IPFS components
 
+//TODO-REL4-API scan this file and add documentation
 
 const IPFS = require('ipfs');
 const CID = require('cids');
@@ -32,6 +33,7 @@ require('y-memory')(Y)
 require('y-array')(Y)
 require('y-text')(Y)
 require('y-ipfs-connector')(Y)
+const Url = require('url');
 
 
 const multihashes = require('multihashes'); // TODO-IPFS only required because IPFS makes it hard to get this
@@ -83,9 +85,10 @@ let defaultyarrayoptions = {
 
 // See https://github.com/pgte/ipfs-iiif-db for options
 let defaultiiifoptions = {
-        //ipfs: ..., //Will have ipfsoptions stored during startup
-        store: "leveldb",
+        //store: "leveldb", // leveldb is needed on Node, indexeddb on browser, see test.js for how overridden in node.
+        store: "indexeddb",
         partition: "dweb20170828" //TODO-IIIF try making parition a variable and connecting to multiple lists.
+        //ipfs: ..., //Will have ipfsoptions stored during startup
 };
 
 const annotationlistexample = { //TODO-IPFS update this to better example, not required for Y, only IIIF
@@ -184,14 +187,24 @@ class TransportIPFS extends Transport {
     }
 
 
-    static p_setup(verbose, options) { // Note can pass multiple options dictionaries - furthest right overrides. //TODO-REL4-API
-        let combinedoptions = {
-            iiif: Object.assign(defaultiiifoptions, options.iiif),  //TODO-YARRAY comment out
-            yarray: Object.assign(defaultyarrayoptions, options.yarray),
-            ipfs: Object.assign(defaultipfsoptions, options.ipfs)
-        }
+    static p_setup(verbose, options) {
+        /*
+        Setup the resource and open any P2P connections etc required to be done just once.
+        In almost all cases this will call the constructor of the subclass
+        Should return a new Promise that resolves to a instance of the subclass
+
+        :param obj transportoptions: Data structure required by underlying transport layer (format determined by that layer)
+        :param boolean verbose: True for debugging output
+        :param options: Data structure stored on the .options field of the instance returned.
+        :resolve Transport: Instance of subclass of Transport
+         */
+        let combinedoptions = Transport.mergeoptions(
+            { iiif: defaultiiifoptions, yarray: defaultyarrayoptions, ipfs: defaultipfsoptions },
+            options);
         console.log("IPFS options", JSON.stringify(combinedoptions));
         let t = new TransportIPFS(verbose, combinedoptions);   // Note doesnt start IPFS or IIIF or Y
+        Dweb.transports.ipfs = t;
+        Dweb.transportpriority.push(t);    // Sets to default transport if nothing else set otherwise on a list
         //Switch the comments on the next two lines to switch back and forth between IIIF or Y for testing
         //TODO-REL4 move the IIIF/Y choice into options
         //TODO-REL5 try multiple Y-lists
@@ -205,6 +218,20 @@ class TransportIPFS extends Transport {
             })
     }
 
+    supports(url) { //TODO-REL4-API
+        /*
+        Determine if this transport supports a certain set of URLs
+
+        url     String or parsed URL
+        returns True if this protocol supports these URLs
+         */
+        if (!url) return true; // Can handle default URLs
+        if (url && (typeof url === 'string')) {
+            url = Url.parse(url);    // For efficiency, only parse once.
+        }
+        let protocol = url.protocol;    // Lower case, Includes trailing :
+        return protocol === 'ipfs:';
+    }
     url(data) {
         /*
          Return an identifier for the data without storing typically ipfs:/ipfs/a1b2c3d4...
@@ -221,11 +248,17 @@ class TransportIPFS extends Transport {
     // Everything else - unless documented here - should be opaque to the actual structure of a CID
     // or a url. This code may change as its not clear (from IPFS docs) if this is the right mapping.
     static cid2url(cid) {
+        /*
+        Convert a CID into a standardised URL e.g. ipfs:/ipfs/abc123
+         */
         //console.log(cid.multihash[0],cid.multihash[1],cid.multihash[2]);
         return "ipfs:/ipfs/"+cid.toBaseEncodedString()
     }
 
     static url2cid(url) {
+        /*
+        Convert a URL e.g. ipfs:/ipfs/abc123 into a CID structure suitable for retrieval
+         */
         let arr = url.split('/');
         if (!(arr.length===3 && arr[0] === "ipfs:" && arr[1]==="ipfs"))
                 throw new Dweb.errors.TransportError("TransportIPFS.url2cid bad format for url should be ipfs:/ipfs/...: "+url);
@@ -234,10 +267,14 @@ class TransportIPFS extends Transport {
 
     p_rawfetch(url, verbose) {
         /*
-        Fetch url from IPFS (implements Transport.p_rawfetch)
+        Fetch some bytes based on a url, no assumption is made about the data in terms of size or structure.
+        Where required by the underlying transport it should retrieve a number if its "blocks" and concatenate them.
+        Returns a new Promise that resolves currently to a string.
+        There may also be need for a streaming version of this call, at this point undefined.
 
-        :param url:    Valid ipfs url "ipfs:/ipfs/*"
-        :resolves:      Opaque bytes retrieved from IPFS
+        :param string url: URL of object being retrieved
+        :param boolean verbose: True for debugging output
+        :resolve string: Return the object being fetched, (note currently returned as a string, may refactor to return Buffer)
         :throws:        TransportError if url invalid - note this happens immediately, not as a catch in the promise
          */
         console.assert(url, "TransportIPFS.p_rawfetch: requires url");
@@ -251,11 +288,17 @@ class TransportIPFS extends Transport {
     }
 
     p_rawlist(url, verbose) { //TODO-IPFS-MULTILIST move initialization of annotation list here
-        // obj being loaded
-        // Locate and return a list, based on its url
-        // This is coded as a p_rawlist (i.e. returning a Promise, even though it returns immediately, that is so that
-        // it can be recoded for an architecture where we need to wait for the list.
-        // notify is NOT part of the Python interface, needs implementing there.
+        /*
+        Fetch all the objects in a list, these are identified by the url of the public key used for signing.
+        (Note this is the 'signedby' parameter of the p_rawadd call, not the 'url' parameter
+        Returns a promise that resolves to the list.
+        Each item of the list is a dict: {"url": url, "date": date, "signature": signature, "signedby": signedby}
+        List items may have other data (e.g. reference ids of underlying transport)
+
+        :param string url: String with the url that identifies the list.
+        :param boolean verbose: True for debugging output
+        :resolve array: An array of objects as stored on the list.
+         */
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
         return new Promise((resolve, reject) => {  //XXXREJECT
             try {
@@ -270,7 +313,14 @@ class TransportIPFS extends Transport {
         })
     }
     listmonitor(url, callback, verbose) {
-        // Typically called immediately after a p_rawlist to get notification of future items
+        /*
+        Setup a callback called whenever an item is added to a list, typically it would be called immediately after a p_rawlist to get any more items not returned by p_rawlist.
+
+        :param url:         string Identifier of list (as used by p_rawlist and "signedby" parameter of p_rawadd
+        :param callback:    function(obj)  Callback for each new item added to the list
+               	obj is same format as p_rawlist or p_rawreverse
+        :param verbose:     boolean - True for debugging output
+         */
         //TODO-IPFS-MULTILIST will want to make more efficient.
         if (this.iiif) {
             this.annotationList.on('resource inserted', (event) => {
@@ -289,10 +339,28 @@ class TransportIPFS extends Transport {
         }
     }
 
-    rawreverse() { console.assert(false, "XXX Undefined function TransportHTTP.rawreverse"); }
+    rawreverse() {
+        /*
+        Similar to p_rawlist, but return the list item of all the places where the object url has been listed.
+        The url here corresponds to the "url" parameter of p_rawadd
+        Returns a promise that resolves to the list.
 
-    p_rawstore(data, verbose) { // Note async_rawstore took extra "self" parameter but unued and unclear that any of
-        //PY-HTTP: res = self._sendGetPost(True, "rawstore", headers={"Content-Type": "application/octet-stream"}, urlargs=[], data=data, verbose=verbose)
+        :param string url: String with the url that identifies the object put on a list.
+        :param boolean verbose: True for debugging output
+        :resolve array: An array of objects as stored on the list.
+         */
+        //TODO-REVERSE this needs implementing once list structure on IPFS more certain
+        console.assert(false, "XXX Undefined function TransportHTTP.rawreverse"); }
+
+    p_rawstore(data, verbose) {
+        /*
+        Store a blob of data onto the decentralised transport.
+        Returns a promise that resolves to the url of the data, but also see xxx
+
+        :param string|Buffer data: Data to store - no assumptions made to size or content
+        :param boolean verbose: True for debugging output
+        :resolve string: url of data stored
+         */
         console.assert(data, "TransportIPFS.p_rawstore: requires data");
         let buf = (data instanceof Buffer) ? data : new Buffer(data);
         return this.promisified.ipfs.block.put(buf).then((block) => TransportIPFS.cid2url(block.cid));
@@ -310,6 +378,18 @@ class TransportIPFS extends Transport {
         }
     }
     p_rawadd(url, date, signature, signedby, verbose) {
+        /*
+        Store a new list item, it should be stored so that it can be retrieved either by "signedby" (using p_rawlist) or
+        by "url" (with p_rawreverse). The underlying transport does not need to guarrantee the signature,
+        an invalid item on a list should be rejected on higher layers.
+
+        :param string url: String identifying an object being added to the list.
+        :param string date: Date (as returned by new Data.now() )
+        :param string signature: Signature of url+date
+        :param string signedby: url of the public key used for the signature.
+        :param boolean verbose: True for debugging output
+        :resolve undefined:
+         */
         return new Promise((resolve, reject)=> { try {
             this.rawadd(url, date, signature, signedby, verbose);
             resolve(undefined);
@@ -318,10 +398,10 @@ class TransportIPFS extends Transport {
         } })
     }
 
-    async_update(self, url, type, data, verbose, success, error) { console.trace(); console.assert(false, "OBSOLETE"); //TODO-IPFS obsolete with p_*
+    async_update(self, url, type, data, verbose, success, error) {
+        console.trace(); console.assert(false, "OBSOLETE"); //TODO-IPFS obsolete with p_*
         this.async_post("update", url, type, data, verbose, success, error);
     }
-
 
     static test(transport, verbose) {
         if (verbose) {console.log("TransportIPFS.test")}

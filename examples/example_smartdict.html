@@ -88,12 +88,10 @@
     let verbose = false;
     let transportclass = TransportIPFS;
     setstatus("IPFS Starting");
-    //let transportclass = TransportHTTP    // Uncomment this to choose HTTP, but note p_setup below needs fixing
-    transportclass.p_setup(verbose, {iiif: {store: "indexeddb"}})
-        .then((t) => {
-        setstatus(t.ipfs.isOnline() ? "IPFS Online" : "IPFS Not online");
-    if (verbose) console.log("setup returned and transport set - including annotationList");
-    Dweb.transport = t;
+    //let transportclass = TransportHTTP    // Uncomment this to choose HTTP
+    transportclass.p_setup(verbose)
+    .then((t) => {
+        setstatus(t.ipfs.isOnline() ? "IPFS Online" : "IPFS Not online");   //TODO status refactor to make common across transports
     })
     .then(() => { if(url) fetchanddisplay(url)})
     .catch((err) => { console.log("ERROR:",err); alert(err.message); });

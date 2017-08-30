@@ -187,7 +187,6 @@ class KeyChain extends CommonList {
         // Uses acl passed in from AccessControlList.acl
         acl._allowunsafestore = true;
     })
-    .then(() => verbose = true)
     .then(() => acl.p_add_acle(viewerkeypair._url, verbose))   //Add us as viewer
     .then(() => {
             console.assert("acl._list.length === 1", "Should have added exactly 1 viewerkeypair",acl);

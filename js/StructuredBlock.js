@@ -90,7 +90,7 @@ class StructuredBlock extends SmartDict {
         }
         console.log("ERR - object has no content, not even empty data");
         //Not supporting url/fetch as async
-        //(this.url and Dweb.transport.rawfetch(url = self.url, verbose=verbose, **options)) or # url must point to raw data, not another SB
+        //(this.url and this.transport().rawfetch(url = self.url, verbose=verbose, **options)) or # url must point to raw data, not another SB
     }
     file() { console.assert(false, "XXX Undefined function StructuredBlock.file"); }
     size() { console.assert(false, "XXX Undefined function StructuredBlock.size"); }

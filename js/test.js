@@ -3,7 +3,12 @@ TransportIPFS.IpfsIiifDb = require('ipfs-iiif-db');  //https://github.com/pgte/i
 const TransportHTTP = require('./TransportHTTP');
 const Dweb = require('./Dweb');
 
-// Utility packages (ours) Aand one-loners
+/*
+    This file is intended to be run under node, e.g. "node test.js" to test as many features as possible.
+ */
+
+
+// Utility packages (ours) Aand one-liners
 //UNUSED: const makepromises = require('./utils/makepromises');
 function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { resolve(val); },ms)})}
 
@@ -19,18 +24,15 @@ const dom = new JSDOM(htmlfake);
 //console.log("XXX@8",dom.window.document.getElementById("myList.0").textContent); // Before loading = "Failed to load sb via StructuredBlock"
 document = dom.window.document;   // Note in JS can't see "document" like can in python
 
-
-
 let verbose = false;
 let sb;
 let acl;
     // Note that this test setup is being mirror in test_ipfs.html
-    transportclass.p_setup({}, verbose, {})
-    .then((t) => {
-        if (verbose) console.log("setup returned and transport set - including annoationList");
-        Dweb.transport = t;
-    })
-    .then(() => transportclass.test(Dweb.transport, verbose))
+    // In general it should be possible to comment out failing tests EXCEPT where they provide a value to the next */
+
+    transportclass.p_setup(verbose, {iiif: {store: "leveldb"}}) // Note browser requires indexeddb
+    .then((t) => { if (verbose) console.log("setup returned and transport set - including annoationList"); })
+    .then(() => transportclass.test(Dweb.transport(), verbose))
     .then(() => Dweb.Block.test(verbose))
     .then(() => Dweb.KeyPair.test(verbose))
     .then(() => Dweb.AccessControlList.p_test(verbose))
@@ -41,7 +43,6 @@ let acl;
     .then((testobjs) => sb = testobjs.sb)
     .then(() => console.log("sb=",sb))
     .then(() => Dweb.MutableBlock.test(sb, verbose))
-    .then(() => verbose = true)
     .then(() => Dweb.KeyChain.p_test(acl, verbose)) // depends on MutableBlock for test, though not for KeyChain itself
      //*/ /TODO-REL4 comment out before REL4
     .then(() => console.log("delaying 10 secs"))

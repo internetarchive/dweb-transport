@@ -38,7 +38,7 @@ class MutableBlock extends CommonList {
     p_update(){ console.assert(false, "Need to define p_ function")}
 
     async_update(type, data, verbose, success, error) {   console.trace(); console.assert(false, "OBSOLETE"); //TODO-IPFS obsolete with p_fetch // Send new data for this item to dWeb
-        Dweb.transport.async_update(this, this._url, type, data, verbose, success, error);
+        this.transport().async_update(this, this._url, type, data, verbose, success, error);
     }
 
     _p_storepublic(verbose) {

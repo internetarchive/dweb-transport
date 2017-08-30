@@ -176,7 +176,7 @@ class AccessControlList extends CommonList {
             let aclurl = value.acl;
             let kc = Dweb.KeyChain.keychains_find({_publicurl: aclurl});  // Matching KeyChain or None
             if (kc) {
-                return Dweb.transport.loads(kc.decrypt(value.encrypted, verbose)); // Exception: DecryptionFail - unlikely since publicurl matches
+                return Dweb.transport().loads(kc.decrypt(value.encrypted, verbose)); // Exception: DecryptionFail - unlikely since publicurl matches
             } else {
                 //ACL(url, data, master, key, verbose, options)
                 // TODO-AUTHENTICATION probably add person - to - person version
@@ -185,7 +185,7 @@ class AccessControlList extends CommonList {
                     .then((newacl) => acl = newacl)
                     .then(() => acl.p_list_then_elements(verbose)) // Will load blocks in sig as well
                     .then(() => acl.decrypt(value.encrypted, null, verbose))  // Resolves to data or throws AuthentictionError
-                    .then((data) => Dweb.transport.loads(data))
+                    .then((data) => Dweb.transport().loads(data))
                     .catch((err) => { console.log("Unable to decrypt:",value); throw(err);});
             }
         }
