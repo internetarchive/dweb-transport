@@ -69,7 +69,7 @@ function replacetexts(el, ...dict) { //TODO-REL4 put into example_list and examp
      */
     // First combine with a raw dict so that "prop" doesnt get functions and handles dict like things
     el = (typeof(el) === "string") ? document.getElementById(el) : el;
-    el.source = dict;
+    el.source = dict[0];    // Usually used with one object, if append fields its usually just calculated for display
     oo = Object.assign({},...dict);
     for (let prop in oo) {
         let val = oo[prop];
