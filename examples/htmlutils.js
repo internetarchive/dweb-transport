@@ -81,6 +81,7 @@ function replacetexts(el, dict) { //TODO-REL4 put into example_list and example_
             replacetext(i, val);
         }
     }
+    return el;
 }
 
 function show(el, displayvalue) {

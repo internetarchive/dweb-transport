@@ -69,21 +69,23 @@
             objtype = obj.table; // acl = AccessControlList, kp = KeyPair
             objsym = objsyms[objtype];
             objclick = {acl: 'p_acl_click(this);', kp: 'p_key_click(this);'}[objtype];
-            let htmleach = '<img class="keylist_icon" src="'+objsym+'"/><span class="keylist_name" name="name"></span>'
-            el = add_li_from_html_and_dict("keylist_ul", htmleach, obj, {class: 'keylist_li', onclick: objclick } )
+            let htmleach = '<img class="keylist_icon" src="'+objsym+'"/><span class="keylist_name" name="name"></span>';
+            el = add_li_from_html_and_dict("keylist_ul", htmleach, obj, {class: 'keylist_li', onclick: objclick } );
             return el;
         }
         function p_kc_click(el) {
             let kc = el.source;
             show('keys'); //block - Show keylist
-            replacetexts("keylist_header", kc);    // Set name fields etc in keylistdiv, sets source
-            deletechildren("keylist_ul")
-
+            let el_keylistheader = replacetexts("keylist_header", kc);    // Set name fields etc in keylistdiv, sets source
+            deletechildren("keylist_ul");
             return kc.p_list_then_elements()                            // Retrieve the keys for the keylist
                 .then(() => kc._keys.map((key)=> _kclist_push(key)))    // And add to the HTML
-        		.then(() => kc.listmonitor(
-                    (sig) => sig.p_fetchdata(verbose)
-                            .then((obj) => _kclist_push(obj)),
+        		.then(() => kc.listmonitor(                             // Note the callback will store on kc as well before calling this function
+                    (sig) => {
+                        console.log("XXX@85:",sig.signedby,el_keylistheader.source._publicurl);
+                        if (sig.signedby === el_keylistheader.source._publicurl)
+                            sig.p_fetchdata(verbose)                   // and will ignore duplicates including an echo of the one we add
+                                .then((obj) => _kclist_push(obj)) },
                     verbose));
         }
         function p_newkey() {
@@ -93,7 +95,7 @@
             let dict = form2dict("newkeyform"); //name
             kc = document.getElementById('keylist_header').source;
             key = new Dweb.KeyPair({name: dict.name, key: {keygen: true}, _acl: kc}, verbose )
-            let el = _kclist_push(key);
+            let el = _kclist_push(key);   // Dont put in UI, as listmonitor gets it as well.
             return key.p_store(verbose)
                 .then(() => kc.p_push(key, verbose));
         }

@@ -219,8 +219,10 @@ class CommonList extends SmartDict {
         this.transport().listmonitor(this._publicurl, (obj) => {
             if (verbose) console.log("CL.listmonitor",this._publicurl,"Added",obj);
             let sig = new Dweb.Signature(obj, verbose);
-            this._list.push(sig);
-            callback(sig);
+            if (!this._list.some((othersig) => othersig.signature === sig.signature )) {    // Check not duplicate (esp of locally pushed one
+                this._list.push(sig);
+                callback(sig);
+            }
         })
     }
     //TODO add many of the methods of Array to CommonList see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array
