@@ -512,6 +512,7 @@ exports.Signature = require("./Signature");
 exports.CommonList = require("./CommonList");
 exports.AccessControlList = require("./AccessControlList");
 exports.KeyChain = require('./KeyChain');
+exports.TransportIPFS = require('./TransportIPFS');
 //* Later libraries //TODO-REL4 comment out before REL4
 exports.StructuredBlock = require('./StructuredBlock');
 exports.MutableBlock = require("./MutableBlock");
@@ -570,7 +571,7 @@ exports.transport = function(url) {
     return exports.transportpriority.find((t) => t.supports(url))  // First transport that can support this URL
 }
 
-},{"./AccessControlList":1,"./Block":2,"./CommonList":3,"./Errors":5,"./KeyChain":6,"./KeyPair":7,"./MutableBlock":8,"./Signature":9,"./SmartDict":10,"./StructuredBlock":11,"url":760}],5:[function(require,module,exports){
+},{"./AccessControlList":1,"./Block":2,"./CommonList":3,"./Errors":5,"./KeyChain":6,"./KeyPair":7,"./MutableBlock":8,"./Signature":9,"./SmartDict":10,"./StructuredBlock":11,"./TransportIPFS":13,"url":760}],5:[function(require,module,exports){
 errors = {}
 
 // These are equivalent of python exceptions, will log and raise alert in most cases - exceptions aren't caught
@@ -1971,19 +1972,11 @@ exports = module.exports = Transport;
 },{}],13:[function(require,module,exports){
 (function (Buffer){
 /*
-This Transport layers builds on IPFS and the IPFS-IIIF-Db,
+This Transport layers builds on IPFS and the YJS DB
 
-The IPFS-IIIF-DB is more than needed, and should really strip it down, and just use the bits we need,
-but its hard to figure out
 
-Lists have listeners,
-'started': for when started - then can read list - tested during IPFS start (which slows that down)
-'resource inserted': for when something new posted
-'mutation': triggered when changed
+Y Lists have listeners and generate events - see docs at ...
 
-TODO-IPFS-MULTILIST
-For now we use one list, and filter by url, at some point we'll need lots of lists and its unclear where to split
-- at listener; partition or list within that (resources / hits) or have to filter on content
 
 TODO-IPFS ComeBackFor: TransportHTTP & TransportHTTPBase (make use promises)
 
@@ -1999,6 +1992,7 @@ const IPFS = require('ipfs');
 const CID = require('cids');
 // Leave IpfsIiiifDb commented out as there is (or at least "was") a bug where browserify crashes if included directly - include seperately in the app.
 //const IpfsIiifDb = require('ipfs-iiif-db');  //https://github.com/pgte/ipfs-iiif-db
+
 // The following only required for Y version
 const Y = require('yjs');
 require('y-memory')(Y);
@@ -2032,17 +2026,16 @@ let defaultipfsoptions = {
     //start: false,
     //TODO-IPFS-Q how is this decentralized - can it run offline? Does it depend on star-signal.cloud.ipfs.team
     config: {
-        Addresses: { Swarm: [ '/libp2p-webrtc-star/dns4/star-signal.cloud.ipfs.team/wss' ] },   // For IIIF - same as defaults
-//      Addresses: { Swarm: [ ] },   // For IIIF - same as defaults - disable WebRTC to test browser crash, note disables IIIF so doesnt work.
-                                    // For IIIF - same as defaults
+        Addresses: { Swarm: [ '/libp2p-webrtc-star/dns4/star-signal.cloud.ipfs.team/wss' ] },   // For IIIF or Y - same as defaults
+//      Addresses: { Swarm: [ ] },   // Disable WebRTC to test browser crash, note disables IIIF or Y so doesnt work.
     },
-    //init: true, // Comment out for IIIF
+    //init: true, // Comment out for IIIF or Y
     EXPERIMENTAL: {
         pubsub: true
     }
 };
 
-let defaultyarrayoptions = {    // See how IIIF uses them in bootstrap.js in ipfs-iiif-db repo
+let defaultyarrayoptions = {    // Based on how IIIF uses them in bootstrap.js in ipfs-iiif-db repo
     db: {
         name: 'indexeddb',   // leveldb in node
     },
@@ -2057,6 +2050,8 @@ let defaultyarrayoptions = {    // See how IIIF uses them in bootstrap.js in ipf
     }
 };
 
+
+/* OBS - only required for IIIF
 // See https://github.com/pgte/ipfs-iiif-db for options
 let defaultiiifoptions = {
         //store: "leveldb", // leveldb is needed on Node, indexeddb on browser, see test.js for how overridden in node.
@@ -2065,14 +2060,6 @@ let defaultiiifoptions = {
         //ipfs: ..., //Will have ipfsoptions stored during startup
 };
 
-let defaultoptions = {
-    iiif:   defaultiiifoptions,
-    yarray: defaultyarrayoptions,
-    ipfs:   defaultipfsoptions,
-    listmethod: "yarrays"
-};
-
-
 const annotationlistexample = { //TODO-IPFS update this to better example, not required for Y, only IIIF
     "@id": "foobar",    // Only required field is @id
     "url": "ipfs:/ipfs/A1B2C3D4E5",
@@ -2080,6 +2067,15 @@ const annotationlistexample = { //TODO-IPFS update this to better example, not r
     "signature": "123456ABC",
     "signedby": "123456ABC"
 };
+*/
+
+let defaultoptions = {
+    //iiif:   defaultiiifoptions,   // Stopping support for IIIF, using Y directly
+    yarray: defaultyarrayoptions,
+    ipfs:   defaultipfsoptions,
+    listmethod: "yarrays"
+};
+
 
 class TransportIPFS extends Transport {
     /*
@@ -2109,6 +2105,7 @@ class TransportIPFS extends Transport {
         }}}
     }
 
+    /* OBS Aug2017 - using "yarrays" now to support multiple connections not IIIF, leave code here for month or two in case go back.
     // This starts up IPFS under IIIF
     p_iiifstart(verbose) { //TODO-REL4-API
 
@@ -2139,12 +2136,13 @@ class TransportIPFS extends Transport {
                 })
         })
     }
+    */
 
     p_ipfsstart(verbose) { //TODO-REL4-API
-        /*
-        Just start IPFS - not Y or IIIF (note used with "yarrays" and will be used for non-IPFS list management)
+    /*
+    Just start IPFS - not Y or IIIF (note used with "yarrays" and will be used for non-IPFS list management)
 
-         */
+     */
         let self = this;
         return new Promise((resolve, reject) => {
             this.ipfs = new IPFS(this.options.ipfs);
@@ -2162,7 +2160,9 @@ class TransportIPFS extends Transport {
         })
     }
 
+    /* OBS Aug2017 - using "yarrays" now to support multiple connections, leave code here for month or two in case go back.
     p_yarraystart(verbose) { //TODO-REL4-API
+        // Singular version - one Yarray, on one IPFS connection, monitoring everything.
         let yarrayoptions = this.options.yarray;
         let self = this;
         return p_ipfsstart(verbose)
@@ -2180,8 +2180,11 @@ class TransportIPFS extends Transport {
         })
         //Lots of issues with "init" not knowing state before it//  this.ipfs.init({emptyRepo: true, bits: 2048})     //.then((unused) => ipfs.init({emptyRepo: true, bits: 2048}))
     }
-
+    */
     p_yarraysstart(verbose) { //TODO-REL4-API
+        /*
+        This starts IPFS, but only sets up for Y connections, which are opened each time a resource is listed, added to, or listmonitored.
+         */
         let self = this;
         return this.p_ipfsstart(verbose)
             .then(() => {
@@ -2192,6 +2195,25 @@ class TransportIPFS extends Transport {
                 throw(err);
             })
         //Lots of issues with "init" not knowing state before it//  this.ipfs.init({emptyRepo: true, bits: 2048})     //.then((unused) => ipfs.init({emptyRepo: true, bits: 2048}))
+    }
+
+    p__yarray(url, verbose) {
+        /*
+        Utility function to get Yarray for this URL and open a new connection if not already
+
+        url:        URL string to find list of
+        resolves:   Y
+        */
+        if (this.yarrays[url]) {
+            if (verbose) console.log("Found Y for",url);
+            return new Promise((resolve, reject) => resolve(this.yarrays[url]));
+        } else {
+            if (verbose) console.log("Creating Y for",url);
+            let options = Transport.mergeoptions(this.options.yarray, {connector: { room: url}}) // Copies options
+            options.connector.ipfs = this.ipfs;
+            return Y(options)
+                .then((y) => this.yarrays[url] = y);
+        }
     }
 
 
@@ -2213,8 +2235,8 @@ class TransportIPFS extends Transport {
         Dweb.transportpriority.push(t);    // Sets to default transport if nothing else set otherwise on a list
         //Switch the comments on the next two lines to switch back and forth between IIIF or Y for testing
         //TODO-REL5 try multiple Y-lists
-        return  (   (t.options.listmethod === "iiif")    ? t.p_iiifstart(verbose)
-                :   (t.options.listmethod === "yarray")  ? t.p_yarraystart(verbose)
+        return  (   (t.options.listmethod === "iiif")    ? t.p_iiifstart(verbose)   // Not currently supported
+                :   (t.options.listmethod === "yarray")  ? t.p_yarraystart(verbose)  // Not currently supported
                 :   (t.options.listmethod === "yarrays") ? t.p_yarraysstart(verbose)
                 :   undefined   )
             .then(() => t);
@@ -2289,26 +2311,18 @@ class TransportIPFS extends Transport {
             })
     }
 
-    p__yarray(url, verbose) {
-        /*
-        Utility function to get Yarray for this URL and open if not already
-
-        url:        URL string to find list of
-        resolves:   Y
-        */
-        if (this.yarrays[url]) {
-            if (verbose) console.log("Found Y for",url);
-            return new Promise((resolve, reject) => resolve(this.yarrays[url]));
-        } else {
-            if (verbose) console.log("Creating Y for",url);
-            let options = Transport.mergeoptions(this.options.yarray, {connector: { room: url}}) // Copies options
-            options.connector.ipfs = this.ipfs;
-            return Y(options)
-                .then((y) => this.yarrays[url] = y);
-        }
-    }
-
     p_rawlist(url, verbose) { //TODO-IPFS-MULTILIST merge with older p_rawlist when works.
+    /*
+    Fetch all the objects in a list, these are identified by the url of the public key used for signing.
+    (Note this is the 'signedby' parameter of the p_rawadd call, not the 'url' parameter
+    Returns a promise that resolves to the list.
+    Each item of the list is a dict: {"url": url, "date": date, "signature": signature, "signedby": signedby}
+    List items may have other data (e.g. reference ids of underlying transport)
+
+    :param string url: String with the url that identifies the list.
+    :param boolean verbose: True for debugging output
+    :resolve array: An array of objects as stored on the list.
+     */
         console.assert(this.options.listmethod === "yarrays");
         verbose = true; // TODO-IPFS-MULTILIST delete this line
         return this.p__yarray(url, verbose)
@@ -2324,8 +2338,9 @@ class TransportIPFS extends Transport {
             })
     }
 
-    p_rawlistXXX(url, verbose) { //TODO-IPFS-MULTILIST move initialization of annotation list here
-        /*
+    /*OBS - not supporting IIIF or YARRAY (singular)
+    p_rawlist(url, verbose) { //TODO-IPFS-MULTILIST move initialization of annotation list here
+        /-*
         Fetch all the objects in a list, these are identified by the url of the public key used for signing.
         (Note this is the 'signedby' parameter of the p_rawadd call, not the 'url' parameter
         Returns a promise that resolves to the list.
@@ -2335,7 +2350,7 @@ class TransportIPFS extends Transport {
         :param string url: String with the url that identifies the list.
         :param boolean verbose: True for debugging output
         :resolve array: An array of objects as stored on the list.
-         */
+         *-/
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
         //The listmethods are handled slightly differently as iiif & yarray is sync while the other is potentially async as may have to connect first
 
@@ -2353,8 +2368,17 @@ class TransportIPFS extends Transport {
             }
         })
     }
+    */
 
     listmonitor(url, callback, verbose) {   //TODO-MULTILIST merge into below when works
+    /*
+    Setup a callback called whenever an item is added to a list, typically it would be called immediately after a p_rawlist to get any more items not returned by p_rawlist.
+
+    :param url:         string Identifier of list (as used by p_rawlist and "signedby" parameter of p_rawadd
+    :param callback:    function(obj)  Callback for each new item added to the list
+               obj is same format as p_rawlist or p_rawreverse
+    :param verbose:     boolean - True for debugging output
+     */
         console.assert(this.options.listmethod === "yarrays");
         verbose = true; // TODO-IPFS-MULTILIST delete this line
         let y = this.yarrays[url];
@@ -2367,15 +2391,16 @@ class TransportIPFS extends Transport {
         })
     }
 
-    XXXlistmonitor(url, callback, verbose) {
-        /*
+    /*OBS - not supporting IIIF or YARRAY(Singular)
+    listmonitor(url, callback, verbose) {
+        /-*
         Setup a callback called whenever an item is added to a list, typically it would be called immediately after a p_rawlist to get any more items not returned by p_rawlist.
 
         :param url:         string Identifier of list (as used by p_rawlist and "signedby" parameter of p_rawadd
         :param callback:    function(obj)  Callback for each new item added to the list
                	obj is same format as p_rawlist or p_rawreverse
         :param verbose:     boolean - True for debugging output
-         */
+         *-/
         //TODO-IPFS-MULTILIST will want to make more efficient.
         if ( this.options.listmethod === "iiif") {
             this.annotationList.on('resource inserted', (event) => {
@@ -2392,6 +2417,7 @@ class TransportIPFS extends Transport {
             });
         }
     }
+    */
 
     rawreverse() {
         /*
@@ -2427,7 +2453,8 @@ class TransportIPFS extends Transport {
         return this.p__yarray(signedby, verbose)
             .then((y) => y.share.array.push([value]));
     }
-    XXXrawadd(url, date, signature, signedby, verbose) {
+    /*OBS - not supporting IIIF or YARRAY singular
+    rawadd(url, date, signature, signedby, verbose) {
         console.assert(url && signature && signedby, "p_rawadd args",url,signature,signedby);
         if (verbose) console.log("p_rawadd", url, date, signature, signedby);
         let value = {"url": url, "date": date, "signature": signature, "signedby": signedby};
@@ -2438,8 +2465,9 @@ class TransportIPFS extends Transport {
             this.yarray.share.array.push([value]);
         }
     }
-    XXXp_rawadd(url, date, signature, signedby, verbose) {
-        /*
+
+    p_rawadd(url, date, signature, signedby, verbose) {
+        /-*
         Store a new list item, it should be stored so that it can be retrieved either by "signedby" (using p_rawlist) or
         by "url" (with p_rawreverse). The underlying transport does not need to guarrantee the signature,
         an invalid item on a list should be rejected on higher layers.
@@ -2450,7 +2478,7 @@ class TransportIPFS extends Transport {
         :param string signedby: url of the public key used for the signature.
         :param boolean verbose: True for debugging output
         :resolve undefined:
-         */
+         *-/
         return new Promise((resolve, reject)=> { try {
             this.rawadd(url, date, signature, signedby, verbose);
             resolve(undefined);
@@ -2458,7 +2486,7 @@ class TransportIPFS extends Transport {
             reject(err);
         } })
     }
-
+    */
     async_update(self, url, type, data, verbose, success, error) {
         console.trace(); console.assert(false, "OBSOLETE"); //TODO-IPFS obsolete with p_*
         this.async_post("update", url, type, data, verbose, success, error);
@@ -2637,10 +2665,10 @@ exports = module.exports = Transportable;
 window.Dweb = require('./Dweb');
 window.sodium = require("libsodium-wrappers");  // Needed for cryptotest
 //window.IpfsIiifDb = require('ipfs-iiif-db');  // Currently fails in browserify - doesnt load anything after this
-window.TransportIPFS = require('./TransportIPFS');  //TODO-REL4 try oving this to Dweb.TransportIPFS = ...
+//window.TransportIPFS = require('./TransportIPFS');  //TODO-REL4 try oving this to Dweb.TransportIPFS = ...
 //window.TransportHTTP = require('./TransportHTTP');
 
-},{"./Dweb":4,"./TransportIPFS":13,"libsodium-wrappers":483}],16:[function(require,module,exports){
+},{"./Dweb":4,"libsodium-wrappers":483}],16:[function(require,module,exports){
 module.exports = after
 
 function after(count, callback, err_cb) {

@@ -3,5 +3,5 @@
 window.Dweb = require('./Dweb');
 window.sodium = require("libsodium-wrappers");  // Needed for cryptotest
 //window.IpfsIiifDb = require('ipfs-iiif-db');  // Currently fails in browserify - doesnt load anything after this
-window.TransportIPFS = require('./TransportIPFS');  //TODO-REL4 try oving this to Dweb.TransportIPFS = ...
+//window.TransportIPFS = require('./TransportIPFS');  //TODO-REL4 try oving this to Dweb.TransportIPFS = ...
 //window.TransportHTTP = require('./TransportHTTP');

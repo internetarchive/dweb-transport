@@ -6,6 +6,7 @@ exports.Signature = require("./Signature");
 exports.CommonList = require("./CommonList");
 exports.AccessControlList = require("./AccessControlList");
 exports.KeyChain = require('./KeyChain');
+exports.TransportIPFS = require('./TransportIPFS');
 //* Later libraries //TODO-REL4 comment out before REL4
 exports.StructuredBlock = require('./StructuredBlock');
 exports.MutableBlock = require("./MutableBlock");

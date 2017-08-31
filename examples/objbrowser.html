@@ -53,9 +53,9 @@
 
 <script type="text/javascript">
     let verbose = false;
-    let transportclass = TransportIPFS;
+    let transportclass = Dweb.TransportIPFS;
     //let transportclass = TransportHTTP    // Uncomment this to choose HTTP, but note p_setup below needs fixing
-    transportclass.p_setup({iiif: {store: "indexeddb"}}, verbose, {})
+    transportclass.p_setup(verbose)
         .then((t) => {
             if (verbose) console.log("setup returned and transport set - including annotationList");
             Dweb.transport = t;

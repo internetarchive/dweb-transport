@@ -208,7 +208,7 @@
         console.log("Loaded with url=", url, "but ignored in this example");
 
         let verbose = false;
-        let transportclass = TransportIPFS;
+        let transportclass = Dweb.TransportIPFS;
         setstatus("IPFS Starting");
         //let transportclass = TransportHTTP    // Uncomment this to choose HTTP
         transportclass.p_setup(verbose)

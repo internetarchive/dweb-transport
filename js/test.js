@@ -1,5 +1,5 @@
-const TransportIPFS = require('./TransportIPFS');
-TransportIPFS.IpfsIiifDb = require('ipfs-iiif-db');  //https://github.com/pgte/ipfs-iiif-db
+//const TransportIPFS = require('./TransportIPFS'); //TODO-DELETE THIS MOVED TO Dweb below
+//Dweb.TransportIPFS.IpfsIiifDb = require('ipfs-iiif-db');  //https://github.com/pgte/ipfs-iiif-db
 const TransportHTTP = require('./TransportHTTP');
 const Dweb = require('./Dweb');
 
@@ -13,7 +13,7 @@ const Dweb = require('./Dweb');
 function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { resolve(val); },ms)})}
 
 //Comment out one of these next two lines
-let transportclass = TransportIPFS;
+let transportclass = Dweb.TransportIPFS;
 //let transportclass = TransportHTTP
 
 // Fake a browser like environment for some tests
