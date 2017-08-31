@@ -30,7 +30,11 @@ let acl;
     // Note that this test setup is being mirror in test_ipfs.html
     // In general it should be possible to comment out failing tests EXCEPT where they provide a value to the next */
 
-    transportclass.p_setup(verbose, {iiif: {store: "leveldb"}}) // Note browser requires indexeddb
+    transportclass.p_setup(verbose, {
+        iiif: {store: "leveldb"}, // Note browser requires indexeddb
+        yarray: {db: {name: "leveldb", dir: "../dbtestjs", cleanStart: true}},  // Cleanstart clears db
+        listmethod: "yarrays"
+    }) // Note browser requires indexeddb
     .then((t) => { if (verbose) console.log("setup returned and transport set - including annoationList"); })
     .then(() => transportclass.test(Dweb.transport(), verbose))
     .then(() => Dweb.Block.test(verbose))

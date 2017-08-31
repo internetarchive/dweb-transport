@@ -28,11 +28,13 @@ const CID = require('cids');
 // Leave IpfsIiiifDb commented out as there is (or at least "was") a bug where browserify crashes if included directly - include seperately in the app.
 //const IpfsIiifDb = require('ipfs-iiif-db');  //https://github.com/pgte/ipfs-iiif-db
 // The following only required for Y version
-const Y = require('yjs')
-require('y-memory')(Y)
-require('y-array')(Y)
-require('y-text')(Y)
-require('y-ipfs-connector')(Y)
+const Y = require('yjs');
+require('y-memory')(Y);
+require('y-array')(Y);
+require('y-text')(Y);
+require('y-ipfs-connector')(Y);
+require('y-indexeddb')(Y);
+//require('y-leveldb')(Y); - can't be there for browser, node seems to find it ok without this, though not sure why..
 const Url = require('url');
 
 
@@ -71,7 +73,6 @@ let defaultipfsoptions = {
 let defaultyarrayoptions = {    // See how IIIF uses them in bootstrap.js in ipfs-iiif-db repo
     db: {
         name: 'indexeddb',   // leveldb in node
-        dir: path.join(__dirname, '..', db)
     },
     connector: {
         name: 'ipfs',

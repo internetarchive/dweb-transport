@@ -493,8 +493,10 @@ class CommonList extends SmartDict {
         this.transport().listmonitor(this._publicurl, (obj) => {
             if (verbose) console.log("CL.listmonitor",this._publicurl,"Added",obj);
             let sig = new Dweb.Signature(obj, verbose);
-            this._list.push(sig);
-            callback(sig);
+            if (!this._list.some((othersig) => othersig.signature === sig.signature )) {    // Check not duplicate (esp of locally pushed one
+                this._list.push(sig);
+                callback(sig);
+            }
         })
     }
     //TODO add many of the methods of Array to CommonList see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array
@@ -1998,11 +2000,13 @@ const CID = require('cids');
 // Leave IpfsIiiifDb commented out as there is (or at least "was") a bug where browserify crashes if included directly - include seperately in the app.
 //const IpfsIiifDb = require('ipfs-iiif-db');  //https://github.com/pgte/ipfs-iiif-db
 // The following only required for Y version
-const Y = require('yjs')
-require('y-memory')(Y)
-require('y-array')(Y)
-require('y-text')(Y)
-require('y-ipfs-connector')(Y)
+const Y = require('yjs');
+require('y-memory')(Y);
+require('y-array')(Y);
+require('y-text')(Y);
+require('y-ipfs-connector')(Y);
+require('y-indexeddb')(Y);
+//require('y-leveldb')(Y); - can't be there for browser, node seems to find it ok without this, though not sure why..
 const Url = require('url');
 
 
@@ -2038,9 +2042,9 @@ let defaultipfsoptions = {
     }
 };
 
-let defaultyarrayoptions = {
+let defaultyarrayoptions = {    // See how IIIF uses them in bootstrap.js in ipfs-iiif-db repo
     db: {
-        name: 'memory'
+        name: 'indexeddb',   // leveldb in node
     },
     connector: {
         name: 'ipfs',
@@ -2060,6 +2064,14 @@ let defaultiiifoptions = {
         partition: "dweb20170828" //TODO-IIIF try making parition a variable and connecting to multiple lists.
         //ipfs: ..., //Will have ipfsoptions stored during startup
 };
+
+let defaultoptions = {
+    iiif:   defaultiiifoptions,
+    yarray: defaultyarrayoptions,
+    ipfs:   defaultipfsoptions,
+    listmethod: "yarrays"
+};
+
 
 const annotationlistexample = { //TODO-IPFS update this to better example, not required for Y, only IIIF
     "@id": "foobar",    // Only required field is @id
@@ -2096,6 +2108,7 @@ class TransportIPFS extends Transport {
             get: promisify(this.ipfs.block.get)
         }}}
     }
+
     // This starts up IPFS under IIIF
     p_iiifstart(verbose) { //TODO-REL4-API
 
@@ -2127,12 +2140,14 @@ class TransportIPFS extends Transport {
         })
     }
 
-    p_yarraystart(verbose) { //TODO-REL4-API
+    p_ipfsstart(verbose) { //TODO-REL4-API
+        /*
+        Just start IPFS - not Y or IIIF (note used with "yarrays" and will be used for non-IPFS list management)
 
-        let yarrayoptions = this.options.yarray;
+         */
         let self = this;
         return new Promise((resolve, reject) => {
-            this.ipfs = new IPFS(this.options.ipfs)
+            this.ipfs = new IPFS(this.options.ipfs);
             this.ipfs.on('ready', () => {
                 this._makepromises()
                 resolve();
@@ -2141,6 +2156,16 @@ class TransportIPFS extends Transport {
         })
         .then(() => self.ipfs.version())
         .then((version) => console.log('IPFS READY',version))
+        .catch((err) => {
+            console.log("Error caught in p_ipfsstart",err);
+            throw(err);
+        })
+    }
+
+    p_yarraystart(verbose) { //TODO-REL4-API
+        let yarrayoptions = this.options.yarray;
+        let self = this;
+        return p_ipfsstart(verbose)
         .then(() => {
             yarrayoptions.connector.ipfs = this.ipfs; // Note that Y needs the IPFS instance, while IIIF needs the IPFS options.
             return Y(yarrayoptions)
@@ -2156,6 +2181,19 @@ class TransportIPFS extends Transport {
         //Lots of issues with "init" not knowing state before it//  this.ipfs.init({emptyRepo: true, bits: 2048})     //.then((unused) => ipfs.init({emptyRepo: true, bits: 2048}))
     }
 
+    p_yarraysstart(verbose) { //TODO-REL4-API
+        let self = this;
+        return this.p_ipfsstart(verbose)
+            .then(() => {
+                this.yarrays = {};
+            })
+            .catch((err) => {
+                console.log("Error caught in p_yarraystart",err);
+                throw(err);
+            })
+        //Lots of issues with "init" not knowing state before it//  this.ipfs.init({emptyRepo: true, bits: 2048})     //.then((unused) => ipfs.init({emptyRepo: true, bits: 2048}))
+    }
+
 
     static p_setup(verbose, options) {
         /*
@@ -2168,24 +2206,18 @@ class TransportIPFS extends Transport {
         :param options: Data structure stored on the .options field of the instance returned.
         :resolve Transport: Instance of subclass of Transport
          */
-        let combinedoptions = Transport.mergeoptions(
-            { iiif: defaultiiifoptions, yarray: defaultyarrayoptions, ipfs: defaultipfsoptions },
-            options);
+        let combinedoptions = Transport.mergeoptions(defaultoptions, options);
         console.log("IPFS options", JSON.stringify(combinedoptions));
         let t = new TransportIPFS(verbose, combinedoptions);   // Note doesnt start IPFS or IIIF or Y
         Dweb.transports.ipfs = t;
         Dweb.transportpriority.push(t);    // Sets to default transport if nothing else set otherwise on a list
         //Switch the comments on the next two lines to switch back and forth between IIIF or Y for testing
-        //TODO-REL4 move the IIIF/Y choice into options
         //TODO-REL5 try multiple Y-lists
-        //TODO-REL5 move to multi-transport
-        //return t.p_iiifstart(verbose)
-        return t.p_yarraystart(verbose)
-            .then(() => t)
-            .catch((err) => {
-                console.log("Uncaught error in TransportIPFS.setup", err);
-                throw(err);
-            })
+        return  (   (t.options.listmethod === "iiif")    ? t.p_iiifstart(verbose)
+                :   (t.options.listmethod === "yarray")  ? t.p_yarraystart(verbose)
+                :   (t.options.listmethod === "yarrays") ? t.p_yarraysstart(verbose)
+                :   undefined   )
+            .then(() => t);
     }
 
     supports(url) { //TODO-REL4-API
@@ -2257,7 +2289,42 @@ class TransportIPFS extends Transport {
             })
     }
 
-    p_rawlist(url, verbose) { //TODO-IPFS-MULTILIST move initialization of annotation list here
+    p__yarray(url, verbose) {
+        /*
+        Utility function to get Yarray for this URL and open if not already
+
+        url:        URL string to find list of
+        resolves:   Y
+        */
+        if (this.yarrays[url]) {
+            if (verbose) console.log("Found Y for",url);
+            return new Promise((resolve, reject) => resolve(this.yarrays[url]));
+        } else {
+            if (verbose) console.log("Creating Y for",url);
+            let options = Transport.mergeoptions(this.options.yarray, {connector: { room: url}}) // Copies options
+            options.connector.ipfs = this.ipfs;
+            return Y(options)
+                .then((y) => this.yarrays[url] = y);
+        }
+    }
+
+    p_rawlist(url, verbose) { //TODO-IPFS-MULTILIST merge with older p_rawlist when works.
+        console.assert(this.options.listmethod === "yarrays");
+        verbose = true; // TODO-IPFS-MULTILIST delete this line
+        return this.p__yarray(url, verbose)
+            .then((y) => y.share.array.toArray().filter((obj) => (obj.signedby === url)))
+            .then((res) => {
+                if (verbose) console.log("p_rawlist found", ...Dweb.utils.consolearr(res));
+                return res;
+            })
+            .then((res) => res)
+            .catch((err) => {
+                console.log("Uncaught error in TransportIPFS.p_rawlist", err);
+                thow(err);
+            })
+    }
+
+    p_rawlistXXX(url, verbose) { //TODO-IPFS-MULTILIST move initialization of annotation list here
         /*
         Fetch all the objects in a list, these are identified by the url of the public key used for signing.
         (Note this is the 'signedby' parameter of the p_rawadd call, not the 'url' parameter
@@ -2270,9 +2337,13 @@ class TransportIPFS extends Transport {
         :resolve array: An array of objects as stored on the list.
          */
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
+        //The listmethods are handled slightly differently as iiif & yarray is sync while the other is potentially async as may have to connect first
+
         return new Promise((resolve, reject) => {  //XXXREJECT
             try {
-                let res = (this.iiif ? this.annotationList.getResources() : this.yarray.share.array.toArray()) // Support IIIF or Y for now
+                let res = (
+                      (this.options.listmethod === "iiif")      ? this.annotationList.getResources()    // IIIF
+                    : (this.options.listmethod === "yarray")    ? this.yarray.share.array.toArray() : undefined)    // YARRAY (singular)
                     .filter((obj) => (obj.signedby === url));
                 if (verbose) console.log("p_rawlist found", ...Dweb.utils.consolearr(res));
                 resolve(res);
@@ -2282,7 +2353,21 @@ class TransportIPFS extends Transport {
             }
         })
     }
-    listmonitor(url, callback, verbose) {
+
+    listmonitor(url, callback, verbose) {   //TODO-MULTILIST merge into below when works
+        console.assert(this.options.listmethod === "yarrays");
+        verbose = true; // TODO-IPFS-MULTILIST delete this line
+        let y = this.yarrays[url];
+        console.assert(y,"Should always exist before calling listmonitor - async call p__yarray(url) to create");
+        y.share.array.observe((event) => {
+            if (event.type === 'insert') { // Currently ignoring deletions.
+                if (verbose) console.log('resources inserted', event.values);
+                event.values.filter((obj) => obj.signedby === url).map(callback)
+            }
+        })
+    }
+
+    XXXlistmonitor(url, callback, verbose) {
         /*
         Setup a callback called whenever an item is added to a list, typically it would be called immediately after a p_rawlist to get any more items not returned by p_rawlist.
 
@@ -2292,7 +2377,7 @@ class TransportIPFS extends Transport {
         :param verbose:     boolean - True for debugging output
          */
         //TODO-IPFS-MULTILIST will want to make more efficient.
-        if (this.iiif) {
+        if ( this.options.listmethod === "iiif") {
             this.annotationList.on('resource inserted', (event) => {
                 let obj = event.value;
                 if (verbose) console.log('resource inserted', obj);
@@ -2301,7 +2386,6 @@ class TransportIPFS extends Transport {
         } else {
             this.yarray.share.array.observe((event) => {
                 if (event.type === 'insert') { // Currently ignoring deletions.
-                    //console.log("XXX@273", event);
                     if (verbose) console.log('resources inserted', event.values);
                     event.values.filter((obj) => obj.signedby === url).map(callback)
                 }
@@ -2336,18 +2420,25 @@ class TransportIPFS extends Transport {
         return this.promisified.ipfs.block.put(buf).then((block) => TransportIPFS.cid2url(block.cid));
     }
 
-    rawadd(url, date, signature, signedby, verbose) {
+    p_rawadd(url, date, signature, signedby, verbose) { //TODO-MULTILIST - merge with XXXrawadd and XXXp_rawadd
+        console.assert(url && signature && signedby, "p_rawadd args",url,signature,signedby);
+        if (verbose) console.log("p_rawadd", url, date, signature, signedby);
+        let value = {url: url, date: date, signature: signature, signedby: signedby};
+        return this.p__yarray(signedby, verbose)
+            .then((y) => y.share.array.push([value]));
+    }
+    XXXrawadd(url, date, signature, signedby, verbose) {
         console.assert(url && signature && signedby, "p_rawadd args",url,signature,signedby);
         if (verbose) console.log("p_rawadd", url, date, signature, signedby);
         let value = {"url": url, "date": date, "signature": signature, "signedby": signedby};
-        if (this.iiif) {
+        if ( this.options.listmethod === "iiif") {
             value["@id"] = signature;
             this.annotationList.pushResource(value);
         } else {
             this.yarray.share.array.push([value]);
         }
     }
-    p_rawadd(url, date, signature, signedby, verbose) {
+    XXXp_rawadd(url, date, signature, signedby, verbose) {
         /*
         Store a new list item, it should be stored so that it can be retrieved either by "signedby" (using p_rawlist) or
         by "url" (with p_rawreverse). The underlying transport does not need to guarrantee the signature,
@@ -2374,6 +2465,7 @@ class TransportIPFS extends Transport {
     }
 
     static test(transport, verbose) {
+        verbose = true; //TODO-MULTILIST delete this
         if (verbose) {console.log("TransportIPFS.test")}
         return new Promise((resolve, reject) => {
             try {
@@ -2433,7 +2525,7 @@ class TransportIPFS extends Transport {
 exports = module.exports = TransportIPFS;
 
 }).call(this,require("buffer").Buffer)
-},{"./Dweb":4,"./Transport":12,"buffer":129,"cids":130,"crypto":142,"ipfs":339,"multihashes":563,"promisify-es6":612,"url":760,"y-array":779,"y-ipfs-connector":782,"y-memory":783,"y-text":785,"yjs":793}],14:[function(require,module,exports){
+},{"./Dweb":4,"./Transport":12,"buffer":129,"cids":130,"crypto":142,"ipfs":339,"multihashes":563,"promisify-es6":612,"url":760,"y-array":779,"y-indexeddb":780,"y-ipfs-connector":783,"y-memory":784,"y-text":786,"yjs":794}],14:[function(require,module,exports){
 // ######### Parallel development to CommonBlock.py ########
 const Dweb = require("./Dweb");
 
@@ -32531,7 +32623,7 @@ Polling.prototype.uri = function () {
   return schema + '://' + (ipv6 ? '[' + this.hostname + ']' : this.hostname) + port + this.path + query;
 };
 
-},{"../transport":195,"component-inherit":134,"debug":152,"engine.io-parser":202,"parseqs":596,"xmlhttprequest-ssl":201,"yeast":786}],200:[function(require,module,exports){
+},{"../transport":195,"component-inherit":134,"debug":152,"engine.io-parser":202,"parseqs":596,"xmlhttprequest-ssl":201,"yeast":787}],200:[function(require,module,exports){
 (function (global){
 /**
  * Module dependencies.
@@ -32821,7 +32913,7 @@ WS.prototype.check = function () {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../transport":195,"component-inherit":134,"debug":152,"engine.io-parser":202,"parseqs":596,"ws":97,"yeast":786}],201:[function(require,module,exports){
+},{"../transport":195,"component-inherit":134,"debug":152,"engine.io-parser":202,"parseqs":596,"ws":97,"yeast":787}],201:[function(require,module,exports){
 (function (global){
 // browser shim for xmlhttprequest module
 
@@ -124003,18 +124095,379 @@ if (typeof Y !== 'undefined') {
 }
 
 },{}],780:[function(require,module,exports){
+/* global Y, IDBKeyRange, indexedDB, localStorage, IDBRequest, IDBOpenDBRequest, IDBCursor, IDBCursorWithValue, addEventListener */
+'use strict'
+// Thx to @jed for this script https://gist.github.com/jed/982883
+function generateGuid(a){return a?(a^Math.random()*16>>a/4).toString(16):([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,generateGuid)} // eslint-disable-line
+
+function extend (Y) {
+  Y.requestModules(['memory']).then(function () {
+    class Store {
+      constructor (transaction, name) {
+        this.store = transaction.objectStore(name)
+      }
+      * find (id) {
+        return yield this.store.get(id)
+      }
+      * put (v) {
+        yield this.store.put(v)
+      }
+      * delete (id) {
+        yield this.store.delete(id)
+      }
+      * findWithLowerBound (start) {
+        return yield this.store.openCursor(IDBKeyRange.lowerBound(start))
+      }
+      * findWithUpperBound (end) {
+        return yield this.store.openCursor(IDBKeyRange.upperBound(end), 'prev')
+      }
+      * findNext (id) {
+        return yield* this.findWithLowerBound([id[0], id[1] + 1])
+      }
+      * findPrev (id) {
+        return yield* this.findWithUpperBound([id[0], id[1] - 1])
+      }
+      * iterate (t, start, end, gen) {
+        var range = null
+        if (start != null && end != null) {
+          range = IDBKeyRange.bound(start, end)
+        } else if (start != null) {
+          range = IDBKeyRange.lowerBound(start)
+        } else if (end != null) {
+          range = IDBKeyRange.upperBound(end)
+        }
+        var cursorResult
+        if (range != null) {
+          cursorResult = this.store.openCursor(range)
+        } else {
+          cursorResult = this.store.openCursor()
+        }
+        while ((yield cursorResult) != null) {
+          yield* gen.call(t, cursorResult.result.value)
+          cursorResult.result.continue()
+        }
+      }
+      * flush () {}
+    }
+
+    function createStoreClone (Store) {
+      class Clone extends Store {
+        constructor () {
+          super(...arguments)
+          this.buffer = []
+          this._copyTo = null
+        }
+        // copy to this store
+        // it may be neccessary to reset this every time you create a transaction
+        copyTo (store) {
+          this._copyTo = store
+          return this
+        }
+        * put (v, dontCopy) {
+          if (!dontCopy) {
+            this.buffer.push(this._copyTo.put(v))
+          }
+          yield* super.put(v)
+        }
+        * delete (id) {
+          this.buffer.push(this._copyTo.delete(id))
+          yield* super.delete(id)
+        }
+        * flush () {
+          yield* super.flush()
+          for (var i = 0; i < this.buffer.length; i++) {
+            yield* this.buffer[i]
+          }
+          yield* this._copyTo.flush()
+        }
+      }
+      return Clone
+    }
+    Y.utils.createStoreClone = createStoreClone
+
+    var BufferedStore = Y.utils.createSmallLookupBuffer(Store)
+    // var ClonedStore = Y.utils.createStoreClone(Y.utils.RBTree)
+
+    class Transaction extends Y.Transaction {
+      constructor (store) {
+        super(store)
+        var transaction = store.db.transaction(['OperationStore', 'StateStore', 'DeleteStore'], 'readwrite')
+        this.store = store
+        this.ss = new BufferedStore(transaction, 'StateStore')
+        this.os = new BufferedStore(transaction, 'OperationStore')
+        // this._ds = new BufferedStore(transaction, 'DeleteStore')
+        // this.ds = store.dsClone.copyTo(this._ds)
+        this.ds = new BufferedStore(transaction, 'DeleteStore')
+      }
+    }
+    class OperationStore extends Y.AbstractDatabase {
+      constructor (y, options) {
+        /**
+         * There will be no garbage collection when using this connector!
+         * There may be several instances that communicate via localstorage,
+         * and we don't want too many instances to garbage collect.
+         * Currently, operationAdded (see AbstractDatabase) does not communicate updates to the garbage collector.
+         *
+         * While this could work, it only decreases performance.
+         * Operations are automatically garbage collected when the client syncs (the server still garbage collects, if there is any).
+         * Another advantage is that now the indexeddb adapter works with y-webrtc (since no gc is in place).
+         *
+         */
+        if (options.gc == null) {
+          options.gc = false
+        }
+        super(y, options)
+        // dsClone is persistent over transactions!
+        // _ds is not
+        // this.dsClone = new ClonedStore()
+        if (options == null) {
+          options = {}
+        }
+        this.options = options
+        if (options.namespace == null) {
+          if (y.options.connector.room == null) {
+            throw new Error('IndexedDB: expect a string (options.namespace)! (you can also skip this step if your connector has a room property)')
+          } else {
+            options.namespace = y.options.connector.room
+          }
+        }
+        if (options.idbVersion != null) {
+          this.idbVersion = options.idbVersion
+        } else {
+          this.idbVersion = 5
+        }
+        var store = this
+        // initialize database!
+        this.requestTransaction(function * () {
+          store.db = yield indexedDB.open(options.namespace, store.idbVersion)
+        })
+        if (options.cleanStart) {
+          if (typeof localStorage !== 'undefined') {
+            delete localStorage[JSON.stringify(['Yjs_indexeddb', options.namespace])]
+          }
+          this.requestTransaction(function * () {
+            yield this.os.store.clear()
+            yield this.ds.store.clear() // formerly only _ds
+            yield this.ss.store.clear()
+          })
+        }
+        this.whenUserIdSet(function (userid) {
+          if (typeof localStorage !== 'undefined' && localStorage[JSON.stringify(['Yjs_indexeddb', options.namespace])] == null) {
+            localStorage[JSON.stringify(['Yjs_indexeddb', options.namespace])] = JSON.stringify([userid, 0])
+          }
+        })
+        this.requestTransaction(function * () {
+          // this should be executed after the previous two defined transactions
+          // after we computed the upgrade event (see `yield indexedDB.open(..)`), we can check if userid is still stored on localstorage
+          var uid = null
+          if (typeof localStorage !== 'undefined') {
+            uid = localStorage[JSON.stringify(['Yjs_indexeddb', options.namespace])]
+          }
+          if (uid != null) {
+            store.setUserId(uid)
+            if (typeof localStorage !== 'undefined') {
+              var nextuid = JSON.parse(uid)
+              nextuid[1] = nextuid[1] + 1
+              localStorage[JSON.stringify(['Yjs_indexeddb', options.namespace])] = JSON.stringify(nextuid)
+            }
+          } else {
+            // wait for a 200ms before setting a random user id
+            setTimeout(function () {
+              if (store.userId == null) {
+                // the user is probably offline, so that the connector can't get a user id
+                store.setUserId(generateGuid()) // TODO: maybe it is best to always use a generated uid
+              }
+            }, 200)
+          }
+          // copy from persistent Store to non persistent StoreClone. (there could already be content in Store)
+          /*
+          yield* this._ds.iterate(this, null, null, function * (o) {
+            yield* this.ds.put(o, true)
+          })
+          */
+        })
+        var operationsToAdd = []
+        this.communicationObserver = function (op) {
+          operationsToAdd.push(op)
+          if (operationsToAdd.length === 1) {
+            store.requestTransaction(function * () {
+              var _toAdd = []
+              /*
+              There is a special case (see issue y-js/y-indexeddb#2) which we need to handle:
+              Assume a user creates a new type (lets say an Array) and then inserts something in it. Assume both operations are in operationsToAdd.
+              Since a type is initialized first, it already knows about the insertion, and we no longer need to call .operationAdded.
+              If we don't handle this case the type inserts the same operation twice.
+              => So wee need to filter out the operations whose parent is also inclduded in operationsToAdd!
+              */
+              for (var i = 0; i < operationsToAdd.length; i++) {
+                var op = operationsToAdd[i]
+                if (op.parent == null || operationsToAdd.every(function (p) {
+                  return !Y.utils.compareIds(p.id, op.parent)
+                })) {
+                  _toAdd.push(op)
+                }
+              }
+              operationsToAdd = []
+
+              for (i = 0; i < _toAdd.length; i++) {
+                yield* this.store.operationAdded(this, _toAdd[i], true)
+              }
+            })
+          }
+        }
+        Y.utils.localCommunication.addObserver(this.options.namespace, this.communicationObserver)
+      }
+      * operationAdded (transaction, op, noAdd) {
+        yield* super.operationAdded(transaction, op)
+        if (!noAdd) {
+          Y.utils.localCommunication.broadcast(this.options.namespace, op)
+        }
+      }
+      transact (makeGen) {
+        var transaction = this.db != null ? new Transaction(this) : null
+        var store = this
+
+        var gen = makeGen.call(transaction)
+        handleTransactions(gen.next())
+
+        function handleTransactions (result) {
+          var request = result.value
+          if (result.done) {
+            makeGen = store.getNextRequest()
+            if (makeGen != null) {
+              if (transaction == null && store.db != null) {
+                transaction = new Transaction(store)
+              }
+              gen = makeGen.call(transaction)
+              handleTransactions(gen.next())
+            } // else no transaction in progress!
+            return
+          }
+          // console.log('new request', request.source != null ? request.source.name : null)
+          if (request.constructor === IDBRequest) {
+            request.onsuccess = function () {
+              var res = request.result
+              if (res != null && res.constructor === IDBCursorWithValue) {
+                res = res.value
+              }
+              handleTransactions(gen.next(res))
+            }
+            request.onerror = function (err) {
+              gen.throw(err)
+            }
+          } else if (request.constructor === IDBCursor) {
+            request.onsuccess = function () {
+              handleTransactions(gen.next(request.result != null ? request.result.value : null))
+            }
+            request.onerror = function (err) {
+              gen.throw(err)
+            }
+          } else if (request.constructor === IDBOpenDBRequest) {
+            request.onsuccess = function (event) {
+              var db = event.target.result
+              handleTransactions(gen.next(db))
+            }
+            request.onerror = function () {
+              gen.throw("Couldn't open IndexedDB database!")
+            }
+            request.onupgradeneeded = function (event) {
+              var db = event.target.result
+              if (typeof localStorage !== 'undefined') {
+                delete localStorage[JSON.stringify(['Yjs_indexeddb', store.options.namespace])]
+              }
+              if (db.objectStoreNames.contains('OperationStore')) {
+                // delete only if exists (we skip the remaining tests)
+                db.deleteObjectStore('OperationStore')
+                db.deleteObjectStore('DeleteStore')
+                db.deleteObjectStore('StateStore')
+              }
+              db.createObjectStore('OperationStore', {keyPath: 'id'})
+              db.createObjectStore('DeleteStore', {keyPath: 'id'})
+              db.createObjectStore('StateStore', {keyPath: 'id'})
+            }
+          } else {
+            gen.throw('You must not yield this type!')
+          }
+        }
+      }
+      // TODO: implement "free"..
+      * destroy () {
+        this.db.close()
+      }
+      deleteDB () {
+        Y.utils.localCommunication.removeObserver(this.options.namespace, this.communicationObserver)
+        indexedDB.deleteDatabase(this.options.namespace)
+        return Promise.resolve()
+      }
+    }
+    if (Y.utils.localCommunication == null) {
+      // localCommunication uses localStorage to communicate with all tabs / windows
+      // Using pure localStorage does not call the event listener on the tab the event is created on.
+      // Using this implementation the event is also called on the tab the event is created on.
+      Y.utils.localCommunication = {
+        observer: {},
+        addObserver: function (room, f) {
+          var listener = this.observer[room]
+          if (listener == null) {
+            listener = []
+            this.observer[room] = listener
+          }
+          listener.push(f)
+        },
+        removeObserver: function (room, f) {
+          this.observer[room] = this.observer[room].filter(function (g) { return f !== g })
+        },
+        broadcast: function (room, m) {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(JSON.stringify(['__YJS__', room]), JSON.stringify(m))
+          }
+          this.observer[room].map(function (f) {
+            f(m)
+          })
+        }
+      }
+      if (typeof localStorage !== 'undefined') {
+        addEventListener('storage', function (event) {
+          var room
+          try {
+            var parsed = JSON.parse(event.key)
+            if (parsed[0] === '__YJS__') {
+              room = parsed[1]
+            } else {
+              return
+            }
+          } catch (e) { return }
+          var listener = Y.utils.localCommunication.observer[room]
+          if (listener != null) {
+            listener.map(function (f) {
+              f(JSON.parse(event.newValue))
+            })
+          }
+        })
+      }
+    }
+    Y.extend('indexeddb', OperationStore)
+  })
+}
+
+module.exports = extend
+if (typeof Y !== 'undefined') {
+  extend(Y)
+}
+
+},{}],781:[function(require,module,exports){
 'use strict'
 
 module.exports = (data) => JSON.parse(data.toString())
 
-},{}],781:[function(require,module,exports){
+},{}],782:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
 module.exports = (message) => Buffer.from(JSON.stringify(message))
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":129}],782:[function(require,module,exports){
+},{"buffer":129}],783:[function(require,module,exports){
 /* global Y */
 'use strict'
 
@@ -124215,7 +124668,7 @@ function localEncode (m) {
   return JSON.stringify(m)
 }
 
-},{"./decode":780,"./encode":781,"async/queue":66,"async/setImmediate":69,"debug":152,"events":216,"ipfs-pubsub-room":273,"safe-buffer":714}],783:[function(require,module,exports){
+},{"./decode":781,"./encode":782,"async/queue":66,"async/setImmediate":69,"debug":152,"events":216,"ipfs-pubsub-room":273,"safe-buffer":714}],784:[function(require,module,exports){
 /* global Y */
 'use strict'
 
@@ -124289,7 +124742,7 @@ if (typeof Y !== 'undefined') {
   extend(Y)
 }
 
-},{"./RedBlackTree.js":784}],784:[function(require,module,exports){
+},{"./RedBlackTree.js":785}],785:[function(require,module,exports){
 'use strict'
 
 /*
@@ -124794,7 +125247,7 @@ module.exports = function (Y) {
   Y.utils.RBTree = RBTree
 }
 
-},{}],785:[function(require,module,exports){
+},{}],786:[function(require,module,exports){
 /* global Y, Element */
 'use strict'
 
@@ -125374,7 +125827,7 @@ if (typeof Y !== 'undefined') {
   extend(Y)
 }
 
-},{"fast-diff":218}],786:[function(require,module,exports){
+},{"fast-diff":218}],787:[function(require,module,exports){
 'use strict';
 
 var alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_'.split('')
@@ -125444,7 +125897,7 @@ yeast.encode = encode;
 yeast.decode = decode;
 module.exports = yeast;
 
-},{}],787:[function(require,module,exports){
+},{}],788:[function(require,module,exports){
 function canRead (auth) { return auth === 'read' || auth === 'write' }
 function canWrite (auth) { return auth === 'write' }
 
@@ -125931,7 +126384,7 @@ module.exports = function (Y/* :any */) {
   Y.AbstractConnector = AbstractConnector
 }
 
-},{}],788:[function(require,module,exports){
+},{}],789:[function(require,module,exports){
 /* global getRandom, async */
 'use strict'
 
@@ -126111,7 +126564,7 @@ module.exports = function (Y) {
   Y.Test = Test
 }
 
-},{}],789:[function(require,module,exports){
+},{}],790:[function(require,module,exports){
 /* @flow */
 'use strict'
 
@@ -126717,7 +127170,7 @@ module.exports = function (Y /* :any */) {
   Y.AbstractDatabase = AbstractDatabase
 }
 
-},{}],790:[function(require,module,exports){
+},{}],791:[function(require,module,exports){
 /* @flow */
 'use strict'
 
@@ -127133,7 +127586,7 @@ module.exports = function (Y/* :any */) {
   Y.Struct = Struct
 }
 
-},{}],791:[function(require,module,exports){
+},{}],792:[function(require,module,exports){
 /* @flow */
 'use strict'
 
@@ -128233,7 +128686,7 @@ module.exports = function (Y/* :any */) {
   Y.Transaction = TransactionInterface
 }
 
-},{}],792:[function(require,module,exports){
+},{}],793:[function(require,module,exports){
 /* @flow */
 'use strict'
 
@@ -129030,7 +129483,7 @@ module.exports = function (Y /* : any*/) {
   Y.utils.generateGuid = generateGuid
 }
 
-},{}],793:[function(require,module,exports){
+},{}],794:[function(require,module,exports){
 /* @flow */
 'use strict'
 
@@ -129269,4 +129722,4 @@ class YConfig {
   }
 }
 
-},{"./Connector.js":787,"./Connectors/Test.js":788,"./Database.js":789,"./Struct.js":790,"./Transaction.js":791,"./Utils.js":792,"debug":152}]},{},[15]);
+},{"./Connector.js":788,"./Connectors/Test.js":789,"./Database.js":790,"./Struct.js":791,"./Transaction.js":792,"./Utils.js":793,"debug":152}]},{},[15]);

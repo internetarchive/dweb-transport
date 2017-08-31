@@ -5,10 +5,8 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>DWEB CommonList example</title>
     <link rel='stylesheet' href='example_styles.css'>
-    <script src="https://unpkg.com/ipfs-iiif-db/dist/browser.js"></script><!--or browser.min.js-->
-    <!--<script src="https://unpkg.com/ipfs-iiif-db@2.4.0/dist/browser.min.js"></script><!--or browser.min.js-->
-    <!--<script src="cached/browser.min.js"></script><!-- cached version of ipfs/iiif so can test offline-->
-    <!--<script type="text/javascript" src="/file/mb/BLAKE2.iYiNlcLOfxRU-coIq2foYgTN9V1J4DzPV2yTXqHUN2I="></script><!-- Dweb bundled via Dweb-->
+    <!-- IIIF loading, not being done currently -->
+    <!--<script src="https://unpkg.com/ipfs-iiif-db/dist/browser.js"></script><!--or browser.min.js-->
     <script type="text/javascript" src="dweb_transport_ipfs_bundled.js"></script><!-- Dwebbundle via local filesystem when testing without Dweb-->
     <!--<script src='/dweb/tinymce/tinymce.min.js'></script><!-- TinyMCE -->
     <!--<script src='http://cloud.tinymce.com/stable/tinymce.min.js'></script><!-- TinyMCE -->
@@ -39,21 +37,22 @@
         console.log("sendit ---");
         let verbose = false; // Copious output on
         // Get the data from the form
-        dict = form2dict("entryform");
+        let dict = form2dict("entryform");
         // Create a new object and add to the list
         let obj = new Dweb.SmartDict(dict, verbose )
         cl.p_push(obj, verbose)
             .then(() => console.log("Added:",obj))  // Show on the Javascript console
             .then(() => objbrowser(cl, cl._url, null, "ObjBrowser", false))   // Redisplay in objbrowser
+            .then(() => addtoelement("listresults", obj))   // Display locally as listmonitor will not pick up local entries
             .catch((err) => { console.log("ERROR:",err); alert(err.message); });
         return false; // Stop form submission and page reloading reloading
     }
 
 
     function fetchit() {
-        console.log("fetchit ---")
+        console.log("fetchit ---");
         // Get the string from the form, its just one element this time
-        dict = form2dict("fetchform")
+        let dict = form2dict("fetchform");
         // Fetch it, and display
         fetchanddisplay(dict.url);
     }
@@ -61,6 +60,7 @@
     function addtoelement(el, sd) { //TODO-REL4 use replacetext etc from htmlutils
         //Add the element from the list (subclass of SmartDict) to the HTML element
         //This adds a span element to a div, but it could really do anything
+        el = (typeof(el) === "string") ? document.getElementById(el) : el;
         let tx = document.createTextNode(sd.say);
         let sp = document.createElement('span');
         sp.className="said";
@@ -71,30 +71,31 @@
     function fetchanddisplay(url) {
         verbose=true;
         console.log("fetchanddisplay",url);
-        destn = document.getElementById("retrievaldestn");
-        let listdestn = document.getElementById("listresults");
+        let destn = document.getElementById("retrievaldestn");
         try {
             Dweb.SmartDict.p_fetch(url, verbose)   // Throws TransportError immediately if url invalid
                 .then((obj) => cl = obj) // Save it for adding to in sendentry
                 .then(() => {
                     console.log("Fetched=", cl);
                     // Only display the input prompt if its a master list.
-                    if (cl.master) { show("entryrow"); } else { hide("entryrow"); }
+                    if (cl._master) { show("entryrow"); } else { hide("entryrow"); }
                     // Display the name and urls of the list
                     displayobj(destn, cl);
-                    // Fetch the current elements from the list if any
-                    while (listdestn.firstChild) {
-                        listdestn.removeChild(listdestn.firstChild);
-                    } // Clear old text
+                    deletechildren("listresults");
+                    // Clear old text
                 })
+                // Fetch the current elements from the list if any
                 .then(() => cl.p_list_then_elements(verbose))
-                //The elements in the list
                 .then((objs) => { console.log("objs=",JSON.stringify(objs)); return objs;})
-                .then((objs) => objs.map((obj) => addtoelement(listdestn, obj)))
+                //Add the elements to the list
+                .then((objs) => objs.map((obj) => addtoelement("listresults", obj)))
+                // Setup a monitor to get anything new added to the list.
                 .then(() => cl.listmonitor(
-                    (sig) => sig.p_fetchdata(verbose)
-                            .then((obj) => addtoelement(listdestn, obj)),
+                    (sig) => {
+                        sig.p_fetchdata(verbose)
+                            .then((obj) => addtoelement("listresults", obj))},
                     verbose))
+                // Redisplay it in the object browser for debugging
                 .then(() => objbrowser(cl, cl._url, null, "ObjBrowser", verbose))
                 .catch((err) => { console.log("ERROR:",err); alert(err.message); });
         } catch(err) {
@@ -103,19 +104,11 @@
         }
     }
     function displayobj(el, obj) { /* Display an obj, under an element in appropriately named fields */
-        oo = Object.assign({}, obj, { _privateurl: (obj._master ? obj._url : "")})
-        console.log(JSON.stringify(oo))
-        for (let prop in oo ) {
-            let val = oo[prop];
-            let dests = el.querySelectorAll("[name="+ prop + "]");
-            for (i in dests) {
-                dests[i].innerHTML = val;   //TODO-SECURITY replace with setting text
-            }
-        }
+        console.log(JSON.stringify(obj))
+        replacetexts(el, obj, { _privateurl: (obj._master ? obj._url : "")});
         // Now set up links to the urls for sharing
-        let publicurl, privateurl;
-        publicurl = new URL(window.location.href);
-        privateurl = new URL(window.location.href);
+        let publicurl = new URL(window.location.href);
+        let privateurl = new URL(window.location.href);
         publicurl.search=(oo._publicurl ? "url="+oo._publicurl : "");
         document.getElementById("publiclink").href=publicurl.href
         privateurl.search=oo._privateurl ? "url="+oo._privateurl : "";
@@ -169,7 +162,7 @@
         <td style="width:3em;"><b>&gt;</b></td>
         <td>
             <form style="display:inline" name="entryform" onsubmit="sendentry(); return false;">
-                <input class="propval" type="text" name="say"/>
+                <input class="propval" type="text" name="say" size="70" placeholder="Say something witty"/>
                     <input type="submit" value="Send"/>
                 </ul>
             </form>

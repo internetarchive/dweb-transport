@@ -82,7 +82,6 @@
                 .then(() => kc._keys.map((key)=> _kclist_push(key)))    // And add to the HTML
         		.then(() => kc.listmonitor(                             // Note the callback will store on kc as well before calling this function
                     (sig) => {
-                        console.log("XXX@85:",sig.signedby,el_keylistheader.source._publicurl);
                         if (sig.signedby === el_keylistheader.source._publicurl)
                             sig.p_fetchdata(verbose)                   // and will ignore duplicates including an echo of the one we add
                                 .then((obj) => _kclist_push(obj)) },
