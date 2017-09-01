@@ -12,6 +12,18 @@ exports.StructuredBlock = require('./StructuredBlock');
 exports.MutableBlock = require("./MutableBlock");
 //*/
 
+const table2class = { // Each of these needs a constructor that takes data and is ok with no other parameters, (otherwise define a set of these methods as factories)
+    "cl": "CommonList",
+    "sb": "StructuredBlock",
+    "kc": "KeyChain",
+    "kp": "KeyPair",
+    "mb": "MutableBlock",
+    "acl": "AccessControlList",
+    "sd": "SmartDict",
+};
+
+
+
 Url = require("url"); // Doesnt appear to be needed - also gets node interface which looks different
 
 // Javascript library for dweb
@@ -51,7 +63,7 @@ exports.utils.mergeTypedArraysUnsafe = function(a, b) { // Take care of inabilit
     return c;
 };
 
-exports.transport = function(url) {
+exports.transport = function(url) { //TODO-REL4-API
     /*
     Pick between associated transports based on URL
 

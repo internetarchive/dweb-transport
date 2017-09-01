@@ -3,19 +3,6 @@ const Dweb = require("./Dweb");
 
 //TODO-IPFS change to go direct to Dag rather than Block - maybe by making Transport.p_store decide ?
 
-//TODO-SEPERATE - move these to Dweb
-const table2class = { // Each of these needs a constructor that takes data and is ok with no other parameters, (otherwise define a set of these methods as factories)
-    "cl": "CommonList",
-    "sb": "StructuredBlock",
-    "kc": "KeyChain",
-    "kp": "KeyPair",
-    "mb": "MutableBlock",
-    "acl": "AccessControlList",
-    "sd": "SmartDict",
-    //"accesscontrollistentry", AccessControlListEntry - not listed as AccessControlListEntry is not exposed
-};
-
-
 // See CommonBlock.py for Python version
 
 class SmartDict extends Transportable {
@@ -122,10 +109,10 @@ class SmartDict extends Transportable {
             .then((data) => {
                 data = Dweb.transport(url).loads(data);      // Parse JSON //TODO-REL3 maybe function in Transportable
                 let table = data.table;              // Find the class it belongs to
-                cls = Dweb[table2class[table]];         // Gets class name, then looks up in Dweb - avoids dependency
+                cls = Dweb[Dweb.table2class[table]];         // Gets class name, then looks up in Dweb - avoids dependency
                 if (!cls) throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: "+table+" isnt implemented in table2class");
                 //console.log(cls);
-                if (!((table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict))) throw new Dweb.errors.ForbiddenError("Avoiding data driven hacks to other classes - seeing "+table);
+                if (!((Dweb.table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict))) throw new Dweb.errors.ForbiddenError("Avoiding data driven hacks to other classes - seeing "+table);
                 return data;
             })
             .then((data) => cls.p_decrypt(data, verbose))    // decrypt - may return string or obj , note it can be suclassed for different encryption
