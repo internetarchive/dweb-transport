@@ -150,7 +150,7 @@ class TransportIPFS extends Transport {
                 .then((version) => console.log("Version=", version))
                 .then(() => {
                     console.log("IPFS/IIIF node",self.ipfs.isOnline() ? "and online" : "but offline");    //TODO throw error if not online
-                    this.annotationList = this.iiif.annotationList(annotationlistexample);    //TODO-IPFS-MULTILIST move this to the list command - means splitting stuff under it that calls bootstrap
+                    this.annotationList = this.iiif.annotationList(annotationlistexample);    //inefficient ... move this to the list command - means splitting stuff under it that calls bootstrap
                     this.annotationList.on('started', (event) => {
                         console.log("IPFS node after annotation list start",self.ipfs.isOnline() ? "now online" : "but still offline");   //TODO throw error if not online
                         if (verbose) { console.log("annotationList started, list at start = ", ...Dweb.utils.consolearr(this.annotationList.getResources()));}
@@ -338,7 +338,7 @@ class TransportIPFS extends Transport {
             })
     }
 
-    p_rawlist(url, verbose) { //TODO-IPFS-MULTILIST merge with older p_rawlist when works.
+    p_rawlist(url, verbose) {
     /*
     Fetch all the objects in a list, these are identified by the url of the public key used for signing.
     (Note this is the 'signedby' parameter of the p_rawadd call, not the 'url' parameter
@@ -351,7 +351,6 @@ class TransportIPFS extends Transport {
     :resolve array: An array of objects as stored on the list.
      */
         console.assert(this.options.listmethod === "yarrays");
-        verbose = true; // TODO-IPFS-MULTILIST delete this line
         return this.p__yarray(url, verbose)
             .then((y) => y.share.array.toArray().filter((obj) => (obj.signedby === url)))
             .then((res) => {
@@ -366,18 +365,7 @@ class TransportIPFS extends Transport {
     }
 
     /*OBS - not supporting IIIF or YARRAY (singular)
-    p_rawlist(url, verbose) { //TODO-IPFS-MULTILIST move initialization of annotation list here
-        /-*
-        Fetch all the objects in a list, these are identified by the url of the public key used for signing.
-        (Note this is the 'signedby' parameter of the p_rawadd call, not the 'url' parameter
-        Returns a promise that resolves to the list.
-        Each item of the list is a dict: {"url": url, "date": date, "signature": signature, "signedby": signedby}
-        List items may have other data (e.g. reference ids of underlying transport)
-
-        :param string url: String with the url that identifies the list.
-        :param boolean verbose: True for debugging output
-        :resolve array: An array of objects as stored on the list.
-         *-/
+    p_rawlist(url, verbose) {
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
         //The listmethods are handled slightly differently as iiif & yarray is sync while the other is potentially async as may have to connect first
 
@@ -397,7 +385,7 @@ class TransportIPFS extends Transport {
     }
     */
 
-    listmonitor(url, callback, verbose) {   //TODO-MULTILIST merge into below when works
+    listmonitor(url, callback, verbose) {
     /*
     Setup a callback called whenever an item is added to a list, typically it would be called immediately after a p_rawlist to get any more items not returned by p_rawlist.
 
@@ -407,7 +395,6 @@ class TransportIPFS extends Transport {
     :param verbose:     boolean - True for debugging output
      */
         console.assert(this.options.listmethod === "yarrays");
-        verbose = true; // TODO-IPFS-MULTILIST delete this line
         let y = this.yarrays[url];
         console.assert(y,"Should always exist before calling listmonitor - async call p__yarray(url) to create");
         y.share.array.observe((event) => {
@@ -420,15 +407,6 @@ class TransportIPFS extends Transport {
 
     /*OBS - not supporting IIIF or YARRAY(Singular)
     listmonitor(url, callback, verbose) {
-        /-*
-        Setup a callback called whenever an item is added to a list, typically it would be called immediately after a p_rawlist to get any more items not returned by p_rawlist.
-
-        :param url:         string Identifier of list (as used by p_rawlist and "signedby" parameter of p_rawadd
-        :param callback:    function(obj)  Callback for each new item added to the list
-               	obj is same format as p_rawlist or p_rawreverse
-        :param verbose:     boolean - True for debugging output
-         *-/
-        //TODO-IPFS-MULTILIST will want to make more efficient.
         if ( this.options.listmethod === "iiif") {
             this.annotationList.on('resource inserted', (event) => {
                 let obj = event.value;
@@ -473,7 +451,19 @@ class TransportIPFS extends Transport {
         return this.promisified.ipfs.block.put(buf).then((block) => TransportIPFS.cid2url(block.cid));
     }
 
-    p_rawadd(url, date, signature, signedby, verbose) { //TODO-MULTILIST - merge with XXXrawadd and XXXp_rawadd
+    p_rawadd(url, date, signature, signedby, verbose) {
+        /*
+        Store a new list item, it should be stored so that it can be retrieved either by "signedby" (using p_rawlist) or
+        by "url" (with p_rawreverse). The underlying transport does not need to guarrantee the signature,
+        an invalid item on a list should be rejected on higher layers.
+
+        :param string url: String identifying an object being added to the list.
+        :param string date: Date (as returned by new Data.now() )
+        :param string signature: Signature of url+date
+        :param string signedby: url of the public key used for the signature.
+        :param boolean verbose: True for debugging output
+        :resolve undefined:
+        */
         console.assert(url && signature && signedby, "p_rawadd args",url,signature,signedby);
         if (verbose) console.log("p_rawadd", url, date, signature, signedby);
         let value = {url: url, date: date, signature: signature, signedby: signedby};
@@ -494,18 +484,6 @@ class TransportIPFS extends Transport {
     }
 
     p_rawadd(url, date, signature, signedby, verbose) {
-        /-*
-        Store a new list item, it should be stored so that it can be retrieved either by "signedby" (using p_rawlist) or
-        by "url" (with p_rawreverse). The underlying transport does not need to guarrantee the signature,
-        an invalid item on a list should be rejected on higher layers.
-
-        :param string url: String identifying an object being added to the list.
-        :param string date: Date (as returned by new Data.now() )
-        :param string signature: Signature of url+date
-        :param string signedby: url of the public key used for the signature.
-        :param boolean verbose: True for debugging output
-        :resolve undefined:
-         *-/
         return new Promise((resolve, reject)=> { try {
             this.rawadd(url, date, signature, signedby, verbose);
             resolve(undefined);
@@ -520,7 +498,6 @@ class TransportIPFS extends Transport {
     }
 
     static test(transport, verbose) {
-        verbose = true; //TODO-MULTILIST delete this
         if (verbose) {console.log("TransportIPFS.test")}
         return new Promise((resolve, reject) => {
             try {

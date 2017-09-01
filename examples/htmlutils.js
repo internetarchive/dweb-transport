@@ -53,7 +53,6 @@ function replacetext(el, text) {
     /* Replace the text of el with text, removing all other children
     :param el:  An HTML element, or a string with id of an HTML element
     */
-
     el = (typeof(el) === "string") ? document.getElementById(el) : el;
     deletechildren(el);
     return el.appendChild(document.createTextNode(text))
@@ -80,6 +79,33 @@ function replacetexts(el, ...dict) { //TODO-REL4 put into example_list and examp
     }
     return el;
 }
+
+function addhtml(el, htmleach, dict) { //TODO-REL4 if works in example_list replace code in example_keys that constructs html
+    /*
+    Standardised tool to add fields to html,  add that as the last child (or children) of el
+    The slightly convulated way of doing this is because of the limited set of functions available
+    Note this has to be done with care, as "dict" may be user supplied and contain HTML or other malicious content
+
+    el: An HTML element, or a string with the id of one.
+    html: html to add under outerelement
+    dict: Dictionary with parameters to replace in html, it looks for nodes with name="xxx" and replaces text inside it with dict[xxx]
+    */
+    el = (typeof(el) === "string") ? document.getElementById(el) : el;
+    let el_li = document.createElement('div');   // usually a 'li' but could be a 'div'
+    if (htmleach) {
+        el_li.innerHTML = htmleach;                           //Note safe since html from above, not from net
+    }
+    replacetexts(el_li, dict);                          // Safe since only replace text
+    kids = Array.from(el_li.children);                  // Array.from required because children is not an array.
+    kids[0].source = el_li.source;                      // source will be at wrong level.
+    for (let c in kids) {
+        console.log(kids[c]);
+        el.appendChild(kids[c])
+    };
+    return kids;
+}
+
+
 
 function show(el, displayvalue) {
     displayvalue = displayvalue || "";

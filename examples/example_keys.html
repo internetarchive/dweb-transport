@@ -18,23 +18,12 @@
 
     </script>
     <script>
-        function add_li_from_html_and_dict(el_ul, htmleach, dict, options) {
-            let el_li = document.createElement('li');
-            el_li.innerHTML=htmleach; //Note safe since html from above, not from net
-            replacetexts(el_li, dict);
-            if (options) {
-                if (options.class) el_li.classList.add(options.class);
-                if (options.onclick) el_li.setAttribute("onclick", options.onclick);
-            }
-            if (typeof el_ul === 'string') { el_ul = document.getElementById(el_ul)}
-            el_ul.appendChild(el_li);
-        }
         function p_login_and_add_to_keychain(dict) {
             // Add to HTML list of logins
             return Dweb.KeyChain.p_new({ name: dict.name}, {passphrase: dict.name + "/" + dict.passphrase}, verbose)
                 .then((kc) => {
-                    let htmleach = "<span class='kclist_name' name='name'></span>";
-                    let el = add_li_from_html_and_dict("kclist_ul", htmleach, kc, {class: 'kclist_li', onclick: 'p_kc_click(this);'} );
+                    let htmleach = "<li class='kclist_li' onclick='p_kc_click(this);'><span class='kclist_name' name='name'></span></li>";
+                    let el = addhtml("kclist_ul", htmleach, kc );
                     return kc;
                 })
         }
@@ -69,8 +58,8 @@
             objtype = obj.table; // acl = AccessControlList, kp = KeyPair
             objsym = objsyms[objtype];
             objclick = {acl: 'p_acl_click(this);', kp: 'p_key_click(this);'}[objtype];
-            let htmleach = '<img class="keylist_icon" src="'+objsym+'"/><span class="keylist_name" name="name"></span>';
-            el = add_li_from_html_and_dict("keylist_ul", htmleach, obj, {class: 'keylist_li', onclick: objclick } );
+            let htmleach = '<li class="keylist_li" onclick="'+objclick+'"><img class="keylist_icon" src="'+objsym+'"/><span class="keylist_name" name="name"></span></li>';
+            el = addhtml("keylist_ul", htmleach, obj);
             return el;
         }
         function p_kc_click(el) {

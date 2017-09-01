@@ -59,13 +59,8 @@
 
     function addtoelement(el, sd) { //TODO-REL4 use replacetext etc from htmlutils
         //Add the element from the list (subclass of SmartDict) to the HTML element
-        //This adds a span element to a div, but it could really do anything
-        el = (typeof(el) === "string") ? document.getElementById(el) : el;
-        let tx = document.createTextNode(sd.say);
-        let sp = document.createElement('span');
-        sp.className="said";
-        sp.appendChild(tx);
-        el.appendChild(sp);
+        //The 'say' field in the HTML below gets filled in from the fields of sd
+        addhtml(el, "<span class='said' name='say'></span>", sd);
     }
 
     function fetchanddisplay(url) {
