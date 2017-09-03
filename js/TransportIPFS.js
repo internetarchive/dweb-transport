@@ -114,8 +114,8 @@ class TransportIPFS extends Transport {
     yarray: object returned when starting yarray
      */
 
-    constructor(verbose, options) {
-        super(verbose, options);
+    constructor(options, verbose) {
+        super(options, verbose);
         this.ipfs = undefined;          // Undefined till start IPFS
         this.options = options;         // Dictionary of options { ipfs: {...}, iiif: {...}, yarray: {...} }
     }
@@ -244,7 +244,7 @@ class TransportIPFS extends Transport {
     }
 
 
-    static p_setup(verbose, options) {
+    static p_setup(options, verbose ) {
         /*
         Setup the resource and open any P2P connections etc required to be done just once.
         In almost all cases this will call the constructor of the subclass
@@ -257,7 +257,7 @@ class TransportIPFS extends Transport {
          */
         let combinedoptions = Transport.mergeoptions(defaultoptions, options);
         console.log("IPFS options", JSON.stringify(combinedoptions));
-        let t = new TransportIPFS(verbose, combinedoptions);   // Note doesnt start IPFS or IIIF or Y
+        let t = new TransportIPFS(combinedoptions, verbose);   // Note doesnt start IPFS or IIIF or Y
         Dweb.transports.ipfs = t;
         Dweb.transportpriority.push(t);    // Sets to default transport if nothing else set otherwise on a list
         //Switch the comments on the next two lines to switch back and forth between IIIF or Y for testing

@@ -10,11 +10,11 @@ defaulthttpoptions = {
 class TransportHTTP extends TransportHTTPBase {
 
     constructor(options, verbose) {
-        super(options.http.ipandport, options);
+        super(options, verbose);
         this.options = options;
     }
 
-    static p_setup(verbose, options) {
+    static p_setup(options, verbose) {
     /*
     Setup the resource and open any P2P connections etc required to be done just once.
     In almost all cases this will call the constructor of the subclass

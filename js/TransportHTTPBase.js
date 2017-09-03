@@ -5,9 +5,9 @@ const myrequest = request.defaults({pool: {maxSockets: 2}, forever: true});
 //const myrequest = request.defaults({forever: true});
 
 class TransportHTTPBase extends Transport {
-    constructor(ipandport, verbose, options) {
-        super(verbose, options);
-        this.ipandport = ipandport;
+    constructor(options, verbose) {
+        super(options, verbose);
+        this.ipandport = options.http.ipandport;
         this.baseurl = "http://" + ipandport[0] + ":" + ipandport[1] + "/";
     }
     //TODO-ASYNC make this use promises and change calller in TransportHTTP

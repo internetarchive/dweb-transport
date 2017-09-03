@@ -21,7 +21,7 @@ class SmartDict extends Transportable {
         //        value = dateutil.parser.parse(value)
         //}
         //TODO - instead of calling "setter" automatically, assuming that __setattr__ in each class does so.
-        this[name] = value; //TODO: Python-Javascript: In Python can assume will get methods of property e.g. _data, in javascript need to be explicit here, or in caller.
+        this[name] = value;
     }
 
     _setproperties(dict) { // Call chain is ... onloaded or constructor > _setdata > _setproperties > __setattr__

@@ -182,7 +182,7 @@
     let transportclass = Dweb.TransportIPFS;
     setstatus("IPFS Starting");
     //let transportclass = TransportHTTP    // Uncomment this to choose HTTP
-    transportclass.p_setup(verbose)
+    transportclass.p_setup({}, verbose)
         .then((t) => {
             setstatus(t.ipfs.isOnline() ? "IPFS Online" : "IPFS Not online");   //TODO status refactor to make common across transports
         })

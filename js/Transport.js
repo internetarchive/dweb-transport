@@ -1,5 +1,5 @@
 class Transport {
-    constructor(verbose, options) {}    // Doesnt do anything, its all done by SuperClasses
+    constructor(options, verbose) {}    // Doesnt do anything, its all done by SuperClasses
 
     p_setup(transportoptions, verbose, options) {
         /*
@@ -70,6 +70,7 @@ class Transport {
         console.assert(false, "Intentionally undefined  function Transport.p_rawfetch should have been subclassed");
     }
     p_fetch() { console.assert(false, "Intentionally Undefined function Transport.p_fetch - may define higher level semantics here (see Python)"); }
+
     p_rawadd(url, date, signature, signedby, verbose) {
         /*
         Store a new list item, it should be stored so that it can be retrieved either by "signedby" (using p_rawlist) or
