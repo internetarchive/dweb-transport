@@ -154,6 +154,7 @@ class StructuredBlock extends SmartDict {
                     .then(() => {
                         if (verbose) console.assert(sb2.data === teststr, "SB should round trip", sb2.data, "!==", teststr)
                     })
+                    //TODO-REL5 if elimonate p_elem, remove from Transportable
                     /* //TODO-IPFS create a test set of SB's that have a path
                     .then(() => sb.p_path(["langs", "readme.md"], verbose, ["p_elem", el, verbose, null]))
                     //To debug, uncomment the el.textContent line in Transportable.p_elem

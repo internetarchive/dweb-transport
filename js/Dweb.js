@@ -51,6 +51,7 @@ exports.utils.SecurityWarning = function(msg, self) {
     alert("Security Warning: "+ msg);
 };
 
+// Utility function to print a array of items but just show number and last.
 exports.utils.consolearr  = (arr) => ((arr && arr.length >0) ? [arr.length+" items inc:", arr[arr.length-1]] : arr );
 
 // Utility functions

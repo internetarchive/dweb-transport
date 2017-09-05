@@ -13,7 +13,7 @@ class MutableBlock extends CommonList {
         this.table = "mb"
     }
 
-    p_elem(el, verbose, successmethodeach) {
+    p_elem(el, verbose, successmethodeach) { //TODO-REL5 as update, maybe remove p_elem from Transportable
         // this._current should be setup, it might not be loaded, but p_elem can load it
         return this._current.p_elem(el, verbose, successmethodeach);    // Typically _current will be a SB
     }
@@ -38,7 +38,7 @@ class MutableBlock extends CommonList {
     p_update(){ console.assert(false, "Need to define p_ function")}
 
     async_update(type, data, verbose, success, error) {   console.trace(); console.assert(false, "OBSOLETE"); //TODO-IPFS obsolete with p_fetch // Send new data for this item to dWeb
-        this.transport().async_update(this, this._url, type, data, verbose, success, error);
+        this.transport().async_update(this, this._url, type, data, verbose, success, error); //TODO-IPFS when obsolete can obsolete transport.async_update
     }
 
     _p_storepublic(verbose) {

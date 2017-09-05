@@ -6,9 +6,28 @@ const Dweb = require("./Dweb");
 // See CommonBlock.py for Python version
 
 class SmartDict extends Transportable {
+    /*
+    Subclass of Transport that stores a data structure, usually a single layer Javascript dictionary object.
+    SmartDict is intended to support the mechanics of storage and retrieval while being  subclassed to implement functionality
+    that understands what the data means.
+
+    By default any fields not starting with “_” will be stored, and any object will be converted into its url.
+
+    The hooks for encrypting and decrypting data are at this level, depending on the _acl field, but are implemented by code in CryptoLib.
+
+    Fields:
+    _acl    if set (on master) defines storage as encrypted
+     */
+
     constructor(data, verbose, options) {
-        // data = json string or dict
-        super(data); // _url is _url of SmartDict, not of data - will call _setdata (which usually set fields), -note does not fetch the has, but sets _needsfetch
+        /*
+        Creates and initialize a new SmartDict.
+
+        data	String|Object, If a string (typically JSON), then pass to Transport.loads first.
+                A object with attributes to set on SmartDict via _setdata
+        options	Passed to _setproperties, by default overrides attributes set by data
+         */
+        super(data); // will call _setdata (which usually set fields), does not store or set _url
         this._setproperties(options);   // Note this will override any properties set with data
         if (!this.table) { this.table = "sd"; } // Set it if the data doesnt set it, should be overridden by subclasses
     }
@@ -34,6 +53,12 @@ class SmartDict extends Transportable {
     }
 
     preflight(dd) { // Called on outgoing dictionary of outgoing data prior to sending - note order of subclassing can be significant
+        /*
+        Default handler for preflight, strips attributes starting “_” and stores and converts objects to urls.
+            Subclassed in AccessControlList and KeyPair to avoid storing private keys.
+            dd	dictionary to convert..
+            Returns	converted dictionary
+        */
         let res = {};
         for (let i in dd) {
             if (i.indexOf('_') !== 0) { // Ignore any attributes starting _
@@ -50,6 +75,11 @@ class SmartDict extends Transportable {
     }
 
     _getdata() {
+        /*
+        Prepares data for sending. Retrieves attributes, runs through preflight.
+            If there is an _acl field then it passes data through it for encrypting (see AccessControl library)
+        Returns	String suitable for p_rawstore
+        */
         let dd = {};
         for (let i in this) {
             //noinspection JSUnfilteredForInLoop don't use "of" because want inherited attributes
@@ -65,6 +95,10 @@ class SmartDict extends Transportable {
     }    // Should be being called on outgoing _data includes dumps and encoding etc
 
     _setdata(value) {
+        /*
+        Stores data, subclass this if the data should be interpreted as its stored.
+        value	Object, or JSON string to load into object.
+         */
         // Note SmartDict expects value to be a dictionary, which should be the case since the HTTP requester interprets as JSON
         // Call chain is ...  or constructor > _setdata > _setproperties > __setattr__
         // COPIED FROM PYTHON 2017-5-27
@@ -73,7 +107,6 @@ class SmartDict extends Transportable {
             throw new Dweb.errors.EncryptionError("Should have been decrypted in p_fetch");
         this._setproperties(value); // Note value should not contain a "_data" field, so wont recurse even if catch "_data" at __setattr__()
     }
-
 
     match(dict) {
         /*
@@ -94,13 +127,14 @@ class SmartDict extends Transportable {
 
     static p_fetch(url, verbose) {
         /*
-            Fetch a block which initially we don't know which type
-            See also p_fetchlist, p_list_then_current, p_list_then_elements
+        Fetches the object from Dweb, passes to p_decrypt in case it needs decrypting,
+        and creates an object of the appropriate class and passes data to _setdata
+        This should not need subclassing, (subclass _setdata or p_decrypt instead).
 
-            :resolves: New object - e.g. StructuredBlock or MutableBlock
-            :catch: TransportError - can probably, or should throw TransportError if transport fails
-            :throws: TransportError if url invalid
-            :errors: Authentication Error
+        :resolves: New object - e.g. StructuredBlock or MutableBlock
+        :catch: TransportError - can probably, or should throw TransportError if transport fails
+        :throws: TransportError if url invalid
+        :errors: Authentication Error
 
          */
         if (verbose) console.log("SmartDict.p_fetch", url);

@@ -6,12 +6,23 @@ const Dweb = require("./Dweb");
 
 class Block extends Transportable {
     constructor(data) {
+        /*
+        data	opaque data to store (byte string)
+         */
         super(data);
         this.table = 'b';
     }
-    size() { return this._data.length; }
+    size() {
+        /*
+        Returns	size of _data
+         */
+        return this._data.length;
+    }
 
     content() {
+        /*
+        Returns	string: from _data
+         */
         return this._data;
     }
     static p_fetch(url, verbose) {
