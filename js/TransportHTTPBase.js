@@ -7,6 +7,7 @@ const myrequest = request.defaults({pool: {maxSockets: 2}, forever: true});
 class TransportHTTPBase extends Transport {
     constructor(options, verbose) {
         super(options, verbose);
+        this.options = options;
         this.ipandport = options.http.ipandport;
         this.baseurl = "http://" + ipandport[0] + ":" + ipandport[1] + "/";
     }

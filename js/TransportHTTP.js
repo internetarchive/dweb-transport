@@ -11,7 +11,6 @@ class TransportHTTP extends TransportHTTPBase {
 
     constructor(options, verbose) {
         super(options, verbose);
-        this.options = options;
     }
 
     static p_setup(options, verbose) {
@@ -25,9 +24,7 @@ class TransportHTTP extends TransportHTTPBase {
     :param options: Data structure stored on the .options field of the instance returned.
     :resolve Transport: Instance of subclass of Transport
      */
-        let combinedoptions = Transport.mergeoptions(
-            { http: defaulthttpoptions },
-            options);
+        let combinedoptions = Transport.mergeoptions({ http: defaulthttpoptions },options);
         return new Promise((resolve, reject) => {
                 try {
                     let t = new TransportHTTP(combinedoptions, verbose);
@@ -51,7 +48,7 @@ class TransportHTTP extends TransportHTTPBase {
     url(data) {
         /*
          Return an identifier for the data without storing
-         //TODO-REL4-MULTITRANSPORT - this needs changing the identifier should look like a real URL
+         //TODO-REL4-MULTITRANSPORT - this needs changing the identifier should look like a real URL and use multihash
 
          :param string|Buffer data   arbitrary data
          :return string              valid id to retrieve data via p_rawfetch
