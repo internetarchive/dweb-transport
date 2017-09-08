@@ -48,7 +48,7 @@ const Dweb = require('./Dweb');
 //Debugging only
 
 let defaultipfsoptions = {
-    repo: '/tmp/ipfs_dweb20170828', //TODO-IPFS think through where, esp for browser
+    repo: '/tmp/ipfs_dweb20170908', //TODO-IPFS think through where, esp for browser
     //init: false,
     //start: false,
     //TODO-IPFS-Q how is this decentralized - can it run offline? Does it depend on star-signal.cloud.ipfs.team
@@ -69,7 +69,7 @@ let defaultyarrayoptions = {    // Based on how IIIF uses them in bootstrap.js i
     },
     connector: {
         name: 'ipfs',
-        room: 'dweb20170828'
+        room: 'dweb20170908'
         //ipfs: ipfs,   // Need to link IPFS here once created
     },
     share: {
