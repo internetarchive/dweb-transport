@@ -28,8 +28,10 @@
 .said {display: block; border-bottom: 1px black solid;} /* Each item added to list in example_list */
 .status {float: right; margin 0 0 10px 10px;}           /* Status in top right corner */
 .button { border: 1px black solid; background-color:#dddddd;  padding-bottom:0.1em;  display:inline;} /* Buttons */
-.displayedblock {border: 1px #e0e0e0 solid; background-color:#f0f0f0; box-shadow: 1px 1px 2px #cccccc; padding-top:0.1em; padding-bottom: 0.1em; margin-top: 10px; margin-bottom: 5px;}
+.displayedblock {border: 1px #e0e0e0 solid; background-color:#f0f0f0; box-shadow: 1px 1px 2px #cccccc; padding-top:0.1em; padding-bottom: 0.1em; margin-top: 10px; margin-bottom: 5px; display:inline-block;}
 .displayedblockheader {background-color:#e0e0e0; padding-top:0.1em; padding-bottom: 0.1em; margin-top: 3px; margin-bottom: 3px;}
+.loginform .propval {white-space: pre; display:block; background-color:#dddddd;border: 1px dotted grey; padding-left: 0.3em; padding-top: 0.3em; padding-bottom: 0.1em; margin-top: 0.5em; margin-left: 0.5em; margin-right: 0.5em; margin-bottom: 0.5em;  }
+.loginform .button { border: 1px black solid; background-color:#dddddd;  padding-bottom: 0.1em; padding-right: 0.3em; padding-left: 0.3em; margin-top: 0.5em; margin-left: 0.5em; margin-right: 0.5em; margin-bottom: 0.5em;   display:block;}
 .iconopener {width:20px;float:left}
 .keylist_li, .kclist_li {display:inline; padding-left: 1em; padding-right: 1em;} /*A single login in a list of KeyChains or Keys */
 .keylist_ul, .kclist_ul {display:inline; -webkit-padding-start: 0px;} /*A List of KeyChains or Keys*/

@@ -12,7 +12,7 @@ exports.StructuredBlock = require('./StructuredBlock');
 exports.MutableBlock = require("./MutableBlock");
 //*/
 
-const table2class = { // Each of these needs a constructor that takes data and is ok with no other parameters, (otherwise define a set of these methods as factories)
+exports.table2class = { // Each of these needs a constructor that takes data and is ok with no other parameters, (otherwise define a set of these methods as factories)
     "cl": "CommonList",
     "sb": "StructuredBlock",
     "kc": "KeyChain",
@@ -41,7 +41,6 @@ exports.transports = {}; // Transports - instances NOT CLASSES of loaded transpo
 exports.keychains = [];
 exports.transportpriority = []; // First on list is top priority
 
-//TODO-ASYNC - fix objbrowser esp its path
 // ==== OBJECT ORIENTED JAVASCRIPT ===============
 
 // These are equivalent of python exceptions, will log and raise alert in most cases - exceptions aren't caught
@@ -64,7 +63,7 @@ exports.utils.mergeTypedArraysUnsafe = function(a, b) { // Take care of inabilit
     return c;
 };
 
-exports.transport = function(url) { //TODO-REL4-API
+exports.transport = function(url) {
     /*
     Pick between associated transports based on URL
 

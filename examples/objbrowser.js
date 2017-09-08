@@ -86,9 +86,6 @@ function objbrowser(self, url, path, ul, verbose) {
                         // Group of fields where display then add behavior or something
                         //noinspection ES6ConvertVarToLetConst
                         spanval = document.createElement('span');
-                        if (prop === "_needsfetch") {
-                            li2.setAttribute('onclick','p_objbrowserfetch(this.parentNode.parentNode);');
-                        }
                     }
                     //noinspection JSUnfilteredForInLoop
                     let val = (typeof self[prop] === "object") ? JSON.stringify(self[prop],null,'\t ') : self[prop]

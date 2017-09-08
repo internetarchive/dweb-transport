@@ -77,7 +77,6 @@ class StructuredBlock extends SmartDict {
     }
 
     content(verbose) {
-        console.assert(!this._needsfetch, "Must load before call content");
         if (this.data) { return this.data; }
         if (this.links) {
             let res = "";

@@ -9,13 +9,12 @@ class KeyPair extends SmartDict {
     /*
     Encapsulates public key cryptography
 
-    Fields:
-    _key    Holds a structure, that may depend on cryptographic library used.
-
     Constants:
     KeyPair.KEYTYPESIGN=1, KEYTYPEENCRYPT=2, KEYTYPESIGNANDENCRYPT=3  specify which type of key to generate
 
     Libsodium implementation: Note that Uint8Array is the result of converting UrlSafeBase64 with sodium.to_urlsafebase64
+
+    Fields:
     _key = {
         sign: { publicKey: Uint8Array, privateKey: Uint8Array, keyType: "ed25519" }
         encrypt: { publicKey: Uint8Array, privateKey: Uint8Array},
@@ -54,9 +53,9 @@ class KeyPair extends SmartDict {
 
     _key_setter(value) {
         /*
-        Set a key, convert formats if required.
+        Set a key, convert formats or generate key if required.
 
-        value:  Dictionary in local format, or Uint8Array or urlsafebase64 string
+        value:  Dictionary in local format, or Uint8Array or urlsafebase64 string TODO-API doc this
          */
         let verbose = false;
         if (typeof value === "string" || Array.isArray(value)) {
@@ -154,7 +153,7 @@ class KeyPair extends SmartDict {
             } else if (tag === "NACL SIGNING")   { console.assert(false, "_importkey: Cant (yet) import Signing key "+value+" normally use SEED");
             } else if (tag === "NACL SEED")      { this._key = KeyPair._keyfromseed(hasharr, Dweb.KeyPair.KEYTYPESIGNANDENCRYPT);
             } else if (tag === "NACL VERIFY")    { this._key["sign"] = {"publicKey": hasharr};
-            } else                              { console.assert(false, "_importkey: Cant (yet) import "+value); }
+            } else { throw new ToBeImplemented("_importkey: Cant (yet) import "+value) }
         }
     }
 
@@ -191,7 +190,7 @@ class KeyPair extends SmartDict {
          */
         if ((key.encrypt && key.encrypt.privateKey) || (key.sign && key.sign.privateKey) || key.seed) { return true; }
         if ((key.encrypt && key.encrypt.publicKey) || (key.sign && key.sign.publicKey)) { return false; }
-        console.log("_key_url_private doesnt recognize",key);
+        console.log("_key_has_private doesnt recognize",key);
     }
 
     has_private() {

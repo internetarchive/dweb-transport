@@ -24,6 +24,7 @@
                 .then((kc) => {
                     let htmleach = "<li class='kclist_li' onclick='p_kc_click(this);'><span class='kclist_name' name='name'></span></li>";
                     let el = addhtml("kclist_ul", htmleach, kc );
+                    show('logout'); // And show the logout button
                     return kc;
                 })
         }
@@ -131,7 +132,7 @@
         Need way to add this key to smartdict or list
     //TODO - need some example of using them
     -->
-    <img src="noun_186903_cc.png" class="iconopener" onclick="togglevis('keychains','inline');"/>
+    <img src="noun_186903_cc.png" class="iconopener" onclick="togglevis('keychains','');"/>
     <div id="keychains" style="position:relative; left:25px; display:none;"><!-- needs position:relative, so parent for overdiv below-->
         <div id="registrationdiv" class="overdiv" style="display:none">
             <form name="registrationform" onsubmit="p_registrationsubmit(); return false;">
@@ -140,14 +141,14 @@
                 <input class="button" type="submit" value="Register"/>
             </form>
         </div>
-        <div class="displayedblock" syle="display:inline"><!--inline next to keychain-->
+        <div class="displayedblock"><!--inline next to keychain-->
             <ul id="kclist_ul" class="kclist_ul"><!-- List of all existing keychains--></ul>
-            <span class="button" onclick="logout();">Logout</span><!--logout all keychains-->
-                <form name="loginform" onsubmit="p_loginformsubmit(); return false;"><!--TODO-->
+            <form><input class="button" type="button" onclick="logout();" value="Logout"/></form><!--logout all keychains-->
+                <form class="loginform" name="loginform" onsubmit="p_loginformsubmit(); return false;"><!--TODO-->
                     <input class="propval" type="text" name="name" size="20" placeholder="Your id"/>
                     <input class="propval" type="text" name="url" size="70" placeholder="Passphrase"/>
                     <input class="button" type="submit" value="Login"/>
-                    <span class="button" onclick="togglevis('registrationdiv','block');">Register</span>
+                    <input class="button" type="button" onclick="togglevis('registrationdiv','block');" value="Register"/>
                 </form>
         </div>
 

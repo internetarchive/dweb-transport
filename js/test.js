@@ -24,7 +24,7 @@ const dom = new JSDOM(htmlfake);
 //console.log("XXX@8",dom.window.document.getElementById("myList.0").textContent); // Before loading = "Failed to load sb via StructuredBlock"
 document = dom.window.document;   // Note in JS can't see "document" like can in python
 
-let verbose = false;
+let verbose = true;
 let sb;
 let acl;
     // Note that this test setup is being mirror in test_ipfs.html

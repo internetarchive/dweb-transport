@@ -144,7 +144,7 @@ class CommonList extends SmartDict {
          Typically subclassed to save specific fields
          Note that this returns immediately after setting url, so caller may not need to wait for success
          */
-        //CL(url, data, master, key, verbose, options)
+        //CL(data, master, key, verbose, options)
         let cl = new CommonList(null, false, this.keypair, verbose, {"name": this.name});
         cl.p_store(verbose);    // Returns immediately but sets _url first
         this._publicurl = cl._url;
@@ -185,7 +185,7 @@ class CommonList extends SmartDict {
             .then(() => {
                 if (!(self._master && self.keypair)) throw new Dweb.errors.ForbiddenError("Signing a new entry when not a master list");
                 let url = (typeof obj === 'string') ? obj : obj._url
-                sig = this._makesig(url, verbose);
+                sig = self._makesig(url, verbose);
                 self._list.push(sig);   // Keep copy locally on _list
             })
             .then(() => self.p_add(sig, verbose))    // Add to list in dweb

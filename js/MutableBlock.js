@@ -50,7 +50,6 @@ class MutableBlock extends CommonList {
     }
 
     content() {
-        console.assert(!this._needsfetch, "Content is asynchronous, must load first");
         return this._current.content();
     }
 

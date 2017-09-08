@@ -53,7 +53,8 @@ let defaultipfsoptions = {
     //start: false,
     //TODO-IPFS-Q how is this decentralized - can it run offline? Does it depend on star-signal.cloud.ipfs.team
     config: {
-        Addresses: { Swarm: [ '/libp2p-webrtc-star/dns4/star-signal.cloud.ipfs.team/wss' ] },   // For IIIF or Y - same as defaults
+//        Addresses: { Swarm: [ '/p2p-webrtc-star/dns4/star-signal.cloud.ipfs.team/wss' ] },   // For IIIF or Y - same as defaults (Old pre IPFS26)
+        Addresses: { Swarm: [ '/dns4/star-signal.cloud.ipfs.team/wss/p2p-webrtc-star']},
 //      Addresses: { Swarm: [ ] },   // Disable WebRTC to test browser crash, note disables IIIF or Y so doesnt work.
     },
     //init: true, // Comment out for IIIF or Y
@@ -172,6 +173,7 @@ class TransportIPFS extends Transport {
      */
         let self = this;
         return new Promise((resolve, reject) => {
+            console.log("XXX@176",JSON.stringify(this.options.ipfs));
             this.ipfs = new IPFS(this.options.ipfs);
             this.ipfs.on('ready', () => {
                 this._makepromises()
