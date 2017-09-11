@@ -1,19 +1,34 @@
+const Url = require('url');
+
 class Transport {
     constructor(options, verbose) {}    // Doesnt do anything, its all done by SuperClasses
 
-    p_setup(transportoptions, verbose, options) {
+    p_setup(options, verbose) { //TODO-API
         /*
         Setup the resource and open any P2P connections etc required to be done just once.
         In almost all cases this will call the constructor of the subclass
         Should return a new Promise that resolves to a instance of the subclass
 
-        :param obj transportoptions: Data structure required by underlying transport layer (format determined by that layer)
+        :param obj options: Data structure required by underlying transport layer (format determined by that layer)
         :param boolean verbose: True for debugging output
-        :param options: Data structure stored on the .options field of the instance returned.
         :resolve Transport: Instance of subclass of Transport
          */
         console.assert(false, "Intentionally undefined function Transport.p_setup should have been subclassed");
     }
+    supports(url) {
+        /*
+        Determine if this transport supports a certain set of URLs
+
+        :param url: String or parsed URL
+        :return:    True if this protocol supports these URLs
+         */
+        if (!url) { return true; }  // By default, can handle default URLs
+        if (typeof url === "string") {
+            url = Url.parse(url);    // For efficiency, only parse once.
+        }
+        return url.scheme in this.urlschemes  //Lower case, NO trailing : (unlike JS)
+    }
+
     url(data) {
         /*
          Return an identifier for the data without storing

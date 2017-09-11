@@ -99,7 +99,7 @@ class CommonList extends SmartDict {
          */
         if (dd.keypair) {
             if (dd._master && !dd._acl && !this._allowunsafestore) {
-                Dweb.utils.SecurityWarning("Probably shouldnt be storing private key", dd);
+                throw new Dweb.errors.SecurityWarning("Probably shouldnt be storing private key" + JSON.stringify(dd));
             }
             dd.keypair = dd._master ? dd.keypair.privateexport() : dd.keypair.publicexport();
         }
@@ -185,19 +185,21 @@ class CommonList extends SmartDict {
             .then(() => {
                 if (!(self._master && self.keypair)) throw new Dweb.errors.ForbiddenError("Signing a new entry when not a master list");
                 let url = (typeof obj === 'string') ? obj : obj._url
-                sig = self._makesig(url, verbose);
+                sig = self.sign(url, verbose);
                 self._list.push(sig);   // Keep copy locally on _list
             })
             .then(() => self.p_add(sig, verbose))    // Add to list in dweb
             .then(() => sig);
     }
 
-    _makesig(url, verbose) {
+    sign(url, verbose) {
         /*
-        Utility function to create a signature - used by p_push and in KeyChain.p_push
+        Create a signature -
+        Normally better to use p_push as stores signature and puts on _list and on Dweb
+
         :param url:    URL of object to sign
         :returns:       Signature
-         */
+        */
         if (!url) throw new Dweb.errors.CodingError("Empty url is a coding error");
         if (!this._master) throw new Dweb.errors.ForbiddenError("Must be master to sign something");
         let sig = Dweb.Signature.sign(this, url, verbose); //returns a new Signature
@@ -213,6 +215,17 @@ class CommonList extends SmartDict {
          */
         if (!sig) throw new Dweb.errors.CodingError("CommonList.p_add is meaningless without a sig");
         return this.transport().p_rawadd(sig.url, sig.date, sig.signature, sig.signedby, verbose);
+    }
+
+    verify(sig, verbose) {
+        /*
+        Check that a signature is vald for this list, i.e. signed by this keypair.
+
+        sig:    Signature object
+        returns:    True if verifies
+        throws:     assertion error if doesn't //TODO handle that gracefully depending on caller
+         */
+        return this.keypair.verify(sig.signable(), sig.signature)    //TODO currently throws assertion error if doesnt - not sure thats correct
     }
 
     listmonitor(callback, verbose) {

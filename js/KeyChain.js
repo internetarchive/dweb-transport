@@ -70,7 +70,7 @@ class KeyChain extends CommonList {
          */
         if (! this.keypair._key.encrypt)
             throw new Dweb.errors.EncryptionError("No decryption key in"+JSON.stringify(this.keypair._key));
-        return this.keypair.decrypt(data, this, "text"); //data, b64, signer - Throws EnryptionError if no encrypt.privateKey, CodingError if !data
+        return this.keypair.decrypt(data, this, "text"); //data, signer, outputformat - Throws EnryptionError if no encrypt.privateKey, CodingError if !data
     }
 
     accesskey() { throw new Dweb.errors.CodingError("KeyChain doesnt have an accesskey"); }
@@ -90,6 +90,7 @@ class KeyChain extends CommonList {
 
     _p_storepublic(verbose) {
         /*
+        Subclasses CommonList._storepublic
         Store a publicly viewable version of KeyChain - note the keys should be encrypted
         Note - does not return a promise, the store is happening in the background
         Sets this_publicurl to the URL of this stored version.

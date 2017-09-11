@@ -133,8 +133,7 @@ class AccessControlList extends CommonList {
                 let accesskey = accesskeys[j];
                 try {   // If can descrypt then return the data
                     return Dweb.KeyPair.sym_decrypt(data, accesskey, "text"); //data. symkey #Exception DecryptionFail
-                } catch(err) {
-                    //Should really only catch DecryptionFail
+                } catch(err) { //TODO Should really only catch DecryptionFailError, but presume not experiencing other errors
                     //do nothing,
                 }
             }
@@ -176,7 +175,7 @@ class AccessControlList extends CommonList {
             let aclurl = value.acl;
             let kc = Dweb.KeyChain.keychains_find({_publicurl: aclurl});  // Matching KeyChain or None
             if (kc) {
-                return Dweb.transport().loads(kc.decrypt(value.encrypted, verbose)); // Exception: DecryptionFail - unlikely since publicurl matches
+                return Dweb.transport().loads(kc.decrypt(value.encrypted, verbose)); // DecryptionFailError - unlikely since publicurl matches
             } else {
                 //ACL(url, data, master, key, verbose, options)
                 // TODO-AUTHENTICATION probably add person - to - person version
@@ -191,7 +190,7 @@ class AccessControlList extends CommonList {
         }
     }
 
-    static p_test(verbose) {
+    static p_test(verbose) { //TODO-BACKPORT - copy into Python/test_client
         // Test ACL - note creates and returns a ACL suitable for other tests
         if (verbose) console.log("AccessControlList.p_test");
         return new Promise((resolve, reject) => {

@@ -43,13 +43,6 @@ exports.transportpriority = []; // First on list is top priority
 
 // ==== OBJECT ORIENTED JAVASCRIPT ===============
 
-// These are equivalent of python exceptions, will log and raise alert in most cases - exceptions aren't caught
-
-exports.utils.SecurityWarning = function(msg, self) {
-    console.log("Security Warning:", msg, self);
-    alert("Security Warning: "+ msg);
-};
-
 // Utility function to print a array of items but just show number and last.
 exports.utils.consolearr  = (arr) => ((arr && arr.length >0) ? [arr.length+" items inc:", arr[arr.length-1]] : arr );
 

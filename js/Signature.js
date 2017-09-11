@@ -25,22 +25,35 @@ class Signature extends SmartDict {
         this.table = "sig"; //TODO- consider passing as options to super, need to do across all classes
     }
 
+    signable() {
+        /*
+        Returns a string suitable for signing and dating, current implementation includes date and storage url of data.
+
+        :return: Signable or comparable string
+        */
+        console.log("XXX@34", this.date.toISOString() + this.url)
+        return this.date.toISOString() + this.url;
+    }
+
     static sign(commonlist, url, verbose) {
         /*
-        Sign and date a url.
+        Sign and date a url, returning a new Signature
 
         :param commonlist: Subclass of CommonList containing a private key to sign with.
         :param url: of item being signed
         :return: Signature (dated with current time on browser)
          */
-        let date = new Date(Date.now());  //TODO-DATE
-        let signature = commonlist.keypair.sign(date, url);
+        let date = new Date(Date.now());
         if (!commonlist._publicurl) commonlist.p_store(verbose); // Sets _publicurl sync, while storing async
         console.assert(commonlist._publicurl, "Signature.sign should be a publicurl by here");
-        return new Signature({"date": date, "url": url, "signature": signature, "signedby": commonlist._publicurl})
+        let sig = new Signature({"date": date, "url": url, "signedby": commonlist._publicurl})
+        sig.signature = commonlist.keypair.sign(sig.signable());
+        return sig
     }
 
-    verify() { console.assert(false, "XXX Undefined function Signature.verify, available in CommonList and KeyPair"); }
+    verify(commonlist, verbose) {
+        return commonlist.verify(this, verbose);
+    }
 
     static filterduplicates(arr) {
         /*
@@ -62,6 +75,31 @@ class Signature extends SmartDict {
         } else { // Return data if we've aleady fetched it
             return new Promise((resolve, reject) => resolve(self.data));
         }
+    }
+
+    static p_test(verbose) {
+        // Test Signatures
+        //verbose=True
+        let mydic = { "a": "AAA", "1":100, "B_date": Date.now()}  // Dic can't contain integer field names
+        let signedblock = new Dweb.SmartDict(mydic, verbose);
+        let keypair = new Dweb.KeyPair({"key":{"keygen":true}}, verbose);
+        // This test should really fail, BUT since keypair has private it passes signature
+        // commonlist0 = CommonList(keypair=keypair, master=False)
+        // print commonlist0
+        // signedblock.sign(commonlist0, verbose) # This should fail, but
+        if (verbose) console.log("test_Signatures CommonList");
+        let commonlist = new Dweb.CommonList({name: "test_Signatures.commonlist" }, true, keypair, verbose); //data,master,key,verbose
+        commonlist.table = "BOGUS";
+        if (verbose) console.log("test_Signatures sign");
+        commonlist._allowunsafestore = true;
+        let sig;
+        return signedblock.p_store(verbose)
+            .then(()=> {
+            sig = Dweb.Signature.sign(commonlist,signedblock._url, verbose); //commonlist, url, verbose
+            commonlist._allowunsafestore = false
+            if (verbose) console.log("test_Signatures verification");
+            console.assert(commonlist.verify(sig, verbose),"Should verify");
+            })
     }
 
 }

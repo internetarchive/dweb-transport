@@ -54,5 +54,28 @@ class AuthenticationError extends Error {
 }
 errors.AuthenticationError = AuthenticationError;
 
+class IntentionallyUnimplementedError extends Error {
+    constructor(message) {
+        super(message || "Intentionally Unimplemented Function");
+        this.name = "IntentionallyUnimplementedError"
+    }
+}
+errors.IntentionallyUnimplementedError = IntentionallyUnimplementedError;
+
+class DecryptionFailError extends Error {
+    constructor(message) {
+        super(message || "Decryption Failed");
+        this.name = "DecryptionFailError"
+    }
+}
+errors.DecryptionFailError = DecryptionFailError;
+
+class SecurityWarning extends Error {
+    constructor(message) {
+        super(message || "Security Warning");
+        this.name = "SecurityWarning"
+    }
+}
+errors.SecurityWarning = SecurityWarning;
 
 exports = module.exports = errors;
