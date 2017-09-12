@@ -24,7 +24,7 @@
             if (verbose) console.log("p_login_and_add_to_keychain",JSON.stringify(dict));
             return Dweb.KeyChain.p_new({ name: dict.name}, {passphrase: dict.name + "/" + dict.passphrase}, verbose)
                 .then((kc) => {
-                    let htmleach = "<li class='inline_li' onclick='p_kc_click(this);'><span class='kclist_name' name='name'></span></li>";
+                    let htmleach = "<li class='vertical_li' onclick='p_kc_click(this);'><span class='kclist_name' name='name'></span></li>";
                     let el = addhtml("kclist_ul", htmleach, kc );
                     show('logout'); // And show the logout button
                     return kc;
@@ -52,6 +52,7 @@
             let verbose = true; //copious debugging in console log
             if (verbose) console.log("loginformsubmit ---");
             let dict = form2dict("loginform"); //name, passphrase
+            hide('logindiv')
             return p_login_and_add_to_keychain(dict)
                 .then((kc) => objbrowser(kc,null,null,'ObjBrowser',verbose))
         }
@@ -153,7 +154,12 @@
     </script>
 </head>
 <body>
-    <div id="status" class="status"></div>
+    <div class="floatright">
+        <div id="status"></div>
+        <ul id="kclist_ul"><!-- List of all existing keychains--></ul>
+        <form><input id="logout" class="button" type="button" onclick="clicklogout();" style="display:none;"; value="Logout"/></form><!--logout all keychains-->
+        <img src="noun_186903_cc.png" class="iconopener" onclick="togglevis('logindiv','');"/>
+    </div>
     <h1>Dweb - KeyChains and Access Control List Example</h1>
     <!-- General design
     Key Chains icon - opens / closes to
@@ -178,11 +184,8 @@
         Need way to add this key to smartdict or list
     //TODO - need some example of using them
     -->
-    <img src="noun_186903_cc.png" class="iconopener" onclick="togglevis('keychains','');"/>
-    <div id="keychains" style="position:relative; left:25px; display:none;"><!-- needs position:relative, so parent for overdiv below-->
+    <div id="logindiv" style="position:relative; left:25px; display:none;"><!-- needs position:relative, so parent for overdiv below-->
         <div class="displayedblock"><!--inline next to keychain-->
-            <ul id="kclist_ul" class="inline_ul"><!-- List of all existing keychains--></ul>
-            <form class="inline"><input id="logout" class="button" type="button" onclick="clicklogout();" style="display:none;"; value="Logout"/></form><!--logout all keychains-->
             <form class="dialogform" name="loginform" onsubmit="p_loginformsubmit(); return false;"><!--TODO-->
                 <input class="propval" type="text" name="name" size="20" placeholder="Your id"/>
                 <input class="propval" type="text" name="passphrase" size="70" placeholder="Passphrase"/>
@@ -216,8 +219,8 @@
         </div>
         <div id="keylist_div" class="displayedblock">
             <div class="displayedblockheader" id="keylist_header">
-                Keys on KeyChain:
                 <form class="dialogform">
+                    Keys on KeyChain:
                     <span name="name"></span>
                     <!--If change icons, see objsyms above-->
                     <img class="keylist_icon" src="noun_1146472_cc.png"/><input class="button" type="button" onclick="show('keynew_div');" value="new key"/>
