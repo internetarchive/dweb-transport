@@ -20,9 +20,11 @@
     <script>
         function p_login_and_add_to_keychain(dict) {
             // Add to HTML list of logins
+            verbose=true;
+            if (verbose) console.log("p_login_and_add_to_keychain",JSON.stringify(dict));
             return Dweb.KeyChain.p_new({ name: dict.name}, {passphrase: dict.name + "/" + dict.passphrase}, verbose)
                 .then((kc) => {
-                    let htmleach = "<li class='kclist_li' onclick='p_kc_click(this);'><span class='kclist_name' name='name'></span></li>";
+                    let htmleach = "<li class='inline_li' onclick='p_kc_click(this);'><span class='kclist_name' name='name'></span></li>";
                     let el = addhtml("kclist_ul", htmleach, kc );
                     show('logout'); // And show the logout button
                     return kc;
@@ -38,10 +40,11 @@
                     .then((kc) => objbrowser(kc,null,null,'ObjBrowser',verbose))
         }
 
-        function logout() {
+        function clicklogout() {
             // Remove from keychains
             Dweb.keychains = [];
             deletechildren("kclist_ul");   // Delete any visible ones
+            if (Dweb.keychains.length == 0) hide('logout'); // Nothing to logout
         }
 
         function p_loginformsubmit() {
@@ -55,11 +58,11 @@
 
         const objsyms = {acl: "noun_1093404_cc.png", kp: "noun_1146472_cc.png"} /* If change here - see also Keys on KeyChain code below*/
         function _kclist_push(obj) {
-            // Utility function to add new or existing element to KeyChain List
+            // Utility function to add new or existing element to Key List
             objtype = obj.table; // acl = AccessControlList, kp = KeyPair
             objsym = objsyms[objtype];
             objclick = {acl: 'p_acl_click(this);', kp: 'p_key_click(this);'}[objtype];
-            let htmleach = '<li class="keylist_li" onclick="'+objclick+'"><img class="keylist_icon" src="'+objsym+'"/><span class="keylist_name" name="name"></span></li>';
+            let htmleach = '<li class="inline_li" onclick="'+objclick+'"><img class="keylist_icon" src="'+objsym+'"/><span class="keylist_name" name="name"></span></li>';
             el = addhtml("keylist_ul", htmleach, obj);
             return el;
         }
@@ -88,6 +91,15 @@
             return key.p_store(verbose)
                 .then(() => kc.p_push(key, verbose));
         }
+        function p_newtoken() { //Called by "Add" button on new token dialog
+            let verbose = true; //copious debugging in console log
+            if (verbose) console.log("p_newtoken ---");
+            hide('tokennew_div');
+            let dict = form2dict("newtokenform"); //url
+            acl = document.getElementById('acl_header').source;
+            return acl.p_add_acle(dict.url, {name: dict["name"]}, verbose)
+                .then((tok) => p_acllist_push(tok)) // Push to visual list, as listmonitor will be a duplicate
+        }
         function p_newacl() {
             let verbose = true; //copious debugging in console log
             if (verbose) console.log("p_newacl ---");
@@ -95,13 +107,47 @@
             let dict = form2dict("newaclform"); //name
             kc = document.getElementById('keylist_header').source;  // The KeyChain being added to.
             return Dweb.AccessControlList.p_new({name: dict.name, _acl: kc}, true, {keygen: true}, verbose, null, kc )    //(data, master, key, verbose, options, kc)
-                .then((acl) => _kclist_push(acl));
+                .then((acl) => _kclist_push(acl)); // Dont put in UI, as listmonitor gets it as well.
         }
         function p_key_click(el) {
-            let verbose = true; //copious debugging in console log
+            let verbose = false; //copious debugging in console log
             if (verbose) console.log("p_key_click ---");
             source = el.source;
-            window.prompt("Copy tp clipboard (Ctrl-C + OK)", el.source._url);
+            window.prompt("Copy to clipboard (Ctrl-C + OK)", el.source._url);
+        }
+        function p_acllist_push(obj) {
+            // Utility function to add new or existing element to ACL display
+            //objtype = obj.table; // Should be 'sd'
+            //objsym = objsyms[objtype];
+            //objclick = {acl: 'p_acl_click(this);', kp: 'p_key_click(this);'}[objtype];
+            //let htmleach = '<li class="keylist_li" onclick="'+objclick+'"><img class="keylist_icon" src="'+objsym+'"/><span class="keylist_name" name="name"></span></li>';
+            //el = addhtml("keylist_ul", htmleach, obj);
+            let objclick='xxx114();';
+            let objsym = objsyms['kp']; // Show like a key
+            //Temporarily showing viewerkeypair - will add a name.
+            let htmleach = '<li class="inline_li" onclick="'+objclick+'"><img class="keylist_icon" src="'+objsym+'"/><span class="keylist_name" name="name"></span></li>';
+            let el = addhtml("acl_ul", htmleach, obj);
+            return el;
+        }
+        function p_acl_click(el) {
+            let verbose = true; //copious debugging in console log
+            if (verbose) console.log("p_acl_click ---");
+            source = el.source;
+            let acl = el.source;
+            //window.prompt("Copy to clipboard (Ctrl-C + OK)", acl._url);
+            show('tokens_div'); //block - Show list of tokens in ACL
+            let el_aclheader = replacetexts("acl_header", acl);    // Set name fields etc in keylistdiv, sets source
+            deletechildren("acl_ul");
+            return acl.p_list_then_elements()                            // Retrieve the keys for the keylist
+                .then((toks) => toks.map((tok) => p_acllist_push(tok)))   // And add to the HTML
+                .then(() => acl.listmonitor(                             // Note the callback should store on acl as well before calling this function
+                    (sig) => {
+                        if (sig.signedby === el_aclheader.source._publicurl) {
+                            sig.p_fetchdata(verbose)
+                                .then((tok) => p_acllist_push(tok))
+                        }},
+                    verbose));
+
         }
 
     </script>
@@ -134,22 +180,22 @@
     -->
     <img src="noun_186903_cc.png" class="iconopener" onclick="togglevis('keychains','');"/>
     <div id="keychains" style="position:relative; left:25px; display:none;"><!-- needs position:relative, so parent for overdiv below-->
-        <div id="registrationdiv" class="overdiv" style="display:none">
-            <form name="registrationform" onsubmit="p_registrationsubmit(); return false;">
-                <input class="propval" type="text" name="name" size="50" placeholder="Your id - it doesnt have to be unique"/>
-                <input class="propval" type="text" name="passphrase" size="100" placeholder="Type a complex phrase, easy for you to remember, hard for others to guess, mixed case, numbers, punctuation are all good"/>
-                <input class="button" type="submit" value="Register"/>
+        <div class="displayedblock"><!--inline next to keychain-->
+            <ul id="kclist_ul" class="inline_ul"><!-- List of all existing keychains--></ul>
+            <form class="inline"><input id="logout" class="button" type="button" onclick="clicklogout();" style="display:none;"; value="Logout"/></form><!--logout all keychains-->
+            <form class="dialogform" name="loginform" onsubmit="p_loginformsubmit(); return false;"><!--TODO-->
+                <input class="propval" type="text" name="name" size="20" placeholder="Your id"/>
+                <input class="propval" type="text" name="passphrase" size="70" placeholder="Passphrase"/>
+                <input class="button" type="submit" value="Login"/>
+                <input class="button" type="button" onclick="togglevis('registrationdiv','block');" value="Register"/>
             </form>
         </div>
-        <div class="displayedblock"><!--inline next to keychain-->
-            <ul id="kclist_ul" class="kclist_ul"><!-- List of all existing keychains--></ul>
-            <form><input class="button" type="button" onclick="logout();" value="Logout"/></form><!--logout all keychains-->
-                <form class="loginform" name="loginform" onsubmit="p_loginformsubmit(); return false;"><!--TODO-->
-                    <input class="propval" type="text" name="name" size="20" placeholder="Your id"/>
-                    <input class="propval" type="text" name="url" size="70" placeholder="Passphrase"/>
-                    <input class="button" type="submit" value="Login"/>
-                    <input class="button" type="button" onclick="togglevis('registrationdiv','block');" value="Register"/>
-                </form>
+        <div id="registrationdiv" class="overdiv" style="display:none">
+            <form class="dialogform" name="registrationform" onsubmit="p_registrationsubmit(); return false;">
+                <input class="propval" type="text" name="name" size="50" placeholder="Your id - it doesnt have to be unique"/>
+                <input class="propval" type="text" name="passphrase" size="70" placeholder="Type a complex phrase, easy for you to remember, hard for others to guess, mixed case, numbers, punctuation are all good"/>
+                <input class="button" type="submit" value="Register"/>
+            </form>
         </div>
 
     </div>
@@ -171,14 +217,38 @@
         <div id="keylist_div" class="displayedblock">
             <div class="displayedblockheader" id="keylist_header">
                 Keys on KeyChain:
-                <span name="name"></span>
-                <!--If change icons, see objsyms above-->
-                <span class="button" onclick="show('keynew_div');"><img class="keylist_icon" src="noun_1146472_cc.png"/>New</span>
-                <span class="button" onclick="show('aclnew_div');"<img class="keylist_icon" src="noun_1093404_cc.png"/>New</span>
-                <span class="button" onclick="hide'keys');">X</span><!--TODO replace with close icon-->
+                <form class="dialogform">
+                    <span name="name"></span>
+                    <!--If change icons, see objsyms above-->
+                    <img class="keylist_icon" src="noun_1146472_cc.png"/><input class="button" type="button" onclick="show('keynew_div');" value="new key"/>
+                    <img class="keylist_icon" src="noun_1093404_cc.png"/><input class="button" type="button" onclick="show('aclnew_div');" value="new lock"/>
+                    <input class="button" type="button" onclick="hide'keys');" value="x"/><!--TODO replace with close icon-->
+                </form>
             </div>
-            <ul id="keylist_ul" class="keylist_ul"><!-- List of all keys in keychain--></ul>
+            <ul id="keylist_ul" class="inline_ul"><!-- List of all keys in keychain--></ul>
         </div>
+        <!--ACL display -->
+    </div>
+    <div id="acl" style="position:relative;"><!-- needs position:relative, so parent for overdiv below-->
+        <div id="tokens_div" class="displayedblock" style="display:none">
+            <div class="displayedblockheader" id="acl_header">
+                Keys valid in this lock:
+                <form class="dialogform">
+                    <img class="keylist_icon" src="noun_1146472_cc.png"/><input class="button" type="button" onclick="show('tokennew_div');" value="new key"/>
+                    <input class="button" type="button" onclick="hide'keys');" value="x"/><!--TODO replace with close icon-->
+                </form>
+            </div>
+            <ul id="acl_ul" class="inline_ul"><!-- List of all tokens in AccessControlList--></ul>
+        </div>
+        <!--Dialogue to enter a new key for an ACL --><!--TODO-REL4 add a name to token-->
+        <div id="tokennew_div" class="overdiv" style="display:none">
+            <form name="newtokenform" onsubmit="p_newtoken(); return false;">
+                <input class="propval" type="text" name="name" size="20" placeholder="Name of key"/>
+                <input class="propval" type="text" name="url" size="50" placeholder="URL of key"/>
+                <input class="button" type="submit" value="Add"/>
+            </form>
+        </div>
+
 
     </div>
 

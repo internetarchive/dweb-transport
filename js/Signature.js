@@ -31,7 +31,6 @@ class Signature extends SmartDict {
 
         :return: Signable or comparable string
         */
-        console.log("XXX@34", this.date.toISOString() + this.url)
         return this.date.toISOString() + this.url;
     }
 
@@ -68,6 +67,11 @@ class Signature extends SmartDict {
     }
 
     p_fetchdata(verbose) {
+        /*
+        Fetch the data related to a Signature, store on .data
+
+        :resolves to: obj - object that was signed
+         */
         let self = this;
         if (!this.data) {
             return Dweb.SmartDict.p_fetch(this.url, verbose)

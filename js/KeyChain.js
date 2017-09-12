@@ -188,7 +188,7 @@ class KeyChain extends CommonList {
         // Uses acl passed in from AccessControlList.acl
         acl._allowunsafestore = true;
     })
-    .then(() => acl.p_add_acle(viewerkeypair._url, verbose))   //Add us as viewer
+    .then(() => acl.p_add_acle(viewerkeypair._url, {"name":"my token"}, verbose))   //Add us as viewer - resolves to tok
     .then(() => {
             console.assert("acl._list.length === 1", "Should have added exactly 1 viewerkeypair",acl);
         sb = new Dweb.StructuredBlock({"name": "test_sb", "data": qbf, "_acl": acl}, verbose); //url,data,verbose

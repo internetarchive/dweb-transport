@@ -13,6 +13,7 @@ class AccessControlList extends CommonList {
     _list: Contains a list of signatures, each for a SmartDict each of which is:
         viewerkeypair: public URL of the KeyPair of an authorised viewer
         token:  accesskey encrypted with PublicKey from the KeyPair
+        TODO-REL4 add name to token
 
     */
 
@@ -21,6 +22,9 @@ class AccessControlList extends CommonList {
         Create a new AccessControlList - see CommonList for parameters
          */
         super(data, master, key, verbose, options);
+        if (this._master && !this.accesskey) {
+            this.accesskey = Dweb.KeyPair.b64enc(Dweb.KeyPair.randomkey());
+        }
         this.table = "acl";
     }
 
@@ -31,6 +35,7 @@ class AccessControlList extends CommonList {
             :param data,master,key,verbose,options: see new CommonList
             :param kc: Optional KeyChain to add to
          */
+        if (verbose) console.log("AccessControlList.p_new");
         let acl = new Dweb.AccessControlList(data, master, key, verbose, options); // Create ACL
         if (master) {
             kc = kc || Dweb.keychains[0];    // Default to first KeyChain
@@ -55,7 +60,7 @@ class AccessControlList extends CommonList {
         return super.preflight(dd);
     }
 
-    p_add_acle(viewerpublicurl, verbose) {
+    p_add_acle(viewerpublicurl, data, verbose) {
         /*
         Add a new ACL entry - that gives a viewer the ability to see the accesskey of this URL
 
@@ -72,11 +77,11 @@ class AccessControlList extends CommonList {
             .then((viewerpublickeypair) => new SmartDict({
                     //Need to go B64->binary->encrypt->B64
                     "token": viewerpublickeypair.encrypt(Dweb.KeyPair.b64dec(self.accesskey), true, self),
-                    "viewer": viewerpublicurl
+                    "viewer": viewerpublicurl,
+                    "name": data["name"]
                 }, verbose) //data,verbose
             )
-            .then((acle) => self.p_push(acle, verbose))
-            .then(() => self);
+            .then((acle) => { self.p_push(acle, verbose); return acle;})
     }
 
     tokens(viewerkeypair, decrypt, verbose) {

@@ -173,7 +173,6 @@ class TransportIPFS extends Transport {
      */
         let self = this;
         return new Promise((resolve, reject) => {
-            console.log("XXX@176",JSON.stringify(this.options.ipfs));
             this.ipfs = new IPFS(this.options.ipfs);
             this.ipfs.on('ready', () => {
                 this._makepromises()
