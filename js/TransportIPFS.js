@@ -31,10 +31,6 @@ require('y-indexeddb')(Y);
 const Url = require('url');
 
 
-const multihashes = require('multihashes'); // TODO-IPFS only required because IPFS makes it hard to get this
-
-const crypto = require('crypto'); //TODO-IPFS only for testing - can remove
-//Buffer seems to be built in, require('Buffer') actually breaks things
 
 // Utility packages (ours) Aand one-loners
 const promisify = require('promisify-es6');
@@ -284,17 +280,14 @@ class TransportIPFS extends Transport {
         let protocol = url.protocol;    // Lower case, Includes trailing :
         return protocol === 'ipfs:';
     }
-    url(data) {
+    url(data) { //TODO-BACKPORT to Python - called multihash
         /*
          Return an identifier for the data without storing typically ipfs:/ipfs/a1b2c3d4...
 
          :param string|Buffer data   arbitrary data
          :return string              valid url to retrieve data via p_rawfetch
          */
-        let b2 = (data instanceof Buffer) ? data : new Buffer(data);
-        let b3 = crypto.createHash('sha256').update(b2).digest();   // Note this is the only dependence on crypto and exists only because IPFS makes it ridiculously hard to get the hash synchronously without storing
-        let hash = multihashes.toB58String(multihashes.encode(b3, 'sha2-256'));  //TODO-IPFS-Q unclear how to make generic
-        return "ipfs:/ipfs/" + hash
+        return "ipfs:/ipfs/" + KeyPair.multihashsha256_58(data)
     }
 
     // Everything else - unless documented here - should be opaque to the actual structure of a CID

@@ -4,6 +4,7 @@ const SmartDict = require("./SmartDict");
 const Dweb = require("./Dweb");
 const crypto = require('crypto'); // Needed to do a simple sha256 which doesnt appear to be in libsodium
 //Buffer seems to be built in, require('Buffer') actually breaks things
+const multihashes = require('multihashes'); // TODO-IPFS only required because IPFS makes it hard to get this
 
 class KeyPair extends SmartDict {
     /*
@@ -376,6 +377,20 @@ class KeyPair extends SmartDict {
         //TODO-BACKPORT get better test from Python.test_client.test_keypair
     };
 
+    static sha256(data) {
+        /*
+        data:       String or Buffer containing string of arbitrary length
+        returns:    32 byte Uint8Array with SHA256 hash
+        */
+        let b2 = (data instanceof Buffer) ? data : new Buffer(data);
+        return crypto.createHash('sha256').update(b2).digest();   // Note this is the only dependence on crypto and exists only because IPFS makes it ridiculously hard to get the hash synchronously without storing
+        //Not sure if this is Buffer or string
+    }
+
+    static multihashsha256_58(data) {
+        // Base58 of a Multihash of a Sha2_256 of data - as used by IPFS
+        return multihashes.toB58String(multihashes.encode(KeyPair.sha256(data), 'sha2-256'));
+    }
 
 }
 

@@ -9,10 +9,10 @@ class TransportHTTPBase extends Transport {
         super(options, verbose);
         this.options = options;
         this.ipandport = options.http.ipandport;
-        this.baseurl = "http://" + ipandport[0] + ":" + ipandport[1] + "/";
+        this.baseurl = "http://" + this.ipandport[0] + ":" + this.ipandport[1] + "/";
     }
     //TODO-ASYNC make this use promises and change calller in TransportHTTP
-    async_load(command, url, verbose, success, error) {
+    OBS_async_load(command, url, verbose, success, error) {
         // Locate and return a block, based on its url
         if (verbose) {
             console.log("TransportHTTP async_load:",command, ":url=", url); }
@@ -53,7 +53,8 @@ class TransportHTTPBase extends Transport {
                     if (success) success(data);
                 } else {
                     console.log("Error status=",response["statusCode"],response["statusMessage"]);
-                    if (error) error(undefined, undefined, undefined);
+                    let err = new Error(response["statusCode"]+": "+ response["statusMessage"]); //Should be TransportError but out of scope
+                    if (error) error(undefined, undefined, err);
                 }
             }
 
@@ -62,11 +63,11 @@ class TransportHTTPBase extends Transport {
     }
 
     //TODO-IPFS replace this and async_load with a more standard promised XHR
-    p_load(command, url, verbose) {
+    OBS_p_load(command, url, verbose) {
         return new Promise((resolve, reject) => {
             this.async_load(command, url, verbose,
                 (msg) => resolve(msg),
-                (xhr, status, error) => reject(undefined)
+                (xhr, status, error) => reject(error)
             )
         })
     }

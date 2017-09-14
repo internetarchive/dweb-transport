@@ -21,12 +21,15 @@ class Transport {
 
         :param url: String or parsed URL
         :return:    True if this protocol supports these URLs
+        :throw:     TransportError if invalid URL
          */
         if (!url) { return true; }  // By default, can handle default URLs
         if (typeof url === "string") {
             url = Url.parse(url);    // For efficiency, only parse once.
         }
-        return url.scheme in this.urlschemes  //Lower case, NO trailing : (unlike JS)
+        console.log("XXX@30",url.protocol, typeof url.protocol, url.protocol.slice(0,-1), this.urlschemes, this.urlschemes.includes(url.protocol.slice(0,-1)));
+        if (!url.protocol) { throw new Error("URL failed to specific a scheme (before :) "+url.href)} //Should be TransportError but out of scope here
+        return this.urlschemes.includes(url.protocol.slice(0,-1))
     }
 
     url(data) {
@@ -142,9 +145,9 @@ class Transport {
         console.assert(false, "XXX Undefined function Transport.listmonitor");
     }
 
-    static _add_value(url, date, signature, signedby, verbose) {
+    _add_value(url, date, signature, signedby, verbose) { //TODO-API its not static
         let store = {"url": url, "date": date, "signature": signature, "signedby": signedby};
-        return Dweb.transport(signedby).dumps(store);   // Note transport is that of signedby, not url
+        return this.dumps(store);   // Note transport is that of signedby, not url
     }
 
     static mergeoptions(a, b) {

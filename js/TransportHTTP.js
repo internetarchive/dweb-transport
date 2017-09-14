@@ -1,16 +1,26 @@
 const TransportHTTPBase = require('./TransportHTTPBase.js');
+const Transport = require('./Transport.js');
+const Dweb = require('./Dweb.js');
 const sodium = require("libsodium-wrappers");   // Note for now this has to be Mitra's version as live version doesn't support urlsafebase64
-
+if (typeof(Window) === "undefined") {
+    console.log("XXX@TransportHTTP.7 Must be on Node");
+    //var fetch = require('whatwg-fetch').fetch; //Not as good as node-fetch-npm, but might be the polyfill needed for browser.safari
+    //XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;  // Note this doesnt work if set to a var or const, needed by whatwg-fetch
+    var fetch = require('node-fetch-npm');
+    console.log("XXX Node loaded");
+}
 //TODO-HTTP at the moment this isn't setup to work in browser, should be simple to do.
+//TODO-HTTP to work on Safari or mobile will require a polyfill, see https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch for comment
 
 defaulthttpoptions = {
     ipandport: [ 'localhost',4243]
 };
 
-class TransportHTTP extends TransportHTTPBase {
+class TransportHTTP extends TransportHTTPBase { //TODO-HTTP merge TransportHTTPBase into here
 
     constructor(options, verbose) {
         super(options, verbose);
+        this.urlschemes = ['http'];
     }
 
     static p_setup(options, verbose) {
@@ -48,18 +58,51 @@ class TransportHTTP extends TransportHTTPBase {
     url(data) {
         /*
          Return an identifier for the data without storing
-         //TODO-REL4-MULTITRANSPORT - this needs changing the identifier should look like a real URL and use multihash
 
          :param string|Buffer data   arbitrary data
          :return string              valid id to retrieve data via p_rawfetch
          */
-        return "BLAKE2."+ sodium.crypto_generichash(32, data, null, 'urlsafebase64');
+        //TODO-HTTP use templating in next string
+        return "http://"+this.ipandport[0]+":"+this.ipandport[1]+"/rawfetch/"+Dweb.KeyPair.multihashsha256_58(data);    // Was "BLAKE2."+ sodium.crypto_generichash(32, data, null, 'urlsafebase64');
     }
 
-    p_rawfetch(url, verbose) {
+    p_load(command, url, verbose) { // Embrace and extend "fetch" to check result etc.
         // Locate and return a block, based on its url
-        return this.p_load("rawfetch", url, verbose);
+        // Throws Error if fails - should be TransportError but out of scope
+        let parsedurl = Url.parse(url);
+        let multihash = parsedurl.pathname.split('/').slice(-1);
+        //TODO-HTTP could check that rest of URL conforms to expectations.
+        let httpgeturl=`http://${this.ipandport[0]}:${this.ipandport[1]}/${command}/${multihash}`;
+        if (verbose) console.log("p_rawfetch httpgeturl=",httpgeturl);
+        let init = {    //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
+            method: 'GET',
+            headers: {},
+            mode: 'cors',
+            cache: 'default',
+            redirect: 'follow',  // Chrome defaults to manual
+        }; //TODO-HTTP expand this
+        return fetch(httpgeturl,init) // A promise
+            .then((response) => {
+                console.log("XXX@86---")
+                if(response.ok) {
+                    console.log("XXX@87---")
+                    console.log("XXX@88",response.headers)
+                    if (response.headers.get('Content-type') === "application/json") {
+                        console.log("XXX@89---")
+                        return response.json(); // promise resolving to JSON
+                    } else {
+                        return response.text(); // promise resolving to text
+                    }
+                }   // TODO-HTTP may need to handle binary as a buffer instead of text
+                throw new Error(`Transport Error ${response.status}: ${response.statusText}`); // Should be TransportError but out of scope
+            })
+            .then((xxx) => {console.log("p.rawfetch returning",typeof(xxx),xxx); return xxx;} )
     }
+    p_rawfetch(url, verbose) {
+        console.assert(url, "TransportHTTP.p_rawlist: requires url");
+        return this.p_load("rawfetch", url, verbose)
+    }
+
     p_rawlist(url, verbose) {
         // obj being loaded
         // Locate and return a block, based on its url
@@ -78,7 +121,7 @@ class TransportHTTP extends TransportHTTPBase {
         //verbose=true;
         console.assert(url && signature && signedby, "p_rawadd args",url,signature,signedby);
         if (verbose) console.log("rawadd", url, date, signature, signedby);
-        let value = TransportHTTP._add_value( url, date, signature, signedby, verbose)+ "\n";
+        let value = this._add_value( url, date, signature, signedby, verbose)+ "\n";
         return this.p_post("rawadd", null, "application/json", value, verbose); // Returns immediately
     }
 

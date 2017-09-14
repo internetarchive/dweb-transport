@@ -62,6 +62,7 @@ exports.transport = function(url) {
 
     url     URL or string that can be parsed into a URL
     returns subclass of Transport that can support this kind of URL or undefined if none.
+    throws  Error (should be TransportError but out of scope) if URL parsing fails
     */
     //TODO-efficiency, could parse URL once at higher level and pass URL down
     if (url && (typeof url === 'string')) {

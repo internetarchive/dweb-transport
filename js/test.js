@@ -13,8 +13,8 @@ const Dweb = require('./Dweb');
 function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { resolve(val); },ms)})}
 
 //Comment out one of these next two lines
-let transportclass = Dweb.TransportIPFS;
-//let transportclass = TransportHTTP
+//let transportclass = Dweb.TransportIPFS;
+let transportclass = TransportHTTP
 
 // Fake a browser like environment for some tests
 const jsdom = require("jsdom");
@@ -34,9 +34,11 @@ let acl;
         iiif: {store: "leveldb"}, // Note browser requires indexeddb
         yarray: {db: {name: "leveldb", dir: "../dbtestjs", cleanStart: true}},  // Cleanstart clears db
         listmethod: "yarrays"
+        //http uses default arguments in TransportHTTP for now TODO-HTTP bring them here
     }, verbose) // Note browser requires indexeddb
     .then((t) => { if (verbose) console.log("setup returned and transport set - including annoationList"); })
     .then(() => transportclass.test(Dweb.transport(), verbose))
+    .then(() => verbose=true)
     .then(() => Dweb.Block.test(verbose))
     .then(() => Dweb.Signature.p_test(verbose))
     .then(() => Dweb.KeyPair.test(verbose))
@@ -65,3 +67,4 @@ let acl;
  console.log("END testing previouslyworking()");
 
  */
+
