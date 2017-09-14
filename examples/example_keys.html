@@ -99,7 +99,7 @@
             let dict = form2dict("newtokenform"); //url
             acl = document.getElementById('acl_header').source;
             return acl.p_add_acle(dict.url, {name: dict["name"]}, verbose)
-                .then((tok) => p_acllist_push(tok)) // Push to visual list, as listmonitor will be a duplicate
+                .then((tok) => acllist_push(tok)) // Push to visual list, as listmonitor will be a duplicate
         }
         function p_newacl() {
             let verbose = true; //copious debugging in console log
@@ -114,9 +114,9 @@
             let verbose = false; //copious debugging in console log
             if (verbose) console.log("p_key_click ---");
             source = el.source;
-            window.prompt("Copy to clipboard (Ctrl-C + OK)", el.source._url);
+            window.prompt("Copy to clipboard (Ctrl-C + OK)", el.source._publicurl);
         }
-        function p_acllist_push(obj) {
+        function acllist_push(obj) {
             // Utility function to add new or existing element to ACL display
             //objtype = obj.table; // Should be 'sd'
             //objsym = objsyms[objtype];
@@ -140,12 +140,12 @@
             let el_aclheader = replacetexts("acl_header", acl);    // Set name fields etc in keylistdiv, sets source
             deletechildren("acl_ul");
             return acl.p_list_then_elements()                            // Retrieve the keys for the keylist
-                .then((toks) => toks.map((tok) => p_acllist_push(tok)))   // And add to the HTML
+                .then((toks) => toks.map((tok) => acllist_push(tok)))   // And add to the HTML
                 .then(() => acl.listmonitor(                             // Note the callback should store on acl as well before calling this function
                     (sig) => {
                         if (sig.signedby === el_aclheader.source._publicurl) {
                             sig.p_fetchdata(verbose)
-                                .then((tok) => p_acllist_push(tok))
+                                .then((tok) => acllist_push(tok))
                         }},
                     verbose));
 
@@ -235,7 +235,8 @@
     <div id="acl" style="position:relative;"><!-- needs position:relative, so parent for overdiv below-->
         <div id="tokens_div" class="displayedblock" style="display:none">
             <div class="displayedblockheader" id="acl_header">
-                Keys valid in this lock:
+                Keys valid in lock: <span name="name"></span>
+
                 <form class="dialogform">
                     <img class="keylist_icon" src="noun_1146472_cc.png"/><input class="button" type="button" onclick="show('tokennew_div');" value="new key"/>
                     <input class="button" type="button" onclick="hide'keys');" value="x"/><!--TODO replace with close icon-->

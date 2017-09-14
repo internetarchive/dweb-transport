@@ -59,6 +59,7 @@ class KeyPair extends SmartDict {
         value:  Dictionary in local format, or Uint8Array or urlsafebase64 string TODO-API doc this
          */
         let verbose = false;
+        if (verbose) console.log("KP._key_setter")
         if (typeof value === "string" || Array.isArray(value)) {
             this._importkey(value);
         } else {    // Should be object, or maybe undefined ?
@@ -89,7 +90,21 @@ class KeyPair extends SmartDict {
             this._key = value;
         }
     }
-    preflight(dd) {
+
+
+    p_store(verbose) {  //TODO-BACKPORT added to KP
+        if (this._url)
+            return; // Already stored
+        if (!this._publicurl && KeyPair._key_has_private(this._key)) { // Haven't stored a public version yet.
+            let publickp = new KeyPair({key:this.publicexport()}, verbose)
+            publickp.p_store(verbose); // Returns immediately while storing async, _url is set
+            this._publicurl = publickp._url;
+        }
+        return super.p_store(verbose)
+    }
+
+
+    preflight(dd) { //TODO-BACKPORT to PY changed to save publicurl
         /*
         Subclasses SmartDict.preflight, checks not exporting unencrypted private keys, and exports private or public.
 
@@ -102,7 +117,13 @@ class KeyPair extends SmartDict {
         if (dd._key) { //Based on whether the CommonList is master, rather than if the key is (key could be master, and CL not)
             dd.key = KeyPair._key_has_private(dd._key) ? this.privateexport() : this.publicexport();
         }
-        return super.preflight(dd)
+        let publicurl = dd._publicurl; // Save before preflight super
+        let master = KeyPair._key_has_private(dd._key)
+        dd = super.preflight(dd);  // Edits dd in place
+        if (master) { // Only store on Master, on !Master will be None and override storing url as _publicurl
+            dd._publicurl = publicurl;   // May be None, have to do this AFTER the super call as super filters out "_*"
+        }
+        return dd
     }
 
     static _keyfromseed(seed, keytype, verbose) {

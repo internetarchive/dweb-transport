@@ -103,6 +103,7 @@ class CommonList extends SmartDict {
             }
             dd.keypair = dd._master ? dd.keypair.privateexport() : dd.keypair.publicexport();
         }
+        // Note same code on KeyPair
         let publicurl = dd._publicurl; // Save before preflight
         let master = dd._master;
         dd = super.preflight(dd);  // Edits dd in place
@@ -179,11 +180,12 @@ class CommonList extends SmartDict {
          :resolves: sig created in process - for adding to lists etc.
          :throws:   ForbiddenError if not master;
          */
+        if (verbose) console.log("CL.p_push",obj._url,"onto",this._url);
         if (!obj) throw new Dweb.errors.CodingError("CL.p_push obj should never be non-empty");
         let self = this;
         let sig;
-        return this.p_store() // Make sure stored
-            .then(() => {if (typeof obj !== 'string') obj.p_store()} )
+        return this.p_store(verbose) // Make sure stored
+            .then(() => {if (typeof obj !== 'string') obj.p_store(verbose)} )
             .then(() => {
                 if (!(self._master && self.keypair)) throw new Dweb.errors.ForbiddenError("Signing a new entry when not a master list");
                 let url = (typeof obj === 'string') ? obj : obj._url

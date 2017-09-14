@@ -68,12 +68,14 @@ class AccessControlList extends CommonList {
         :resolves to: this for chaining
         */
         let self = this;
-        if (verbose) console.log("AccessControlList.add viewerpublicurl=",viewerpublicurl);
+        if (verbose) console.log("AccessControlList.p_add_acle viewerpublicurl=",viewerpublicurl);
         if (!this._master) {
             throw new Dweb.errors.ForbiddenError("Cant add viewers to a public copy of an ACL");
         }
+        console.log("XXX@p_add_acle:75")
         return Dweb.SmartDict.p_fetch(viewerpublicurl, verbose) // Fetch the public key will be KeyPair
             // Create a new ACLE with access key, encrypted by publickey
+            .then((xxx) => { console.log("XXX@p_add_acle:77"); return xxx;})
             .then((viewerpublickeypair) => new SmartDict({
                     //Need to go B64->binary->encrypt->B64
                     "token": viewerpublickeypair.encrypt(Dweb.KeyPair.b64dec(self.accesskey), true, self),
@@ -81,7 +83,8 @@ class AccessControlList extends CommonList {
                     "name": data["name"]
                 }, verbose) //data,verbose
             )
-            .then((acle) => { self.p_push(acle, verbose); return acle;})
+            .then((acle) => { console.log("XXX@p_add_acle:84");
+            self.p_push(acle, verbose); console.log("XXX@p_add_acle:86"); return acle;})
     }
 
     tokens(viewerkeypair, decrypt, verbose) {
@@ -177,6 +180,7 @@ class AccessControlList extends CommonList {
         if (! value.encrypted) {
             return value;
         } else {
+            if (verbose) console.log("ACL.p_decryptdata")
             let aclurl = value.acl;
             let kc = Dweb.KeyChain.keychains_find({_publicurl: aclurl});  // Matching KeyChain or None
             if (kc) {

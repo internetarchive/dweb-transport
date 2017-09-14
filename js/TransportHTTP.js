@@ -66,29 +66,19 @@ class TransportHTTP extends TransportHTTPBase { //TODO-HTTP merge TransportHTTPB
         return "http://"+this.ipandport[0]+":"+this.ipandport[1]+"/rawfetch/"+Dweb.KeyPair.multihashsha256_58(data);    // Was "BLAKE2."+ sodium.crypto_generichash(32, data, null, 'urlsafebase64');
     }
 
-    p_load(command, url, verbose) { // Embrace and extend "fetch" to check result etc.
+    p_httpfetch(command, url, init, verbose) { // Embrace and extend "fetch" to check result etc.
         // Locate and return a block, based on its url
         // Throws Error if fails - should be TransportError but out of scope
         let parsedurl = Url.parse(url);
         let multihash = parsedurl.pathname.split('/').slice(-1);
         //TODO-HTTP could check that rest of URL conforms to expectations.
-        let httpgeturl=`http://${this.ipandport[0]}:${this.ipandport[1]}/${command}/${multihash}`;
-        if (verbose) console.log("p_rawfetch httpgeturl=",httpgeturl);
-        let init = {    //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
-            method: 'GET',
-            headers: {},
-            mode: 'cors',
-            cache: 'default',
-            redirect: 'follow',  // Chrome defaults to manual
-        }; //TODO-HTTP expand this
-        return fetch(httpgeturl,init) // A promise
+        let httpurl=`http://${this.ipandport[0]}:${this.ipandport[1]}/${command}/${multihash}`;
+        if (verbose) console.log(command, "httpurl=",httpurl);
+        return fetch(httpurl, init) // A promise
             .then((response) => {
-                console.log("XXX@86---")
                 if(response.ok) {
-                    console.log("XXX@87---")
                     console.log("XXX@88",response.headers)
                     if (response.headers.get('Content-type') === "application/json") {
-                        console.log("XXX@89---")
                         return response.json(); // promise resolving to JSON
                     } else {
                         return response.text(); // promise resolving to text
@@ -98,6 +88,34 @@ class TransportHTTP extends TransportHTTPBase { //TODO-HTTP merge TransportHTTPB
             })
             .then((xxx) => {console.log("p.rawfetch returning",typeof(xxx),xxx); return xxx;} )
     }
+
+    p_get(command, url, verbose) {
+        // Locate and return a block, based on its url
+        // Throws Error if fails - should be TransportError but out of scope
+        let init = {    //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
+            method: 'GET',
+            headers: {},
+            mode: 'cors',
+            cache: 'default',
+            redirect: 'follow',  // Chrome defaults to manual
+        }; //TODO-HTTP expand this
+        return p_httpfetch(command, url, init, verbose);
+    }
+
+    p_post(command, url, type, data, verbose) {
+        // Locate and return a block, based on its url
+        // Throws Error if fails - should be TransportError but out of scope
+        let init = {    //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
+            method: 'POST',
+            headers: { 'Content-type': type},
+            body: data,
+            mode: 'cors',
+            cache: 'default',
+            redirect: 'follow',  // Chrome defaults to manual
+        }; //TODO-HTTP expand this
+        return p_httpfetch(command, url, init, verbose);
+    }
+
     p_rawfetch(url, verbose) {
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
         return this.p_load("rawfetch", url, verbose)
