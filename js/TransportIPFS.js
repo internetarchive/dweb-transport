@@ -287,7 +287,7 @@ class TransportIPFS extends Transport {
          :param string|Buffer data   arbitrary data
          :return string              valid url to retrieve data via p_rawfetch
          */
-        return "ipfs:/ipfs/" + KeyPair.multihashsha256_58(data)
+        return "ipfs:/ipfs/" + Dweb.KeyPair.multihashsha256_58(data)
     }
 
     // Everything else - unless documented here - should be opaque to the actual structure of a CID
