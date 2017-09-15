@@ -30,7 +30,6 @@ class SmartDict extends Transportable {
         super(data); // will call _setdata (which usually set fields), does not store or set _url
         this._setproperties(options);   // Note this will override any properties set with data
         if (!this.table) { this.table = "sd"; } // Set it if the data doesnt set it, should be overridden by subclasses
-        console.log("XXX@SD().33");
     }
 
     __setattr__(name, value) { // Call chain is ... success or constructor > _setdata > _setproperties > __setattr__
@@ -141,25 +140,20 @@ class SmartDict extends Transportable {
         if (verbose) console.log("SmartDict.p_fetch", url);
         let cls;
         return super.p_fetch(url, verbose) // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
-            .then((xxx) => {console.log("XXX@SD.p_fetch.144"); return xxx})
             .then((data) => {
                 data = Dweb.transport(url).loads(data);      // Parse JSON //TODO-REL3 maybe function in Transportable
                 let table = data.table;              // Find the class it belongs to
-                console.log("XXX@SD.p_fetch.147",table)
                 cls = Dweb[Dweb.table2class[table]];         // Gets class name, then looks up in Dweb - avoids dependency
                 if (!cls) throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: "+table+" isnt implemented in table2class");
                 //console.log(cls);
                 if (!((Dweb.table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict))) throw new Dweb.errors.ForbiddenError("Avoiding data driven hacks to other classes - seeing "+table);
                 return data;
             })
-            .then((xxx) => {console.log("XXX@SD.p_fetch.154"); return xxx})
             .then((data) => cls.p_decrypt(data, verbose))    // decrypt - may return string or obj , note it can be suclassed for different encryption
-            .then((xxx) => {console.log("XXX@SD.p_fetch.156"); return xxx})
             .then((data) => {
                     data._url = url;                         // Save where we got it - preempts a store - must do this afer decrypt
                     return new cls(data);
             })                // Returns new block that should be a subclass of SmartDict
-            .then((xxx) => {console.log("XXX@SD.p_fetch.160"); return xxx})
             .catch((err) => {console.log("cant fetch and decrypt unknown"); throw(err)});
     }
 
