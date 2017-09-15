@@ -13,8 +13,8 @@ const Dweb = require('./Dweb');
 function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { resolve(val); },ms)})}
 
 //Comment out one of these next two lines
-let transportclass = Dweb.TransportIPFS;
-//let transportclass = TransportHTTP
+//let transportclass = Dweb.TransportIPFS;
+let transportclass = TransportHTTP
 
 // Fake a browser like environment for some tests
 const jsdom = require("jsdom");

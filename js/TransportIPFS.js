@@ -1,12 +1,7 @@
 /*
 This Transport layers builds on IPFS and the YJS DB
 
-
 Y Lists have listeners and generate events - see docs at ...
-
-
-TODO-IPFS ComeBackFor: TransportHTTP & TransportHTTPBase (make use promises)
-
 */
 
 

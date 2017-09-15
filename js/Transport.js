@@ -1,8 +1,12 @@
 const Url = require('url');
 
 class Transport {
-    constructor(options, verbose) {}    // Doesnt do anything, its all done by SuperClasses
-
+    constructor(options, verbose) {
+        /*
+        Doesnt do anything, its all done by SuperClasses,
+        Superclass should merge with default options, call super
+        */
+    }
     p_setup(options, verbose) { //TODO-API
         /*
         Setup the resource and open any P2P connections etc required to be done just once.

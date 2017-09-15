@@ -1,4 +1,3 @@
-const TransportHTTPBase = require('./TransportHTTPBase.js');
 const Transport = require('./Transport.js');
 const Dweb = require('./Dweb.js');
 const sodium = require("libsodium-wrappers");   // Note for now this has to be Mitra's version as live version doesn't support urlsafebase64
@@ -9,17 +8,19 @@ if (typeof(Window) === "undefined") {
     var fetch = require('node-fetch-npm');
     console.log("XXX Node loaded");
 }
-//TODO-HTTP at the moment this isn't setup to work in browser, should be simple to do.
+//TODO-HTTP at the moment this isn't setup to work in browser, should be simple to do except for potential Cross Origin (cors) issues
 //TODO-HTTP to work on Safari or mobile will require a polyfill, see https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch for comment
 
 defaulthttpoptions = {
     ipandport: [ 'localhost',4243]
 };
 
-class TransportHTTP extends TransportHTTPBase { //TODO-HTTP merge TransportHTTPBase into here
+class TransportHTTP extends Transport {
 
     constructor(options, verbose) {
         super(options, verbose);
+        this.options = options;
+        this.ipandport = options.http.ipandport;
         this.urlschemes = ['http'];
     }
 
@@ -67,12 +68,20 @@ class TransportHTTP extends TransportHTTPBase { //TODO-HTTP merge TransportHTTPB
     }
 
     p_httpfetch(command, url, init, verbose) { // Embrace and extend "fetch" to check result etc.
+        /*
+        Fetch a url based from default server at command/multihash
+
+        url: optional - contains multihash as last component (Maybe TODO handle already parsed URL if provided).
+         */
         // Locate and return a block, based on its url
         // Throws Error if fails - should be TransportError but out of scope
-        let parsedurl = Url.parse(url);
-        let multihash = parsedurl.pathname.split('/').slice(-1);
         //TODO-HTTP could check that rest of URL conforms to expectations.
-        let httpurl=`http://${this.ipandport[0]}:${this.ipandport[1]}/${command}/${multihash}`;
+        let httpurl=`http://${this.ipandport[0]}:${this.ipandport[1]}/${command}`;
+        if (url) {
+            let parsedurl = Url.parse(url);
+            let multihash = parsedurl.pathname.split('/').slice(-1);
+            if (multihash) httpurl += "/" + multihash;
+        }
         if (verbose) console.log(command, "httpurl=",httpurl);
         return fetch(httpurl, init) // A promise
             .then((response) => {
@@ -98,7 +107,7 @@ class TransportHTTP extends TransportHTTPBase { //TODO-HTTP merge TransportHTTPB
             cache: 'default',
             redirect: 'follow',  // Chrome defaults to manual
         }; //TODO-HTTP expand this
-        return p_httpfetch(command, url, init, verbose);
+        return this.p_httpfetch(command, url, init, verbose);
     }
 
     p_post(command, url, type, data, verbose) {
@@ -112,19 +121,19 @@ class TransportHTTP extends TransportHTTPBase { //TODO-HTTP merge TransportHTTPB
             cache: 'default',
             redirect: 'follow',  // Chrome defaults to manual
         }; //TODO-HTTP expand this
-        return p_httpfetch(command, url, init, verbose);
+        return this.p_httpfetch(command, url, init, verbose);
     }
 
     p_rawfetch(url, verbose) {
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
-        return this.p_load("rawfetch", url, verbose)
+        return this.p_get("rawfetch", url, verbose)
     }
 
     p_rawlist(url, verbose) {
         // obj being loaded
         // Locate and return a block, based on its url
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
-        return this.p_load("rawlist", url, verbose);
+        return this.p_get("rawlist", url, verbose);
     }
     rawreverse() { console.assert(false, "XXX Undefined function TransportHTTP.rawreverse"); }
 
@@ -149,6 +158,9 @@ class TransportHTTP extends TransportHTTPBase { //TODO-HTTP merge TransportHTTPB
     static test() {
         return new Promise((resolve, reject)=> resolve(this));  // I think this should be a noop - fetched already
     }
+
+    info() { console.assert(false, "XXX Undefined function Transport.info"); }
+
 }
 exports = module.exports = TransportHTTP;
 
