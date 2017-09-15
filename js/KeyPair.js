@@ -92,7 +92,7 @@ class KeyPair extends SmartDict {
     }
 
 
-    p_store(verbose) {  //TODO-BACKPORT added to KP
+    p_store(verbose) {
         if (this._url)
             return; // Already stored
         if (!this._publicurl && KeyPair._key_has_private(this._key)) { // Haven't stored a public version yet.
@@ -104,7 +104,7 @@ class KeyPair extends SmartDict {
     }
 
 
-    preflight(dd) { //TODO-BACKPORT to PY changed to save publicurl
+    preflight(dd) {
         /*
         Subclasses SmartDict.preflight, checks not exporting unencrypted private keys, and exports private or public.
 
@@ -117,6 +117,7 @@ class KeyPair extends SmartDict {
         if (dd._key) { //Based on whether the CommonList is master, rather than if the key is (key could be master, and CL not)
             dd.key = KeyPair._key_has_private(dd._key) ? this.privateexport() : this.publicexport();
         }
+        // This code copied from CommonList
         let publicurl = dd._publicurl; // Save before preflight super
         let master = KeyPair._key_has_private(dd._key)
         dd = super.preflight(dd);  // Edits dd in place

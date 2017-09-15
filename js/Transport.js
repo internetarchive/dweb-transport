@@ -27,7 +27,6 @@ class Transport {
         if (typeof url === "string") {
             url = Url.parse(url);    // For efficiency, only parse once.
         }
-        console.log("XXX@30",url.protocol, typeof url.protocol, url.protocol.slice(0,-1), this.urlschemes, this.urlschemes.includes(url.protocol.slice(0,-1)));
         if (!url.protocol) { throw new Error("URL failed to specific a scheme (before :) "+url.href)} //Should be TransportError but out of scope here
         return this.urlschemes.includes(url.protocol.slice(0,-1))
     }

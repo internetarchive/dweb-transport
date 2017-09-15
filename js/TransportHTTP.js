@@ -3,7 +3,7 @@ const Transport = require('./Transport.js');
 const Dweb = require('./Dweb.js');
 const sodium = require("libsodium-wrappers");   // Note for now this has to be Mitra's version as live version doesn't support urlsafebase64
 if (typeof(Window) === "undefined") {
-    console.log("XXX@TransportHTTP.7 Must be on Node");
+    //console.log("XXX@TransportHTTP.7 Must be on Node");
     //var fetch = require('whatwg-fetch').fetch; //Not as good as node-fetch-npm, but might be the polyfill needed for browser.safari
     //XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;  // Note this doesnt work if set to a var or const, needed by whatwg-fetch
     var fetch = require('node-fetch-npm');
@@ -77,7 +77,6 @@ class TransportHTTP extends TransportHTTPBase { //TODO-HTTP merge TransportHTTPB
         return fetch(httpurl, init) // A promise
             .then((response) => {
                 if(response.ok) {
-                    console.log("XXX@88",response.headers)
                     if (response.headers.get('Content-type') === "application/json") {
                         return response.json(); // promise resolving to JSON
                     } else {
