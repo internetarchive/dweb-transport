@@ -84,12 +84,12 @@
     console.log("Loaded with url=", url);
 
     let verbose = true;
-    let transportclass = Dweb.TransportIPFS;
+    //let transportclass = Dweb.TransportIPFS;
     setstatus("IPFS Starting");
-    //let transportclass = TransportHTTP    // Uncomment this to choose HTTP
+    let transportclass = Dweb.TransportHTTP    // Uncomment this to choose HTTP
     transportclass.p_setup({}, verbose)
         .then((t) => {
-            setstatus(t.ipfs.isOnline() ? "IPFS Online" : "IPFS Not online");   //TODO status refactor to make common across transports
+            //setstatus(t.ipfs.isOnline() ? "IPFS Online" : "IPFS Not online");   //TODO status refactor to make common across transports
         })
     .then(() => { if(url) fetchanddisplay(url)})
     .catch((err) => { console.log("ERROR:",err); alert(err.message); });
