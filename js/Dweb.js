@@ -1,4 +1,4 @@
-//exports.TransportHTTP = require('./TransportHTTP');   //TODO-IPFS breaks
+exports.TransportHTTP = require('./TransportHTTP'); // Note this used to cause a problem in bundle I believe
 exports.Block = require('./Block');
 exports.SmartDict = require("./SmartDict");
 exports.KeyPair = require("./KeyPair");

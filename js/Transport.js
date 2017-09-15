@@ -1,8 +1,12 @@
 const Url = require('url');
 
 class Transport {
-    constructor(options, verbose) {}    // Doesnt do anything, its all done by SuperClasses
-
+    constructor(options, verbose) {
+        /*
+        Doesnt do anything, its all done by SuperClasses,
+        Superclass should merge with default options, call super
+        */
+    }
     p_setup(options, verbose) { //TODO-API
         /*
         Setup the resource and open any P2P connections etc required to be done just once.
@@ -27,7 +31,6 @@ class Transport {
         if (typeof url === "string") {
             url = Url.parse(url);    // For efficiency, only parse once.
         }
-        console.log("XXX@30",url.protocol, typeof url.protocol, url.protocol.slice(0,-1), this.urlschemes, this.urlschemes.includes(url.protocol.slice(0,-1)));
         if (!url.protocol) { throw new Error("URL failed to specific a scheme (before :) "+url.href)} //Should be TransportError but out of scope here
         return this.urlschemes.includes(url.protocol.slice(0,-1))
     }

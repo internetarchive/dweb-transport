@@ -1,12 +1,7 @@
 /*
 This Transport layers builds on IPFS and the YJS DB
 
-
 Y Lists have listeners and generate events - see docs at ...
-
-
-TODO-IPFS ComeBackFor: TransportHTTP & TransportHTTPBase (make use promises)
-
 */
 
 
@@ -280,7 +275,7 @@ class TransportIPFS extends Transport {
         let protocol = url.protocol;    // Lower case, Includes trailing :
         return protocol === 'ipfs:';
     }
-    url(data) { //TODO-BACKPORT to Python - called multihash
+    url(data) {
         /*
          Return an identifier for the data without storing typically ipfs:/ipfs/a1b2c3d4...
 

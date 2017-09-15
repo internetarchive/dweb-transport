@@ -180,6 +180,7 @@ class AccessControlList extends CommonList {
         if (! value.encrypted) {
             return value;
         } else {
+            if (verbose) console.log("ACL.p_decryptdata")
             let aclurl = value.acl;
             let kc = Dweb.KeyChain.keychains_find({_publicurl: aclurl});  // Matching KeyChain or None
             if (kc) {

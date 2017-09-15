@@ -1,25 +1,26 @@
-const TransportHTTPBase = require('./TransportHTTPBase.js');
 const Transport = require('./Transport.js');
 const Dweb = require('./Dweb.js');
 const sodium = require("libsodium-wrappers");   // Note for now this has to be Mitra's version as live version doesn't support urlsafebase64
 if (typeof(Window) === "undefined") {
-    console.log("XXX@TransportHTTP.7 Must be on Node");
+    //console.log("XXX@TransportHTTP.7 Must be on Node");
     //var fetch = require('whatwg-fetch').fetch; //Not as good as node-fetch-npm, but might be the polyfill needed for browser.safari
     //XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;  // Note this doesnt work if set to a var or const, needed by whatwg-fetch
     var fetch = require('node-fetch-npm');
     console.log("XXX Node loaded");
 }
-//TODO-HTTP at the moment this isn't setup to work in browser, should be simple to do.
+//TODO-HTTP at the moment this isn't setup to work in browser, should be simple to do except for potential Cross Origin (cors) issues
 //TODO-HTTP to work on Safari or mobile will require a polyfill, see https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch for comment
 
 defaulthttpoptions = {
     ipandport: [ 'localhost',4243]
 };
 
-class TransportHTTP extends TransportHTTPBase { //TODO-HTTP merge TransportHTTPBase into here
+class TransportHTTP extends Transport {
 
     constructor(options, verbose) {
         super(options, verbose);
+        this.options = options;
+        this.ipandport = options.http.ipandport;
         this.urlschemes = ['http'];
     }
 
@@ -66,29 +67,26 @@ class TransportHTTP extends TransportHTTPBase { //TODO-HTTP merge TransportHTTPB
         return "http://"+this.ipandport[0]+":"+this.ipandport[1]+"/rawfetch/"+Dweb.KeyPair.multihashsha256_58(data);    // Was "BLAKE2."+ sodium.crypto_generichash(32, data, null, 'urlsafebase64');
     }
 
-    p_load(command, url, verbose) { // Embrace and extend "fetch" to check result etc.
+    p_httpfetch(command, url, init, verbose) { // Embrace and extend "fetch" to check result etc.
+        /*
+        Fetch a url based from default server at command/multihash
+
+        url: optional - contains multihash as last component (Maybe TODO handle already parsed URL if provided).
+         */
         // Locate and return a block, based on its url
         // Throws Error if fails - should be TransportError but out of scope
-        let parsedurl = Url.parse(url);
-        let multihash = parsedurl.pathname.split('/').slice(-1);
         //TODO-HTTP could check that rest of URL conforms to expectations.
-        let httpgeturl=`http://${this.ipandport[0]}:${this.ipandport[1]}/${command}/${multihash}`;
-        if (verbose) console.log("p_rawfetch httpgeturl=",httpgeturl);
-        let init = {    //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
-            method: 'GET',
-            headers: {},
-            mode: 'cors',
-            cache: 'default',
-            redirect: 'follow',  // Chrome defaults to manual
-        }; //TODO-HTTP expand this
-        return fetch(httpgeturl,init) // A promise
+        let httpurl=`http://${this.ipandport[0]}:${this.ipandport[1]}/${command}`;
+        if (url) {
+            let parsedurl = Url.parse(url);
+            let multihash = parsedurl.pathname.split('/').slice(-1);
+            if (multihash) httpurl += "/" + multihash;
+        }
+        if (verbose) console.log(command, "httpurl=",httpurl);
+        return fetch(httpurl, init) // A promise
             .then((response) => {
-                console.log("XXX@86---")
                 if(response.ok) {
-                    console.log("XXX@87---")
-                    console.log("XXX@88",response.headers)
                     if (response.headers.get('Content-type') === "application/json") {
-                        console.log("XXX@89---")
                         return response.json(); // promise resolving to JSON
                     } else {
                         return response.text(); // promise resolving to text
@@ -98,16 +96,44 @@ class TransportHTTP extends TransportHTTPBase { //TODO-HTTP merge TransportHTTPB
             })
             .then((xxx) => {console.log("p.rawfetch returning",typeof(xxx),xxx); return xxx;} )
     }
+
+    p_get(command, url, verbose) {
+        // Locate and return a block, based on its url
+        // Throws Error if fails - should be TransportError but out of scope
+        let init = {    //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
+            method: 'GET',
+            headers: {},
+            mode: 'cors',
+            cache: 'default',
+            redirect: 'follow',  // Chrome defaults to manual
+        }; //TODO-HTTP expand this
+        return this.p_httpfetch(command, url, init, verbose);
+    }
+
+    p_post(command, url, type, data, verbose) {
+        // Locate and return a block, based on its url
+        // Throws Error if fails - should be TransportError but out of scope
+        let init = {    //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
+            method: 'POST',
+            headers: { 'Content-type': type},
+            body: data,
+            mode: 'cors',
+            cache: 'default',
+            redirect: 'follow',  // Chrome defaults to manual
+        }; //TODO-HTTP expand this
+        return this.p_httpfetch(command, url, init, verbose);
+    }
+
     p_rawfetch(url, verbose) {
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
-        return this.p_load("rawfetch", url, verbose)
+        return this.p_get("rawfetch", url, verbose)
     }
 
     p_rawlist(url, verbose) {
         // obj being loaded
         // Locate and return a block, based on its url
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
-        return this.p_load("rawlist", url, verbose);
+        return this.p_get("rawlist", url, verbose);
     }
     rawreverse() { console.assert(false, "XXX Undefined function TransportHTTP.rawreverse"); }
 
@@ -132,6 +158,9 @@ class TransportHTTP extends TransportHTTPBase { //TODO-HTTP merge TransportHTTPB
     static test() {
         return new Promise((resolve, reject)=> resolve(this));  // I think this should be a noop - fetched already
     }
+
+    info() { console.assert(false, "XXX Undefined function Transport.info"); }
+
 }
 exports = module.exports = TransportHTTP;
 

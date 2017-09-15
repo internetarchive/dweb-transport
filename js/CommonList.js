@@ -103,6 +103,7 @@ class CommonList extends SmartDict {
             }
             dd.keypair = dd._master ? dd.keypair.privateexport() : dd.keypair.publicexport();
         }
+        // Note same code on KeyPair
         let publicurl = dd._publicurl; // Save before preflight
         let master = dd._master;
         dd = super.preflight(dd);  // Edits dd in place
@@ -118,12 +119,10 @@ class CommonList extends SmartDict {
         Use p_list_then_elements instead if wish to load the individual items in the list
         */
         let self = this;
-        verbose=true; //TODO-HTTP revert
         if (!this._publicurl) this._p_storepublic(verbose); // Async, but sets _publicurl immediately
         return this.transport().p_rawlist(this._publicurl, verbose)  //TODO modify to allow listmonitor
             .then((lines) => { // lines should be an array
                 if (verbose) console.log("CommonList:p_fetchlist.success", self._url, "len=", lines.length);
-                console.log("XXX@126",lines)
                 self._list = lines.map((l) => new Dweb.Signature(l, verbose));    // Turn each line into a Signature
             })
     }
