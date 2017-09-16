@@ -5,7 +5,6 @@ if (typeof(Window) === "undefined") {
     //console.log("XXX@TransportHTTP.7 Must be on Node");
     //var fetch = require('whatwg-fetch').fetch; //Not as good as node-fetch-npm, but might be the polyfill needed for browser.safari
     //XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;  // Note this doesnt work if set to a var or const, needed by whatwg-fetch
-    var fetch = require('node-fetch-npm');
     console.log("XXX Node loaded");
 }
 //TODO-HTTP at the moment this isn't setup to work in browser, should be simple to do except for potential Cross Origin (cors) issues
@@ -72,6 +71,7 @@ class TransportHTTP extends Transport {
         Fetch a url based from default server at command/multihash
 
         url: optional - contains multihash as last component (Maybe TODO handle already parsed URL if provided).
+        throws: TODO if fails to fetch
          */
         // Locate and return a block, based on its url
         // Throws Error if fails - should be TransportError but out of scope
@@ -83,10 +83,13 @@ class TransportHTTP extends Transport {
             if (multihash) httpurl += "/" + multihash;
         }
         if (verbose) console.log(command, "httpurl=",httpurl);
-        return fetch(httpurl, init) // A promise
+        if (verbose) console.log(command, "init=",init);
+        //console.log('CTX=',init["headers"].get('Content-Type'))
+        // Using window.fetch, because it doesn't appear to be in scope otherwise in the browser.
+        return window.fetch(new window.Request(httpurl, init)) // A promise, throws (on Chrome, untested on Ffox or Node) TypeError: Failed to fetch)
             .then((response) => {
                 if(response.ok) {
-                    if (response.headers.get('Content-type') === "application/json") {
+                    if (response.headers.get('Content-Type') === "application/json") {
                         return response.json(); // promise resolving to JSON
                     } else {
                         return response.text(); // promise resolving to text
@@ -95,6 +98,7 @@ class TransportHTTP extends Transport {
                 throw new Error(`Transport Error ${response.status}: ${response.statusText}`); // Should be TransportError but out of scope
             })
             .then((xxx) => {console.log("p.rawfetch returning",typeof(xxx),xxx); return xxx;} )
+            .catch((err) => { console.log("Probably misleading error from fetch:",httpurl,err); throw new Error(`Transport error thrown by ${httpurl}`)})   // Error here is particularly unhelpful - if rejected during the COrs process it throws a TypeError
     }
 
     p_get(command, url, verbose) {
@@ -102,7 +106,7 @@ class TransportHTTP extends Transport {
         // Throws Error if fails - should be TransportError but out of scope
         let init = {    //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
             method: 'GET',
-            headers: {},
+            headers: new window.Headers(),
             mode: 'cors',
             cache: 'default',
             redirect: 'follow',  // Chrome defaults to manual
@@ -113,9 +117,14 @@ class TransportHTTP extends Transport {
     p_post(command, url, type, data, verbose) {
         // Locate and return a block, based on its url
         // Throws Error if fails - should be TransportError but out of scope
-        let init = {    //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
+        //let headers = new window.Headers();
+        //headers.set('content-type',type); Doesn't work, it ignores it
+        let init = {
+            //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
+            //https://developer.mozilla.org/en-US/docs/Glossary/Forbidden_header_name for headers tat cant be set
             method: 'POST',
-            headers: { 'Content-type': type},
+            headers: {}, //headers,
+            //body: new Buffer(data),
             body: data,
             mode: 'cors',
             cache: 'default',

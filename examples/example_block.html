@@ -32,7 +32,8 @@
                 .then(() => {
                     el = document.getElementById("retrievalarea");
                     el.value = blk._url; // Use as default on input
-                });
+                })
+                .catch((err) => alert(err));
         }
     });
 
