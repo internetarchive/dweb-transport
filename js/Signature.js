@@ -25,6 +25,13 @@ class Signature extends SmartDict {
         this.table = "sig"; //TODO- consider passing as options to super, need to do across all classes
     }
 
+    __setattr__(name, value) {
+        if (name === "date" && typeof value === 'string') {
+            value = new Date(value);    // Convert from presumably ISOString (note JSON.stringify does an ISOString in Javascript)
+        }
+        super.__setattr__(name, value);
+    }
+
     signable() {
         /*
         Returns a string suitable for signing and dating, current implementation includes date and storage url of data.

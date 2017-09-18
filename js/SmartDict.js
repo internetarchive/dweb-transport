@@ -34,7 +34,7 @@ class SmartDict extends Transportable {
 
     __setattr__(name, value) { // Call chain is ... success or constructor > _setdata > _setproperties > __setattr__
         // Subclass this to catch any field (other than _data) which has its own setter
-        //TODO-DATE Need a javascript equivalent way of transforming date
+        //Note how Signature transforms date to a string
         // if (name[0] != "_") {
         //    if "date" in name and isinstance(value,basestring):
         //        value = dateutil.parser.parse(value)

@@ -152,11 +152,11 @@ class TransportHTTP extends Transport {
         return this.p_post("rawstore", null, "application/octet-stream", data, verbose) // Returns immediately with a promise
     }
 
-    p_rawadd(url, date, signature, signedby, verbose) {
+    p_rawadd(url, date, signature, signedby, verbose) { //TODO-BACKPORT turn date into ISO before adding
         //verbose=true;
         console.assert(url && signature && signedby, "p_rawadd args",url,signature,signedby);
         if (verbose) console.log("rawadd", url, date, signature, signedby);
-        let value = this._add_value( url, date, signature, signedby, verbose)+ "\n";
+        let value = this._add_value( url, date.toISOString(), signature, signedby, verbose)+ "\n";
         return this.p_post("rawadd", null, "application/json", value, verbose); // Returns immediately
     }
 

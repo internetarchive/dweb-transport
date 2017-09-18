@@ -455,7 +455,7 @@ class TransportIPFS extends Transport {
         */
         console.assert(url && signature && signedby, "p_rawadd args",url,signature,signedby);
         if (verbose) console.log("p_rawadd", url, date, signature, signedby);
-        let value = {url: url, date: date, signature: signature, signedby: signedby};
+        let value = {url: url, date: date.toISOString(), signature: signature, signedby: signedby};
         return this.p__yarray(signedby, verbose)
             .then((y) => y.share.array.push([value]));
     }
