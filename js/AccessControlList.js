@@ -84,12 +84,19 @@ class AccessControlList extends CommonList {
             .then((acle) => { self.p_push(acle, verbose); return acle;})
     }
 
-    tokens(viewerkeypair, decrypt, verbose) {
+    p_tokens(verbose) { //TODO-API add //TODO-BACKPORT
+        /*
+        Return the list of tokens on this ACL. Side effect of loading data on each Signature in this._list
+        resolves to: [ SmartDict{token:, viewer:, name: }, ... ]
+         */
+        return this.p_list_then_elements(verbose);      // Trivial
+    }
+    _findtokens(viewerkeypair, decrypt, verbose) {  //TODO-API was "tokens"
         /*
         Find the entries, if any, in the ACL for a specific viewer
         There might be more than one if either the accesskey changed or the person was added multiple times.
         Entries are SmartDict with token being the decryptable accesskey we want
-        The ACL should have been p_list_then_elements() before so that this can run synchronously.
+        The ACL should have been p_tokens() before so that this can run synchronously.
 
         :param viewerkeypair:  KeyPair of viewer
         :param decrypt: If should decrypt the
@@ -133,7 +140,7 @@ class AccessControlList extends CommonList {
         if (!Array.isArray(vks)) { vks = [ vks ]; } // Convert singular key into an array
         for (let i in vks) {
             let vk = vks[i];
-            let accesskeys = this.tokens(vk, true, verbose); // Find any tokens in ACL for this KeyPair and decrypt to get accesskey (maybe empty)
+            let accesskeys = this._findtokens(vk, true, verbose); // Find any tokens in ACL for this KeyPair and decrypt to get accesskey (maybe empty)
             for (let j in accesskeys) { // Try each of these keys
                 let accesskey = accesskeys[j];
                 try {   // If can descrypt then return the data
@@ -188,7 +195,7 @@ class AccessControlList extends CommonList {
                 let acl;
                 return Dweb.SmartDict.p_fetch(aclurl, verbose) // Will be AccessControlList
                     .then((newacl) => acl = newacl)
-                    .then(() => acl.p_list_then_elements(verbose)) // Will load blocks in sig as well
+                    .then(() => acl.p_tokens(verbose)) // Will load blocks in sig as well
                     .then(() => acl.decrypt(value.encrypted, null, verbose))  // Resolves to data or throws AuthentictionError
                     .then((data) => Dweb.transport().loads(data))
                     .catch((err) => { console.log("Unable to decrypt:",value); throw(err);});
