@@ -531,7 +531,7 @@ class TransportIPFS extends Transport {
                         if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res))
                     })
                     .then(() => transport.listmonitor(testurl, (obj) => console.log("Monitored", obj), verbose))
-                    .then((res) => transport.p_rawadd("123", "TODAY", "Joe Smith", testurl, verbose))
+                    .then((res) => transport.p_rawadd("123", new Date(Date.now()), "Joe Smith", testurl, verbose))
                     .then(() => { if (verbose) console.log("p_rawadd returned ")  })
                     .then(() => transport.p_rawlist(testurl, verbose))
                     .then((res) => { if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res)) }) // Note not showing return

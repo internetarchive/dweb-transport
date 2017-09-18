@@ -13,8 +13,8 @@ const Dweb = require('./Dweb');
 function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { resolve(val); },ms)})}
 
 //Comment out one of these next two lines
-let transportclass = Dweb.TransportIPFS;
-//let transportclass = TransportHTTP
+//let transportclass = Dweb.TransportIPFS;
+let transportclass = TransportHTTP
 
 // Fake a browser like environment for some tests
 const jsdom = require("jsdom");
@@ -23,10 +23,6 @@ htmlfake = '<!DOCTYPE html><ul><li id="myList.0">Failed to load sb via Structure
 const dom = new JSDOM(htmlfake);
 //console.log("XXX@8",dom.window.document.getElementById("myList.0").textContent); // Before loading = "Failed to load sb via StructuredBlock"
 document = dom.window.document;   // Note in JS can't see "document" like can in python
-window = dom.window;                // Set window global (so window.fetch will look in correct place) but note
-window.fetch = require('node-fetch-npm');
-window.Headers = window.fetch.Headers;      // A class
-window.Request = window.fetch.Request;      // A class
 
 let verbose = true;
 let sb;

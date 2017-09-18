@@ -1,11 +1,20 @@
 const Transport = require('./Transport.js');
 const Dweb = require('./Dweb.js');
 const sodium = require("libsodium-wrappers");   // Note for now this has to be Mitra's version as live version doesn't support urlsafebase64
+const nodefetch = require('node-fetch-npm');
 if (typeof(Window) === "undefined") {
-    //console.log("XXX@TransportHTTP.7 Must be on Node");
     //var fetch = require('whatwg-fetch').fetch; //Not as good as node-fetch-npm, but might be the polyfill needed for browser.safari
     //XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;  // Note this doesnt work if set to a var or const, needed by whatwg-fetch
-    console.log("XXX Node loaded");
+    console.log("Node loaded");
+    var fetch = nodefetch
+    var Headers = fetch.Headers;      // A class
+    var Request = fetch.Request;      // A class
+} else {
+    // If on a browser, need to find fetch,Headers,Request in window
+    console.log("Loading browser version of fetch,Headers,Request")
+    var fetch = window.fetch;
+    var Headers = window.Headers;
+    var Request = window.Request;
 }
 //TODO-HTTP at the moment this isn't setup to work in browser, should be simple to do except for potential Cross Origin (cors) issues
 //TODO-HTTP to work on Safari or mobile will require a polyfill, see https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch for comment
@@ -104,7 +113,7 @@ class TransportHTTP extends Transport {
         if (verbose) console.log(command, "init=",init);
         //console.log('CTX=',init["headers"].get('Content-Type'))
         // Using window.fetch, because it doesn't appear to be in scope otherwise in the browser.
-        return window.fetch(new window.Request(httpurl, init)) // A promise, throws (on Chrome, untested on Ffox or Node) TypeError: Failed to fetch)
+        return fetch(new Request(httpurl, init)) // A promise, throws (on Chrome, untested on Ffox or Node) TypeError: Failed to fetch)
             .then((response) => {
                 if(response.ok) {
                     if (response.headers.get('Content-Type') === "application/json") {
@@ -124,7 +133,7 @@ class TransportHTTP extends Transport {
         // Throws Error if fails - should be TransportError but out of scope
         let init = {    //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
             method: 'GET',
-            headers: new window.Headers(),
+            headers: new Headers(),
             mode: 'cors',
             cache: 'default',
             redirect: 'follow',  // Chrome defaults to manual
