@@ -61,7 +61,9 @@
     </script>
 </head>
 <body>
-<div id="status" class="status"></div>
+<div class="floatright">
+    <div id="status">Starting</div>
+</div>
 <h1>Dweb - Block Example</h1>
 <h4>Create something here, and when its saved its link will appear below</h4>
 <form method="post">
@@ -76,24 +78,22 @@
 
 <div class="displayedblock" id="retrievaldestn">retrieved data will go here</div>
 
-
-
 <script type="text/javascript">
+    // This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
+    var searchparms = new URL(window.location.href).searchParams;
+    var url = searchparms.get("url");
+    let transportclass = Dweb["Transport"+(searchparms.get("transport") || "IPFS").toUpperCase()]; // e.g. Dweb["TransportHTTP"]
 
-    /* Pull url out of URL search string.*/
-    var url = new URL(window.location.href).searchParams.get("url")
-    console.log("Loaded with url=", url);
-
-    let verbose = true;
-    //let transportclass = Dweb.TransportIPFS;
-    setstatus("IPFS Starting");
-    let transportclass = Dweb.TransportHTTP    // Uncomment this to choose HTTP
+    let verbose = false;
     transportclass.p_setup({}, verbose)
-        .then((t) => {
-            //setstatus(t.ipfs.isOnline() ? "IPFS Online" : "IPFS Not online");   //TODO status refactor to make common across transports
+        .then((t) => t.p_status())
+        .then((msg) => setstatus(msg))
+        .then(() => {
+            // Any code you want to run once online goes here.
+            if(url) fetchanddisplay(url);
         })
-    .then(() => { if(url) fetchanddisplay(url)})
-    .catch((err) => { console.log("ERROR:",err); alert(err.message); });
+        .catch((err) => { console.log("ERROR:",err); alert(err.message); });
 </script>
+
 </body>
 </html>

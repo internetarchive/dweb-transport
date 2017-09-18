@@ -66,6 +66,24 @@ class TransportHTTP extends Transport {
         return "http://"+this.ipandport[0]+":"+this.ipandport[1]+"/rawfetch/"+Dweb.KeyPair.multihashsha256_58(data);    // Was "BLAKE2."+ sodium.crypto_generichash(32, data, null, 'urlsafebase64');
     }
 
+    p_status() {    //TODO-API //TODO-BACKPORT
+        /*
+        Return a string for the status of a transport. No particular format, but keep it short as it will probably be in a small area of the screen.
+        resolves to: String representing type connected (always HTTP) and online if online.
+         */
+        let self = this;
+        return this.p_info()
+            .then((info) => {
+                self.info = info;
+                return self.info.type.toUpperCase() + " online"
+            })
+            .catch((err) => {
+                console.log("Error in p_status.info",err);
+                return "OFFLINE ERROR";
+            })
+    }
+
+
     p_httpfetch(command, url, init, verbose) { // Embrace and extend "fetch" to check result etc.
         /*
         Fetch a url based from default server at command/multihash
@@ -168,7 +186,7 @@ class TransportHTTP extends Transport {
         return new Promise((resolve, reject)=> resolve(this));  // I think this should be a noop - fetched already
     }
 
-    info() { console.assert(false, "XXX Undefined function Transport.info"); }
+    p_info() { return this.p_get("info"); } //TODO-BACKPORT //TODO-API
 
 }
 exports = module.exports = TransportHTTP;

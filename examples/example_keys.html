@@ -155,7 +155,7 @@
 </head>
 <body>
     <div class="floatright">
-        <div id="status"></div>
+        <div id="status">Starting</div>
         <ul id="kclist_ul"><!-- List of all existing keychains--></ul>
         <form><input id="logout" class="button" type="button" onclick="clicklogout();" style="display:none;"; value="Logout"/></form><!--logout all keychains-->
         <img src="noun_186903_cc.png" class="iconopener" onclick="togglevis('logindiv','');"/>
@@ -266,20 +266,19 @@
     </div>
 
     <script type="text/javascript">
-        <!--Start transport, and if passed a URL then open it-->
-        <!-- TODO-REL4-MULTITRANSPORT copy this to other examples -->
-        var url = new URL(window.location.href).searchParams.get("url")
-        console.log("Loaded with url=", url, "but ignored in this example");
+        // This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
+        const searchparms = new URL(window.location.href).searchParams;
+        const url = searchparms.get("url");
+        let transportclass = Dweb["Transport"+(searchparms.get("transport") || "IPFS").toUpperCase()]; // e.g. Dweb["TransportHTTP"]
 
         let verbose = false;
-        let transportclass = Dweb.TransportIPFS;
-        setstatus("IPFS Starting");
-        //let transportclass = TransportHTTP    // Uncomment this to choose HTTP
         transportclass.p_setup({}, verbose)
-            .then((t) => {
-                setstatus(t.ipfs.isOnline() ? "IPFS Online" : "IPFS Not online");   //TODO status refactor to make common across transports
+            .then((t) => t.p_status())
+            .then((msg) => setstatus(msg))
+            .then(() => {
+                // Any code you want to run once online goes here.
+                //if(url) fetchanddisplay(url);  // In this app, ignoring any URL passed in call
             })
-            //.then(() => { if(url) fetchanddisplay(url)})
             .catch((err) => { console.log("ERROR:",err); alert(err.message); });
     </script>
 </body>

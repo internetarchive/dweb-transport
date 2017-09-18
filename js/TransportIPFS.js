@@ -275,6 +275,14 @@ class TransportIPFS extends Transport {
         let protocol = url.protocol;    // Lower case, Includes trailing :
         return protocol === 'ipfs:';
     }
+
+    p_status() {
+        /*
+        Return a string for the status of a transport. No particular format, but keep it short as it will probably be in a small area of the screen.
+         */
+        return new Promise(resolve => resolve(this.ipfs.isOnline() ? "IPFS Online" : "IPFS Offline"));
+    }
+
     url(data) {
         /*
          Return an identifier for the data without storing typically ipfs:/ipfs/a1b2c3d4...
