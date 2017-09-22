@@ -30,7 +30,7 @@ class TransportHTTP extends Transport {
         super(options, verbose);
         this.options = options;
         this.ipandport = options.http.ipandport;
-        this.urlschemes = ['http'];
+        this.urlschemes = ['http','https'];
     }
 
     static p_setup(options, verbose) {
