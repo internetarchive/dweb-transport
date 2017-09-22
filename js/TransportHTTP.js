@@ -73,7 +73,7 @@ class TransportHTTP extends Transport {
          :return string              valid id to retrieve data via p_rawfetch
          */
         //TODO-HTTP use templating in next string
-        return "http://"+this.ipandport[0]+":"+this.ipandport[1]+"/rawfetch/"+Dweb.KeyPair.multihashsha256_58(data);    // Was "BLAKE2."+ sodium.crypto_generichash(32, data, null, 'urlsafebase64');
+        return "https://"+this.ipandport[0]+":"+this.ipandport[1]+"/rawfetch/"+Dweb.KeyPair.multihashsha256_58(data);    // Was "BLAKE2."+ sodium.crypto_generichash(32, data, null, 'urlsafebase64');
     }
 
     p_status() {    //TODO-API //TODO-BACKPORT
@@ -104,7 +104,7 @@ class TransportHTTP extends Transport {
         // Locate and return a block, based on its url
         // Throws Error if fails - should be TransportError but out of scope
         //TODO-HTTP could check that rest of URL conforms to expectations.
-        let httpurl=`http://${this.ipandport[0]}:${this.ipandport[1]}/${command}`;
+        let httpurl=`https://${this.ipandport[0]}:${this.ipandport[1]}/${command}`;
         if (url) {
             let parsedurl = Url.parse(url);
             let multihash = parsedurl.pathname.split('/').slice(-1);
