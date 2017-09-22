@@ -21,7 +21,7 @@ if (typeof(Window) === "undefined") {
 
 defaulthttpoptions = {
     //ipandport: [ 'localhost',4243]
-    ipandport: [ 'sandbox.dweb.me', 80]
+    ipandport: [ 'sandbox.dweb.me', 443]
 };
 
 class TransportHTTP extends Transport {
