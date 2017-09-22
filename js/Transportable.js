@@ -57,7 +57,8 @@ class Transportable {
         let self = this;
         return this.transport().p_rawstore(data, verbose)
             .then((msg) => {
-                if (msg !== self._url) {
+                //if (msg !== self._url) {
+                if (false) { //TODO match URLs but only match bottom half e.g. localhost:4243 -> sandbox.dweb.me:80 is fine
                     console.log("Transportable.p_store: ERROR URL returned ",msg,"doesnt match url expected",self._url);
                     throw new Dweb.errors.TransportError("URL returned "+msg+" doesnt match url expected "+self._url)
                 }

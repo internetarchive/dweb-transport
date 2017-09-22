@@ -20,7 +20,8 @@ if (typeof(Window) === "undefined") {
 //TODO-HTTP to work on Safari or mobile will require a polyfill, see https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch for comment
 
 defaulthttpoptions = {
-    ipandport: [ 'localhost',4243]
+    //ipandport: [ 'localhost',4243]
+    ipandport: [ 'sandbox.dweb.me', 80]
 };
 
 class TransportHTTP extends Transport {
