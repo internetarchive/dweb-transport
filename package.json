@@ -10,7 +10,7 @@
     "libsodium-wrappers": "git+https://git@github.com/mitra42/libsodium.js.git",
     "node-fetch-npm": "^2.0.2",
     "promisify-es6": "^1.0.3",
-    "request": ">=2.81.0",
+    "request": "^2.82.0",
     "sha3": "^1.2.0",
     "whatwg-fetch": "^2.0.3",
     "xmlhttprequest": "^1.8.0",
