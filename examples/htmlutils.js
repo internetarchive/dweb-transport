@@ -39,13 +39,17 @@ function setstatus(msg) {
     document.getElementById("status").innerHTML=msg;
 }
 
-function deletechildren(el) {
+function deletechildren(el, keeptemplate) {
     /*
     Remove all children from a node
     :param el:  An HTML element, or a string with id of an HTML element
     */
+    if (typeof keeptemplate === "undefined") keeptemplate=true;
     el = (typeof(el) === "string") ? document.getElementById(el) : el;
-    while (el.firstChild) { el.removeChild(el.firstChild); }
+    while (el.firstChild) { // Note that deletechildren is also used on Span's to remove the children before replacing with text.
+        if (!(keeptemplate && el.firstChild.classList && el.firstChild.classList.contains("template")))
+            el.removeChild(el.firstChild);
+    }
     return el; // For chaining
 }
 
@@ -80,8 +84,27 @@ function replacetexts(el, ...dict) { //TODO-REL4 put into example_list and examp
     return el;
 }
 
+function addtemplatedchild(el, dict) {
+    /*
+    ALTERNATIVE EXPERIMENT TO addhtml
+    Standardised tool to add fields to html,  add that as the last child (or children) of el
+    The slightly convulated way of doing this is because of the limited set of functions available
+    Note this has to be done with care, as "dict" may be user supplied and contain HTML or other malicious content
+
+    el: An HTML element, or a string with the id of one.
+    html: html to add under outerelement
+    dict: Dictionary with parameters to replace in html, it looks for nodes with name="xxx" and replaces text inside it with dict[xxx]
+    */
+    el = (typeof(el) === "string") ? document.getElementById(el) : el;
+    el_li = el.getElementsByClassName("template")[0].cloneNode(true);   // Copy first child with class=Template
+    el_li.classList.remove("template");                                 // Remove the "template" class so it displays
+    replacetexts(el_li, dict);                          // Safe since only replace text - sets el_li.source to dict
+    el.appendChild(el_li)
+    return el_li;
+}
 function addhtml(el, htmleach, dict) { //TODO-REL4 if works in example_list replace code in example_keys that constructs html
     /*
+    TODO OBSOLETED BY addtemplatechild
     Standardised tool to add fields to html,  add that as the last child (or children) of el
     The slightly convulated way of doing this is because of the limited set of functions available
     Note this has to be done with care, as "dict" may be user supplied and contain HTML or other malicious content

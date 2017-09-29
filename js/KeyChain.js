@@ -88,6 +88,12 @@ class KeyChain extends CommonList {
         }
     }
 
+    static logout() { //TODO-API
+        /*
+        Logout user - which means removing from Dweb.keychains
+         */
+        Dweb.keychains = []
+    }
     _p_storepublic(verbose) {
         /*
         Subclasses CommonList._storepublic

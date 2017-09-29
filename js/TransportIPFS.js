@@ -230,9 +230,7 @@ class TransportIPFS extends Transport {
             if (verbose) console.log("Creating Y for",url);
             let options = Transport.mergeoptions(this.options.yarray, {connector: { room: url}}) // Copies options
             options.connector.ipfs = this.ipfs;
-            console.log("XXX@p__yarray pre call", options)
             return Y(options)
-                .then((xxx) => { console.log("XXX@p__yarray post call"); return xxx;})
                 .then((y) => this.yarrays[url] = y);
         }
     }

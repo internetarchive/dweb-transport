@@ -4,95 +4,94 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>DWEB KeyChains and Access Control List example</title>
     <link rel='stylesheet' href='example_styles.css'>
-    <!-- Load IIIF - can be commented if using Y, needed for IIIF due to error in browserify/iiif interaction-->
-    <!--<script src="https://unpkg.com/ipfs-iiif-db/dist/browser.js"></script><!--or browser.min.js-->
-    <!--<script src="https://unpkg.com/ipfs-iiif-db@2.4.0/dist/browser.min.js"></script><!--or browser.min.js-->
-    <!--<script src="cached/browser.min.js"></script><!-- cached version of ipfs/iiif so can test offline-->
-    <script type="text/javascript" src="dweb_transport_ipfs_bundled.js"></script><!-- Dwebbundle via local filesystem when testing without Dweb-->
-    <!--<script src='/dweb/tinymce/tinymce.min.js'></script><!-- TinyMCE -->
-    <!--<script src='http://cloud.tinymce.com/stable/tinymce.min.js'></script><!-- TinyMCE -->
-    <!--<script src='/file/mb/BLAKE2.dfMoOqTdXvqKhoZo7HPvD5raBXfgH7chXsN2PElizs8=/tinymce.min.js'></script><!-- TinyMCE via relative URL-->
+    <script type="text/javascript" src="dweb_transport_ipfs_bundled.js"></script><!-- Load bundle - assigns to "Dweb"-->
     <script type="text/javascript" src="objbrowser.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript" src="htmlutils.js"></script><!--Non Dweb specific utility functions for working with HTML-->
+
     <script type="text/javascript">
 
-    </script>
-    <script type="text/javascript">
-        function p_login_and_add_to_keychain(dict) {
-            // Add to HTML list of logins
-            verbose=true;
-            if (verbose) console.log("p_login_and_add_to_keychain",JSON.stringify(dict));
+        /* NOTES
+         * As with the browser library, the convention p_xyz means the function is asynchronous and returns a Promise
+         */
+
+        // Array of images can use
+        const images = {acl: "noun_1093404_cc.png", kp: "noun_1146472_cc.png"}; /* If change here - see also Keys on KeyChain code below*/
+
+        function _p_login(dict) {
+            /* common routine to login someone by name and passphrase, and display in KeyChain list - note
+            :param dict: {name: passprase: }
+             */
+            // concatenate them so that a common passphrase isn't sufficient to guess an id.
+            let passphrase = dict.name + "/" + dict.passphrase;
             return Dweb.KeyChain.p_new({ name: dict.name}, {passphrase: dict.name + "/" + dict.passphrase}, verbose)
                 .then((kc) => {
-                    let htmleach = "<li class='vertical_li' onclick='p_kc_click(this);'><span class='kclist_name' name='name'></span></li>";
-                    addhtml("kclist_ul", htmleach, kc );    // returns el, but unused
-                    show('logout'); // And show the logout button
-                    return kc;
+                    addtemplatedchild("kclist_ul", kc );    // returns el, but unused
+                    show('logout');                         // And show the logout button
                 })
         }
 
         function p_registrationsubmit() {
-            let verbose = true; //copious debugging in console log
+            /* User has filled in and submitted the registration button */
             if (verbose) console.log("p_registrationsubmit ---");
-            hide('registrationdiv');
-            let dict = form2dict("registrationform"); //name, passphrase
-            return p_login_and_add_to_keychain(dict)
-                    .then((kc) => objbrowser(kc,null,null,'ObjBrowser',verbose))
-        }
-
-        function clicklogout() {
-            // Remove from keychains
-            Dweb.keychains = [];
-            deletechildren("kclist_ul");   // Delete any visible ones
-            if (Dweb.keychains.length === 0) hide('logout'); // Nothing to logout
+            hide('registrationdiv');                                // Hide after submission
+            return _p_login(form2dict("registrationform"));         // { name, passphrase }
         }
 
         function p_loginformsubmit() {
+            /* Login button clicked - User has logged in */
             // At the moment this is identical behavior to p_registrationsubmit, but that could change
-            let verbose = true; //copious debugging in console log
+            //TODO - check if user already exists, require "registration if not
             if (verbose) console.log("loginformsubmit ---");
-            let dict = form2dict("loginform"); //name, passphrase
-            hide('logindiv');
-            return p_login_and_add_to_keychain(dict)
-                .then((kc) => objbrowser(kc,null,null,'ObjBrowser',verbose))
+            hide('logindiv');                           // Hide after submission
+            return _p_login(form2dict("loginform"));    // { name, passphrase }
         }
 
-        const objsyms = {acl: "noun_1093404_cc.png", kp: "noun_1146472_cc.png"}; /* If change here - see also Keys on KeyChain code below*/
-        function _kclist_push(obj) {
+        function clicklogout() {
+            /* Logout button clicked  - logged out*/
+            Dweb.KeyChain.logout();         // Empty keychains
+            deletechildren("kclist_ul");    // Delete any visible children
+            hide('logout');                 // Nothing remains to logout so hide button
+        }
+
+        function _showkeyorlock(obj) {
             // Utility function to add new or existing element to Key List
             let objtype = obj.table; // acl = AccessControlList, kp = KeyPair
-            let objsym = objsyms[objtype];
+            let objsym = images[objtype];
             let objclick = {acl: 'p_acl_click(this);', kp: 'p_key_click(this);'}[objtype];
             let htmleach = '<li class="inline_li" onclick="'+objclick+'"><img class="keylist_icon" src="'+objsym+'"/><span class="keylist_name" name="name"></span></li>';
             return addhtml("keylist_ul", htmleach, obj);
         }
         function p_kc_click(el) {
-            let kc = el.source;
-            show('keys'); //block - Show keylist
-            let el_keylistheader = replacetexts("keylist_header", kc);    // Set name fields etc in keylistdiv, sets source
-            deletechildren("keylist_ul");
+            /* Click on a KeyChain i.e. on a login - display list of Keys and Locks for that login */
+            let kc = el.source;                                         // Find KeyChain clicked on
+            show('keys');                                               // Show the div 'keys' for showing keylist
+            let el_keylistheader = replacetexts("keylist_header", kc);  // Set name fields etc in keylistdiv, sets source
+            deletechildren("keylist_ul");                               // Delete any locks or eys currently displayed
+            //TODO this is not quite right, should retrieve at login, and then monitor then, but only right to keylist_ul if its monitoring this keylist
+            //TODO should add this as event listener on KC, then add an "addEventListner" on the KC and default it at creation
+            //TODO https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener
+            //TODO and https://developer.mozilla.org/en-US/docs/Web/API/EventTarget
             return kc.p_list_then_elements()                            // Retrieve the keys for the keylist
-                .then(() => kc._keys.map((key)=> _kclist_push(key)))    // And add to the HTML
-        		.then(() => kc.listmonitor(                             // Note the callback will store on kc as well before calling this function
+                .then(() => kc._keys.map((key)=> _showkeyorlock(key)))  // And add to the HTML
+        		.then(() => kc.listmonitor(                             // Setup a callback when something is added to the list
+                    // Note the callback will ignore duplicates (including echo of any we add) and store on kc as well before calling this function
                     (sig) => {
-                        if (sig.signedby === el_keylistheader.source._publicurl)
-                            sig.p_fetchdata(verbose)                   // and will ignore duplicates including an echo of the one we add
-                                .then((obj) => _kclist_push(obj)) },
+                        if (kc === el_keylistheader.source._publicurl)  // Check its still this KeyChain being displayed in keylist
+                            sig.p_fetchdata(verbose)                    // Get the data from a sig, its not done automatically as in other cases could be large
+                                .then((obj) => _showkeyorlock(obj)) },  // Show on the list
                     verbose));
         }
         function p_newkey() {
-            let verbose = true; //copious debugging in console log
             if (verbose) console.log("p_newkey ---");
             hide('keynew_div');
             let dict = form2dict("newkeyform"); //name
             let kc = document.getElementById('keylist_header').source;
             let key = new Dweb.KeyPair({name: dict.name, key: {keygen: true}, _acl: kc}, verbose );
-            _kclist_push(key);   // Dont put in UI, as listmonitor gets it as well.
+            _showkeyorlock(key);   // Dont put in UI, as listmonitor gets it as well.
             return key.p_store(verbose)
                 .then(() => kc.p_push(key, verbose));
         }
         function p_newtoken() { //Called by "Add" button on new token dialog
-            let verbose = true; //copious debugging in console log
             if (verbose) console.log("p_newtoken ---");
             hide('tokennew_div');
             let dict = form2dict("newtokenform"); //url
@@ -101,7 +100,6 @@
                 .then((tok) => acllist_push(tok)) // Push to visual list, as listmonitor will be a duplicate
         }
         function p_newacl() {
-            let verbose = true; //copious debugging in console log
             if (verbose) console.log("p_newacl ---");
             hide('aclnew_div');
             let dict = form2dict("newaclform"); //name
@@ -110,18 +108,16 @@
                 .then((acl) => _kclist_push(acl)); // Dont put in UI, as listmonitor gets it as well.
         }
         function p_key_click(el) {
-            let verbose = false; //copious debugging in console log
             if (verbose) console.log("p_key_click ---");
             source = el.source;
             window.prompt("Copy to clipboard (Ctrl-C + OK)", el.source._publicurl);
         }
         function acllist_push(obj) {
             // Add an key to list showing an ACL, clicking on it will display key's public key (just as for a KeyChain).
-            let htmleach = `<li class="inline_li" onclick="p_key_click(this)"><img class="keylist_icon" src="${objsyms['kp']}"/><span class="keylist_name" name="name"></span></li>`;
+            let htmleach = `<li class="inline_li" onclick="p_key_click(this)"><img class="keylist_icon" src="${images['kp']}"/><span class="keylist_name" name="name"></span></li>`;
             return addhtml("acl_ul", htmleach, obj);    // returns element
         }
         function p_acl_click(el) {
-            let verbose = false;
             if (verbose) console.log("p_acl_click ---");
             let acl = el.source;                                    // The ACL clicked on
             show('tokens_div');                                     // Show the HTML with a list of tokens in ACL
@@ -143,7 +139,9 @@
 <body>
     <div class="floatright">
         <div id="status">Starting</div>
-        <ul id="kclist_ul"><!-- List of all existing keychains--></ul>
+        <ul id="kclist_ul"><!-- List of all existing keychains-->
+        <li class='template vertical_li' onclick='p_kc_click(this);'><span class='kclist_name' name='name'>PLACEHOLDER</span></li>
+        </ul>
         <form><input id="logout" class="button" type="button" onclick="clicklogout();" style="display:none;" value="Logout"/></form><!--logout all keychains-->
         <img src="noun_186903_cc.png" alt="keychain" class="iconopener" onclick="togglevis('logindiv','');"/>
     </div>
@@ -209,7 +207,7 @@
                 <form class="dialogform">
                     Keys on KeyChain:
                     <span name="name"></span>
-                    <!--If change icons, see objsyms above-->
+                    <!--If change icons, see images above-->
                     <img class="keylist_icon" src="noun_1146472_cc.png" alt="Key"/><input class="button" type="button" onclick="show('keynew_div');" value="new key"/>
                     <img class="keylist_icon" src="noun_1093404_cc.png" alt="Lock"/><input class="button" type="button" onclick="show('aclnew_div');" value="new lock"/>
                     <input class="button" type="button" onclick="hide('keys');" value="x"/><!--TODO replace with close icon-->
@@ -256,9 +254,9 @@
         // This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
         const searchparms = new URL(window.location.href).searchParams;
         const url = searchparms.get("url");
+        var verbose = searchparms.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)
         let transportclass = Dweb["Transport"+(searchparms.get("transport") || "IPFS").toUpperCase()]; // e.g. Dweb["TransportHTTP"]
 
-        let verbose = false;
         transportclass.p_setup({}, verbose)
             .then((t) => t.p_status())
             .then((msg) => setstatus(msg))
