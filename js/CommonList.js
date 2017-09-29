@@ -13,6 +13,7 @@ class CommonList extends SmartDict {
     _publicurl     Holds the url of publicly available version of the list.
     _allowunsafestore True if should override protection against storing unencrypted private keys (usually only during testing)
     dontstoremaster True if should not store master key
+    _listeners      Any event listeners
     */
 
     constructor(data, master, key, verbose, options) {
@@ -29,6 +30,7 @@ class CommonList extends SmartDict {
             :param options: dict that overrides any fields of data
          */
         super(data, verbose, options);
+        this._listeners = {};
         if (key) {
             this._setkeypair(key, verbose);
         }
@@ -229,8 +231,38 @@ class CommonList extends SmartDict {
          */
         return this.keypair.verify(sig.signable(), sig.signature)    //TODO currently throws assertion error if doesnt - not sure thats correct
     }
+    // ----- Listener interface ----- see https://developer.mozilla.org/en-US/docs/Web/API/EventTarget for the pattern
 
-    listmonitor(callback, verbose) {
+    addEventListener(type, callback) {
+        console.log("XXX@CL.addEventListener",type)
+        if (!(type in this._listeners)) this._listeners[type] = [];
+        this._listeners[type].push(callback);
+        console.log("XXX@CL.addEventListener done")
+    }
+
+    removeEventListener(type, callback) {
+        if (!(type in this._listeners)) return;
+        var stack = this._listeners[type];
+        for (let i = 0, l = stack.length; i < l; i++) {
+            if (stack[i] === callback) {
+                stack.splice(i, 1);
+                return;
+            }
+        }
+    }
+    dispatchEvent(event) {
+        console.log("XXX@CL.dispatchEvent",event)
+        if (!(event.type in this._listeners)) return true;
+        let stack = this._listeners[event.type];
+        console.log("THIS=",this, "event.target=",event.target);
+        //event.target = this;   //https://developer.mozilla.org/en-US/docs/Web/API/EventTarget but fails because target is readonly, with no apparant way to set it
+        for (let i = 0, l = stack.length; i < l; i++) {
+            stack[i].call(this, event);
+        }
+        return !event.defaultPrevented;
+    }
+
+    listmonitor(callback, verbose) {    //TODO-EVENT API will need updating
         this.transport().listmonitor(this._publicurl, (obj) => {
             if (verbose) console.log("CL.listmonitor",this._publicurl,"Added",obj);
             let sig = new Dweb.Signature(obj, verbose);
@@ -239,6 +271,8 @@ class CommonList extends SmartDict {
                 if (!this._list.some((othersig) => othersig.signature === sig.signature)) {    // Check not duplicate (esp of locally pushed one
                     this._list.push(sig);
                     callback(sig);
+                    let ev = new CustomEvent("insert", {target: this, detail: ["XXX"]})   // Note target doesnt get set here.
+                    this.dispatchEvent(ev);  //TODO-EVENT should replace the callback
                 } else {
                     console.log("Duplicate signature: ",sig);
                 }

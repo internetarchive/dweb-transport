@@ -55,6 +55,7 @@
 
         function _showkeyorlock(obj) {
             // Utility function to add new or existing element to Key List
+            console.log("XXX@_showkeyorlock",obj)
             let objtype = obj.table; // acl = AccessControlList, kp = KeyPair
             let objsym = images[objtype];
             let objclick = {acl: 'p_acl_click(this);', kp: 'p_key_click(this);'}[objtype];
@@ -71,12 +72,15 @@
             //TODO should add this as event listener on KC, then add an "addEventListner" on the KC and default it at creation
             //TODO https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener
             //TODO and https://developer.mozilla.org/en-US/docs/Web/API/EventTarget
+            //TODOhttps://developer.mozilla.org/en-US/docs/Web/API/EventTarget/dispatchEvent
+            kc.addEventListener("insert", (event) => console.log("XXX@75", event));   //TODO-EVENT this is temporary test hook
             return kc.p_list_then_elements()                            // Retrieve the keys for the keylist
                 .then(() => kc._keys.map((key)=> _showkeyorlock(key)))  // And add to the HTML
         		.then(() => kc.listmonitor(                             // Setup a callback when something is added to the list
                     // Note the callback will ignore duplicates (including echo of any we add) and store on kc as well before calling this function
                     (sig) => {
-                        if (kc === el_keylistheader.source._publicurl)  // Check its still this KeyChain being displayed in keylist
+                        console.log("XXX@p_kc_click.callback",sig)
+                        if (kc._publicurl === el_keylistheader.source._publicurl)  // Check its still this KeyChain being displayed in keylist
                             sig.p_fetchdata(verbose)                    // Get the data from a sig, its not done automatically as in other cases could be large
                                 .then((obj) => _showkeyorlock(obj)) },  // Show on the list
                     verbose));
