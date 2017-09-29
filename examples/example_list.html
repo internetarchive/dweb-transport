@@ -19,7 +19,6 @@
 
     function createit() {     // Send form data to Dweb, and display the url
         console.log("createit ---");
-        let verbose = false;
         // Get the data from the form
         dict = form2dict("newform");
         <!--CommonList(data, master, keypair, keygen, mnemonic, verbose, options)-->
@@ -35,7 +34,6 @@
 
     function sendentry() {     // Send form data to Dweb, and display the url
         console.log("sendit ---");
-        let verbose = false; // Copious output on
         // Get the data from the form
         let dict = form2dict("entryform");
         // Create a new object and add to the list
@@ -43,7 +41,7 @@
         cl.p_push(obj, verbose)
             .then(() => console.log("Added:",obj))  // Show on the Javascript console
             .then(() => objbrowser(cl, cl._url, null, "ObjBrowser", false))   // Redisplay in objbrowser
-            .then(() => addtoelement("listresults", obj))   // Display locally as listmonitor will not pick up local entries
+            .then(() => addtemplatedchild("listresults", obj))   // Display locally as listmonitor will not pick up local entries
             .catch((err) => { console.log("ERROR:",err); alert(err.message); });
         return false; // Stop form submission and page reloading reloading
     }
@@ -56,15 +54,8 @@
         // Fetch it, and display
         fetchanddisplay(dict.url);
     }
-
-    function addtoelement(el, sd) { //TODO-REL4 use replacetext etc from htmlutils
-        //Add the element from the list (subclass of SmartDict) to the HTML element
-        //The 'say' field in the HTML below gets filled in from the fields of sd
-        addhtml(el, "<span class='said' name='say'></span>", sd);
-    }
-
+    
     function fetchanddisplay(url) {
-        verbose=true;
         console.log("fetchanddisplay",url);
         let destn = document.getElementById("retrievaldestn");
         try {
@@ -83,13 +74,14 @@
                 .then(() => cl.p_list_then_elements(verbose))
                 .then((objs) => { console.log("objs=",JSON.stringify(objs)); return objs;})
                 //Add the elements to the list
-                .then((objs) => objs.map((obj) => addtoelement("listresults", obj)))
-                // Setup a monitor to get anything new added to the list.
-                .then(() => cl.listmonitor(
-                    (sig) => {
-                        sig.p_fetchdata(verbose)
-                            .then((obj) => addtoelement("listresults", obj))},
-                    verbose))
+                .then((objs) => objs.map((obj) => addtemplatedchild("listresults", obj)))
+                // Setup a EventListener to get anything new added to the list.
+                .then(() => cl.addEventListener("insert", (event) => {
+                    if (verbose) console.log("fetchanddisplay",event);
+                    let sig = event.detail;
+                    sig.p_fetchdata(verbose)
+                        .then((obj) => addtemplatedchild("listresults", obj))
+                }))
                 // Redisplay it in the object browser for debugging
                 .then(() => objbrowser(cl, cl._url, null, "ObjBrowser", verbose))
                 .catch((err) => { console.log("ERROR:",err); alert(err.message); });
@@ -154,7 +146,7 @@
 </ul>
 
 <table class="displayedblock">
-    <tr><td colspan="2" id="listresults" style="min-height:200px; border: 1px black solid; background-color:#f0f0f0;"></td></tr>
+    <tr><td colspan="2" id="listresults" style="min-height:200px; border: 1px black solid; background-color:#f0f0f0;"><span class='template said' name='say'></span></td></tr>
     <tr id="entryrow">
         <td style="width:3em;"><b>&gt;</b></td>
         <td>
@@ -179,9 +171,8 @@
     // This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
     var searchparms = new URL(window.location.href).searchParams;
     var url = searchparms.get("url");
+    var verbose = searchparms.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)  //TODO-document this and Transport in Readme
     let transportclass = Dweb["Transport"+(searchparms.get("transport") || "IPFS").toUpperCase()]; // e.g. Dweb["TransportHTTP"]
-
-    let verbose = false;
     transportclass.p_setup({}, verbose)
         .then((t) => t.p_status())
         .then((msg) => setstatus(msg))

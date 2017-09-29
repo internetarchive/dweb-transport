@@ -46,9 +46,10 @@ function deletechildren(el, keeptemplate) {
     */
     if (typeof keeptemplate === "undefined") keeptemplate=true;
     el = (typeof(el) === "string") ? document.getElementById(el) : el;
-    while (el.firstChild) { // Note that deletechildren is also used on Span's to remove the children before replacing with text.
-        if (!(keeptemplate && el.firstChild.classList && el.firstChild.classList.contains("template")))
-            el.removeChild(el.firstChild);
+    // Carefull - this deletes from the end, because template if it exists will be firstChild
+    while (el.lastChild && !(keeptemplate && el.lastChild.classList && el.lastChild.classList.contains("template"))) {
+        // Note that deletechildren is also used on Span's to remove the children before replacing with text.
+        el.removeChild(el.lastChild);
     }
     return el; // For chaining
 }
@@ -77,6 +78,7 @@ function replacetexts(el, ...dict) { //TODO-REL4 put into example_list and examp
     for (let prop in oo) {
         let val = oo[prop];
         let dests = el.querySelectorAll("[name="+ prop + "]"); //TODO its possible map works on dests, but maybe its not an array
+        if (el.getAttribute("name") === prop) replacetext(el, val); //TODO need to change self if has name=prop
         for (let i of dests) {
             replacetext(i, val);
         }

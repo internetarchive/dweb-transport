@@ -122,7 +122,7 @@ class CommonList extends SmartDict {
         */
         let self = this;
         if (!this._publicurl) this._p_storepublic(verbose); // Async, but sets _publicurl immediately
-        return this.transport().p_rawlist(this._publicurl, verbose)  //TODO modify to allow listmonitor
+        return this.transport().p_rawlist(this._publicurl, verbose)
             .then((lines) => { // lines should be an array
                 if (verbose) console.log("CommonList:p_fetchlist.success", self._url, "len=", lines.length);
                 self._list = lines.map((l) => new Dweb.Signature(l, verbose));    // Turn each line into a Signature
@@ -137,6 +137,7 @@ class CommonList extends SmartDict {
         */
         let self=this;
         return this.p_fetchlist(verbose)
+            .then(() => self.listmonitor(verbose))  // Track any future objects  - will call event Handler on any added
             .then(() => Promise.all(Dweb.Signature.filterduplicates(self._list) // Dont load multiple copies of items on list (might need to be an option?)
                 .map((sig) => sig.p_fetchdata(verbose)))) // Return is array result of p_fetch which is array of new objs (suitable for storing in keys etc)
         }
@@ -262,17 +263,14 @@ class CommonList extends SmartDict {
         return !event.defaultPrevented;
     }
 
-    listmonitor(callback, verbose) {    //TODO-EVENT API will need updating
+    listmonitor(verbose) {    //TODO-EVENT API will need updating
         this.transport().listmonitor(this._publicurl, (obj) => {
             if (verbose) console.log("CL.listmonitor",this._publicurl,"Added",obj);
             let sig = new Dweb.Signature(obj, verbose);
             if ((sig.signedby === this._publicurl) && this.verify(sig)) { // Ignore if not signed by this node, and verifies
-                //TODO-VERIFY add a check here that the signature matches
                 if (!this._list.some((othersig) => othersig.signature === sig.signature)) {    // Check not duplicate (esp of locally pushed one
                     this._list.push(sig);
-                    callback(sig);
-                    let ev = new CustomEvent("insert", {target: this, detail: ["XXX"]})   // Note target doesnt get set here.
-                    this.dispatchEvent(ev);  //TODO-EVENT should replace the callback
+                    this.dispatchEvent(new CustomEvent("insert", {target: this, detail: sig}));   // Note target doesnt get set here.
                 } else {
                     console.log("Duplicate signature: ",sig);
                 }

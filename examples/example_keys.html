@@ -68,22 +68,15 @@
             show('keys');                                               // Show the div 'keys' for showing keylist
             let el_keylistheader = replacetexts("keylist_header", kc);  // Set name fields etc in keylistdiv, sets source
             deletechildren("keylist_ul");                               // Delete any locks or eys currently displayed
-            //TODO this is not quite right, should retrieve at login, and then monitor then, but only right to keylist_ul if its monitoring this keylist
-            //TODO should add this as event listener on KC, then add an "addEventListner" on the KC and default it at creation
-            //TODO https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener
-            //TODO and https://developer.mozilla.org/en-US/docs/Web/API/EventTarget
-            //TODOhttps://developer.mozilla.org/en-US/docs/Web/API/EventTarget/dispatchEvent
-            kc.addEventListener("insert", (event) => console.log("XXX@75", event));   //TODO-EVENT this is temporary test hook
+            kc.addEventListener("insert", (event) => {                  // Setup a listener that will trigger when anything added to the list and update HTML
+                if (verbose) console.log("p_kc_click.eventlistener",event);
+                let sig = event.detail;
+                if (kc._publicurl === el_keylistheader.source._publicurl)  // Check its still this KeyChain being displayed in keylist
+                    sig.p_fetchdata(verbose)                            // Get the data from a sig, its not done automatically as in other cases could be large
+                        .then((obj) => _showkeyorlock(obj))             // Show on the list
+            });
             return kc.p_list_then_elements()                            // Retrieve the keys for the keylist
-                .then(() => kc._keys.map((key)=> _showkeyorlock(key)))  // And add to the HTML
-        		.then(() => kc.listmonitor(                             // Setup a callback when something is added to the list
-                    // Note the callback will ignore duplicates (including echo of any we add) and store on kc as well before calling this function
-                    (sig) => {
-                        console.log("XXX@p_kc_click.callback",sig)
-                        if (kc._publicurl === el_keylistheader.source._publicurl)  // Check its still this KeyChain being displayed in keylist
-                            sig.p_fetchdata(verbose)                    // Get the data from a sig, its not done automatically as in other cases could be large
-                                .then((obj) => _showkeyorlock(obj)) },  // Show on the list
-                    verbose));
+                .then(() => kc._keys.map((key)=> _showkeyorlock(key)));  // And add to the HTML
         }
         function p_newkey() {
             if (verbose) console.log("p_newkey ---");
@@ -129,13 +122,13 @@
             deletechildren("acl_ul");                               // Remove any existing HTML children
             return acl.p_tokens()                                       // Retrieve the keys for the keylist
                 .then((toks) => toks.map((tok) => acllist_push(tok)))   // And add to the HTML
-                .then(() => acl.listmonitor(                            // Note the callback should store on acl as well before calling this function
-                    (sig) => {
-                        if (sig.signedby === el_aclheader.source._publicurl) {
-                            sig.p_fetchdata(verbose)
-                                .then((tok) => acllist_push(tok))
-                        }},
-                    verbose));
+                .then(() => acl.addEventListener("insert", (event) => {                  // Setup a listener that will trigger when anything added to the list and update HTML
+                    if (verbose) console.log("p_acl_click.eventlistener",event);
+                    let sig = event.detail;
+                    if (acl._publicurl === el_aclheader.source._publicurl)  // Check its still this ACL being displayed in keylist
+                        sig.p_fetchdata(verbose)                    // Get the data from a sig, its not done automatically as in other cases could be large
+                        .then((tok) => acllist_push(tok))           // Show on the list
+                }));
         }
 
     </script>
