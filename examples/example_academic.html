@@ -34,43 +34,6 @@
             multihash58url: `https://gateway.dweb.me:443/content/contenthash/${f.multihash58}`
         }));  // Adds one line per file: bytes, mimetype
         show("metadata");
-        test_display_object(); //TODO-XXX just for testing
-    }
-    function test_display_object(url) {
-        console.log("XXX@52 display_object");
-        url = "https://gateway.dweb.me/content/contenthash/5dqpnTaoMSJPpsHna58ZJHcrcJeAjW"
-        fetch(new Request(url, {
-            method: 'GET',
-            headers: new Headers(),
-            mode: 'cors',
-            cache: 'default',
-            redirect: 'follow',  // Chrome defaults to manual
-        }))
-        //.then((resp) => resp.blob() ) // Just this line works, but no good if its a string
-            .then((resp) => resp.text())
-            .then((txt) => {
-                console.log("XXX@52",typeof txt, txt.length)
-                let ab = new ArrayBuffer(txt)
-                let ua = new Uint8Array(txt)
-                let blob = new Blob(ua, { type: "application/pdf"})
-                return blob;
-            })
-            .then((blob) => display_object(blob))
-    }
-    function display_object(bb) {  //TODO figure out how to pass streams to this and how to pass from IPFS
-        // bb is a BLob
-        // See https://developer.mozilla.org/en-US/docs/Web/API/URL/createObjectURL
-        // and https://stackoverflow.com/questions/3665115/create-a-file-in-memory-for-user-to-download-not-through-server
-        console.log("XXX@display_object",typeof bb);
-        var a = window.document.createElement('a');
-        //bb = new Blob([datapdf], {type: 'application/pdf'});    //TODO-STREAMS make this work on streams
-        objectURL = URL.createObjectURL(bb);    //TODO-STREAMS make this work on streams
-        a.href = objectURL;
-        a.target="_blank";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        //URL.revokeObjectURL(objectURL)    //TODO figure out when can do this - maybe last one ?
     }
 
     </script>
