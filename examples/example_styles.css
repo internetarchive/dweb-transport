@@ -43,3 +43,7 @@
 .hidden {display:none}
 .overdiv {position: absolute; top: 1em; left: 1em; z-index:10; background-color: #f0f0ff; border: 1px #e0e0e0 solid; padding: 5px; } /* Dialogue box over other*/
 .template {display: none}
+
+/*
+    Academic playing around without effecting others
+ */

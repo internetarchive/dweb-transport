@@ -125,7 +125,6 @@ class TransportHTTP extends Transport {
                 }   // TODO-HTTP may need to handle binary as a buffer instead of text
                 throw new Error(`Transport Error ${response.status}: ${response.statusText}`); // Should be TransportError but out of scope
             })
-            .then((xxx) => {console.log("p.rawfetch returning",typeof(xxx),xxx); return xxx;} )
             .catch((err) => { console.log("Probably misleading error from fetch:",httpurl,err); throw new Error(`Transport error thrown by ${httpurl}`)})   // Error here is particularly unhelpful - if rejected during the COrs process it throws a TypeError
     }
 

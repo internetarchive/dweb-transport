@@ -79,14 +79,15 @@ function replacetexts(el, ...dict) { //TODO-REL4 put into example_list and examp
         let val = oo[prop];
         let dests = el.querySelectorAll("[name="+ prop + "]"); //TODO its possible map works on dests, but maybe its not an array
         if (el.getAttribute("name") === prop) replacetext(el, val); //TODO need to change self if has name=prop
-        for (let i of dests) {
-            replacetext(i, val);
-        }
+        Array.prototype.slice.call(dests).map((i) => replacetext(i, val))
+        dests = el.querySelectorAll("[href=" + prop + "]"); //TODO its possible map works on dests, but maybe its not an array
+        if (el.getAttribute("href") === prop) el.href = val; //TODO need to change self if has name=prop
+        Array.prototype.slice.call(dests).map((i) => i.href = val)
     }
     return el;
 }
 
-function addtemplatedchild(el, dict) {
+function addtemplatedchild(el, ...dict) {
     /*
     ALTERNATIVE EXPERIMENT TO addhtml
     Standardised tool to add fields to html,  add that as the last child (or children) of el
@@ -100,7 +101,7 @@ function addtemplatedchild(el, dict) {
     el = (typeof(el) === "string") ? document.getElementById(el) : el;
     el_li = el.getElementsByClassName("template")[0].cloneNode(true);   // Copy first child with class=Template
     el_li.classList.remove("template");                                 // Remove the "template" class so it displays
-    replacetexts(el_li, dict);                          // Safe since only replace text - sets el_li.source to dict
+    replacetexts(el_li, ...dict);                          // Safe since only replace text - sets el_li.source to dict
     el.appendChild(el_li)
     return el_li;
 }
@@ -143,4 +144,33 @@ function hide(el) {
     if (Array.isArray(el)) el.map((e) => hide(e));
     el = (typeof(el) === "string") ? document.getElementById(el) : el;
     el.style.display = "none";
+}
+
+function p_httpget(url) {
+    //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
+    /* Simple Get of a URL, resolves to either json or text depending on mimetype */
+    console.log("XXX@152");
+    return fetch(new Request(url, {
+            method: 'GET',
+            headers: new Headers(),
+            mode: 'cors',
+            cache: 'default',
+            redirect: 'follow',  // Chrome defaults to manual
+        })) // A promise, throws (on Chrome, untested on Ffox or Node) TypeError: Failed to fetch)
+        .then((response) => {
+            console.log("XXX@160");
+            if (response.ok) {
+                console.log("XXX@162");
+                if (response.headers.get('Content-Type') === "application/json") {  // It should always be JSON
+                    return response.json(); // promise resolving to JSON
+                } else {
+                    return response.text(); // promise resolving to text
+                }
+            }
+            throw new Error(`Transport Error ${response.status}: ${response.statusText}`); // Should be TransportError but out of scope
+        })
+        .catch((err) => {
+            console.log("Probably misleading error from fetch:", url, err);
+            throw new Error(`Transport error thrown by ${url}`)
+        });  // Error here is particularly unhelpful - if rejected during the COrs process it throws a TypeError
 }

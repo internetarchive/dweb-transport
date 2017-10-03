@@ -1,17 +1,12 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 <!--suppress HtmlUnknownTarget -->
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>DWEB CommonList example</title>
     <link rel='stylesheet' href='example_styles.css'>
-    <!-- IIIF loading, not being done currently -->
-    <!--<script src="https://unpkg.com/ipfs-iiif-db/dist/browser.js"></script><!--or browser.min.js-->
     <script type="text/javascript" src="dweb_transport_ipfs_bundled.js"></script><!-- Dwebbundle via local filesystem when testing without Dweb-->
-    <!--<script src='/dweb/tinymce/tinymce.min.js'></script><!-- TinyMCE -->
-    <!--<script src='http://cloud.tinymce.com/stable/tinymce.min.js'></script><!-- TinyMCE -->
-    <!--<script src='/file/mb/BLAKE2.dfMoOqTdXvqKhoZo7HPvD5raBXfgH7chXsN2PElizs8=/tinymce.min.js'></script><!-- TinyMCE via relative URL-->
-    <script type="text/javascript" src="htmlutils.js"></script><!--objectbrowser functionality for debugging-->
+    <script type="text/javascript" src="htmlutils.js"></script><!--HTML tools (not specific to Dweb)-->
     <script type="text/javascript" src="objbrowser.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript">
 
@@ -39,9 +34,9 @@
         // Create a new object and add to the list
         let obj = new Dweb.SmartDict(dict, verbose )
         cl.p_push(obj, verbose)
-            .then(() => console.log("Added:",obj))  // Show on the Javascript console
-            .then(() => objbrowser(cl, cl._url, null, "ObjBrowser", false))   // Redisplay in objbrowser
-            .then(() => addtemplatedchild("listresults", obj))   // Display locally as listmonitor will not pick up local entries
+            .then(() => console.log("Added:",obj))                            // Show on the Javascript console
+            .then(() => objbrowser(cl, cl._url, null, "ObjBrowser", false))   // Redisplay in objbrowser just for debugging
+            .then(() => addtemplatedchild("listresults", obj))                // Display locally as listmonitor will not pick up local entries
             .catch((err) => { console.log("ERROR:",err); alert(err.message); });
         return false; // Stop form submission and page reloading reloading
     }
@@ -56,8 +51,8 @@
     }
     
     function fetchanddisplay(url) {
+        /* Fetch a URL, display the meta data and a box for adding to it*/
         console.log("fetchanddisplay",url);
-        let destn = document.getElementById("retrievaldestn");
         try {
             Dweb.SmartDict.p_fetch(url, verbose)   // Throws TransportError immediately if url invalid
                 .then((obj) => cl = obj) // Save it for adding to in sendentry
@@ -66,16 +61,16 @@
                     // Only display the input prompt if its a master list.
                     if (cl._master) { show("entryrow"); } else { hide("entryrow"); }
                     // Display the name and urls of the list
-                    displayobj(destn, cl);
+                    displayobj("retrievaldestn", cl);
                     deletechildren("listresults");
                     // Clear old text
                 })
                 // Fetch the current elements from the list if any
-                .then(() => cl.p_list_then_elements(verbose))
+                .then(() => cl.p_list_then_elements(verbose))   //This adds the listmonitor as a side effect, so updated as changes
                 .then((objs) => { console.log("objs=",JSON.stringify(objs)); return objs;})
                 //Add the elements to the list
                 .then((objs) => objs.map((obj) => addtemplatedchild("listresults", obj)))
-                // Setup a EventListener to get anything new added to the list.
+                // Setup a EventListener so anything new added to the list us added to the display
                 .then(() => cl.addEventListener("insert", (event) => {
                     if (verbose) console.log("fetchanddisplay",event);
                     let sig = event.detail;
@@ -90,8 +85,9 @@
             alert(err.message); // bad url generates TransportError
         }
     }
-    function displayobj(el, obj) { /* Display an obj, under an element in appropriately named fields */
-        console.log(JSON.stringify(obj))
+    function displayobj(el, obj) {
+        /* Display an obj, under an element in appropriately named fields */
+        console.log(obj)
         replacetexts(el, obj, { _privateurl: (obj._master ? obj._url : "")});
         // Now set up links to the urls for sharing
         let publicurl = new URL(window.location.href);

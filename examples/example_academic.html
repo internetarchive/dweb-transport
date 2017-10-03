@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DWEB Academic Papers example</title>
+    <link rel='stylesheet' href='example_styles.css'>
+    <script type="text/javascript" src="dweb_transport_ipfs_bundled.js"></script><!-- Dwebbundle via local filesystem when testing without Dweb-->
+    <script type="text/javascript" src="htmlutils.js"></script><!--HTML tools (not specific to Dweb)-->
+    <script type="text/javascript" src="objbrowser.js"></script><!--objectbrowser functionality for debugging-->
+    <script type="text/javascript">
+
+    function p_submit_searchbox() {
+        //TODO-ACADEMIC handle contenthash format
+        let dict = form2dict("searchbox");
+        url = `https://gateway.dweb.me:443/content/${dict.namespace}/${dict.name}`; //TODO-ACADEMIC chnge to /metadata/
+        console.log("p_submit_searchbox: ---", dict, "fetching", url);
+        //TODO-ACADEMIC switch to TransportHTTP, and merge this pattern into TransportHTTP or move to miscutils.js.httpget()
+        p_httpget(url)
+            .then((json) => display_metadata(json))
+            .catch((err) => {
+                console.log("Probably misleading error from fetch:", url, err);
+                throw new Error(`Transport error thrown by ${url}`)
+            });  // Error here is particularly unhelpful - if rejected during the COrs process it throws a TypeError
+    }
+    function display_metadata(j) {
+        //TODO-ACADEMIC - add a way to view the JSON
+        console.log("XXX@display_metadata",j);
+        let authors = j.doi_org_metadata.author.map((a) => `${a.given} ${a.family}`).join(', ');
+        replacetexts("metadata", j.doi_org_metadata, {authors: authors});  //TODO expand this
+        deletechildren('list_of_files');
+        j.files.map((f) => addtemplatedchild("list_of_files", f, {
+            ipldurl: `https://ipfs.dweb.me:443/ipfs/${f.ipldhash}`,
+            //ipldurl: `https://ipfs.io:443/ipfs/${f.ipldhash}`,
+            multihash58url: `https://gateway.dweb.me:443/content/contenthash/${f.multihash58}`
+        }));  // Adds one line per file: bytes, mimetype
+        show("metadata");
+        test_display_object(); //TODO-XXX just for testing
+    }
+    function test_display_object(url) {
+        console.log("XXX@52 display_object");
+        url = "https://gateway.dweb.me/content/contenthash/5dqpnTaoMSJPpsHna58ZJHcrcJeAjW"
+        fetch(new Request(url, {
+            method: 'GET',
+            headers: new Headers(),
+            mode: 'cors',
+            cache: 'default',
+            redirect: 'follow',  // Chrome defaults to manual
+        }))
+        //.then((resp) => resp.blob() ) // Just this line works, but no good if its a string
+            .then((resp) => resp.text())
+            .then((txt) => {
+                console.log("XXX@52",typeof txt, txt.length)
+                let ab = new ArrayBuffer(txt)
+                let ua = new Uint8Array(txt)
+                let blob = new Blob(ua, { type: "application/pdf"})
+                return blob;
+            })
+            .then((blob) => display_object(blob))
+    }
+    function display_object(bb) {  //TODO figure out how to pass streams to this and how to pass from IPFS
+        // bb is a BLob
+        // See https://developer.mozilla.org/en-US/docs/Web/API/URL/createObjectURL
+        // and https://stackoverflow.com/questions/3665115/create-a-file-in-memory-for-user-to-download-not-through-server
+        console.log("XXX@display_object",typeof bb);
+        var a = window.document.createElement('a');
+        //bb = new Blob([datapdf], {type: 'application/pdf'});    //TODO-STREAMS make this work on streams
+        objectURL = URL.createObjectURL(bb);    //TODO-STREAMS make this work on streams
+        a.href = objectURL;
+        a.target="_blank";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        //URL.revokeObjectURL(objectURL)    //TODO figure out when can do this - maybe last one ?
+    }
+
+    </script>
+</head>
+
+<body>
+<!--Online indicator--><div class="floatright"><div id="status">Starting</div></div>
+<h1>Decentralized Web Academic Papers Example</h1>
+<!--DOI name entry box-->
+<div>
+    <p>This is a demonstration gateway for Academic documents, a (centralized) search at Archive.org results in links to
+    the file either via IPFS or through the Archive's content server.</p>
+    <p>Hint: You can try with DOI: 10.1001/jama.2009.1064</p>
+</div>
+<div class="displayedblock">
+    <div class="displayedblockheader" id="doi_header">
+        <form class="dialogform" name="searchbox" onsubmit="p_submit_searchbox(); return false;">
+            <!--TODO autopopulate this from an info call-->
+            <select name="namespace" ><!--TODO catch changes and change placeholder for text input-->
+                <option value="doi">DOI</option>
+                <option value="contenthash">Content Hash</option>
+            </select>
+            <input type="text" name="name" size="50" placeholder="DOI of paper"/>
+            <input class="button" type="submit" value="SEARCH"/>
+        </form>
+    </div>
+    <div class="displayedblock" style="display:none;" id="metadata">
+        <span name="title" class="prop"></span>
+        <span name="authors" class="prop"></span>
+        <!-- TODO turn mimetype into icon like PDF -->
+        <ul id="list_of_files">
+            <li class="template prop"><span name="mimetype" class="propval"></span> <span name="size_bytes" class="propval"></span>
+                <a href="ipldurl" class="propval"><img src="ipfslogo.png" height="18px"/></a> <a href="multihash58url" class="propval"><img src="archivelogowhiteonblack.png" height="18px"/></a></li><!--use IPFS logo-->
+        </ul>
+    </div>
+
+</div>
+<script type="text/javascript">
+    // This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
+    const searchparms = new URL(window.location.href).searchParams;
+    /*TODO what parameters ?
+    const url = searchparms.get("url");
+    */
+    var verbose = searchparms.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)
+    /* Select transport - ?transport=HTTP to use HTTP*/
+    // Add a function to htmlutils to simplify this.
+    Dweb.TransportHTTP.p_setup({http: { ipandport:["gateway.dweb.me", 443]}}, verbose)
+        .then((t) => t.p_status())
+        .then((msg) => alert(msg))  //TODO-status as list
+        .catch((err) => { console.log("ERROR in connecting to HTTP:",err); alert(err.message); });
+    let transportclass = Dweb["Transport"+(searchparms.get("transport") || "HTTP").toUpperCase()]; // e.g. Dweb["TransportHTTP"]
+    transportclass.p_setup({}, verbose)
+        .then((t) => t.p_status())
+        .then((msg) => setstatus(msg))
+        .then(() => {
+            // Any code you want to run once online goes here.
+            //if(url) fetchanddisplay(url);  // In this app, ignoring any URL passed in call
+        })
+        .catch((err) => { console.log("ERROR connecting:",err); alert(err.message); });
+
+</script>
+</body>
+</html>
