@@ -8,11 +8,11 @@
     <script type="text/javascript" src="htmlutils.js"></script><!--HTML tools (not specific to Dweb)-->
     <script type="text/javascript" src="objbrowser.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript">
-
+        
     function p_submit_searchbox() {
         //TODO-ACADEMIC handle contenthash format
         let dict = form2dict("searchbox");
-        url = `https://gateway.dweb.me:443/content/${dict.namespace}/${dict.name}`; //TODO-ACADEMIC chnge to /metadata/
+        url = `https://gateway.dweb.me:443/metadata/${dict.namespace}/${dict.name}`;
         console.log("p_submit_searchbox: ---", dict, "fetching", url);
         //TODO-ACADEMIC switch to TransportHTTP, and merge this pattern into TransportHTTP or move to miscutils.js.httpget()
         p_httpget(url)
@@ -52,7 +52,7 @@
     <div class="displayedblockheader" id="doi_header">
         <form class="dialogform" name="searchbox" onsubmit="p_submit_searchbox(); return false;">
             <!--TODO autopopulate this from an info call-->
-            <select name="namespace" ><!--TODO catch changes and change placeholder for text input-->
+            <select name="namespace" ><!--TODO catch changes and change placeholder for text input--><!--TODO-OTHERNAMESPACE-->
                 <option value="doi">DOI</option>
                 <option value="contenthash">Content Hash</option>
             </select>

@@ -77,11 +77,11 @@ function replacetexts(el, ...dict) { //TODO-REL4 put into example_list and examp
     oo = Object.assign({},...dict);
     for (let prop in oo) {
         let val = oo[prop];
-        let dests = el.querySelectorAll("[name="+ prop + "]"); //TODO its possible map works on dests, but maybe its not an array
-        if (el.getAttribute("name") === prop) replacetext(el, val); //TODO need to change self if has name=prop
+        let dests = el.querySelectorAll("[name="+ prop + "]");
+        if (el.getAttribute("name") === prop) replacetext(el, val);
         Array.prototype.slice.call(dests).map((i) => replacetext(i, val))
-        dests = el.querySelectorAll("[href=" + prop + "]"); //TODO its possible map works on dests, but maybe its not an array
-        if (el.getAttribute("href") === prop) el.href = val; //TODO need to change self if has name=prop
+        dests = el.querySelectorAll("[href=" + prop + "]");
+        if (el.getAttribute("href") === prop) el.href = val;
         Array.prototype.slice.call(dests).map((i) => i.href = val)
     }
     return el;
