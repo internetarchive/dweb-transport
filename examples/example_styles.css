@@ -4,7 +4,10 @@
 .props { padding-left: 0px; } /*Move back directly under type name*/
 .prop {display:table-row; border: 1px dotted grey; } /*ignoring border*/
 .propname {display:table-cell; font-weight:bold;background-color:#cccccc;border: 1px dotted grey; padding-left:0.3em; padding-right:0.3em} /*width:15em */
-.propval {white-space: pre; display:table-cell; background-color:#dddddd;border: 1px dotted grey; padding-left: 0.3em; padding-right: 0.3em;} /*width:15em;*/
+.examplesacademic .propname {background-color:#f0f0f0; border: 0px; }
+.propval {display:table-cell; background-color:#dddddd;border: 1px dotted grey; padding-left: 0.3em; padding-right: 0.3em;} /*width:15em;*/
+.examplesacademic .propval { background-color:#f0f0f0; border: 0px; vertical-align: middle; }
+.propval span {white-space: pre;} /*Dont want white-space in e.g. img*/
 .proplinks {padding-left: 0.5em;} /*List of sub-objects inside propval*/
 .propobj {border-color: black; border-top: 2px solid; padding-bottom:0.3em; padding-top:0.3em; }
 .classname {font-weight: bold;} /* Used for class name in objbrowser */
@@ -47,3 +50,12 @@
 /*
     Academic playing around without effecting others
  */
+.tooltip { position: relative; display: inline-block; } /*border-bottom: 1px dotted black; */
+.tooltip .tooltiptext { visibility: hidden; z-index: 1;  opacity: 0; transition: opacity 1s;
+    width: 250px; background-color: #555; color: #fff; text-align: center; border-radius: 6px; padding: 5px 0;
+    position: absolute; bottom: 125%; left: 50%; margin-left: -60px;  }
+.tooltip .tooltiptext::after { content: ""; position: absolute; top: 100%; left: 50%;
+    margin-left: -5px; border-width: 5px; border-style: solid; border-color: #555 transparent transparent transparent;   }
+.tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
+.examplesacademic .fileslist { text-align: center}
+.propval .tooltoptext {white-space: normal}
