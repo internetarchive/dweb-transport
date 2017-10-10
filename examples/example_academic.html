@@ -24,7 +24,7 @@
     }
     function display_metadata(j) {
         //TODO-ACADEMIC - add a way to view the JSON
-        console.log("XXX@display_metadata",j);
+        if (verbose) console.log("display_metadata",j);
         let authors = j.doi_org_metadata.author ? j.doi_org_metadata.author.map((a) => `${a.given} ${a.family}`).join(', ') : "Unable to retrieve author";
         replacetexts("metadata", j.doi_org_metadata, {authors: authors});  //TODO expand this
         deletechildren('list_of_files');
@@ -37,13 +37,12 @@
     }
 
     function display_ipfs(el) {
-        console.log("XXX@47",el);
-        verbose = true;
+        //verbose = true;
         let multihash = el.getAttribute("href"); // Note this is not el.href which has the domain as well
         if (verbose) console.log("display_ipfs:", multihash);
         Dweb.Block.p_fetch(`ipfs:/ipfs/${multihash}`, verbose)
             .then((blk) => {
-                if (verbose) console.log("XXX@40 retrieved",blk._data.constructor.name, blk.size());
+                if (verbose) console.log("display_ipfs retrieved",blk._data.constructor.name, blk.size());
                 if (verbose && blk.size() < 1000) console.log("Buffer=", blk._data.toString());
                 display_blob(blk._data,{type: 'application/pdf'}); //TODO allow for multiple types
             })

@@ -148,7 +148,6 @@ function hide(el) {
 function p_httpget(url) {
     //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
     /* Simple Get of a URL, resolves to either json or text depending on mimetype */
-    console.log("XXX@152");
     return fetch(new Request(url, {
             method: 'GET',
             headers: new Headers(),
@@ -157,9 +156,7 @@ function p_httpget(url) {
             redirect: 'follow',  // Chrome defaults to manual
         })) // A promise, throws (on Chrome, untested on Ffox or Node) TypeError: Failed to fetch)
         .then((response) => {
-            console.log("XXX@160");
             if (response.ok) {
-                console.log("XXX@162");
                 if (response.headers.get('Content-Type') === "application/json") {  // It should always be JSON
                     return response.json(); // promise resolving to JSON
                 } else {
@@ -180,7 +177,7 @@ function display_blob(bb, options) {//TODO figure out how to pass streams to thi
     if (!(bb instanceof Blob)) {
         bb = new Blob([bb], {type: options.type})
     }
-    console.log("XXX@display_object",typeof bb);
+    console.log("display_object",typeof bb);
     let a = window.document.createElement('a');
     //bb = new Blob([datapdf], {type: 'application/pdf'});    //TODO-STREAMS make this work on streams
     objectURL = URL.createObjectURL(bb);    //TODO-STREAMS make this work on streams
