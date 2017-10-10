@@ -25,17 +25,34 @@
     function display_metadata(j) {
         //TODO-ACADEMIC - add a way to view the JSON
         console.log("XXX@display_metadata",j);
-        let authors = j.doi_org_metadata.author.map((a) => `${a.given} ${a.family}`).join(', ');
+        let authors = j.doi_org_metadata.author ? j.doi_org_metadata.author.map((a) => `${a.given} ${a.family}`).join(', ') : "Unable to retrieve author";
         replacetexts("metadata", j.doi_org_metadata, {authors: authors});  //TODO expand this
         deletechildren('list_of_files');
         j.files.map((f) => addtemplatedchild("list_of_files", f, {
             ipldurl: `https://ipfs.dweb.me:443/ipfs/${f.ipldhash}`,
-            //ipldurl: `https://ipfs.io:443/ipfs/${f.ipldhash}`,
+            ipld2url: `https://ipfs.io:443/ipfs/${f.ipldhash}`,
             multihash58url: `https://gateway.dweb.me:443/content/contenthash/${f.multihash58}`
         }));  // Adds one line per file: bytes, mimetype
         show("metadata");
     }
 
+    function display_ipfs(el) {
+        console.log("XXX@47",el);
+        verbose = true;
+        let multihash = el.getAttribute("href"); // Note this is not el.href which has the domain as well
+        if (verbose) console.log("display_ipfs:", multihash);
+        Dweb.Block.p_fetch(`ipfs:/ipfs/${multihash}`, verbose)
+            .then((blk) => {
+                if (verbose) console.log("XXX@40 retrieved",blk._data.constructor.name, blk.size());
+                if (verbose && blk.size() < 1000) console.log("Buffer=", blk._data.toString());
+                display_blob(blk._data,{type: 'application/pdf'}); //TODO allow for multiple types
+            })
+            .catch((err) => {
+                console.log("display_ipfs cant retrieve",err)
+            })
+
+
+    }
     </script>
 </head>
 
@@ -76,12 +93,20 @@
                 &nbsp;<span name="size_bytes" class="propval"></span>
                 &nbsp;<span class="propval">bytes</span>
                 <a href="ipldurl" class="propval tooltip" target="_blank">
-                    <span class="tooltiptext">Fetch the file from an IPFS gateway</span>
+                    <span class="tooltiptext">Fetch the file from the Archive's IPFS gateway</span>
+                    <img src="ipfslogo.png" height="24px" alt="IPFS Logo"/>
+                </a>
+                <a href="ipld2url" class="propval tooltip" target="_blank">
+                    <span class="tooltiptext">Fetch the file from the main IPFS gateway</span>
                     <img src="ipfslogo.png" height="24px" alt="IPFS Logo"/>
                 </a>
                 <a href="multihash58url" class="propval tooltip" target="_blank">
                     <span class="tooltiptext">Fetch the file from the Archive's contenthash server</span>
                     <img src="archivelogowhiteonblack.png" height="24px" alt="Archive logo"/>
+                </a>
+                <a href="ipldhash" class="propval tooltip" target="_blank" onclick="display_ipfs(this); return false;">
+                    <span class="tooltiptext">Fetch the file from IPFS directly in the browser</span>
+                    <img src="ipfslogo.png" height="24px" alt="IPFS Logo"/>
                 </a>
             </li><!--use IPFS logo-->
         </ul>
@@ -97,17 +122,18 @@
     var verbose = searchparms.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)
     /* Select transport - ?transport=HTTP to use HTTP*/
     // Add a function to htmlutils to simplify this.
-    Dweb.TransportHTTP.p_setup({http: { ipandport:["gateway.dweb.me", 443]}}, verbose)
-        .then((t) => t.p_status())
-        .then((msg) => alert(msg))  //TODO-status as list
-        .catch((err) => { console.log("ERROR in connecting to HTTP:",err); alert(err.message); });
-    let transportclass = Dweb["Transport"+(searchparms.get("transport") || "HTTP").toUpperCase()]; // e.g. Dweb["TransportHTTP"]
+    // Dweb.TransportIPFS.p_setup({http: { ipandport:["gateway.dweb.me", 443]}}, verbose)
+    //    .then((t) => t.p_status())
+    //    .then((msg) => alert(msg))  //TODO-status as list
+    //    .catch((err) => { console.log("ERROR in connecting to HTTP:",err); alert(err.message); });
+    let transportclass = Dweb["Transport"+(searchparms.get("transport") || "IPFS").toUpperCase()]; // e.g. Dweb["TransportHTTP"]
     transportclass.p_setup({}, verbose)
         .then((t) => t.p_status())
         .then((msg) => setstatus(msg))
         .then(() => {
             // Any code you want to run once online goes here.
             //if(url) fetchanddisplay(url);  // In this app, ignoring any URL passed in call
+            //test_display_object();
         })
         .catch((err) => { console.log("ERROR connecting:",err); alert(err.message); });
 

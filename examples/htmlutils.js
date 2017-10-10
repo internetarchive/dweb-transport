@@ -11,7 +11,6 @@ function form2dict(frm) {
     /* Find the element if we are given a string */
     /* Note this is not the usual getElementById since forms have their own array */
     el_form = (typeof frm === "string") ? document.forms.namedItem(frm) : frm;
-    let el;
     for (let el of el_form.elements) {
         if (el.type !== "submit") {
             res[el.name] = el.value;
@@ -79,7 +78,7 @@ function replacetexts(el, ...dict) { //TODO-REL4 put into example_list and examp
         let val = oo[prop];
         let dests = el.querySelectorAll("[name="+ prop + "]");
         if (el.getAttribute("name") === prop) replacetext(el, val);
-        Array.prototype.slice.call(dests).map((i) => replacetext(i, val))
+        Array.prototype.slice.call(dests).map((i) => replacetext(i, val));
         dests = el.querySelectorAll("[href=" + prop + "]");
         if (el.getAttribute("href") === prop) el.href = val;
         Array.prototype.slice.call(dests).map((i) => i.href = val)
@@ -102,7 +101,7 @@ function addtemplatedchild(el, ...dict) {
     el_li = el.getElementsByClassName("template")[0].cloneNode(true);   // Copy first child with class=Template
     el_li.classList.remove("template");                                 // Remove the "template" class so it displays
     replacetexts(el_li, ...dict);                          // Safe since only replace text - sets el_li.source to dict
-    el.appendChild(el_li)
+    el.appendChild(el_li);
     return el_li;
 }
 function addhtml(el, htmleach, dict) { //TODO-REL4 if works in example_list replace code in example_keys that constructs html
@@ -127,7 +126,7 @@ function addhtml(el, htmleach, dict) { //TODO-REL4 if works in example_list repl
     for (let c in kids) {
         console.log(kids[c]);
         el.appendChild(kids[c])
-    };
+    }
     return kids;
 }
 
@@ -174,3 +173,22 @@ function p_httpget(url) {
             throw new Error(`Transport error thrown by ${url}`)
         });  // Error here is particularly unhelpful - if rejected during the COrs process it throws a TypeError
 }
+
+function display_blob(bb, options) {//TODO figure out how to pass streams to this and how to pass from IPFS
+    // See https://developer.mozilla.org/en-US/docs/Web/API/URL/createObjectURL
+    // and https://stackoverflow.com/questions/3665115/create-a-file-in-memory-for-user-to-download-not-through-server
+    if (!(bb instanceof Blob)) {
+        bb = new Blob([bb], {type: options.type})
+    }
+    console.log("XXX@display_object",typeof bb);
+    let a = window.document.createElement('a');
+    //bb = new Blob([datapdf], {type: 'application/pdf'});    //TODO-STREAMS make this work on streams
+    objectURL = URL.createObjectURL(bb);    //TODO-STREAMS make this work on streams
+    a.href = objectURL;
+    a.target= (options && options.target) || "_blank";                      // Open in new window by default
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    //URL.revokeObjectURL(objectURL)    //TODO figure out when can do this - maybe last one, or maybe dont care?
+}
+

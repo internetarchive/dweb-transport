@@ -166,7 +166,7 @@ class TransportIPFS extends Transport {
         return new Promise((resolve, reject) => {
             this.ipfs = new IPFS(this.options.ipfs);
             this.ipfs.on('ready', () => {
-                this._makepromises()
+                this._makepromises();
                 resolve();
             });
             this.ipfs.on('error', (err) => reject(err));
@@ -207,7 +207,7 @@ class TransportIPFS extends Transport {
         let self = this;
         return this.p_ipfsstart(verbose)
             .then(() => {
-                this.yarrays = {};
+                self.yarrays = {};
             })
             .catch((err) => {
                 console.log("Error caught in p_yarraystart",err);
@@ -228,7 +228,7 @@ class TransportIPFS extends Transport {
             return new Promise((resolve, reject) => resolve(this.yarrays[url]));
         } else {
             if (verbose) console.log("Creating Y for",url);
-            let options = Transport.mergeoptions(this.options.yarray, {connector: { room: url}}) // Copies options
+            let options = Transport.mergeoptions(this.options.yarray, {connector: { room: url}}); // Copies options
             options.connector.ipfs = this.ipfs;
             return Y(options)
                 .then((y) => this.yarrays[url] = y);
@@ -325,10 +325,12 @@ class TransportIPFS extends Transport {
         :resolve string: Return the object being fetched, (note currently returned as a string, may refactor to return Buffer)
         :throws:        TransportError if url invalid - note this happens immediately, not as a catch in the promise
          */
+        if (verbose) { console.log("IPFS p_rawfetch",url)}
         console.assert(url, "TransportIPFS.p_rawfetch: requires url");
         let cid = (url instanceof CID) ? url : TransportIPFS.url2cid(url);  // Throws TransportError if url bad
         return this.promisified.ipfs.block.get(cid)
-            .then((result)=> result.data.toString())
+            //.then((result)=> result.data.toString())
+            .then((result)=> result.data)
             .catch((err) => {
                 console.log("Caught misc error in TransportIPFS.p_rawfetch", err);
                 reject(err);
@@ -522,7 +524,7 @@ class TransportIPFS extends Transport {
                     */
                     // Note above returns immediately and runs async, we don't wait for it before below
                     .then(() => transport.p_rawfetch(urlqbf, verbose))
-                    .then((data) => console.assert(data === qbf, "Should fetch block stored above"))
+                    .then((data) => console.assert(data.toString() === qbf, "Should fetch block stored above"))
                     .then(() => transport.p_rawlist(testurl, verbose))
                     .then((res) => {
                         listlen = res.length;

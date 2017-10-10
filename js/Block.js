@@ -7,7 +7,7 @@ const Dweb = require("./Dweb");
 class Block extends Transportable {
     constructor(data) {
         /*
-        data	opaque data to store (byte string)
+        data	opaque data to store (byte string or Buffer) - should always convert it to what you want.
          */
         super(data);
         this.table = 'b';
@@ -33,12 +33,11 @@ class Block extends Transportable {
         if (verbose) {console.log("Block.test")}
         return new Promise((resolve, reject) => {
             let blk;
-            let blk2;
             blk = new Block("The dirty old chicken");       // Create a block with some data
             blk.p_store(verbose)                            // Store it to transport
             .then(() => Block.p_fetch(blk._url, verbose))
             .then((blk2) => {
-                console.assert(blk2._data === blk._data, "Block should survive round trip");
+                console.assert(blk2._data.toString() === blk._data, "Block should survive round trip");
                 resolve(blk2);
             })
             .catch((err) => { console.log("Block Test failed", err); reject(err); })

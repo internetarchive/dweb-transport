@@ -1,12 +1,12 @@
 /* Styles used for all the examples */
 
 /* Sty;es used for tables of properties, especially by objbrowser.js*/
-.props { padding-left: 0px; } /*Move back directly under type name*/
+.props { padding-left: 0; } /*Move back directly under type name*/
 .prop {display:table-row; border: 1px dotted grey; } /*ignoring border*/
 .propname {display:table-cell; font-weight:bold;background-color:#cccccc;border: 1px dotted grey; padding-left:0.3em; padding-right:0.3em} /*width:15em */
-.examplesacademic .propname {background-color:#f0f0f0; border: 0px; }
+.examplesacademic .propname {background-color:#f0f0f0; border: 0; }
 .propval {display:table-cell; background-color:#dddddd;border: 1px dotted grey; padding-left: 0.3em; padding-right: 0.3em;} /*width:15em;*/
-.examplesacademic .propval { background-color:#f0f0f0; border: 0px; vertical-align: middle; }
+.examplesacademic .propval { background-color:#f0f0f0; border: 0; vertical-align: middle; }
 .propval span {white-space: pre;} /*Dont want white-space in e.g. img*/
 .proplinks {padding-left: 0.5em;} /*List of sub-objects inside propval*/
 .propobj {border-color: black; border-top: 2px solid; padding-bottom:0.3em; padding-top:0.3em; }
@@ -31,7 +31,7 @@
 .floatright {margin: 0 0 3px 10px; float: right; clear: right; text-align: right} /* Grouped in top right corner */
 .floatright li {margin: 0 0 3px 10px; }
 .floatright ul {margin: 0 0 3px 10px; }
-.vertical_li {display: table-row; padding-top: 3px; padding-right: 0px; margin: 0 0 3px; 3px;}
+.vertical_li {display: table-row; padding-top: 3px; padding-right: 0; margin: 0 0 3px 3px;}
 .said {display: block; border-bottom: 1px black solid;} /* Each item added to list in example_list */
 .button { border: 1px black solid; background-color:#dddddd;  padding-bottom:0.1em;  display:inline;} /* Buttons */
 .displayedblock {border: 1px #e0e0e0 solid; background-color:#f0f0f0; box-shadow: 1px 1px 2px #cccccc; padding-top:0.1em; padding-bottom: 0.1em; margin-top: 10px; margin-bottom: 5px; display:inline-block;}
@@ -40,7 +40,7 @@
 .dialogform .button { border: 1px black solid; background-color:#dddddd;  padding-bottom: 0.1em; padding-right: 0.3em; padding-left: 0.3em; margin-top: 0.5em; margin-left: 0.5em; margin-right: 0.5em; margin-bottom: 0.5em;}
 .iconopener {width:20px;}
 .inline_li {display:inline; padding-left: 1em; padding-right: 1em;} /*A single login in a list of KeyChains or Keys */
-.inline_ul {display:inline; -webkit-padding-start: 0px;} /*A List of KeyChains or Keys*/
+.inline_ul {display:inline; -webkit-padding-start: 0;} /*A List of KeyChains or Keys*/
 .keylist_icon {height: 12px; margin-left: 12px; margin-right: 3px;}
 .inline {display:inline;}
 .hidden {display:none}
@@ -58,4 +58,4 @@
     margin-left: -5px; border-width: 5px; border-style: solid; border-color: #555 transparent transparent transparent;   }
 .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
 .examplesacademic .fileslist { text-align: center}
-.propval .tooltoptext {white-space: normal}
+.propval .tooltiptext {white-space: normal}
