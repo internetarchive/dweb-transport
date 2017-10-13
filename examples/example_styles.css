@@ -6,7 +6,6 @@
 .propname {display:table-cell; font-weight:bold;background-color:#cccccc;border: 1px dotted grey; padding-left:0.3em; padding-right:0.3em} /*width:15em */
 .examplesacademic .propname {background-color:#f0f0f0; border: 0; }
 .propval {display:table-cell; background-color:#dddddd;border: 1px dotted grey; padding-left: 0.3em; padding-right: 0.3em;} /*width:15em;*/
-.examplesacademic .propval { background-color:#f0f0f0; border: 0; vertical-align: middle; }
 .propval span {white-space: pre;} /*Dont want white-space in e.g. img*/
 .proplinks {padding-left: 0.5em;} /*List of sub-objects inside propval*/
 .propobj {border-color: black; border-top: 2px solid; padding-bottom:0.3em; padding-top:0.3em; }
@@ -29,6 +28,7 @@
    Some specific styles used by difference examples
  */
 .floatright {margin: 0 0 3px 10px; float: right; clear: right; text-align: right} /* Grouped in top right corner */
+.floatleft {margin: 0 0 3px 10px;  clear: left; float: left; text-align: left} /* Grouped in top left corner */
 .floatright li {margin: 0 0 3px 10px; }
 .floatright ul {margin: 0 0 3px 10px; }
 .vertical_li {display: table-row; padding-top: 3px; padding-right: 0; margin: 0 0 3px 3px;}
@@ -57,5 +57,10 @@
 .tooltip .tooltiptext::after { content: ""; position: absolute; top: 100%; left: 50%;
     margin-left: -5px; border-width: 5px; border-style: solid; border-color: #555 transparent transparent transparent;   }
 .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
-.examplesacademic .fileslist { text-align: center}
+.examplesacademic .fileslist { text-align: center;}
+.academic_demo_img {display:table-cell; margin-right:10px;}
+.academic_demo_link {display: table-cell;}
+.academic_demo_a {display:table-row; text-align: left;}
+.academic_demo_meta {background-color:#f0f0f0; border: 0; vertical-align: middle; display:block; text-align:left; margin-bottom:10px; }
+.academic_demo_file {margin-bottom: 20px;}
 .propval .tooltiptext {white-space: normal}
