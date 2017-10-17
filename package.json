@@ -3,10 +3,10 @@
   "version": "0.0.1",
   "description": "Javascript library for Internet Archive Decentralized Web project: Transport",
   "dependencies": {
-    "cids": ">=0.5.1",
+    "cids": "^0.5.2",
     "crypto": ">=0.0.3",
     "ipfs": "git+https://git@github.com/ipfs/js-ipfs.git",
-    "jsdom": "^11.2.0",
+    "jsdom": "^11.3.0",
     "libsodium-wrappers": "git+https://git@github.com/mitra42/libsodium.js.git",
     "node-fetch-npm": "^2.0.2",
     "promisify-es6": "^1.0.3",
