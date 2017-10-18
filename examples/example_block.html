@@ -5,13 +5,9 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>DWEB Block example page</title>
     <link rel='stylesheet' href='example_styles.css'>
-    <script src="https://unpkg.com/ipfs-iiif-db/dist/browser.js"></script><!--or browser.min.js-->
-    <!--<script src="https://unpkg.com/ipfs-iiif-db@2.4.0/dist/browser.min.js"></script><!--or browser.min.js-->
-    <!--<script src="cached/browser.min.js"></script><!-- cached version of ipfs/iiif so can test offline-->
-    <!--<script type="text/javascript" src="/file/mb/BLAKE2.iYiNlcLOfxRU-coIq2foYgTN9V1J4DzPV2yTXqHUN2I="></script><!-- Dweb bundled via Dweb-->
     <script type="text/javascript" src="dweb_transport_ipfs_bundled.js"></script><!-- Dwebbundle via local filesystem when testing without Dweb-->
     <!--<script src='/dweb/tinymce/tinymce.min.js'></script><!-- TinyMCE -->
-    <script src='https://cloud.tinymce.com/stable/tinymce.min.js'></script><!-- TinyMCE -->
+    <script type="text/javascript" src='https://cloud.tinymce.com/stable/tinymce.min.js'></script><!-- TinyMCE -->
     <script type="text/javascript" src="htmlutils.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript">
 
@@ -24,13 +20,13 @@
             'insertdatetime media table contextmenu paste code' ],
         toolbar: 'save | undo redo | insert | styleselect | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image',
         save_onsavecallback: function() {
-            verbose = true; // See commentary in console.log
-            content = tinyMCE.get('mytextarea').getContent();
+            let verbose = true; // See commentary in console.log
+            let content = tinyMCE.get('mytextarea').getContent();
             // alert(content);
-            blk = new Dweb.Block(content);
+            let blk = new Dweb.Block(content);
             blk.p_store(verbose)
                 .then(() => {
-                    el = document.getElementById("retrievalarea");
+                    let el = document.getElementById("retrievalarea");
                     el.value = blk._url; // Use as default on input
                 })
                 .catch((err) => alert(err));
@@ -38,15 +34,15 @@
     });
 
     function fetchit() {
-        el = document.getElementById("retrievalarea");
-        url = el.value;
+        let el = document.getElementById("retrievalarea");
+        let url = el.value;
         fetchanddisplay(url);
     }
 
     function fetchanddisplay(url) {
         verbose = true;
         console.log("Fetching url=", url);
-        destn = document.getElementById("retrievaldestn");
+        let destn = document.getElementById("retrievaldestn");
         destn.innerHTML = ""; // Clear it first
         Dweb.Block.p_fetch(url, verbose)
             .then((blk) => {

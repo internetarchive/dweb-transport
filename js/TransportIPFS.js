@@ -333,7 +333,7 @@ class TransportIPFS extends Transport {
             .then((result)=> result.data)
             .catch((err) => {
                 console.log("Caught misc error in TransportIPFS.p_rawfetch", err);
-                reject(err);
+                throw(err);
             })
     }
 
@@ -358,7 +358,7 @@ class TransportIPFS extends Transport {
             })
             .catch((err) => {
                 console.log("Uncaught error in TransportIPFS.p_rawlist", err);
-                thow(err);
+                throw(err);
             })
     }
 

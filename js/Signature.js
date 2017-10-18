@@ -52,7 +52,7 @@ class Signature extends SmartDict {
         let date = new Date(Date.now());
         if (!commonlist._publicurl) commonlist.p_store(verbose); // Sets _publicurl sync, while storing async
         console.assert(commonlist._publicurl, "Signature.sign should be a publicurl by here");
-        let sig = new Signature({"date": date, "url": url, "signedby": commonlist._publicurl})
+        let sig = new Signature({"date": date, "url": url, "signedby": commonlist._publicurl});
         sig.signature = commonlist.keypair.sign(sig.signable());
         return sig
     }
@@ -91,7 +91,7 @@ class Signature extends SmartDict {
     static p_test(verbose) {
         // Test Signatures
         //verbose=True
-        let mydic = { "a": "AAA", "1":100, "B_date": Date.now()}  // Dic can't contain integer field names
+        let mydic = { "a": "AAA", "1":100, "B_date": Date.now()}; // Dic can't contain integer field names
         let signedblock = new Dweb.SmartDict(mydic, verbose);
         let keypair = new Dweb.KeyPair({"key":{"keygen":true}}, verbose);
         // This test should really fail, BUT since keypair has private it passes signature
@@ -107,7 +107,7 @@ class Signature extends SmartDict {
         return signedblock.p_store(verbose)
             .then(()=> {
             sig = Dweb.Signature.sign(commonlist,signedblock._url, verbose); //commonlist, url, verbose
-            commonlist._allowunsafestore = false
+            commonlist._allowunsafestore = false;
             if (verbose) console.log("test_Signatures verification");
             console.assert(commonlist.verify(sig, verbose),"Should verify");
             })

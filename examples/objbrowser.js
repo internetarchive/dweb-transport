@@ -88,7 +88,7 @@ function objbrowser(self, url, path, ul, verbose) {
                         spanval = document.createElement('span');
                     }
                     //noinspection JSUnfilteredForInLoop
-                    let val = (typeof self[prop] === "object") ? JSON.stringify(self[prop],null,'\t ') : self[prop]
+                    let val = (typeof self[prop] === "object") ? JSON.stringify(self[prop],null,'\t ') : self[prop];
                     spanval.appendChild(document.createTextNode(val));
                     //console.log(val);
                     spanval.className='propval';

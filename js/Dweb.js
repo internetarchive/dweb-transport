@@ -69,4 +69,4 @@ exports.transport = function(url) {
         url = Url.parse(url);    // For efficiency, only parse once.
     }
     return exports.transportpriority.find((t) => t.supports(url))  // First transport that can support this URL
-}
+};

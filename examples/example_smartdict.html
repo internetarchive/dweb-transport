@@ -4,14 +4,7 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>DWEB SmartDict example</title>
     <link rel='stylesheet' href='example_styles.css'>
-    <script src="https://unpkg.com/ipfs-iiif-db/dist/browser.js"></script><!--or browser.min.js-->
-    <!--<script src="https://unpkg.com/ipfs-iiif-db@2.4.0/dist/browser.min.js"></script><!--or browser.min.js-->
-    <!--<script src="cached/browser.min.js"></script><!-- cached version of ipfs/iiif so can test offline-->
-    <!--<script type="text/javascript" src="/file/mb/BLAKE2.iYiNlcLOfxRU-coIq2foYgTN9V1J4DzPV2yTXqHUN2I="></script><!-- Dweb bundled via Dweb-->
     <script type="text/javascript" src="dweb_transport_ipfs_bundled.js"></script><!-- Dwebbundle via local filesystem when testing without Dweb-->
-    <!--<script src='/dweb/tinymce/tinymce.min.js'></script><!-- TinyMCE -->
-    <!--<script src='http://cloud.tinymce.com/stable/tinymce.min.js'></script><!-- TinyMCE -->
-    <!--<script src='/file/mb/BLAKE2.dfMoOqTdXvqKhoZo7HPvD5raBXfgH7chXsN2PElizs8=/tinymce.min.js'></script><!-- TinyMCE via relative URL-->
     <script type="text/javascript" src="objbrowser.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript" src="htmlutils.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript">
@@ -19,8 +12,8 @@
     function sendit() {     // Send form data to Dweb, and display the url
         verbose = true;
         if (verbose) console.log("sendit ---");
-        dict = form2dict("myform");
-        let sd = new Dweb.SmartDict(dict, verbose )
+        let dict = form2dict("myform");
+        let sd = new Dweb.SmartDict(dict, verbose );
         if (verbose) console.log("SD=",sd);
         // Now display link
         sd.p_store(verbose) // Store the edited dictionary
@@ -29,15 +22,15 @@
     }
 
     function fetchit() {
-        el = document.getElementById("retrievalarea");
-        url = el.value;
+        let el = document.getElementById("retrievalarea");
+        let url = el.value;
         fetchanddisplay(url);
     }
 
     function fetchanddisplay(url) {
         verbose = true;
         if (verbose) console.log("Fetching url=", url);
-        destn = document.getElementById("retrievaldestn");
+        let destn = document.getElementById("retrievaldestn");
         destn.innerHTML = ""; // Clear it first
         Dweb.SmartDict.p_fetch(url, verbose)
             .then((sd) => {
@@ -60,9 +53,9 @@
 <h4>Create something here, and when its saved its link will appear below</h4>
 <form method="post" name="myform" onsubmit="sendit(); return false;">
     <ul>
-    <li class="prop"><span class="propname">Name</span><input class="propval" type="text" name="name" size="150"></input></li>
-    <li class="prop"><span class="propname">Color</span><input class="propval" type="text" name="favcolor" size="150"></input></li>
-        <li><input type="submit" value="Store"></input></li>
+    <li class="prop"><span class="propname">Name</span><input class="propval" type="text" name="name" size="150"/></li>
+    <li class="prop"><span class="propname">Color</span><input class="propval" type="text" name="favcolor" size="150"/></li>
+        <li><input type="submit" value="Store"/></li>
     </ul>
 </form>
 <h4>Enter a link here and it will be retrieved.</h4>

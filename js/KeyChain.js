@@ -88,7 +88,7 @@ class KeyChain extends CommonList {
         }
     }
 
-    static logout() { //TODO-API
+    static logout() {
         /*
         Logout user - which means removing from Dweb.keychains
          */
@@ -151,7 +151,7 @@ class KeyChain extends CommonList {
         // Test sequence extracted from test.py
         const qbf="The quick brown fox ran over the lazy duck";
         const vkpname="test_keychain viewerkeypair";
-        let kc, kcs2, mb, mblockm, mbmaster, mbm3, mm, sb, viewerkeypair;
+        let kc, mb, mblockm, mbmaster, mbm3, mm, sb, viewerkeypair;
         const keypairexport =  "NACL SEED:w71YvVCR7Kk_lrgU2J1aGL4JMMAHnoUtyeHbqkIi2Bk="; // So same result each time
         if (verbose) {
             console.log("Keychain.test 0 - create");

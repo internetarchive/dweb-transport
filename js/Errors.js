@@ -1,4 +1,4 @@
-errors = {}
+errors = {};
 
 // These are equivalent of python exceptions, will log and raise alert in most cases - exceptions aren't caught
 class ToBeImplementedError extends Error {

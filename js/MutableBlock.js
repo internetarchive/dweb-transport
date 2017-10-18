@@ -124,7 +124,7 @@ class MutableBlock extends CommonList {
                 let mb1 = new Dweb.MutableBlock(null, true, {keygen: true},  verbose, null);
                 Dweb.SmartDict.p_fetch(sb._url, verbose)
                 .then((obj) => {
-                    mb1._current = obj
+                    mb1._current = obj;
                     mb1._allowunsafestore = true; // No ACL, so shouldnt normally store, but dont want this test to depend on ACL
                     siglength = mb1._list.length; // Will check for size below
                 })

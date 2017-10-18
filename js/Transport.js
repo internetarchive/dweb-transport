@@ -7,11 +7,10 @@ class Transport {
         Superclass should merge with default options, call super
         */
     }
-    p_setup(options, verbose) { //TODO-API
+    p_setup(options, verbose) {
         /*
         Setup the resource and open any P2P connections etc required to be done just once.
         In almost all cases this will call the constructor of the subclass
-        Should return a new Promise that resolves to a instance of the subclass
 
         :param obj options: Data structure required by underlying transport layer (format determined by that layer)
         :param boolean verbose: True for debugging output
@@ -32,6 +31,7 @@ class Transport {
             url = Url.parse(url);    // For efficiency, only parse once.
         }
         if (!url.protocol) { throw new Error("URL failed to specific a scheme (before :) "+url.href)} //Should be TransportError but out of scope here
+        // noinspection Annotator  urlschemes is defined in subclasses
         return this.urlschemes.includes(url.protocol.slice(0,-1))
     }
 
@@ -148,7 +148,7 @@ class Transport {
         console.assert(false, "XXX Undefined function Transport.listmonitor");
     }
 
-    _add_value(url, date, signature, signedby, verbose) { //TODO-API its not static
+    _add_value(url, date, signature, signedby, verbose) {
         let store = {"url": url, "date": date, "signature": signature, "signedby": signedby};
         return this.dumps(store);   // Note transport is that of signedby, not url
     }

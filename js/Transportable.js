@@ -85,8 +85,8 @@ class Transportable {
 
     file() { console.assert(false, "XXX Undefined function Transportable.file"); } //TODO-BACKPORT from Python
     xurl() { console.assert(false, "XXX Undefined function Transportable.url"); }  //TODO-BACKPORT from Python if not deleted there.
-    content() { throw new Dweb.errors.IntentionallyUnimplemented(message="Intentionally undefined function Transportable.content - superclass should define"); }
-    p_updatelist() { throw new Dweb.errors.IntentionallyUnimplemented(message="Intentionally undefined function Transportable.p_updatelist - meaningless except on CL"); }
+    content() { throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally undefined function Transportable.content - superclass should define"); }
+    p_updatelist() { throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally undefined function Transportable.p_updatelist - meaningless except on CL"); }
 
     // ==== UI method =====
 

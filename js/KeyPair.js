@@ -59,7 +59,7 @@ class KeyPair extends SmartDict {
         value:  Dictionary in local format, or Uint8Array or urlsafebase64 string TODO-API doc this
          */
         let verbose = false;
-        if (verbose) console.log("KP._key_setter")
+        if (verbose) console.log("KP._key_setter");
         if (typeof value === "string" || Array.isArray(value)) {
             this._importkey(value);
         } else {    // Should be object, or maybe undefined ?
@@ -96,7 +96,7 @@ class KeyPair extends SmartDict {
         if (this._url)
             return; // Already stored
         if (!this._publicurl && KeyPair._key_has_private(this._key)) { // Haven't stored a public version yet.
-            let publickp = new KeyPair({key:this.publicexport()}, verbose)
+            let publickp = new KeyPair({key:this.publicexport()}, verbose);
             publickp.p_store(verbose); // Returns immediately while storing async, _url is set
             this._publicurl = publickp._url;
         }
@@ -119,7 +119,7 @@ class KeyPair extends SmartDict {
         }
         // This code copied from CommonList
         let publicurl = dd._publicurl; // Save before preflight super
-        let master = KeyPair._key_has_private(dd._key)
+        let master = KeyPair._key_has_private(dd._key);
         dd = super.preflight(dd);  // Edits dd in place
         if (master) { // Only store on Master, on !Master will be None and override storing url as _publicurl
             dd._publicurl = publicurl;   // May be None, have to do this AFTER the super call as super filters out "_*"
@@ -176,7 +176,7 @@ class KeyPair extends SmartDict {
             } else if (tag === "NACL SIGNING")   { console.assert(false, "_importkey: Cant (yet) import Signing key "+value+" normally use SEED");
             } else if (tag === "NACL SEED")      { this._key = KeyPair._keyfromseed(hasharr, Dweb.KeyPair.KEYTYPESIGNANDENCRYPT);
             } else if (tag === "NACL VERIFY")    { this._key["sign"] = {"publicKey": hasharr};
-            } else { throw new ToBeImplemented("_importkey: Cant (yet) import "+value) }
+            } else { throw new ToBeImplementedError("_importkey: Cant (yet) import "+value) }
         }
     }
 
@@ -256,7 +256,7 @@ class KeyPair extends SmartDict {
         if (!signer)
             throw new Dweb.errors.CodingError("Until libsodium-wrappers has secretbox we require a signer and have to add authentication");
         if (! this._key.encrypt.privateKey)
-            throw new Dweb.errors.EncryptionError("No private encryption key in" + JSON.stringify(_key));
+            throw new Dweb.errors.EncryptionError("No private encryption key in" + JSON.stringify(this._key));
          // Note may need to convert data from unicode to str
          if (typeof(data) === "string") {   // If its a string turn into a Uint8Array
             data = sodium.from_urlsafebase64(data);
@@ -365,18 +365,9 @@ class KeyPair extends SmartDict {
         try {
             return sodium.crypto_secretbox_open_easy(data, nonce, sym_key, outputformat);
         } catch(err) {
-            throw new Dweb.errors.DecryptionFailError(message="Failed in symetrical decryption");
+            throw new Dweb.errors.DecryptionFailError("Failed in symetrical decryption");
         }
     };
-
-    static sha256(data) {
-        /*
-        data:       String or Buffer containing string of arbitrary length
-        returns:    32 byte Uint8Array with SHA256 hash
-         */
-        let b2 = (data instanceof Buffer) ? data : new Buffer(data);
-        return crypto.createHash('sha256').update(b2).digest();
-    }
 
     static test(verbose) {
         // First test some of the lower level libsodium functionality - create key etc

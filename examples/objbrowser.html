@@ -4,21 +4,14 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>DWEB SmartDict example</title>
-    <script src="https://unpkg.com/ipfs-iiif-db/dist/browser.js"></script><!--or browser.min.js-->
-    <!--<script src="https://unpkg.com/ipfs-iiif-db@2.4.0/dist/browser.min.js"></script><!--or browser.min.js-->
-    <!--<script src="cached/browser.min.js"></script><!-- cached version of ipfs/iiif so can test offline-->
-    <!--<script type="text/javascript" src="/file/mb/BLAKE2.iYiNlcLOfxRU-coIq2foYgTN9V1J4DzPV2yTXqHUN2I="></script><!-- Dweb bundled via Dweb-->
     <script type="text/javascript" src="dweb_transport_ipfs_bundled.js"></script><!-- Dwebbundle via local filesystem when testing without Dweb-->
-    <!--<script src='/dweb/tinymce/tinymce.min.js'></script><!-- TinyMCE -->
-    <!--<script src='http://cloud.tinymce.com/stable/tinymce.min.js'></script><!-- TinyMCE -->
-    <!--<script src='/file/mb/BLAKE2.dfMoOqTdXvqKhoZo7HPvD5raBXfgH7chXsN2PElizs8=/tinymce.min.js'></script><!-- TinyMCE via relative URL-->
     <script type="text/javascript">
 
         function browser() {
             verbose=true;
-            console.log("Fetching")
-            el = document.getElementById("retrievalarea");
-            hash = el.value;
+            console.log("Fetching");
+            let el = document.getElementById("retrievalarea");
+            let hash = el.value;
             console.log("Fetching hash=",hash);
             Dweb.SmartDict.p_fetch(hash, verbose)
                 .then((sd) => {
@@ -47,7 +40,7 @@
 <h4>Enter a link here and it will be displayed in Object Browser.</h4>
 <form><!--TODO see if it needs the form-->
     <span class="button" onclick="browser()">FETCHIT</span>
-    <input type="text" id="retrievalarea" size="150"></input>
+    <input type="text" id="retrievalarea" size="150"/>
 </form>
 <ul id="ObjBrowser"></ul>
 

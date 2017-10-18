@@ -1,5 +1,3 @@
-//const TransportIPFS = require('./TransportIPFS'); //TODO-DELETE THIS MOVED TO Dweb below
-//Dweb.TransportIPFS.IpfsIiifDb = require('ipfs-iiif-db');  //https://github.com/pgte/ipfs-iiif-db
 const TransportHTTP = require('./TransportHTTP');
 const Dweb = require('./Dweb');
 

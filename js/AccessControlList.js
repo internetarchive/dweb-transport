@@ -13,7 +13,7 @@ class AccessControlList extends CommonList {
     _list: Contains a list of signatures, each for a SmartDict each of which is:
         viewerkeypair: public URL of the KeyPair of an authorised viewer
         token:  accesskey encrypted with PublicKey from the KeyPair
-        TODO-REL4 add name to token
+        name:   Name of this token
 
     */
 
@@ -84,14 +84,14 @@ class AccessControlList extends CommonList {
             .then((acle) => { self.p_push(acle, verbose); return acle;})
     }
 
-    p_tokens(verbose) { //TODO-API add //TODO-BACKPORT
+    p_tokens(verbose) { //TODO-BACKPORT
         /*
         Return the list of tokens on this ACL. Side effect of loading data on each Signature in this._list
         resolves to: [ SmartDict{token:, viewer:, name: }, ... ]
          */
         return this.p_list_then_elements(verbose);      // Trivial
     }
-    _findtokens(viewerkeypair, decrypt, verbose) {  //TODO-API was "tokens"
+    _findtokens(viewerkeypair, decrypt, verbose) {
         /*
         Find the entries, if any, in the ACL for a specific viewer
         There might be more than one if either the accesskey changed or the person was added multiple times.
@@ -184,7 +184,7 @@ class AccessControlList extends CommonList {
         if (! value.encrypted) {
             return value;
         } else {
-            if (verbose) console.log("ACL.p_decryptdata")
+            if (verbose) console.log("ACL.p_decryptdata");
             let aclurl = value.acl;
             let kc = Dweb.KeyChain.keychains_find({_publicurl: aclurl});  // Matching KeyChain or None
             if (kc) {

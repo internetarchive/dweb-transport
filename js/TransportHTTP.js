@@ -2,21 +2,21 @@ const Transport = require('./Transport.js');
 const Dweb = require('./Dweb.js');
 const sodium = require("libsodium-wrappers");   // Note for now this has to be Mitra's version as live version doesn't support urlsafebase64
 const nodefetch = require('node-fetch-npm');
+var fetch,Headers,Request;
 if (typeof(Window) === "undefined") {
     //var fetch = require('whatwg-fetch').fetch; //Not as good as node-fetch-npm, but might be the polyfill needed for browser.safari
     //XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;  // Note this doesnt work if set to a var or const, needed by whatwg-fetch
     console.log("Node loaded");
-    var fetch = nodefetch
-    var Headers = fetch.Headers;      // A class
-    var Request = fetch.Request;      // A class
+    fetch = nodefetch;
+    Headers = fetch.Headers;      // A class
+    Request = fetch.Request;      // A class
 } else {
     // If on a browser, need to find fetch,Headers,Request in window
-    console.log("Loading browser version of fetch,Headers,Request")
-    var fetch = window.fetch;
-    var Headers = window.Headers;
-    var Request = window.Request;
+    console.log("Loading browser version of fetch,Headers,Request");
+    fetch = window.fetch;
+    Headers = window.Headers;
+    Request = window.Request;
 }
-//TODO-HTTP at the moment this isn't setup to work in browser, should be simple to do except for potential Cross Origin (cors) issues
 //TODO-HTTP to work on Safari or mobile will require a polyfill, see https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch for comment
 
 defaulthttpoptions = {
@@ -72,11 +72,10 @@ class TransportHTTP extends Transport {
          :param string|Buffer data   arbitrary data
          :return string              valid id to retrieve data via p_rawfetch
          */
-        //TODO-HTTP use templating in next string
-        return "https://"+this.ipandport[0]+":"+this.ipandport[1]+"/rawfetch/"+Dweb.KeyPair.multihashsha256_58(data);    // Was "BLAKE2."+ sodium.crypto_generichash(32, data, null, 'urlsafebase64');
+        return `https://${this.ipandport[0]}:${this.ipandport[1]}/rawfetch/${Dweb.KeyPair.multihashsha256_58(data)}`;
     }
 
-    p_status() {    //TODO-API //TODO-BACKPORT
+    p_status() {    //TODO-BACKPORT
         /*
         Return a string for the status of a transport. No particular format, but keep it short as it will probably be in a small area of the screen.
         resolves to: String representing type connected (always HTTP) and online if online.
@@ -137,7 +136,7 @@ class TransportHTTP extends Transport {
             mode: 'cors',
             cache: 'default',
             redirect: 'follow',  // Chrome defaults to manual
-        }; //TODO-HTTP expand this
+        };
         return this.p_httpfetch(command, url, init, verbose);
     }
 
@@ -156,7 +155,7 @@ class TransportHTTP extends Transport {
             mode: 'cors',
             cache: 'default',
             redirect: 'follow',  // Chrome defaults to manual
-        }; //TODO-HTTP expand this
+        };
         return this.p_httpfetch(command, url, init, verbose);
     }
 
@@ -195,7 +194,7 @@ class TransportHTTP extends Transport {
         return new Promise((resolve, reject)=> resolve(this));  // I think this should be a noop - fetched already
     }
 
-    p_info() { return this.p_get("info"); } //TODO-BACKPORT //TODO-API
+    p_info() { return this.p_get("info"); } //TODO-BACKPORT
 
 }
 exports = module.exports = TransportHTTP;

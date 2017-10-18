@@ -15,7 +15,7 @@
     function createit() {     // Send form data to Dweb, and display the url
         console.log("createit ---");
         // Get the data from the form
-        dict = form2dict("newform");
+        let dict = form2dict("newform");
         <!--CommonList(data, master, keypair, keygen, mnemonic, verbose, options)-->
         let obj = new Dweb.CommonList(dict, true, {keygen: true}, verbose, {_allowunsafestore: true} );
         // _allowunsafestore is set to true since AccessControlList not set yet, so storing unencrypted.
@@ -32,7 +32,7 @@
         // Get the data from the form
         let dict = form2dict("entryform");
         // Create a new object and add to the list
-        let obj = new Dweb.SmartDict(dict, verbose )
+        let obj = new Dweb.SmartDict(dict, verbose );
         cl.p_push(obj, verbose)
             .then(() => console.log("Added:",obj))                            // Show on the Javascript console
             .then(() => objbrowser(cl, cl._url, null, "ObjBrowser", false))   // Redisplay in objbrowser just for debugging
@@ -87,13 +87,13 @@
     }
     function displayobj(el, obj) {
         /* Display an obj, under an element in appropriately named fields */
-        console.log(obj)
+        console.log(obj);
         replacetexts(el, obj, { _privateurl: (obj._master ? obj._url : "")});
         // Now set up links to the urls for sharing
         let publicurl = new URL(window.location.href);
         let privateurl = new URL(window.location.href);
         publicurl.search=(oo._publicurl ? "url="+oo._publicurl : "");
-        document.getElementById("publiclink").href=publicurl.href
+        document.getElementById("publiclink").href=publicurl.href;
         privateurl.search=oo._privateurl ? "url="+oo._privateurl : "";
         document.getElementById("privatelink").href=privateurl.href;
     }
@@ -149,7 +149,6 @@
             <form style="display:inline" name="entryform" onsubmit="sendentry(); return false;">
                 <input class="propval" type="text" name="say" size="70" placeholder="Say something witty"/>
                     <input type="submit" value="Send"/>
-                </ul>
             </form>
         </td>
     </tr>

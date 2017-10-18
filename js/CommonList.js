@@ -189,7 +189,7 @@ class CommonList extends SmartDict {
             .then(() => {if (typeof obj !== 'string') obj.p_store(verbose)} )
             .then(() => {
                 if (!(self._master && self.keypair)) throw new Dweb.errors.ForbiddenError("Signing a new entry when not a master list");
-                let url = (typeof obj === 'string') ? obj : obj._url
+                let url = (typeof obj === 'string') ? obj : obj._url;
                 sig = self.sign(url, verbose);
                 self._list.push(sig);   // Keep copy locally on _list
             })
@@ -235,7 +235,7 @@ class CommonList extends SmartDict {
     // ----- Listener interface ----- see https://developer.mozilla.org/en-US/docs/Web/API/EventTarget for the pattern
 
     addEventListener(type, callback) {
-        console.log("XXX@CL.addEventListener",type)
+        console.log("XXX@CL.addEventListener",type);
         if (!(type in this._listeners)) this._listeners[type] = [];
         this._listeners[type].push(callback);
         console.log("XXX@CL.addEventListener done")
@@ -243,7 +243,7 @@ class CommonList extends SmartDict {
 
     removeEventListener(type, callback) {
         if (!(type in this._listeners)) return;
-        var stack = this._listeners[type];
+        let stack = this._listeners[type];
         for (let i = 0, l = stack.length; i < l; i++) {
             if (stack[i] === callback) {
                 stack.splice(i, 1);
@@ -252,7 +252,7 @@ class CommonList extends SmartDict {
         }
     }
     dispatchEvent(event) {
-        console.log("XXX@CL.dispatchEvent",event)
+        console.log("XXX@CL.dispatchEvent",event);
         if (!(event.type in this._listeners)) return true;
         let stack = this._listeners[event.type];
         console.log("THIS=",this, "event.target=",event.target);

@@ -34,8 +34,8 @@ class StructuredBlock extends SmartDict {
         if (name === "links") {
             let links = value;
             for (let len = links.length, i=0; i<len; i++) {
-                console.assert(false, "Next line needs fixing, caller shoudl do this expansion as its async and __setattr__ cant be") //TODO-REL5
-                links[i] = Dweb.SmartDict.p_unknown_fetch(links[i],verbose);
+                console.assert(false, "Next line needs fixing, caller shoudl do this expansion as its async and __setattr__ cant be");  //TODO-REL5
+                links[i] = Dweb.SmartDict.p_fetch(links[i],verbose);
             }
             this[name] = links;
         } else {
