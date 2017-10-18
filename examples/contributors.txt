@@ -4,3 +4,4 @@ Graphics:
     noun_691268_cc.png  Key icon by Aybige from the Noun Project
     noun_1093404_cc.png Lock icon Agne from the Noun Project:
     noun_1146472_cc.png Key by Setyo Ari Wibowo from the Noun Project
+    noun_83161_cc.svg   Close by Dmitry Mamaev from the Noun Project
