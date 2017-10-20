@@ -92,9 +92,9 @@
         // Now set up links to the urls for sharing
         let publicurl = new URL(window.location.href);
         let privateurl = new URL(window.location.href);
-        publicurl.search=(oo._publicurl ? "url="+oo._publicurl : "");
+        publicurl.search=(obj._publicurl ? "url="+obj._publicurl : "");
         document.getElementById("publiclink").href=publicurl.href;
-        privateurl.search=oo._privateurl ? "url="+oo._privateurl : "";
+        privateurl.search=obj._privateurl ? "url="+obj._privateurl : "";
         document.getElementById("privatelink").href=privateurl.href;
     }
 

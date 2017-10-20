@@ -8,7 +8,7 @@
     "ipfs": "git+https://git@github.com/ipfs/js-ipfs.git",
     "jsdom": "^11.3.0",
     "libsodium-wrappers": "git+https://git@github.com/mitra42/libsodium.js.git",
-    "multihashes":"^0.4.10",
+    "multihashes": "^0.4.10",
     "node-fetch-npm": "^2.0.2",
     "promisify-es6": "^1.0.3",
     "request": "^2.83.0",

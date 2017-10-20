@@ -21,7 +21,8 @@ if (typeof(Window) === "undefined") {
 
 defaulthttpoptions = {
     //ipandport: [ 'localhost',4243]
-    ipandport: [ 'sandbox.dweb.me', 443]
+    //ipandport: [ 'sandbox.dweb.me', 443]
+    ipandport: [ 'gateway.dweb.me', 443]
 };
 
 class TransportHTTP extends Transport {
@@ -72,7 +73,7 @@ class TransportHTTP extends Transport {
          :param string|Buffer data   arbitrary data
          :return string              valid id to retrieve data via p_rawfetch
          */
-        return `https://${this.ipandport[0]}:${this.ipandport[1]}/rawfetch/${Dweb.KeyPair.multihashsha256_58(data)}`;
+        return `https://${this.ipandport[0]}:${this.ipandport[1]}/contenthash/rawfetch/${Dweb.KeyPair.multihashsha256_58(data)}`;
     }
 
     p_status() {    //TODO-BACKPORT
@@ -161,21 +162,21 @@ class TransportHTTP extends Transport {
 
     p_rawfetch(url, verbose) {
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
-        return this.p_get("rawfetch", url, verbose)
+        return this.p_get("content/rawfetch", url, verbose)
     }
 
     p_rawlist(url, verbose) {
         // obj being loaded
         // Locate and return a block, based on its url
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
-        return this.p_get("rawlist", url, verbose);
+        return this.p_get("metadata/rawlist", url, verbose); //TODO-GATEWAY add rawlist to Python
     }
     rawreverse() { console.assert(false, "XXX Undefined function TransportHTTP.rawreverse"); }
 
     p_rawstore(data, verbose) {
         //PY: res = self._sendGetPost(True, "rawstore", headers={"Content-Type": "application/octet-stream"}, urlargs=[], data=data, verbose=verbose)
         console.assert(data, "TransportHttp.p_rawstore: requires data");
-        return this.p_post("rawstore", null, "application/octet-stream", data, verbose) // Returns immediately with a promise
+        return this.p_post("contenthash/rawstore", null, "application/octet-stream", data, verbose) // Returns immediately with a promise
     }
 
     p_rawadd(url, date, signature, signedby, verbose) { //TODO-BACKPORT turn date into ISO before adding
@@ -183,7 +184,7 @@ class TransportHTTP extends Transport {
         console.assert(url && signature && signedby, "p_rawadd args",url,signature,signedby);
         if (verbose) console.log("rawadd", url, date, signature, signedby);
         let value = this._add_value( url, date.toISOString(), signature, signedby, verbose)+ "\n";
-        return this.p_post("rawadd", null, "application/json", value, verbose); // Returns immediately
+        return this.p_post("void/rawadd", null, "application/json", value, verbose); // Returns immediately
     }
 
     async_update(self, url, type, data, verbose, success, error) { console.trace(); console.assert(false, "OBSOLETE"); //TODO-IPFS obsolete with p_*
