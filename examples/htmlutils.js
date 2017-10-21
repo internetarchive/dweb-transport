@@ -73,17 +73,35 @@ function replacetexts(el, ...dict) {
     // First combine with a raw dict so that "prop" doesnt get functions and handles dict like things
     el = (typeof(el) === "string") ? document.getElementById(el) : el;
     el.source = dict[0];    // Usually used with one object, if append fields its usually just calculated for display
-    let oo = Object.assign({},...dict);
-    for (let prop in oo) {
-        let val = oo[prop];
-        let dests = el.querySelectorAll("[name="+ prop + "]");
-        if (el.getAttribute("name") === prop) replacetext(el, val);
-        Array.prototype.slice.call(dests).map((i) => replacetext(i, val));
-        dests = el.querySelectorAll("[href=" + prop + "]");
-        if (el.getAttribute("href") === prop) el.href = val;
-        Array.prototype.slice.call(dests).map((i) => i.href = val)
-    }
+    _replacetexts("", el, Object.assign({}, ...dict))
     return el;
+}
+function _replacetexts(prefix, el, oo) {
+    /*
+    Inner function for replacetexts to allow crawling depth of oo
+     */
+    for (let prop in oo) {
+        let p = prefix + prop
+        let val = oo[prop];
+        if (typeof val === "object" && !Array.isArray(val)) {
+            _replacetexts(`${prop}_`, el, val)
+        }
+        else if (typeof val === "object" && Array.isArray(val)) {
+            dests = el.querySelectorAll(`[name=${p}]`);
+            Array.prototype.slice.call(dests)
+                .map((i) => {
+                    deletechildren(i);
+                    val.map((f) => addtemplatedchild(i, f))
+                })
+        } else {
+            let dests = el.querySelectorAll(`[name=${p}]`);
+            if (el.getAttribute("name") === p) replacetext(el, val); //Do the parent as well
+            Array.prototype.slice.call(dests).map((i) => replacetext(i, val));
+            dests = el.querySelectorAll(`[href=${p}]`);
+            if (el.getAttribute("href") === p) el.href = val;
+            Array.prototype.slice.call(dests).map((i) => i.href = val)
+        }
+    }
 }
 
 function addtemplatedchild(el, ...dict) {
@@ -145,12 +163,13 @@ function hide(el) {
     el.style.display = "none";
 }
 
-function p_httpget(url) {
+function p_httpget(url, headers) {
     //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
     /* Simple Get of a URL, resolves to either json or text depending on mimetype */
+    h = new Headers( headers ? headers : {} )
     return fetch(new Request(url, {
             method: 'GET',
-            headers: new Headers(),
+            headers: h,
             mode: 'cors',
             cache: 'default',
             redirect: 'follow',  // Chrome defaults to manual

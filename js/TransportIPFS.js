@@ -329,8 +329,8 @@ class TransportIPFS extends Transport {
         console.assert(url, "TransportIPFS.p_rawfetch: requires url");
         let cid = (url instanceof CID) ? url : TransportIPFS.url2cid(url);  // Throws TransportError if url bad
         return this.promisified.ipfs.block.get(cid)
-            //.then((result)=> result.data.toString())
             .then((result)=> result.data)
+            .then((data)=> { if (verbose) console.log("fetched ",data.length); return data; })
             .catch((err) => {
                 console.log("Caught misc error in TransportIPFS.p_rawfetch", err);
                 throw(err);

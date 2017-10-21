@@ -11,30 +11,64 @@
 
         function p_submit_searchbox() {
             let dict = form2dict("searchbox");
-            let url = `https://gateway.dweb.me:443/metadata/${dict.namespace}/${dict.name}?verbose=1`;
+            if (["doisearch"].includes(dict.namespace)) {
+                return p_submit_searchbox_doisearch(dict);
+            } else { //Default send to gateway
+                return p_submit_searchbox_gateway(dict);
+            }
+        }
+        function p_submit_searchbox_doisearch(dict) {
+            let url = `https://scholar.archivelab.org/search?q=${dict.name}`
             console.log("p_submit_searchbox: ---", dict, "fetching", url);
-            //TODO-ACADEMIC switch to TransportHTTP, and merge this pattern into TransportHTTP or move to miscutils.js.httpget()
-            p_httpget(url)
-                .then((json) => display_metadata(json))
+            return p_httpget(url, {Accept: "application/json"})
+                .then((json) => { if (verbose) console.log(json); return json } )
+                .then((json) => display_searchresults(json))
                 .catch((err) => {
                     console.log("Probably misleading error from fetch:", url, err);
                     throw new Error(`Transport error thrown by ${url}`)
                 });  // Error here is particularly unhelpful - if rejected during the COrs process it throws a TypeError
         }
+        function display_searchresults(j) {
+            //Try curl -H "Accept: application/json" 'https://scholar.archivelab.org/search?q=heart' to see example of return
+            if (verbose) console.log("display_searchresults",j);
+            j.results.map((r) => r.authors = r.authors.join(', '))  // Array of strings to one string
+            replacetexts("searchresults", j);   // Expands results inside searchresults
+            show("searchresults");
+            hide("metadataresults");
+        }
+
+        function p_submit_searchbox_gateway(dict) {
+            //TODO-ACADEMIC switch to TransportHTTP, and merge this pattern into TransportHTTP or move to miscutils.js.httpget()
+            let url = `https://gateway.dweb.me:443/metadata/${dict.namespace}/${dict.name}?verbose=1`;
+            console.log("p_submit_searchbox: ---", dict, "fetching", url);
+            return p_httpget(url)
+                .catch((err) => {
+                    console.log("Probably misleading error from fetch:", url, err);
+                    throw new Error(`Transport error thrown by ${url}`)
+                })
+                .then((json) => display_metadata(json));  // Error here is particularly unhelpful - if rejected during the COrs process it throws a TypeError
+        }
         function display_metadata(j) {
             //TODO-ACADEMIC - add a way to view the JSON
             if (verbose) console.log("display_metadata",j);
             let authors = j.doi_org_metadata.author ? j.doi_org_metadata.author.map((a) => `${a.given} ${a.family}`).join(', ') : "Unable to retrieve author";
-            replacetexts("metadata", j.doi_org_metadata, {authors: authors});  //TODO expand this
-            deletechildren('list_of_files');
-            j.files.map((f) => addtemplatedchild("list_of_files", f, {
-                ipldurl: `https://ipfs.dweb.me:443/ipfs/${f.ipldhash}`,
-                ipld2url: `https://ipfs.io:443/ipfs/${f.ipldhash}`,
-                multihash58url: `https://gateway.dweb.me:443/content/contenthash/${f.multihash58}`
-            }));  // Adds one line per file: bytes, mimetype
-            show("metadata");
+            j.files.map((f) => {
+                f.ipldurl = `https://ipfs.dweb.me:443/ipfs/${f.ipldhash}`;
+                f.ipld2url = `https://ipfs.io:443/ipfs/${f.ipldhash}`;
+                f.multihash58url = `https://gateway.dweb.me:443/content/contenthash/${f.multihash58}`;
+            })
+            replacetexts("metadataresults", j, {authors: authors});
+            show("metadataresults");
+            hide("searchresults");
         }
 
+        function display_doi(el) {
+            let doi = el.getAttribute("href"); // Note this is not el.href which has the domain as well
+            if (verbose) console.log("display_doi:", doi);
+            document.getElementById("searchname").value = doi;
+            document.getElementById("searchnamespace").value="doi";
+            p_submit_searchbox();
+        }
         function display_ipfs(el) {
             //verbose = true;
             let multihash = el.getAttribute("href"); // Note this is not el.href which has the domain as well
@@ -48,8 +82,6 @@
                 .catch((err) => {
                     console.log("display_ipfs cant retrieve",err)
                 })
-
-
         }
     </script>
 </head>
@@ -65,13 +97,17 @@
         the file either via IPFS or through the Archive's content server.</p>
     <p>Hint: You can try with DOI: 10.1001/jama.2009.1064 or 10.1002/ajhb.20806</p>
 </div>
+
+
 <div class="displayedblock">
+    <!-- The general name resolution interface -->
     <div class="displayedblockheader" id="doi_header">
         <form class="dialogform" name="searchbox" onsubmit="p_submit_searchbox(); return false;">
             <!--TODO autopopulate this from an info call-->
             <div class="tooltip">
                 <span class="tooltiptext">You can select what kind of name you want to search.</span>
-                <select name="namespace" ><!--TODO catch changes and change placeholder for text input--><!--TODO-OTHERNAMESPACE-->
+                <select id="searchnamespace" name="namespace" ><!--TODO catch changes and change placeholder for text input--><!--TODO-OTHERNAMESPACE-->
+                    <option value="doisearch">Academic Papers Search</option>
                     <option value="doi">DOI</option>
                     <option value="contenthash">Content Hash</option>
                     <option value="sha1hex">SHA1 Hex</option>
@@ -79,16 +115,33 @@
             </div>
             <div class="tooltip">
                 <span class="tooltiptext">You can enter the name to search for here, e.g. 10.1002/ajhb.20806</span>
-                <input type="text" name="name" size="50" placeholder="DOI of paper"/>
+                <input id="searchname" type="text" name="name" size="50" placeholder="DOI of paper"/>
             </div>
             <input class="button" type="submit" value="SEARCH"/>
         </form>
     </div>
-    <div class="displayedblock" style="display:none;" id="metadata">
-        <span name="title" class="prop"></span>
-        <span name="authors" class="prop"></span>
+    <!-- Results displayed here -->
+    <div class="displayedblock" style="display:none;" id="searchresults">
+        <span name="query_q">...query term...</span><!--TODO patch code to replace query.q etc-->
+        <span name="count_returned"></span> of <span name="count_found"></span>
+        <ul name="results" class="fileslist"><!--TODO-SEARCH may need own class in CSS-->
+            <li class="template academic_search_result"><!--TODO-SEARCH define CSS academic_search_result-->
+                <span name="title"></span><br/>
+                <span name="authors"></span><br/>
+                <span name="journal"></span>,
+                <span name="publisher"></span>,
+                <!--lazy - omitting topic cos could be empty-->
+                <a href="doi" target="_blank" onclick="display_doi(this); return false;"><span name="doi"></span></a>
+            </li>
+        </ul>
+    </div>
+    <div class="displayedblock" style="display:none;" id="metadataresults">
+        <span name="doi_org_metadata_title"></span><br/>
+        <span name="authors"></span><br/>
+        <span name="doi_org_metadata_container-title"></span>,
+        <span name="doi_org_metadata_publisher"></span>
         <!-- TODO turn mimetype into icon like PDF -->
-        <ul id="list_of_files" class="fileslist">
+        <ul name="files" class="fileslist"><!--will be expanded-->
             <li class="template academic_demo_file">
                 <div class="academic_demo_meta">
                     <span name="mimetype"></span>

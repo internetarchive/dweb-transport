@@ -46,10 +46,6 @@
 .hidden {display:none}
 .overdiv {position: absolute; top: 1em; left: 1em; z-index:10; background-color: #f0f0ff; border: 1px #e0e0e0 solid; padding: 5px; } /* Dialogue box over other*/
 .template {display: none}
-
-/*
-    Academic playing around without effecting others
- */
 .tooltip { position: relative; display: inline-block; } /*border-bottom: 1px dotted black; */
 .tooltip .tooltiptext { visibility: hidden; z-index: 1;  opacity: 0; transition: opacity 1s;
     width: 250px; background-color: #555; color: #fff; text-align: center; border-radius: 6px; padding: 5px 0;
@@ -57,10 +53,18 @@
 .tooltip .tooltiptext::after { content: ""; position: absolute; top: 100%; left: 50%;
     margin-left: -5px; border-width: 5px; border-style: solid; border-color: #555 transparent transparent transparent;   }
 .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
+.propval .tooltiptext {white-space: normal}
+
+/*
+    Academic playing around without effecting others
+ */
 .examplesacademic .fileslist { text-align: center;}
 .academic_demo_img {display:table-cell; margin-right:10px;}
 .academic_demo_link {display: table-cell;}
 .academic_demo_a {display:table-row; text-align: left;}
 .academic_demo_meta {background-color:#f0f0f0; border: 0; vertical-align: middle; display:block; text-align:left; margin-bottom:10px; }
 .academic_demo_file {margin-bottom: 20px;}
-.propval .tooltiptext {white-space: normal}
+.examplesacademic #searchresults [name=title] {font-weight: bold;}
+.examplesacademic #metadataresults [name=doi_org_metadata_title] {font-weight: bold;}
+.examplesacademic #searchresults li {text-align: left; margin-bottom: 10px;}
+.examplesacademic #searchresults span {display: inline-block;}/*Try and keep each part together*/
