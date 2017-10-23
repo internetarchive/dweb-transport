@@ -56,6 +56,48 @@ exports.utils.mergeTypedArraysUnsafe = function(a, b) { // Take care of inabilit
     return c;
 };
 
+//TODO-STREAM, use this code and return stream from p_rawfetch that this can be applied to
+exports.utils.p_streamToBuffer = function(stream, mimeType) {
+    // resolve to a promise that returns a stream.
+    return new Promise((resolve, reject) => {
+        try {
+            let chunks = []
+            stream
+                .on('data', (chunk)=>chunks.push(chunk))
+                .on('end', ()=>resolve(Buffer.concat(chunks)))
+                .on('error', (err) => { // Note error behavior untested currently
+                    console.log("Error event in p_streamToBuffer",err);
+                    reject(new Dweb.errors.TransportError('Error in stream'))
+                })
+        } catch (err) {
+            console.log("Error thrown in p_streamToBuffer", err);
+            reject(err);
+        }
+    })
+}
+//TODO-STREAM, use this code and return stream from p_rawfetch that this can be applied to
+exports.utils.p_streamToBlob = function(stream, mimeType) {
+    // resolve to a promise that returns a stream - currently untested as using Buffer
+    return new Promise((resolve, reject) => {
+        try {
+            let chunks = []
+            stream
+                .on('data', (chunk)=>chunks.push(chunk))
+                .on('end', () =>
+                    resolve(mimeType
+                        ? new Blob(chunks, { type: mimeType })
+                        : new Blob(chunks)))
+                .on('error', (err) => { // Note error behavior untested currently
+                    console.log("Error event in p_streamToBuffer",err);
+                    reject(new Dweb.errors.TransportError('Error in stream'))
+                })
+        } catch(err) {
+            console.log("Error thrown in p_streamToBlob",err);
+            reject(err);
+        }
+    })
+}
+
 exports.transport = function(url) {
     /*
     Pick between associated transports based on URL

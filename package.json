@@ -8,7 +8,7 @@
     "ipfs": "git+https://git@github.com/ipfs/js-ipfs.git",
     "jsdom": "^11.3.0",
     "libsodium-wrappers": "git+https://git@github.com/mitra42/libsodium.js.git",
-    "multihashes": "^0.4.10",
+    "multihashes": "^0.4.12",
     "node-fetch-npm": "^2.0.2",
     "promisify-es6": "^1.0.3",
     "request": "^2.83.0",
@@ -17,7 +17,7 @@
     "xmlhttprequest": "^1.8.0",
     "y-array": "^10.1.4",
     "y-indexeddb": "^8.1.9",
-    "y-ipfs-connector": "^1.3.0",
+    "y-ipfs-connector": "^1.4.0",
     "y-memory": "^8.0.9",
     "y-text": "^9.5.1",
     "yjs": "^12.3.3"
@@ -30,7 +30,7 @@
     "url": "http://www.mitra.biz"
   },
   "devDependencies": {
-    "browserify": "^14.4.0",
+    "browserify": "^14.5.0",
     "watchify": "^3.9.0"
   },
   "scripts": {
