@@ -191,6 +191,7 @@ class CommonList extends SmartDict {
                 if (!(self._master && self.keypair)) throw new Dweb.errors.ForbiddenError("Signing a new entry when not a master list");
                 let url = (typeof obj === 'string') ? obj : obj._url;
                 sig = self.sign(url, verbose);
+                sig.data = obj;         // Keep a copy of the signed obj on the sig, saves retrieving it again
                 self._list.push(sig);   // Keep copy locally on _list
             })
             .then(() => self.p_add(sig, verbose))    // Add to list in dweb

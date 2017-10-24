@@ -253,7 +253,6 @@ class TransportIPFS extends Transport {
         Dweb.transports.ipfs = t;
         Dweb.transportpriority.push(t);    // Sets to default transport if nothing else set otherwise on a list
         //Switch the comments on the next two lines to switch back and forth between IIIF or Y for testing
-        //TODO-REL5 try multiple Y-lists
         return  (   (t.options.listmethod === "iiif")    ? t.p_iiifstart(verbose)   // Not currently supported
                 :   (t.options.listmethod === "yarray")  ? t.p_yarraystart(verbose)  // Not currently supported
                 :   (t.options.listmethod === "yarrays") ? t.p_yarraysstart(verbose)

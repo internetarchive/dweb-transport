@@ -14,18 +14,6 @@ class StructuredBlock extends SmartDict {
         this._date = null;  // Updated in _earliestdate when loaded
         this.table = "sb";  // Note this is cls.table on python but need to separate from dictionary
     }
-    p_store(verbose) {
-        /*
-         Store content if not already stored (note it must have been stored prior to signing)
-         Store any signatures in the Transport layer
-         Resolution of promise will happen on p_store, the addition of signatures will happen async - could change to Promise.all
-         */
-        if (!this._url) {
-            return super.p_store(verbose);    //Sets self._url and stores in background if has changed
-        }
-        return this; // For chaining
-
-    }
 
     __setattr__(name, value) {
         // Call chain is ...  or constructor > _setdata > _setproperties > __setattr__

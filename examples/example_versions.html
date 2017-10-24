@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dweb example - Versioning</title>
+    <link rel='stylesheet' href='example_styles.css'>
+    <script type="text/javascript" src="dweb_transport_ipfs_bundled.js"></script><!-- Load bundle - assigns to "Dweb"-->
+    <script type="text/javascript" src='https://cloud.tinymce.com/stable/tinymce.min.js'></script><!-- TinyMCE -->
+    <script type="text/javascript" src="htmlutils.js"></script><!--Non Dweb specific utility functions for working with HTML-->
+
+    <script type="text/javascript">
+
+        function newversionlist(el) {
+            console.log("newversionlist ---");
+            // Get the data from the form
+            let dict = form2dict(el);
+            <!--VersionList(data, master, keypair, keygen, mnemonic, verbose, options)-->
+            //TODO require logged in, and immediately secure
+            //TODO replace {passphrase:  with {keygen: true}
+            let obj = new Dweb.VersionList(dict, true, {passphrase: "TODO-REPLACE"}, verbose, {_allowunsafestore: true});  //TODO remove _allowunsafestore once secured
+            obj.p_store(verbose)
+            // Now re fetch it from Dweb and display the object
+                .then(() => obj._working = new obj._entryclass({textarea: ""}))
+                .then(() => replacetexts("listmeta", obj))
+                .catch((err) => { console.log("ERROR in newversionlist:",err); alert(err.message); });
+            return false; // Stop form submission and page reloading reloading
+        }
+
+        function updatecontent(content) {
+            // Update the content edited
+            let vl = document.getElementById("listmeta").source;
+            let working = vl._working;
+            working.textarea = content;
+            vl.p_push(working, verbose)
+                .then((sig) => addtemplatedchild("list_ul", sig))  // Add the sig, cos find the data_ field of it
+                .then(() => vl._working = working.copy(verbose)); // New copy to work with
+        }
+        function starteditor() {
+            tinymce.init({
+                selector: '#mytextarea',
+                menubar: "true",
+                plugins: [ "save",
+                    'advlist autolink lists link image charmap print preview anchor',
+                    'searchreplace visualblocks code fullscreen',
+                    'insertdatetime media table contextmenu paste code' ],
+                toolbar: 'save | undo redo | insert | styleselect | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image',
+                save_onsavecallback: function() {
+                    updatecontent(tinyMCE.get('mytextarea').getContent());
+                }
+            });
+        }
+
+    </script>
+
+</head>
+<body class="examplesversions">
+<!--Login and network status box-->
+<div class="floatright">
+    <div id="status">Starting</div>
+    <ul id="kclist_ul"><!-- List of all existing keychains-->
+        <li class='template vertical_li' onclick='p_kc_click(this);'><span class='kclist_name' name='name'>PLACEHOLDER</span></li>
+    </ul>
+    <form><input id="logout" class="button" type="button" onclick="clicklogout();" style="display:none;" value="Logout"/></form><!--logout all keychains-->
+    <img src="noun_186903_cc.png" alt="keychain" class="iconopener" onclick="togglevis('logindiv','');"/>
+</div>
+<h1>Dweb - Version lists example</h1>
+<!-- General Design
+    Status and Login in top right
+    Way to create new list
+    Meta info from list: name, ability to get public/private links
+    Working version editing - as tinymce or some other editor
+        Note working version has not been published
+    List of Versions
+        Selecting one of the versions loads Current with it.
+
+    TODO-PUB add lock editing etc here OR link to page where can
+    TODO-PUB make sure list added to KeyChains, allow visibility and selection
+-->
+
+<!-- Way to create new list -->
+<form method="post" style="display:inline" id="newform" onsubmit="newversionlist(this); return false;">
+    <input class="propval" type="text" name="name" placeholder="Name of new version list" size="70"/>
+    <input class="button" type="submit" value="Create"/>
+</form>
+<!-- Meta info about the list -->
+<!--TODO Visibility of block only when have a list to work with -->
+<div id="listmeta" class="displayedblock">
+    <h4 name="name"></h4>
+    <!-- Editing area -->
+    <form method="post" id="workingform">
+        <textarea id="mytextarea" name="_working_textarea" width="60%">Testing</textarea>
+    </form>
+    <ul id="list_ul" name="_list">
+        <li class="template" name="data_textarea"></li><!--replace with date and maybe first few chars-->
+    </ul>
+</div>
+
+
+<script type="text/javascript">
+    // This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
+    var searchparms = new URL(window.location.href).searchParams;
+    var url = searchparms.get("url");   //TODO determine what to do with parms in url
+    var verbose = searchparms.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)  //TODO-document this and Transport in Readme
+    let transportclass = Dweb["Transport"+(searchparms.get("transport") || "IPFS").toUpperCase()]; // e.g. Dweb["TransportHTTP"]
+    transportclass.p_setup({}, verbose)
+        .then((t) => t.p_status())
+        .then((msg) => setstatus(msg))
+        .then(() => {
+            starteditor();
+            // Any code you want to run once online goes here.
+            //TODO what here e.g.: if(url) fetchanddisplay(url);
+            newversionlist("newform")
+        })
+        .catch((err) => { console.log("ERROR:",err); alert(err.message); });
+</script>
+</body>
+</html>
