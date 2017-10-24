@@ -1,5 +1,4 @@
 const sodium = require("libsodium-wrappers");
-//Uncomment to debug, check urlsafe occurs: console.log("XXX@keypair:2",sodium)
 const SmartDict = require("./SmartDict");
 const Dweb = require("./Dweb");
 const crypto = require('crypto'); // Needed to do a simple sha256 which doesnt appear to be in libsodium
@@ -144,7 +143,6 @@ class KeyPair extends SmartDict {
         if (keytype === Dweb.KeyPair.KEYTYPEENCRYPT || keytype === Dweb.KeyPair.KEYTYPESIGNANDENCRYPT) {
             key.encrypt = sodium.crypto_box_seed_keypair(key.seed); // Object { publicKey: Uint8Array[32], privateKey: Uint8Array[64] } <<maybe other keyType
             // note this doesnt have the keyType field
-            //console.log("XXX write this into KeyPair.js line 32", key.encrypt);
         }
         //if (verbose) { console.log("key generated:",key); }
         return key;

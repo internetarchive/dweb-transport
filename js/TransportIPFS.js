@@ -438,7 +438,7 @@ class TransportIPFS extends Transport {
     p_rawstore(data, verbose) {
         /*
         Store a blob of data onto the decentralised transport.
-        Returns a promise that resolves to the url of the data, but also see xxx
+        Returns a promise that resolves to the url of the data
 
         :param string|Buffer data: Data to store - no assumptions made to size or content
         :param boolean verbose: True for debugging output
