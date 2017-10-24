@@ -83,8 +83,14 @@ function _replacetexts(prefix, el, oo) {
     for (let prop in oo) {
         let p = prefix + prop
         let val = oo[prop];
+        if (val instanceof Date) {  // Convert here because otherwise treated as an object
+            val = val.toString();
+        }
         if (typeof val === "object" && !Array.isArray(val)) {
-            _replacetexts(`${prop}_`, el, val)
+            // Look for current level, longer names e.g. prefixprop_xyz
+            _replacetexts(`${p}_`, el, val)
+            // And nowif found any prefixprop look at xyz under it
+            Array.prototype.slice.call(el.querySelectorAll(`[name=${p}]`)).map((i) => _replacetexts("", i, val));
         }
         else if (typeof val === "object" && Array.isArray(val)) {
             dests = el.querySelectorAll(`[name=${p}]`);

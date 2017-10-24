@@ -21,11 +21,11 @@ class VersionList extends CommonList {
     constructor(data, master, key, verbose, options) {
         super(data, master, key, verbose, options);
         this.table = "vl";
-        this._entryclass = VersionListEntry;
+        this._entryclass = _VersionListEntry;
     }
 }
 
-class VersionListEntry extends SmartDict {
+class _VersionListEntry extends SmartDict {
     /*
     Superclass for all kinds of Version Lists
 
@@ -34,9 +34,6 @@ class VersionListEntry extends SmartDict {
      */
     constructor(data, verbose, options) {
         super(data, verbose, options);
-    }
-    copy(verbose) {
-        return new this.constructor(this, verbose)
     }
 }
 

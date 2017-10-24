@@ -49,6 +49,14 @@
                 }
             });
         }
+        function clickrestore(el) {
+            console.log("clickrestore ---");
+            let vl = document.getElementById("listmeta").source;
+            vl._working = el.source.data.copy(verbose);
+            replacetexts("workingform", vl._working);
+            tinyMCE.activeEditor.setContent(vl._working.textarea); // Set actual MCE editing text
+            tinyMCE.activeEditor.setDirty(true);                    // Allow saving this restored text
+        }
 
     </script>
 
@@ -87,12 +95,11 @@
 <div id="listmeta" class="displayedblock">
     <h4 name="name"></h4>
     <!-- Editing area -->
-    <form method="post" id="workingform">
-        <textarea id="mytextarea" name="_working_textarea" width="60%">Testing</textarea>
+    <form method="post" id="workingform" name="_working">
+        <textarea id="mytextarea" name="textarea" width="60%">Testing</textarea>
     </form>
     <ul id="list_ul" name="_list">
-        <li class="template" name="data_textarea"></li><!--replace with date and maybe first few chars-->
-    </ul>
+        <li  onclick="clickrestore(this);" class="template" ><span name="date"></span></li><!-- alternative name="data_textarea"-->
 </div>
 
 
