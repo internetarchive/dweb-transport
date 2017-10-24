@@ -35,9 +35,9 @@ class MutableBlock extends CommonList {
         // Note any follow on .then is applied to the MB, not to the content, and the content might not have been loaded.
     }
 
-    p_update(){ console.assert(false, "Need to define p_ function")}
+    p_update(){ throw new ToBeImplementedError("Need to define p_ function")}
 
-    async_update(type, data, verbose, success, error) {   console.trace(); console.assert(false, "OBSOLETE"); //TODO-IPFS obsolete with p_fetch // Send new data for this item to dWeb
+    async_update(type, data, verbose, success, error) {   throw new ObsoleteError("MutableBlock.async_update"); //TODO-IPFS obsolete with p_fetch // Send new data for this item to dWeb
         this.transport().async_update(this, this._url, type, data, verbose, success, error); //TODO-IPFS when obsolete can obsolete transport.async_update
     }
 
@@ -54,7 +54,7 @@ class MutableBlock extends CommonList {
     }
 
     file() {
-        console.assert(false, "XXX Undefined function MutableBlock.file");
+        throw new Dweb.errors.ToBeImplementedError("Undefined function MutableBlock.file");
     }   // Retrieving data
 
     p_signandstore(verbose){    //TODO-AUTHENTICATION - add options to remove old signatures by same

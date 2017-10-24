@@ -9,6 +9,14 @@ class ToBeImplementedError extends Error {
 }
 errors.ToBeImplementedError = ToBeImplementedError;
 
+class ObsoleteError extends Error {
+    constructor(message) {
+        super("Obsolete: " + message);
+        this.name = "ObsoleteError"
+    }
+}
+errors.ObsoleteError = ObsoleteError;
+
 //TODO TransportError is wanted in TransportHTTP but its out of scope there. Think about moving to Transport class
 class TransportError extends Error {
     constructor(message) {
@@ -37,6 +45,15 @@ class EncryptionError extends Error {
     }
 }
 errors.EncryptionError = EncryptionError;
+
+// Use this something that should have been signed isn't - this is externally signed, i.e. a data rather than coding error
+class SigningError extends Error {
+    constructor(message) {
+        super(message || "Signing Error");
+        this.name = "SigningError"
+    }
+}
+errors.SigningError = SigningError;
 
 class ForbiddenError extends Error {
     constructor(message) {

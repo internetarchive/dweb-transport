@@ -51,7 +51,7 @@ class Signature extends SmartDict {
          */
         let date = new Date(Date.now());
         if (!commonlist._publicurl) commonlist.p_store(verbose); // Sets _publicurl sync, while storing async
-        console.assert(commonlist._publicurl, "Signature.sign should be a publicurl by here");
+        if (!commonlist._publicurl) throw new CodingError("Signature.sign should be a publicurl by here");
         let sig = new Signature({"date": date, "url": url, "signedby": commonlist._publicurl});
         sig.signature = commonlist.keypair.sign(sig.signable());
         return sig
@@ -109,7 +109,7 @@ class Signature extends SmartDict {
             sig = Dweb.Signature.sign(commonlist,signedblock._url, verbose); //commonlist, url, verbose
             commonlist._allowunsafestore = false;
             if (verbose) console.log("test_Signatures verification");
-            console.assert(commonlist.verify(sig, verbose),"Should verify");
+            if (!commonlist.verify(sig, verbose)) throw new CodingError("Should verify");
             })
     }
 

@@ -44,9 +44,9 @@ class KeyPair extends SmartDict {
         if (name === "key") {
             this._key_setter(value);
         } else if (name === "private") {
-            console.assert(false, "XXX Undefined functionality KeyPair.private.setter");
+            throw new Dweb.errors.ToBeImplementedError("Undefined functionality KeyPair.private.setter");
         } else if (name === "public") {
-            console.assert(false, "XXX Undefined functionality KeyPair.public.setter");
+            throw new Dweb.errors.ToBeImplementedError("Undefined functionality KeyPair.public.setter");
         } else {
             super.__setattr__(name, value);
         }
@@ -69,7 +69,7 @@ class KeyPair extends SmartDict {
                         value.seed = "01234567890123456789012345678901";  // Note this is seed from mnemonic above
                         console.log("Faking mnemonic encoding for now")
                     } else {
-                        console.assert(false, "MNEMONIC STILL TO BE IMPLEMENTED");    //TODO-mnemonic
+                        throw new ToBeImplementedError("MNEMONIC STILL TO BE IMPLEMENTED");    //TODO-mnemonic
                     }
                 }
                 if (value.passphrase) {
@@ -136,8 +136,7 @@ class KeyPair extends SmartDict {
         :returns:       Dict suitable for storing in _key
          */
         let key = {};
-        //console.assert(sodium.crypto_box_SEEDBYTES === sodium.crypto_sign_SEEDBYTES, "KeyPair.keygen assuming seed lengths same");
-        console.assert(sodium.crypto_box_SEEDBYTES === seed.length, "Seed should be", sodium.crypto_box_SEEDBYTES, "but is", seed.length);
+        if (sodium.crypto_box_SEEDBYTES !== seed.length) throw new CodingError("Seed should be", sodium.crypto_box_SEEDBYTES, "but is", seed.length);
         key.seed = seed;
         if (keytype === Dweb.KeyPair.KEYTYPESIGN || keytype === Dweb.KeyPair.KEYTYPESIGNANDENCRYPT) {
             key.sign = sodium.crypto_sign_seed_keypair(key.seed); // Object { publicKey: Uint8Array[32], privateKey: Uint8Array[64], keyType: "ed25519" }
@@ -172,8 +171,8 @@ class KeyPair extends SmartDict {
             //See https://github.com/jedisct1/libsodium.js/issues/91 for issues
             if (!this._key) { this._key = {}}   // Only handles NACL style keys
             if (tag === "NACL PUBLIC")           { this._key["encrypt"] = {"publicKey": hasharr};
-            } else if (tag === "NACL PRIVATE")   { console.assert(false, "_importkey: Cant (yet) import Private key "+value+" normally use SEED");
-            } else if (tag === "NACL SIGNING")   { console.assert(false, "_importkey: Cant (yet) import Signing key "+value+" normally use SEED");
+            } else if (tag === "NACL PRIVATE")   { throw new ToBeImplementedError("_importkey: Cant (yet) import Private key "+value+" normally use SEED");
+            } else if (tag === "NACL SIGNING")   { throw new ToBeImplementedError("_importkey: Cant (yet) import Signing key "+value+" normally use SEED");
             } else if (tag === "NACL SEED")      { this._key = KeyPair._keyfromseed(hasharr, Dweb.KeyPair.KEYTYPESIGNANDENCRYPT);
             } else if (tag === "NACL VERIFY")    { this._key["sign"] = {"publicKey": hasharr};
             } else { throw new ToBeImplementedError("_importkey: Cant (yet) import "+value) }
@@ -190,9 +189,9 @@ class KeyPair extends SmartDict {
         return res;
     }
 
-    //private() { console.assert(false, "XXX Undefined function KeyPair.private"); }    //TODO private is a reserved word in JS
-    //public() { console.assert(false, "XXX Undefined function KeyPair.public"); }  //TODO public is a reserved word in JS
-    mnemonic() { console.assert(false, "XXX Undefined function KeyPair.mnemonic"); }
+    //private() { throw new Dweb.errors.ToBeImplementedError("Undefined function KeyPair.private"); }    //TODO private is a reserved word in JS
+    //public() { throw new Dweb.errors.ToBeImplementedError("Undefined function KeyPair.public"); }  //TODO public is a reserved word in JS
+    mnemonic() { throw new Dweb.errors.ToBeImplementedError("Undefined function KeyPair.mnemonic"); }
 
     privateexport() {
         /*
@@ -203,7 +202,7 @@ class KeyPair extends SmartDict {
         if (key.seed) {
             return "NACL SEED:" + (typeof(key.seed) === "string" ? key.seed : sodium.to_urlsafebase64(key.seed));
         } else {
-            console.assert(false, "XXX Undefined function KeyPair.privateexport witghout seed", key);  //TODO should export full set of keys prob as JSON
+            throw new Dweb.errors.ToBeImplementedError("Undefined function KeyPair.privateexport witghout seed", key);  //TODO should export full set of keys prob as JSON
         }
     }
 
@@ -232,7 +231,7 @@ class KeyPair extends SmartDict {
          :return: str, binary encryption of data or urlsafebase64
          */
         // Assumes nacl.public.PrivateKey or nacl.signing.SigningKey
-        console.assert(signer, "Until PyNaCl bindings have secretbox we require a signer and have to add authentication");
+        if (!signer) throw new CodingError("Until PyNaCl bindings have secretbox we require a signer and have to add authentication");
         //box = nacl.public.Box(signer.keypair._key.encrypt.privateKey, self._key.encrypt.publicKey)
         //return box.encrypt(data, encoder=(nacl.encoding.URLSafeBase64Encoder if b64 else nacl.encoding.RawEncoder))
         const nonce = sodium.randombytes_buf(sodium.crypto_box_NONCEBYTES);
@@ -275,7 +274,7 @@ class KeyPair extends SmartDict {
         :param url: URL being signed, it could really be any data,
         :return: signature that can be verified with verify
         */
-        console.assert(signable);
+        if (!signable) throw new CodingError("Needs signable")
         if (! this._key.sign.privateKey) {
             throw new Dweb.errors.EncryptionError("Can't sign with out private key. Key =" + JSON.stringify(this._key));
         }
@@ -295,7 +294,7 @@ class KeyPair extends SmartDict {
 
         let sig = sodium.from_urlsafebase64(urlb64sig);
         let tested = sodium.crypto_sign_verify_detached(sig, signable, this._key.sign.publicKey);
-        console.assert(tested, "Signature not verified");   //TODO decide what to do at this point - might throw exception
+        if (!tested) throw new SigningError("Signature not verified");   //TODO decide what to do at this point - might throw exception
         return true;
     }
 

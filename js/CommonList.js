@@ -169,8 +169,8 @@ class CommonList extends SmartDict {
         }
     }
 
-    publicurl() { console.assert(false, "XXX Undefined function CommonList.publicurl"); }   // For access via web
-    privateurl() { console.assert(false, "XXX Undefined function CommonList.privateurl"); }   // For access via web
+    publicurl() { throw new Dweb.errors.ToBeImplementedError("Undefined function CommonList.publicurl"); }   // For access via web
+    privateurl() { throw new Dweb.errors.ToBeImplementedError("Undefined function CommonList.privateurl"); }   // For access via web
 
     p_push(obj, verbose ) {
         /*
@@ -208,7 +208,7 @@ class CommonList extends SmartDict {
         if (!url) throw new Dweb.errors.CodingError("Empty url is a coding error");
         if (!this._master) throw new Dweb.errors.ForbiddenError("Must be master to sign something");
         let sig = Dweb.Signature.sign(this, url, verbose); //returns a new Signature
-        console.assert(sig.signature, "Must be a signature");
+        if (!sig.signature) throw new CodingError("Must be a signature");
         return sig
     }
     p_add(sig, verbose) {
