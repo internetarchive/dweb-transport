@@ -145,7 +145,7 @@ class Transport {
                	obj is same format as p_rawlist or p_rawreverse
         :param verbose:     boolean - True for debugging output
          */
-        throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.listmonitor");
+        console.log("Undefined function Transport.listmonitor");    // Note intentionally a log, as legitamte to not implement it
     }
 
     _add_value(url, date, signature, signedby, verbose) {

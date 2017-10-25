@@ -209,7 +209,7 @@ class CommonList extends SmartDict {
         if (!url) throw new Dweb.errors.CodingError("Empty url is a coding error");
         if (!this._master) throw new Dweb.errors.ForbiddenError("Must be master to sign something");
         let sig = Dweb.Signature.sign(this, url, verbose); //returns a new Signature
-        if (!sig.signature) throw new CodingError("Must be a signature");
+        if (!sig.signature) throw new Dweb.errors.CodingError("Must be a signature");
         return sig
     }
     p_add(sig, verbose) {

@@ -325,7 +325,7 @@ class TransportIPFS extends Transport {
         :throws:        TransportError if url invalid - note this happens immediately, not as a catch in the promise
          */
         if (verbose) { console.log("IPFS p_rawfetch",url)}
-        if (!url) throw new CodingError("TransportIPFS.p_rawfetch: requires url");
+        if (!url) throw new Dweb.errors.CodingError("TransportIPFS.p_rawfetch: requires url");
         let cid = (url instanceof CID) ? url : TransportIPFS.url2cid(url);  // Throws TransportError if url bad
         if (verbose) console.log("CID=",cid)
         //return this.promisified.ipfs.block.get(cid).then((result) => result.data) // OLD way, works below 250k bytes, where files.cat doesnt !
@@ -359,7 +359,7 @@ class TransportIPFS extends Transport {
     :param boolean verbose: True for debugging output
     :resolve array: An array of objects as stored on the list.
      */
-        if (this.options.listmethod !== "yarrays") throw new CodingError("Only support yarrays");
+        if (this.options.listmethod !== "yarrays") throw new Dweb.errors.CodingError("Only support yarrays");
         return this.p__yarray(url, verbose)
             .then((y) => y.share.array.toArray().filter((obj) => (obj.signedby === url)))
             .then((res) => {
@@ -502,7 +502,7 @@ class TransportIPFS extends Transport {
     }
     */
     async_update(self, url, type, data, verbose, success, error) {
-        throw new ObsoleteError("OBSOLETE"); //TODO-IPFS obsolete with p_*
+        throw new Dweb.errors.ObsoleteError("OBSOLETE"); //TODO-IPFS obsolete with p_*
         this.async_post("update", url, type, data, verbose, success, error);
     }
 

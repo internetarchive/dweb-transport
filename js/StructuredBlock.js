@@ -22,7 +22,7 @@ class StructuredBlock extends SmartDict {
         if (name === "links") {
             let links = value;
             for (let len = links.length, i=0; i<len; i++) {
-                throw new CodingError("Next line needs fixing, caller should do this expansion as its async and __setattr__ cant be");  //TODO-REL5
+                throw new Dweb.errors.CodingError("Next line needs fixing, caller should do this expansion as its async and __setattr__ cant be");  //TODO-REL5
                 links[i] = Dweb.SmartDict.p_fetch(links[i],verbose);
             }
             this[name] = links;
