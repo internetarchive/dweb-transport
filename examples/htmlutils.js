@@ -58,8 +58,13 @@ function replacetext(el, text) {
     :param el:  An HTML element, or a string with id of an HTML element
     */
     el = (typeof(el) === "string") ? document.getElementById(el) : el;
-    deletechildren(el);
-    return el.appendChild(document.createTextNode(text))
+    //console.log("replacetext",text,el.constructor.name) // Uncomment to get class name of different things want to edit
+    if (el instanceof HTMLImageElement) {
+        el.src = text;
+    } else {
+        deletechildren(el);
+        return el.appendChild(document.createTextNode(text))
+    }
 }
 
 function replacetexts(el, ...dict) {
@@ -100,12 +105,10 @@ function _replacetexts(prefix, el, oo) {
                     val.map((f) => addtemplatedchild(i, f))
                 })
         } else {
-            let dests = el.querySelectorAll(`[name=${p}]`);
             if (el.getAttribute("name") === p) replacetext(el, val); //Do the parent as well
-            Array.prototype.slice.call(dests).map((i) => replacetext(i, val));
-            dests = el.querySelectorAll(`[href=${p}]`);
+            Array.prototype.slice.call(el.querySelectorAll(`[name=${p}]`)).map((i) => replacetext(i, val));
             if (el.getAttribute("href") === p) el.href = val;
-            Array.prototype.slice.call(dests).map((i) => i.href = val)
+            Array.prototype.slice.call(el.querySelectorAll(`[href=${p}]`)).map((i) => i.href = val)
         }
     }
 }

@@ -99,6 +99,7 @@ class CommonList extends SmartDict {
         :param dd: dict of attributes of this, possibly changed by superclass
         :return: dict of attributes ready for storage.
          */
+
         if (dd.keypair) {
             if (dd._master && !dd._acl && !this._allowunsafestore) {
                 throw new Dweb.errors.SecurityWarning("Probably shouldnt be storing private key" + JSON.stringify(dd));
@@ -143,6 +144,14 @@ class CommonList extends SmartDict {
         }
 
     _p_storepublic(verbose) {
+        // Build a copy of the data, then create a new !master version
+        let oo = Object.assign({}, this, {_master: false})
+        let ee = new this.constructor(this.preflight(oo), false, null, verbose);
+        ee.p_store(verbose); //Runs async, but returns immediately setting _url
+        this._publicurl = ee._url;
+    }
+
+    OBS_p_storepublic(verbose) { // THis is the old version, has problem if not subclassed where it creates CommonList *and* that it ignores extra fields
         /*
          Store a public version of the object, just stores name field and public key
          Typically subclassed to save specific fields

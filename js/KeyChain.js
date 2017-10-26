@@ -94,7 +94,11 @@ class KeyChain extends CommonList {
          */
         Dweb.keychains = []
     }
-    _p_storepublic(verbose) {
+    static default() {  //TODO-API
+        return Dweb.keychains.length ? Dweb.keychains[Dweb.keychains.length-1] : undefined;
+    }
+
+    OBS_p_storepublic(verbose) { //TODO delete Dec2017 taken care of by new CL._p_storepublic
         /*
         Subclasses CommonList._storepublic
         Store a publicly viewable version of KeyChain - note the keys should be encrypted
@@ -156,7 +160,7 @@ class KeyChain extends CommonList {
         if (verbose) {
             console.log("Keychain.test 0 - create");
         }
-        KeyChain.p_new({name: "test_keychain kc"},{mnemonic: mnemonic}, verbose)    //Note in KEYCHAIN 4 we recreate exactly same way.
+        KeyChain.p_new({name: "test_keychain kc" },{mnemonic: mnemonic}, verbose)    //Note in KEYCHAIN 4 we recreate exactly same way.
             .then((kc1) => {
             kc = kc1;
         if (verbose) console.log("KEYCHAIN 1 - add MB to KC");

@@ -158,7 +158,7 @@ class SmartDict extends Transportable {
                     data._url = url;                         // Save where we got it - preempts a store - must do this afer decrypt
                     return new cls(data);
             })                // Returns new block that should be a subclass of SmartDict
-            .catch((err) => {console.log("cant fetch and decrypt unknown"); throw(err)});
+            .catch((err) => {console.log(`cant fetch and decrypt ${url}`); throw(err)});
     }
 
     static p_decrypt(data, verbose) {

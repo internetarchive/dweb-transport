@@ -135,7 +135,7 @@ class KeyPair extends SmartDict {
         :returns:       Dict suitable for storing in _key
          */
         let key = {};
-        if (sodium.crypto_box_SEEDBYTES !== seed.length) throw new Dweb.errors.CodingError("Seed should be", sodium.crypto_box_SEEDBYTES, "but is", seed.length);
+        if (sodium.crypto_box_SEEDBYTES !== seed.length) throw new Dweb.errors.CodingError(`Seed should be ${sodium.crypto_box_SEEDBYTES}, but is ${seed.length}`);
         key.seed = seed;
         if (keytype === Dweb.KeyPair.KEYTYPESIGN || keytype === Dweb.KeyPair.KEYTYPESIGNANDENCRYPT) {
             key.sign = sodium.crypto_sign_seed_keypair(key.seed); // Object { publicKey: Uint8Array[32], privateKey: Uint8Array[64], keyType: "ed25519" }

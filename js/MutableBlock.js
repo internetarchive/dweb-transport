@@ -41,7 +41,7 @@ class MutableBlock extends CommonList {
         this.transport().async_update(this, this._url, type, data, verbose, success, error); //TODO-IPFS when obsolete can obsolete transport.async_update
     }
 
-    _p_storepublic(verbose) {
+    OBS_p_storepublic(verbose) { //TODO superceeded by new CL._p_storepublic delete Dec2017
         // Note that this returns immediately after setting url, so caller may not need to wait for success
         //(data, master, key, verbose, options)
         let mb = new MutableBlock({"name": this.name}, false, this.keypair, verbose);
