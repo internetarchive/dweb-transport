@@ -28,7 +28,13 @@
                     obj._working = new obj._entryclass({textarea: "", _acl: obj.contentacl});
                     tinyMCE.activeEditor.setContent(obj._working.textarea); // Set actual MCE editing text
                     tinyMCE.activeEditor.setDirty(true);                    // Allow saving this restored text
-                    replacetexts("listmeta", obj, {readlockimg: icon_images[obj._working._acl ? "locked" : "unlocked"], writelockimg: icon_images[obj._acl ? "locked" : "unlocked"] });
+                    replacetexts("listmeta", obj, {
+                        readlockimg: icon_images[obj._working._acl ? "locked" : "unlocked"],
+                        writelockimg: icon_images[obj._acl ? "locked" : "unlocked"],
+                        readlockname: obj._working._acl ? obj._working._acl.name : "",
+                        writelockname: obj._acl ? obj._acl.name : ""
+
+                });
                 })
                 .catch((err) => { console.log("ERROR in newversionlist:",err); alert(err.message); });
             return false; // Stop form submission and page reloading reloading
@@ -162,9 +168,9 @@
 <!-- Meta info about the list -->
 <!--TODO Visibility of block only when have a list to work with -->
 <div id="listmeta" class="displayedblock">
-    <span style="float:right;display:inline-block;margin-top:3px;margin-right:10px">
-        Read:&nbsp;<img name="readlockimg" class="iconopener" src="noun_1093404_cc_unlocked.png" alt="unlocked">
-        Write:&nbsp;<img name="writelockimg" class="iconopener" src="noun_1093404_cc_unlocked.png" alt="unlocked">
+    <span style="float:right;display:table;margin-top:3px;margin-right:10px">
+        <span style="display:table-row;"><span style="display:table-cell;">Read:</span><img  style="display:table-cell;" name="readlockimg" class="keylist_icon" src="noun_1093404_cc_unlocked.png" alt="unlocked"><span style="display:table-cell;" name="readlockname"></span></span>
+        <span style="display:table-row;"><span style="display:table-cell;">Write:</span><img  style="display:table-cell;" name="writelockimg" class="keylist_icon" src="noun_1093404_cc_unlocked.png" alt="unlocked"><span style="display:table-cell;" name="writelockname"></span></span>
     </span>
     <h4 name="name"></h4>
     <!-- Editing area -->
