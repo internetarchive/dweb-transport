@@ -83,8 +83,8 @@ class Transportable {
         return Dweb.transport(url).p_rawfetch(url, verbose) // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
     }
 
-    file() { console.assert(false, "XXX Undefined function Transportable.file"); } //TODO-BACKPORT from Python
-    xurl() { console.assert(false, "XXX Undefined function Transportable.url"); }  //TODO-BACKPORT from Python if not deleted there.
+    file() { throw new Dweb.errors.ToBeImplementedError("Undefined function Transportable.file"); } //TODO-BACKPORT from Python
+    xurl() { throw new Dweb.errors.ToBeImplementedError("Undefined function Transportable.url"); }  //TODO-BACKPORT from Python if not deleted there.
     content() { throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally undefined function Transportable.content - superclass should define"); }
     p_updatelist() { throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally undefined function Transportable.p_updatelist - meaningless except on CL"); }
 

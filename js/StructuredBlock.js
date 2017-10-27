@@ -34,7 +34,7 @@ class StructuredBlock extends SmartDict {
         if (name === "links") {
             let links = value;
             for (let len = links.length, i=0; i<len; i++) {
-                console.assert(false, "Next line needs fixing, caller shoudl do this expansion as its async and __setattr__ cant be");  //TODO-REL5
+                throw new CodingError("Next line needs fixing, caller should do this expansion as its async and __setattr__ cant be");  //TODO-REL5
                 links[i] = Dweb.SmartDict.p_fetch(links[i],verbose);
             }
             this[name] = links;
@@ -91,8 +91,8 @@ class StructuredBlock extends SmartDict {
         //Not supporting url/fetch as async
         //(this.url and this.transport().rawfetch(url = self.url, verbose=verbose, **options)) or # url must point to raw data, not another SB
     }
-    file() { console.assert(false, "XXX Undefined function StructuredBlock.file"); }
-    size() { console.assert(false, "XXX Undefined function StructuredBlock.size"); }
+    file() { throw new Dweb.errors.ToBeImplementedError("Undefined function StructuredBlock.file"); }
+    size() { throw new Dweb.errors.ToBeImplementedError("Undefined function StructuredBlock.size"); }
 
     /* OBS - moved into MB.p_signandstore
     sign(commonlist, verbose) {
@@ -110,7 +110,7 @@ class StructuredBlock extends SmartDict {
         return sig;  // so that CommonList can add to _list
     }
     */
-    verify() { console.assert(false, "XXX Undefined function StructuredBlock.verify"); }
+    verify() { throw new Dweb.errors.ToBeImplementedError("Undefined function StructuredBlock.verify"); }
 
 
     earliestdate(){    // Set the _date field to the earliest date of any signature or null if not found

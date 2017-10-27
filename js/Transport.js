@@ -16,7 +16,7 @@ class Transport {
         :param boolean verbose: True for debugging output
         :resolve Transport: Instance of subclass of Transport
          */
-        console.assert(false, "Intentionally undefined function Transport.p_setup should have been subclassed");
+        throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally undefined function Transport.p_setup should have been subclassed");
     }
     supports(url) {
         /*
@@ -42,7 +42,7 @@ class Transport {
          :param string|Buffer data   arbitrary data
          :return string              valid id to retrieve data via p_rawfetch
          */
-        console.assert(false, "Intentionally undefined function Transport.url should have been subclassed");
+        throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally undefined function Transport.url should have been subclassed");
     }
     dumps(obj) {
         /*
@@ -65,15 +65,15 @@ class Transport {
     p_rawstore(data, verbose) {
         /*
         Store a blob of data onto the decentralised transport.
-        Returns a promise that resolves to the url of the data, but also see xxx
+        Returns a promise that resolves to the url of the data
 
         :param string|Buffer data: Data to store - no assumptions made to size or content
         :param boolean verbose: True for debugging output
         :resolve string: url of data stored
          */
-        console.assert(false, "Intentionally undefined function Transport.p_rawstore should have been subclassed");
+        throw new Dweb.errors.ToBeImplementedError("Intentionally undefined function Transport.p_rawstore should have been subclassed");
     }
-    p_store() { console.assert(false, "Undefined function Transport.p_store - may define higher level semantics here (see Python)"); }
+    p_store() { throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_store - may define higher level semantics here (see Python)"); }
     //noinspection JSUnusedLocalSymbols
 
     p_rawfetch(url, verbose) {
@@ -90,7 +90,7 @@ class Transport {
          */
         console.assert(false, "Intentionally undefined  function Transport.p_rawfetch should have been subclassed");
     }
-    p_fetch() { console.assert(false, "Intentionally Undefined function Transport.p_fetch - may define higher level semantics here (see Python)"); }
+    p_fetch() { throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally Undefined function Transport.p_fetch - may define higher level semantics here (see Python)"); }
 
     p_rawadd(url, date, signature, signedby, verbose) {
         /*
@@ -105,7 +105,7 @@ class Transport {
         :param boolean verbose: True for debugging output
         :resolve undefined:
          */
-        console.assert(false, "XXX Undefined function Transport.p_rawadd");
+        throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_rawadd");
     }
     p_rawlist(url, verbose) {
         /*
@@ -119,9 +119,9 @@ class Transport {
         :param boolean verbose: True for debugging output
         :resolve array: An array of objects as stored on the list.
          */
-        console.assert(false, "XXX Undefined function Transport.p_rawlist");
+        throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_rawlist");
     }
-    p_list() { console.assert(false, "XXX Undefined function Transport.p_list"); }
+    p_list() { throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_list"); }
     //noinspection JSUnusedGlobalSymbols
     p_rawreverse(url, verbose) {
         /*
@@ -133,7 +133,7 @@ class Transport {
         :param boolean verbose: True for debugging output
         :resolve array: An array of objects as stored on the list.
          */
-        console.assert(false, "XXX Undefined function Transport.p_rawreverse");
+        throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_rawreverse");
     }
 
     listmonitor(url, callback, verbose) {
@@ -145,7 +145,7 @@ class Transport {
                	obj is same format as p_rawlist or p_rawreverse
         :param verbose:     boolean - True for debugging output
          */
-        console.assert(false, "XXX Undefined function Transport.listmonitor");
+        throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.listmonitor");
     }
 
     _add_value(url, date, signature, signedby, verbose) {

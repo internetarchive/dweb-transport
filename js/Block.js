@@ -37,7 +37,7 @@ class Block extends Transportable {
             blk.p_store(verbose)                            // Store it to transport
             .then(() => Block.p_fetch(blk._url, verbose))
             .then((blk2) => {
-                console.assert(blk2._data.toString() === blk._data, "Block should survive round trip");
+                if (blk2._data.toString() !== blk._data) throw new CodingError("Block should survive round trip");
                 resolve(blk2);
             })
             .catch((err) => { console.log("Block Test failed", err); reject(err); })

@@ -169,8 +169,8 @@ class CommonList extends SmartDict {
         }
     }
 
-    publicurl() { console.assert(false, "XXX Undefined function CommonList.publicurl"); }   // For access via web
-    privateurl() { console.assert(false, "XXX Undefined function CommonList.privateurl"); }   // For access via web
+    publicurl() { throw new Dweb.errors.ToBeImplementedError("Undefined function CommonList.publicurl"); }   // For access via web
+    privateurl() { throw new Dweb.errors.ToBeImplementedError("Undefined function CommonList.privateurl"); }   // For access via web
 
     p_push(obj, verbose ) {
         /*
@@ -208,7 +208,7 @@ class CommonList extends SmartDict {
         if (!url) throw new Dweb.errors.CodingError("Empty url is a coding error");
         if (!this._master) throw new Dweb.errors.ForbiddenError("Must be master to sign something");
         let sig = Dweb.Signature.sign(this, url, verbose); //returns a new Signature
-        console.assert(sig.signature, "Must be a signature");
+        if (!sig.signature) throw new CodingError("Must be a signature");
         return sig
     }
     p_add(sig, verbose) {
@@ -235,10 +235,8 @@ class CommonList extends SmartDict {
     // ----- Listener interface ----- see https://developer.mozilla.org/en-US/docs/Web/API/EventTarget for the pattern
 
     addEventListener(type, callback) {
-        console.log("XXX@CL.addEventListener",type);
         if (!(type in this._listeners)) this._listeners[type] = [];
         this._listeners[type].push(callback);
-        console.log("XXX@CL.addEventListener done")
     }
 
     removeEventListener(type, callback) {
@@ -252,7 +250,7 @@ class CommonList extends SmartDict {
         }
     }
     dispatchEvent(event) {
-        console.log("XXX@CL.dispatchEvent",event);
+        console.log("CL.dispatchEvent",event);
         if (!(event.type in this._listeners)) return true;
         let stack = this._listeners[event.type];
         console.log("THIS=",this, "event.target=",event.target);

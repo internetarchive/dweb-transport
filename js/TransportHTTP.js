@@ -171,7 +171,7 @@ class TransportHTTP extends Transport {
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
         return this.p_get("metadata/rawlist", url, verbose); //TODO-GATEWAY add rawlist to Python
     }
-    rawreverse() { console.assert(false, "XXX Undefined function TransportHTTP.rawreverse"); }
+    rawreverse() { throw new Dweb.errors.ToBeImplementedError("Undefined function TransportHTTP.rawreverse"); }
 
     p_rawstore(data, verbose) {
         //PY: res = self._sendGetPost(True, "rawstore", headers={"Content-Type": "application/octet-stream"}, urlargs=[], data=data, verbose=verbose)

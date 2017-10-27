@@ -202,12 +202,12 @@ class KeyChain extends CommonList {
     .then(() => sb.p_store(verbose))
     .then(() => {
             let mvk = KeyChain.mykeys(Dweb.KeyPair);
-            console.assert(mvk[0].name === vkpname, "Should find viewerkeypair stored above");
+            if (mvk[0].name !== vkpname) throw new CodingError("Should find viewerkeypair stored above");
         if (verbose) console.log("KEYCHAIN 6: Check can fetch and decrypt - should use viewerkeypair stored above");
         return Dweb.SmartDict.p_fetch(sb._url, verbose); // Will be StructuredBlock, fetched and decrypted
     })
     .then((sb2) => {
-            console.assert(sb2.data === qbf, "Data should survive round trip");
+            if (sb2.data !== qbf) throw new CodingError("Data should survive round trip");
         if (verbose) console.log("KEYCHAIN 7: Check can store content via an MB");
         //MB.new(acl, contentacl, name, _allowunsafestore, content, signandstore, verbose)
     })
@@ -220,7 +220,7 @@ class KeyChain extends CommonList {
     .then((newpublicmb) => mb = newpublicmb)
     .then(() => mb.p_list_then_current(verbose))
     .then(() => {
-            console.assert(mb.content() === qbf, "Data should round trip through ACL");
+            if (mb.content() !== qbf) throw new CodingError("Data should round trip through ACL");
     })
 
     .then(() => {

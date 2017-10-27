@@ -19,7 +19,6 @@ const jsdom = require("jsdom");
 const { JSDOM } = jsdom;        //TODO - figure out what this does, dont understand the Javascript
 htmlfake = '<!DOCTYPE html><ul><li id="myList.0">Failed to load sb via StructuredBlock</li><li id="myList.1">Failed to load mb via MutableBlock</li><li id="myList.2">Failed to load sb via dwebfile</li><li id="myList.3">Failed to load mb via dwebfile</li></ul>';
 const dom = new JSDOM(htmlfake);
-//console.log("XXX@8",dom.window.document.getElementById("myList.0").textContent); // Before loading = "Failed to load sb via StructuredBlock"
 document = dom.window.document;   // Note in JS can't see "document" like can in python
 
 let verbose = true;

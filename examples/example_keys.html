@@ -100,7 +100,8 @@
             hide('aclnew_div');
             let dict = form2dict("newaclform"); //name
             let kc = document.getElementById('keylist_header').source;  // The KeyChain being added to.
-            return Dweb.AccessControlList.p_new({name: dict.name, _acl: kc}, true, {keygen: true}, verbose, null, kc );    //(data, master, key, verbose, options, kc)
+            return Dweb.AccessControlList.p_new({name: dict.name, _acl: kc}, true, {keygen: true}, verbose, null, kc )    //(data, master, key, verbose, options, kc)
+            .then((acl) => _showkeyorlock(acl)); // Put in UI, as listmonitor return rejected as duplicate
         }
         function p_key_click(el) {
             if (verbose) console.log("p_key_click ---");
@@ -131,7 +132,7 @@
 
     </script>
 </head>
-<body>
+<body class="exampleskeys">
     <div class="floatright">
         <div id="status">Starting</div>
         <ul id="kclist_ul"><!-- List of all existing keychains-->

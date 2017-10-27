@@ -113,7 +113,7 @@ function addtemplatedchild(el, ...dict) {
 
     el: An HTML element, or a string with the id of one.
     html: html to add under outerelement
-    dict: Dictionary with parameters to replace in html, it looks for nodes with name="xxx" and replaces text inside it with dict[xxx]
+    dict: Dictionary with parameters to replace in html, it looks for nodes with name="xyz" and replaces text inside it with dict[xyz]
     */
     el = (typeof(el) === "string") ? document.getElementById(el) : el;
     let el_li = el.getElementsByClassName("template")[0].cloneNode(true);   // Copy first child with class=Template
@@ -131,7 +131,7 @@ function addhtml(el, htmleach, dict) { //TODO merge into addtemplatechild - note
 
     el: An HTML element, or a string with the id of one.
     html: html to add under outerelement
-    dict: Dictionary with parameters to replace in html, it looks for nodes with name="xxx" and replaces text inside it with dict[xxx]
+    dict: Dictionary with parameters to replace in html, it looks for nodes with name="xyz" and replaces text inside it with dict[xyz]
     */
     el = (typeof(el) === "string") ? document.getElementById(el) : el;
     let el_li = document.createElement('div');   // usually a 'li' but could be a 'div'

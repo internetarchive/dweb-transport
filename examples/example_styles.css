@@ -68,3 +68,5 @@
 .examplesacademic #metadataresults [name=doi_org_metadata_title] {font-weight: bold;}
 .examplesacademic #searchresults li {text-align: left; margin-bottom: 10px;}
 .examplesacademic #searchresults span {display: inline-block;}/*Try and keep each part together*/
+
+.exampleskeys .inline_ul {display: grid;  grid-template-columns: repeat(auto-fit, minmax(7em, 1fr));  grid-auto-flow: dense;}
