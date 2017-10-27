@@ -332,6 +332,15 @@ class TransportIPFS extends Transport {
         //return this.promisified.ipfs.block.get(cid).then((result) => result.data) // OLD way, works below 250k bytes, where files.cat doesnt !
         return this.ipfs.files.cat(cid)
             .then((stream) => Dweb.utils.p_streamToBuffer(stream, verbose))
+            .then((data) => {   // Horrible Kludge - stream returns 0 length if short file not IPLD
+                if (data.length) {
+                    return data
+                } else {
+                    if (verbose) console.log("Kludge alert - files.cat failed, trying block.get");
+                    return this.promisified.ipfs.block.get(cid)
+                        .then((blk) => blk.data);
+                }
+            })
             .then((data)=> { if (verbose) console.log("fetched ",data.length); return data; })
             .catch((err) => {
                 console.log("Caught misc error in TransportIPFS.p_rawfetch", err);
