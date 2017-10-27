@@ -59,16 +59,19 @@ exports.utils.mergeTypedArraysUnsafe = function(a, b) { // Take care of inabilit
 //TODO-STREAM, use this code and return stream from p_rawfetch that this can be applied to
 exports.utils.p_streamToBuffer = function(stream, mimeType) {
     // resolve to a promise that returns a stream.
+    // Note this comes form one example ...
+    // There is another example https://github.com/ipfs/js-ipfs/blob/master/examples/exchange-files-in-browser/public/js/app.js#L102 very different
     return new Promise((resolve, reject) => {
         try {
-            let chunks = []
+            let chunks = [];
             stream
-                .on('data', (chunk)=>chunks.push(chunk))
-                .on('end', ()=>resolve(Buffer.concat(chunks)))
+                .on('data', (chunk) => chunks.push(chunk))
+                .once('end', () => resolve(Buffer.concat(chunks)))
                 .on('error', (err) => { // Note error behavior untested currently
                     console.log("Error event in p_streamToBuffer",err);
                     reject(new Dweb.errors.TransportError('Error in stream'))
-                })
+                });
+            stream.resume();
         } catch (err) {
             console.log("Error thrown in p_streamToBuffer", err);
             reject(err);
@@ -80,10 +83,10 @@ exports.utils.p_streamToBlob = function(stream, mimeType) {
     // resolve to a promise that returns a stream - currently untested as using Buffer
     return new Promise((resolve, reject) => {
         try {
-            let chunks = []
+            let chunks = [];
             stream
                 .on('data', (chunk)=>chunks.push(chunk))
-                .on('end', () =>
+                .once('end', () =>
                     resolve(mimeType
                         ? new Blob(chunks, { type: mimeType })
                         : new Blob(chunks)))
@@ -91,6 +94,7 @@ exports.utils.p_streamToBlob = function(stream, mimeType) {
                     console.log("Error event in p_streamToBuffer",err);
                     reject(new Dweb.errors.TransportError('Error in stream'))
                 })
+            stream.resume();
         } catch(err) {
             console.log("Error thrown in p_streamToBlob",err);
             reject(err);
