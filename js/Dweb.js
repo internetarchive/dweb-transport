@@ -57,7 +57,7 @@ exports.utils.mergeTypedArraysUnsafe = function(a, b) { // Take care of inabilit
 };
 
 //TODO-STREAM, use this code and return stream from p_rawfetch that this can be applied to
-exports.utils.p_streamToBuffer = function(stream, mimeType) {
+exports.utils.p_streamToBuffer = function(stream, verbose) {
     // resolve to a promise that returns a stream.
     // Note this comes form one example ...
     // There is another example https://github.com/ipfs/js-ipfs/blob/master/examples/exchange-files-in-browser/public/js/app.js#L102 very different
@@ -65,8 +65,8 @@ exports.utils.p_streamToBuffer = function(stream, mimeType) {
         try {
             let chunks = [];
             stream
-                .on('data', (chunk) => chunks.push(chunk))
-                .once('end', () => resolve(Buffer.concat(chunks)))
+                .on('data', (chunk) => { if (verbose) console.log('on', chunk.length); chunks.push(chunk); })
+                .once('end', () => { if (verbose) console.log('end chunks', chunks.length); resolve(Buffer.concat(chunks)); })
                 .on('error', (err) => { // Note error behavior untested currently
                     console.log("Error event in p_streamToBuffer",err);
                     reject(new Dweb.errors.TransportError('Error in stream'))
@@ -79,7 +79,8 @@ exports.utils.p_streamToBuffer = function(stream, mimeType) {
     })
 }
 //TODO-STREAM, use this code and return stream from p_rawfetch that this can be applied to
-exports.utils.p_streamToBlob = function(stream, mimeType) {
+//TODO-STREAM debugging in streamToBuffer above, copy to here when fixed above
+exports.utils.p_streamToBlob = function(stream, mimeType, verbose) {
     // resolve to a promise that returns a stream - currently untested as using Buffer
     return new Promise((resolve, reject) => {
         try {
