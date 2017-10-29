@@ -58,8 +58,13 @@ function replacetext(el, text) {
     :param el:  An HTML element, or a string with id of an HTML element
     */
     el = (typeof(el) === "string") ? document.getElementById(el) : el;
-    deletechildren(el);
-    return el.appendChild(document.createTextNode(text))
+    //console.log("replacetext",text,el.constructor.name) // Uncomment to get class name of different things want to edit
+    if (el instanceof HTMLImageElement) {
+        el.src = text;
+    } else {
+        deletechildren(el);
+        return el.appendChild(document.createTextNode(text))
+    }
 }
 
 function replacetexts(el, ...dict) {
@@ -83,8 +88,14 @@ function _replacetexts(prefix, el, oo) {
     for (let prop in oo) {
         let p = prefix + prop
         let val = oo[prop];
+        if (val instanceof Date) {  // Convert here because otherwise treated as an object
+            val = val.toString();
+        }
         if (typeof val === "object" && !Array.isArray(val)) {
-            _replacetexts(`${prop}_`, el, val)
+            // Look for current level, longer names e.g. prefixprop_xyz
+            _replacetexts(`${p}_`, el, val)
+            // And nowif found any prefixprop look at xyz under it
+            Array.prototype.slice.call(el.querySelectorAll(`[name=${p}]`)).map((i) => _replacetexts("", i, val));
         }
         else if (typeof val === "object" && Array.isArray(val)) {
             dests = el.querySelectorAll(`[name=${p}]`);
@@ -94,12 +105,10 @@ function _replacetexts(prefix, el, oo) {
                     val.map((f) => addtemplatedchild(i, f))
                 })
         } else {
-            let dests = el.querySelectorAll(`[name=${p}]`);
             if (el.getAttribute("name") === p) replacetext(el, val); //Do the parent as well
-            Array.prototype.slice.call(dests).map((i) => replacetext(i, val));
-            dests = el.querySelectorAll(`[href=${p}]`);
+            Array.prototype.slice.call(el.querySelectorAll(`[name=${p}]`)).map((i) => replacetext(i, val));
             if (el.getAttribute("href") === p) el.href = val;
-            Array.prototype.slice.call(dests).map((i) => i.href = val)
+            Array.prototype.slice.call(el.querySelectorAll(`[href=${p}]`)).map((i) => i.href = val)
         }
     }
 }

@@ -124,6 +124,10 @@ class SmartDict extends Transportable {
         })
     }
 
+    copy(verbose) { //TODO-API
+        // The constructor will treat "this" as a dict and add to fields, note will shallowcopy, not deep copy.
+        return new this.constructor(this, verbose)
+    }
 
     static p_fetch(url, verbose) {
         /*
@@ -154,7 +158,7 @@ class SmartDict extends Transportable {
                     data._url = url;                         // Save where we got it - preempts a store - must do this afer decrypt
                     return new cls(data);
             })                // Returns new block that should be a subclass of SmartDict
-            .catch((err) => {console.log("cant fetch and decrypt unknown"); throw(err)});
+            .catch((err) => {console.log(`cant fetch and decrypt ${url}`); throw(err)});
     }
 
     static p_decrypt(data, verbose) {

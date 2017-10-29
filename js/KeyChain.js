@@ -94,7 +94,11 @@ class KeyChain extends CommonList {
          */
         Dweb.keychains = []
     }
-    _p_storepublic(verbose) {
+    static default() {  //TODO-API
+        return Dweb.keychains.length ? Dweb.keychains[Dweb.keychains.length-1] : undefined;
+    }
+
+    OBS_p_storepublic(verbose) { //TODO delete Dec2017 taken care of by new CL._p_storepublic
         /*
         Subclasses CommonList._storepublic
         Store a publicly viewable version of KeyChain - note the keys should be encrypted
@@ -156,7 +160,7 @@ class KeyChain extends CommonList {
         if (verbose) {
             console.log("Keychain.test 0 - create");
         }
-        KeyChain.p_new({name: "test_keychain kc"},{mnemonic: mnemonic}, verbose)    //Note in KEYCHAIN 4 we recreate exactly same way.
+        KeyChain.p_new({name: "test_keychain kc" },{mnemonic: mnemonic}, verbose)    //Note in KEYCHAIN 4 we recreate exactly same way.
             .then((kc1) => {
             kc = kc1;
         if (verbose) console.log("KEYCHAIN 1 - add MB to KC");
@@ -202,12 +206,12 @@ class KeyChain extends CommonList {
     .then(() => sb.p_store(verbose))
     .then(() => {
             let mvk = KeyChain.mykeys(Dweb.KeyPair);
-            if (mvk[0].name !== vkpname) throw new CodingError("Should find viewerkeypair stored above");
+            if (mvk[0].name !== vkpname) throw new Dweb.errors.CodingError("Should find viewerkeypair stored above");
         if (verbose) console.log("KEYCHAIN 6: Check can fetch and decrypt - should use viewerkeypair stored above");
         return Dweb.SmartDict.p_fetch(sb._url, verbose); // Will be StructuredBlock, fetched and decrypted
     })
     .then((sb2) => {
-            if (sb2.data !== qbf) throw new CodingError("Data should survive round trip");
+            if (sb2.data !== qbf) throw new Dweb.errors.CodingError("Data should survive round trip");
         if (verbose) console.log("KEYCHAIN 7: Check can store content via an MB");
         //MB.new(acl, contentacl, name, _allowunsafestore, content, signandstore, verbose)
     })
@@ -220,7 +224,7 @@ class KeyChain extends CommonList {
     .then((newpublicmb) => mb = newpublicmb)
     .then(() => mb.p_list_then_current(verbose))
     .then(() => {
-            if (mb.content() !== qbf) throw new CodingError("Data should round trip through ACL");
+            if (mb.content() !== qbf) throw new Dweb.errors.CodingError("Data should round trip through ACL");
     })
 
     .then(() => {

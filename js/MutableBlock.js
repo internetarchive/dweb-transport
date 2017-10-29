@@ -35,13 +35,13 @@ class MutableBlock extends CommonList {
         // Note any follow on .then is applied to the MB, not to the content, and the content might not have been loaded.
     }
 
-    p_update(){ throw new ToBeImplementedError("Need to define p_ function")}
+    p_update(){ throw new Dweb.errors.ToBeImplementedError("Need to define p_ function")}
 
-    async_update(type, data, verbose, success, error) {   throw new ObsoleteError("MutableBlock.async_update"); //TODO-IPFS obsolete with p_fetch // Send new data for this item to dWeb
+    async_update(type, data, verbose, success, error) {   throw new Dweb.errors.ObsoleteError("MutableBlock.async_update"); //TODO-IPFS obsolete with p_fetch // Send new data for this item to dWeb
         this.transport().async_update(this, this._url, type, data, verbose, success, error); //TODO-IPFS when obsolete can obsolete transport.async_update
     }
 
-    _p_storepublic(verbose) {
+    OBS_p_storepublic(verbose) { //TODO superceeded by new CL._p_storepublic delete Dec2017
         // Note that this returns immediately after setting url, so caller may not need to wait for success
         //(data, master, key, verbose, options)
         let mb = new MutableBlock({"name": this.name}, false, this.keypair, verbose);

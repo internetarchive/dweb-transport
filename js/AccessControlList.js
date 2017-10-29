@@ -56,6 +56,7 @@ class AccessControlList extends CommonList {
         if ((!this._master) && this.keypair._key.sign.publicKey) {
             dd["publickey"] = dd.publickey || dd.keypair.publicexport();   // Store publickey for verification
         }
+        if (!dd._master)  delete dd.accesskey   // Dont store the accesskey on the public version
         // Super has to come after above as overrights keypair, also cant put in CommonList as MB's dont have a publickey and are only used for signing, not encryption
         return super.preflight(dd);
     }
@@ -154,7 +155,7 @@ class AccessControlList extends CommonList {
         throw new Dweb.errors.AuthenticationError("ACL.decrypt: No valid keys found");
     };
 
-    _p_storepublic(verbose) {
+    OBS_p_storepublic(verbose) { //TODO remove, its same as new CL._p_storepublic
         /*
         Store a public version of the ACL - should not include accesskey, or privatekey
         Note - does not return a promise, the store is happening in the background
@@ -190,11 +191,17 @@ class AccessControlList extends CommonList {
             if (kc) {
                 return Dweb.transport().loads(kc.decrypt(value.encrypted, verbose)); // DecryptionFailError - unlikely since publicurl matches
             } else {
-                //ACL(url, data, master, key, verbose, options)
                 // TODO-AUTHENTICATION probably add person - to - person version
                 let acl;
                 return Dweb.SmartDict.p_fetch(aclurl, verbose) // Will be AccessControlList
                     .then((newacl) => acl = newacl)
+                    .then(() => console.log("XXX@p_decryptdata acl=",acl))
+                    .then(() => {
+                        if (acl instanceof Dweb.KeyChain) {
+                            // Typically its encrypted, but user not logged in - will be public KC
+                            throw new Dweb.errors.AuthenticationError(`Must be logged in as ${acl.name}`);
+                        }
+                    })
                     .then(() => acl.p_tokens(verbose)) // Will load blocks in sig as well
                     .then(() => acl.decrypt(value.encrypted, null, verbose))  // Resolves to data or throws AuthentictionError
                     .then((data) => Dweb.transport().loads(data))
@@ -212,10 +219,9 @@ class AccessControlList extends CommonList {
                 // Create a acl for testing, - full breakout is in test_keychain
                 let accesskey = Dweb.KeyPair.randomkey();
                 let aclseed = "01234567890123456789012345678902";    // Note seed with 01 at end used in mnemonic faking
-                let keypair = new Dweb.KeyPair({key: {seed: aclseed}}, verbose);
+                let keypair = new Dweb.KeyPair({key: "NACL SEED:"+Dweb.KeyPair.b64enc(Buffer(aclseed))}, verbose);
                 //ACL(data, master, keypair, keygen, mnemonic, verbose, options)
                 let acl = new Dweb.AccessControlList({
-                    name: "test_acl.acl",
                     accesskey: Dweb.KeyPair.b64enc(accesskey)
                 }, true, keypair, verbose, {});
                 acl._allowunsafestore = true;    // Not setting _acl on this

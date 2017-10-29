@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dweb example - Versioning</title>
+    <link rel='stylesheet' href='example_styles.css'>
+    <script type="text/javascript" src="dweb_transport_ipfs_bundled.js"></script><!-- Load bundle - assigns to "Dweb"-->
+    <script type="text/javascript" src='https://cloud.tinymce.com/stable/tinymce.min.js'></script><!-- TinyMCE -->
+    <script type="text/javascript" src="htmlutils.js"></script><!--Non Dweb specific utility functions for working with HTML-->
+    <script type="text/javascript" src="loginutils.js"></script><!--Dweb login functions, useful in multiple places-->
+
+    <script type="text/javascript">
+
+        function newversionlist(el) {
+            console.log("newversionlist ---");
+            // Get the data from the form
+            let dict = form2dict(el);
+            <!--VersionList(data, master, keypair, keygen, mnemonic, verbose, options)-->
+            //TODO require logged in, and immediately secure
+            //TODO replace {passphrase:  with {keygen: true}
+            let obj;
+            dict._allowunsafestore = true; //TODO remove _allowunsafestore once secured
+            Dweb.VersionList.p_new(dict, true, {passphrase: "TODO-REPLACE"}, verbose)
+                .then((o) => obj=o)
+                .then(() => obj.p_store(verbose))
+            // Now re fetch it from Dweb and display the object
+                .then(() => {
+                    obj._working = new obj._entryclass({textarea: "", _acl: obj.contentacl});
+                    tinyMCE.activeEditor.setContent(obj._working.textarea); // Set actual MCE editing text
+                    tinyMCE.activeEditor.setDirty(true);                    // Allow saving this restored text
+                    replacetexts("listmeta", obj, {
+                        readlockimg: icon_images[obj._working._acl ? "locked" : "unlocked"],
+                        writelockimg: icon_images[obj._acl ? "locked" : "unlocked"],
+                        readlockname: obj._working._acl ? obj._working._acl.name : "",
+                        writelockname: obj._acl ? obj._acl.name : ""
+
+                });
+                })
+                .catch((err) => { console.log("ERROR in newversionlist:",err); alert(err.message); });
+            return false; // Stop form submission and page reloading reloading
+        }
+
+        function updatecontent(content) {
+            // Update the content edited i.e. sign a copy and store on the list, then make a new copy to work with. Triggered by Save.
+            //TODO move some of this to VersionList
+            let vl = document.getElementById("listmeta").source;
+            let working = vl._working;
+            working.textarea = content;
+            vl.p_saveversion(verbose)
+                .then((sig) => addtemplatedchild("list_ul", sig) );
+        }
+        function starteditor() {
+            tinymce.init({
+                selector: '#mytextarea',
+                menubar: "true",
+                plugins: [ "save",
+                    'advlist autolink lists link image charmap print preview anchor',
+                    'searchreplace visualblocks code fullscreen',
+                    'insertdatetime media table contextmenu paste code' ],
+                toolbar: 'save | undo redo | insert | styleselect | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image',
+                save_onsavecallback: () => updatecontent(tinyMCE.get('mytextarea').getContent())
+            });
+        }
+        function clickrestore(el) {
+            console.log("clickrestore ---");
+            let vl = document.getElementById("listmeta").source;
+            vl._working = el.source.data.copy(verbose);
+            replacetexts("workingform", vl._working);
+            tinyMCE.activeEditor.setContent(vl._working.textarea); // Set actual MCE editing text
+            tinyMCE.activeEditor.setDirty(true);                    // Allow saving this restored text
+        }
+
+    </script>
+
+</head>
+<body class="examplesversions">
+<!--Login and network status box - this is standard for any app requiring logging in -->
+<div class="floatright" style="position:relative;">
+    <div id="status">Starting</div>
+    <ul id="keychains_ul"><li class='template vertical_li' onclick='keychain_click(this);'><span name='name'>PLACEHOLDER</span></li></ul>
+    <form><input id="logout" class="button" type="button" onclick="logout_click();" style="display:none;" value="Logout"/></form><!--logout all keychains-->
+    <img src="noun_186903_cc.png" alt="keychain" class="iconopener" onclick="show('loginform','');"/>
+    <form class="dialogform" id="loginform" onsubmit="loginformsubmit(); return false;" style="display:none;">
+        <img class="keylist_icon" src="noun_83161_cc.svg" alt="Close" onclick="hide('loginform');"/>
+        <input class="propval" type="text" name="name" size="20" placeholder="Your id"/>
+        <input class="propval" type="text" name="passphrase" size="70" placeholder="Passphrase"/>
+        <input class="button" type="submit" value="Login"/>
+        <input class="button" type="button" onclick="show('registrationform');" value="Register"/>
+    </form>
+    <form class="dialogform" id="registrationform" name="registrationform" onsubmit="registrationsubmit(); return false;" style="display:none;">
+        <img class="keylist_icon" src="noun_83161_cc.svg" alt="Close" onclick="hide('registrationform');"/>
+        <input class="propval" type="text" name="name" size="50" placeholder="Your id - it doesnt have to be unique"/>
+        <input class="propval" type="text" name="passphrase" size="70" placeholder="Type a complex phrase, easy for you to remember, hard for others to guess, mixed case, numbers, punctuation are all good"/>
+        <input class="button" type="submit" value="Register"/>
+    </form>
+    <!-- KeyChain -->
+    <div id="keychain" class="displayedblock" style="display:none;">
+        <div class="displayedblockheader" id="keychain_header">
+            <form class="dialogform">
+                <img class="keylist_icon" src="noun_83161_cc.svg" alt="Close" onclick="hide('keychain');" style="float:right;"/>
+               <span name="name" style="display: inline-block;"></span>
+                <!--If change icons, see icon_images above-->
+                <span style="display: inline-block;"><img class="keylist_icon" src="noun_1146472_cc.png" alt="Key"/><input class="button" type="button" onclick="show('keynew_form');" value="new key"/></span>
+                <span style="display: inline-block;"><img class="keylist_icon" src="noun_1093404_cc.png" alt="Lock"/><input class="button" type="button" onclick="show('locknew_form');" value="new lock"/></span>
+            </form>
+        </div>
+        <!-- List of all keys in keychain-->
+        <ul id="keychain_ul" class="inline_ul">
+            <li class="inline_li template" onclick="keyorlock_click(this);"><img class="keylist_icon" name="objsym"/><span class="keylist_name" name="name"></span></li>';
+        </ul>
+    </div>
+    <form id="keynew_form" name="keynew_form" onsubmit="keynew_click(); return false;" style="display:none">
+        <input class="propval" type="text" name="name" size="50" placeholder="Name of the key"/>
+        <input class="button" type="submit" value="Generate"/>
+    </form>
+    <form id="locknew_form" name="locknew_form" onsubmit="locknew_click(); return false;" style="display:none">
+        <input class="propval" type="text" name="name" size="50" placeholder="Name of the Lock"/>
+        <input class="button" type="submit" value="Generate"/>
+    </form>
+    <div id="lock_div" class="displayedblock" style="display:none">
+        <div class="displayedblockheader" id="lock_header"><!--note source will be set on lock_header-->
+            Lock: <img class="keylist_icon" src="noun_1176543_cc.png" onclick='locklink_click("lock_header");' alt="link"/><span name="name"></span>
+            <form class="dialogform" style="display:inline-block;">
+                <img class="keylist_icon" src="noun_708669_cc.png" alt="Key"/><input class="button" type="button" onclick="show('tokennew_form');" value="new token"/>
+                <img class="keylist_icon" src="noun_83161_cc.svg" alt="Close" onclick="hide('lock_div');"/>
+            </form>
+        </div>
+        <!-- List of all tokens in AccessControlList-->
+        <ul id="lock_ul" class="inline_ul">
+            <li class="inline_li template" onclick="keyorlock_click(this)">
+                <img class="keylist_icon" name="objsym" alt="key"/>
+                <span class="keylist_name" name="name"></span>
+            </li>
+        </ul>
+    </div>
+    <!--Dialogue to enter a new key for an ACL -->
+    <form id='tokennew_form' name="tokennew_form" onsubmit="tokennew_click(); return false;" style="display:none;">
+        <input class="propval" type="text" name="name" size="20" placeholder="Name of key" style="align:right;" />
+        <img class="keylist_icon" src="noun_83161_cc.svg" alt="Close" onclick="hide('tokennew_form');"/>
+        <input class="propval" type="text" name="url" size="50" placeholder="URL of key"/><br/>
+        <input class="button" type="submit" value="Add" style="align:right;"/>
+    </form>
+</div><!--End of standard network status and login panel-->
+
+
+<h1>Dweb - Version lists example</h1>
+
+
+<!-- General Design
+    Status and Login in top right
+    Way to create new list
+    Meta info from list: name, ability to get public/private links
+    Working version editing - as tinymce or some other editor
+        Note working version has not been published
+    List of Versions
+        Selecting one of the versions loads Current with it.
+
+    TODO-PUB add lock editing etc here OR link to page where can
+    TODO-PUB make sure list added to KeyChains, allow visibility and selection
+-->
+
+<!-- Way to create new list -->
+<form method="post" style="display:inline" id="newform" onsubmit="newversionlist(this); return false;">
+    <input class="propval" type="text" name="name" placeholder="Name of new version list" size="70" value="foo bar"/><!--TODO remove placeholder foo bar-->
+    <input class="propval" type="text" name="contentacl" value="https://gateway.dweb.me:443/contenthash/rawfetch/QmUf7SFHv3RPgfhjCf45WnJ8zqkJjAkGbDVirFp5P4PqNU"/><!--TODO replace with drop down of ACLs--><!--TODO remove value after testing-->
+    <input class="button" type="submit" value="Create"/>
+</form>
+<!-- Meta info about the list -->
+<!--TODO Visibility of block only when have a list to work with -->
+<div id="listmeta" class="displayedblock">
+    <span style="float:right;display:table;margin-top:3px;margin-right:10px">
+        <span style="display:table-row;"><span style="display:table-cell;">Read:</span><img  style="display:table-cell;" name="readlockimg" class="keylist_icon" src="noun_1093404_cc_unlocked.png" alt="unlocked"><span style="display:table-cell;" name="readlockname"></span></span>
+        <span style="display:table-row;"><span style="display:table-cell;">Write:</span><img  style="display:table-cell;" name="writelockimg" class="keylist_icon" src="noun_1093404_cc_unlocked.png" alt="unlocked"><span style="display:table-cell;" name="writelockname"></span></span>
+    </span>
+
+    <h4 name="name"></h4>
+    <!-- Editing area -->
+    <form method="post" id="workingform" name="_working">
+        <textarea id="mytextarea" name="textarea" width="60%">Testing</textarea>
+    </form>
+    <ul id="list_ul" name="_list">
+        <li  onclick="clickrestore(this);" class="template" ><span name="date"></span></li><!-- alternative name="data_textarea"-->
+</div>
+
+<!--TODO-->
+TODO
+* click lock to select a lock to lock it with
+* click locked key to edit that lock ?
+* Add to KeyChain so can re-open
+* Show docs in KeyChain
+* Click on doc to open
+
+<script type="text/javascript">
+    // This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
+    // These next two lines reqd at this level to get the global scope
+    var searchparams = new URL(window.location.href).searchParams;
+    var verbose = searchparams.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)  //TODO-document this and Transport in Readme
+    p_connect() // Default startup beavior from loginutils.js
+    .then(() => {
+        // Any code you want to run once online goes here.
+        var url = searchparams.get("url");   //TODO determine what to do with parms in url
+        // starteditor();
+    })
+    //.then(() => _login({name: "Mary Smith", passphrase: "had a little lamb"}))
+    .then(() =>Dweb.transport("ipfs:/ipfs/QmPojzKmxqngapSH8Gjd25fCiaDScHnawNcdt42TB48zfi").p_rawfetch("ipfs:/ipfs/QmPojzKmxqngapSH8Gjd25fCiaDScHnawNcdt42TB48zfi", true))
+    //.then(() =>Dweb.transport("ipfs:/ipfs/QmWR4F6sDRM7TVHBK3LVF785ibNJ1PUTdh1SRrF2qb3WJk").p_rawfetch("ipfs:/ipfs/QmWR4F6sDRM7TVHBK3LVF785ibNJ1PUTdh1SRrF2qb3WJk", true))
+    //.then(() => newversionlist("newform"))
+    .catch((err) => { console.log("App Error:",err); alert(err.message); });
+</script>
+</body>
+</html>
