@@ -172,6 +172,7 @@
         <span style="display:table-row;"><span style="display:table-cell;">Read:</span><img  style="display:table-cell;" name="readlockimg" class="keylist_icon" src="noun_1093404_cc_unlocked.png" alt="unlocked"><span style="display:table-cell;" name="readlockname"></span></span>
         <span style="display:table-row;"><span style="display:table-cell;">Write:</span><img  style="display:table-cell;" name="writelockimg" class="keylist_icon" src="noun_1093404_cc_unlocked.png" alt="unlocked"><span style="display:table-cell;" name="writelockname"></span></span>
     </span>
+
     <h4 name="name"></h4>
     <!-- Editing area -->
     <form method="post" id="workingform" name="_working">
@@ -198,10 +199,12 @@ TODO
     .then(() => {
         // Any code you want to run once online goes here.
         var url = searchparams.get("url");   //TODO determine what to do with parms in url
-        starteditor();
+        // starteditor();
     })
-    .then(() => _login({name: "Mary Smith", passphrase: "had a little lamb"}))
-    .then(() => newversionlist("newform"))
+    //.then(() => _login({name: "Mary Smith", passphrase: "had a little lamb"}))
+    .then(() =>Dweb.transport("ipfs:/ipfs/QmPojzKmxqngapSH8Gjd25fCiaDScHnawNcdt42TB48zfi").p_rawfetch("ipfs:/ipfs/QmPojzKmxqngapSH8Gjd25fCiaDScHnawNcdt42TB48zfi", true))
+    //.then(() =>Dweb.transport("ipfs:/ipfs/QmWR4F6sDRM7TVHBK3LVF785ibNJ1PUTdh1SRrF2qb3WJk").p_rawfetch("ipfs:/ipfs/QmWR4F6sDRM7TVHBK3LVF785ibNJ1PUTdh1SRrF2qb3WJk", true))
+    //.then(() => newversionlist("newform"))
     .catch((err) => { console.log("App Error:",err); alert(err.message); });
 </script>
 </body>

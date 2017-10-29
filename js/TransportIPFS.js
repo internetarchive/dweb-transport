@@ -298,7 +298,8 @@ class TransportIPFS extends Transport {
         /*
         Convert a CID into a standardised URL e.g. ipfs:/ipfs/abc123
          */
-        //console.log(cid.multihash[0],cid.multihash[1],cid.multihash[2]);
+        console.log("XXX@cid2url",cid);
+
         return "ipfs:/ipfs/"+cid.toBaseEncodedString()
     }
 
@@ -324,11 +325,11 @@ class TransportIPFS extends Transport {
         :resolve string: Return the object being fetched, (note currently returned as a string, may refactor to return Buffer)
         :throws:        TransportError if url invalid - note this happens immediately, not as a catch in the promise
          */
-        if (verbose) { console.log("IPFS p_rawfetch",url)}
+        if (verbose) console.log("IPFS p_rawfetch",url);
         if (!url) throw new Dweb.errors.CodingError("TransportIPFS.p_rawfetch: requires url");
         let cid = (url instanceof CID) ? url : TransportIPFS.url2cid(url);  // Throws TransportError if url bad
-        if (verbose) console.log("CID=",cid)
         //return this.promisified.ipfs.block.get(cid).then((result) => result.data) // OLD way, works below 250k bytes, where files.cat doesnt !
+        if (verbose) console.log("ipfs.files.cat",cid);
         return this.ipfs.files.cat(cid)
             .then((stream) => Dweb.utils.p_streamToBuffer(stream, verbose))
             .then((data) => {   // Horrible Kludge - stream returns 0 length if short file not IPLD
@@ -340,6 +341,8 @@ class TransportIPFS extends Transport {
                         .then((blk) => blk.data);
                 }
             })
+
+            //.then((data)=> { if (verbose) console.log("fetched ",data.toString()); return data; })
             .then((data)=> { if (verbose) console.log("fetched ",data.length); return data; })
             .catch((err) => {
                 console.log("Caught misc error in TransportIPFS.p_rawfetch", err);
@@ -455,9 +458,14 @@ class TransportIPFS extends Transport {
         :resolve string: url of data stored
          */
         console.assert(data, "TransportIPFS.p_rawstore: requires data");
+        console.log('XXX@p_rawstore',data)
         let buf = (data instanceof Buffer) ? data : new Buffer(data);
-        return this.promisified.ipfs.block.put(buf).then((block) => TransportIPFS.cid2url(block.cid));
-        return this.ipfs.files.put(buf).then((block) => TransportIPFS.cid2url(block.cid));
+        return this.promisified.ipfs.block.put(buf).then((block) => block.cid)
+        //https://github.com/ipfs/interface-ipfs-core/blob/master/SPEC/DAG.md#dagput
+        //return this.ipfs.dag.put(buf,{ format: 'dag-cbor', hashAlg: 'sha2-256' })
+            .then((xxx) => { console.log(xxx.constructor.name, xxx); return xxx;})
+            .then((cid) => TransportIPFS.cid2url(cid));
+        //return this.ipfs.files.put(buf).then((block) => TransportIPFS.cid2url(block.cid));
     }
 
     p_rawadd(url, date, signature, signedby, verbose) {
