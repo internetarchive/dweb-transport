@@ -3,6 +3,7 @@ const IPFS = require('ipfs');
 var ipfs;
 const CID = require('cids');
 const multibase = require('multibase')
+const multihash = require('multihashes')
 const dagPB = require('ipld-dag-pb')
 const DAGNode = dagPB.DAGNode
 const dagCBOR = require('ipld-dag-cbor')
@@ -10,6 +11,9 @@ const IPLDResolver = require('ipld-resolver')
 var promisified;
 const promisify = require('promisify-es6');
 function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { resolve(val); },ms)})}
+
+// Note to get async / await working in node, I had to update node to the current (non-default version) as starts in V7
+// I also had to "npm install levelup leveldown" to upgrade them to match the current version of node.
 
 let defaultipfsoptions = {
     repo: '/tmp/ipfs_testipfs', //TODO-IPFS think through where, esp for browser
@@ -74,7 +78,7 @@ function check_result(name, buff, expected) {
     if ( (typeof(expected) === "number") && (expected !== buff.length)) {
         console.log(name, "Expected block length", expected, "but got", buff.length);
         console.log(buff); // Normally leave commented out - will be long if looking at 250k file !
-    } else if ((typeof(expected) !== "number") && (expected !== buff)) {
+    } else if ((typeof(expected) !== "number") && (JSON.stringify(expected) !== JSON.stringify(buff))) {
         console.log(name, "Expected:", expected.constructor.name, expected, "got", buff.constructor.name, buff);
     } else {
         console.log(name, "Retrieved successfully");
@@ -82,13 +86,17 @@ function check_result(name, buff, expected) {
     return buff; // Simplify promise chain
 }
 
-function test_block_get(cid, expected) {
-    return promisified.ipfs.block.get(cid)
-        .then((block)=>block.data)
-        .then((buff) => check_result("block.get",buff, expected))
-        .then(() => delay(500))    // Allow error on other stream to appear
-        .catch((err) => console.log("Error thrown in block.cat", err))
+async function test_block_get(cid, expected) {
+    try {
+        let block = await promisified.ipfs.block.get(cid)  //TODO remove promisification
+        data = block.data;
+        check_result("block.get", data, expected);
+        await delay(500);    // Allow error on other stream to appear
+    } catch(err) {
+        console.log("Error thrown in block.cat", err);
+    }
 }
+
 function test_dag_get(cid, expected) {
     //Try and retrieve with dag.get
     return ipfs.dag.get(cid)                // fails (never returns nor throws err) if cid came from block.put
@@ -105,110 +113,113 @@ function test_files_cat(cid, expected) {
         .then(() => delay(500))    // Allow error on other stream to appear
         .catch((err) => console.log("Error thrown in files.cat", err)) // Note the HTTP test doesn't throw here, but in separate thread
 }
-function test_universal_get(cid, expected) {
+async function test_universal_get(cid, expected) {
     // This is an attempt at a retriever that works no matter what the type of multihash
-    //TODO check works with v0 CID or always with v1
-    return ipfs.dag.get(cid)
-        // Three possible cases -
-        // a) short file, get from _serialized as there's a Chrome bug in files.cat (it works in Node)
-        // b) long file use files.cat
-        // c) Not a file, value != DAGNode, return the value (works on strings or JSON)
-        .then((res) => { console.assert(!res.remainderPath.length); return res;} ) // Unsupported
-        .then((res) => {
-            if (res.value.constructor.name instanceof DAGNode) {
-                console.log("Case a or b");
-                if (res.value._links.length > 0) {
-                    console.log("Case b");
-                    return ipfs.files.cat(cid)
-                        .then((stream) => p_streamToBuffer(stream, true))
-                } else {
-                    console.log("Case a");
-                    return ipfs.files.cat(cid) // Works on Node, but fails on Chrome, cant figure out how to get data from the DAGNode otherwise (its the wrong size)
-                        .then((stream) => p_streamToBuffer(stream, true))
-                }
-            } else {
-                //Case c
-                return res.value;
+    // Three possible cases -
+    // a) short file, get from _serialized as there's a Chrome bug in files.cat (it works in Node)
+    // b) long file use files.cat
+    // c) Not a file, value != DAGNode, return the value (works on strings or JSON)
+    try {
+        let res = await ipfs.dag.get(cid);
+        console.assert(!res.remainderPath.length);  // Unsupported remainderPath - TODO throw error
+        if (res.value instanceof DAGNode) {
+            //console.log("Case a or b");
+            if (res.value._links.length > 0) { //b: Long file
+                buff = await p_streamToBuffer(await ipfs.files.cat(cid), true);
+            } else { //a: Short file
+                buff = await p_streamToBuffer(await ipfs.files.cat(cid), true); // Works on Node, but fails on Chrome, cant figure out how to get data from the DAGNode otherwise (its the wrong size)
             }
-        })
-        .then((buff) => check_result("universal.get",buff, expected))
-        .then(() => delay(500))    // Allow error on other stream to appear
-        .catch((err) => console.log("Error thrown in files.cat", err)) // Note the HTTP test doesn't throw here, but in separate thread
+        } else { //c: not a file
+            buff = res.value;
+        }
+        check_result("universal.get",buff, expected);
+        await delay(500); // Allow error on other stream to appear
+    } catch(err) {
+        console.log("Error thrown in files.cat", err);
+    }
 }
 
-function test_block() {
+async function test_block() {
     let qbf = "The quick brown fox" // String for testing
-    let cid;   // Will hold CID of string stored with block.put
-    let len;    // Will hold length expected
+    console.log("--------testing block.put:",qbf);
     // Store with block.put
-    return promisified.ipfs.block.put(new Buffer(qbf))
-    .then((block)=>block.cid)
-    .then((cid_stored) => { cid = cid_stored; len = qbf.length; })
-    .then(() => test_block_get(cid,len))        // Works
+    let block = await promisified.ipfs.block.put(new Buffer(qbf));    //TODO try remove promisified
+    let cid = block.cid;       // Will hold CID of string stored with block.put
+    let len = qbf.length;      // Will hold length expected
+    //await test_block_get(cid,len);                  // Works
     //NEXT TWO TESTS COMMENTED OUT AS FAIL *AND* HANG THE THREAD - NASTY IPFS BUG
-    .then(() => console.log("Commented out other ways to retrieve result of block.put as all crash with nasty IPFS bug "))
-    //.then(() => test_dag_get(cid, len))         // Fails - BUG throws "Groups are not supported in different thread, never returns or throws error
-    //.then(() => test_files_cat(cid, len))       // Fails - same as dag_get
-    //.then(() => test_universal_get(cid, len))     // Untested but dont expect to work as will fail in dag.get
-    //.then(() => console.log("test_block completed"))
+    console.log("Commented out other ways to retrieve result of block.put as all crash with nasty IPFS bug ");
+    //await test_dag_get(cid, len);                   // Fails - BUG throws "Groups are not supported in different thread, never returns or throws error
+    //await test_files_cat(cid, len);                 // Fails - same as dag_get
+    //await test_universal_get(cid, len);             // Untested but dont expect to work as will fail in dag.get
+    console.log("test_block completed");
 }
 
-function test_dag_string() {
-    let qbf = "the quick brown fox" // String for testing
-    let cid;   // Will hold CID of string stored with dag.put
-    let len;    // Will hold length expected
+async function test_dag_string() {
+    let qbf = "the quick brown fox"; // String for testing
     //https://github.com/ipfs/interface-ipfs-core/blob/master/SPEC/DAG.md#dagput
     //let qbf = new Buffer(qbf);    // Uncomment to test storing as buffer (behavior same as for string)
-    console.log("dag.put:",qbf);
-    return ipfs.dag.put(qbf,{ format: 'dag-cbor', hashAlg: 'sha3-512' }) //TODO try different hash
-        .then((cid_stored) => { cid = cid_stored; len = qbf.length; })
-        .then(() => test_block_get(cid,len))    // Gets 1 byte too long
-        .then(() => test_dag_get(cid, len))     // Works
-        .then(() => test_files_cat(cid, len))   // Throws  Error: invalid node type
-        .then(() => test_universal_get(cid, len))
+    console.log("--------testing dag.put:",qbf);
+    let cid = await ipfs.dag.put(qbf,{ format: 'dag-cbor', hashAlg: 'sha3-512' }); //TODO try different hash
+    let len = qbf.length;
+    //await test_block_get(cid,len);    // Gets 1 byte too long
+    //await test_dag_get(cid, len);     // Works
+    //await test_files_cat(cid, len);   // Throws  Error: invalid node type
+    await test_universal_get(cid, len);
 }
 
-function test_dag_json() {
-    let j = { fox: "the quick brown"} // String for testing
-    let cid;   // Will hold CID of string stored with dag.put
+async function test_dag_json() {
+    let j = { fox: "the quick brown"}; // String for testing
     //https://github.com/ipfs/interface-ipfs-core/blob/master/SPEC/DAG.md#dagput
-    console.log("dag.put:",j);
-    return ipfs.dag.put(j,{ format: 'dag-cbor', hashAlg: 'sha2-256' })
-        .then((cid_stored) => { cid = cid_stored; })
-        .then(() => test_block_get(cid, j))    // Wrong - gets buffer
-        .then(() => test_dag_get(cid, j))     // Works
-        //.then(() => test_files_cat(cid, j))   // Throws  Error: invalid node type
-        .then(() => test_universal_get(cid, j))
+    console.log("--------Testing dag.put:",j);
+    let cid = await ipfs.dag.put(j,{ format: 'dag-cbor', hashAlg: 'sha2-256' }); // Will hold CID of string stored with dag.put
+    //console.log(cid);                                   // For debugging
+    //console.log(multihash.toB58String(cid.multihash));  // Debugging QmehRkRt4xipvY6sj5X79SMmsCfpryEsUWxYqwddFEjsDr
+    //console.log(cid.toBaseEncodedString());             // Debugging zdpuB2nDXFEoAMVCiKLLqrdHEqpdhvTD2qwtxymA3V9fAb68g
+    //await test_block_get(cid, j);                       // Wrong - gets buffer
+    //await test_dag_get(cid, j);                         // Works
+    //await test_files_cat(cid, j);                     // Throws  Error: invalid node type
+    await test_universal_get(cid, j);
 }
 
-function test_httpapi_short() {
-    console.log("Testing short file sent to http API");
+async function test_httpapi_short() {
+    console.log("--------Testing short file sent to http API");
     let multihash="QmTds3bVoiM9pzfNJX6vT2ohxnezKPdaGHLd4Ptc4ACMLa"; //184324 bytes
     let cid = new CID(multihash)
     let len = 184324;
-    return test_block_get(cid,len)              // Seems to work as a PDF, but gets 184338 not 184324 bytes
-    //.then(() => test_dag_get(cid, len))     // As expected, Fails gets a data structure, not a buffer
-        .then(() => test_files_cat(cid, len))   // Works in node (correct size), fails in Chrome (immediate 'end' event) !! IPFS BUG !!
-        //.then(() => test_universal_get(cid, len))
+    //await test_block_get(cid,len);             // Seems to work as a PDF, but gets 184338 not 184324 bytes
+    //await test_dag_get(cid, len);     // As expected, Fails gets a data structure, not a buffer
+    //await test_files_cat(cid, len);   // Works in node (correct size), fails in Chrome (immediate 'end' event) !! IPFS BUG !!
+    await test_universal_get(cid, len);
 }
-function test_httpapi_long() {
-    console.log("Testing long file sent to http API");
+async function test_httpapi_long() {
+    console.log("--------Testing long file sent to http API");
     let multihash="Qmbzs7jhkBZuVixhnM3J3QhMrL6bcAoSYiRPZrdoX3DhzB";
     let cid = new CID(multihash)
     let len = 262438;
-    return test_block_get(cid,len)              //  As expected, Doesnt work - just gets the IPLD as a buffer
-        //.then(() => test_dag_get(cid, len))     // As expected,  Fails gets a data structure, not a buffer
-        .then(() => test_files_cat(cid, len))   // Works in node and in Chrome
-        //.then(() => test_universal_get(cid, len))
+    //await test_block_get(cid,len);              // As expected, Doesnt work - just gets the IPLD as a buffer
+    //await test_dag_get(cid, len);               // As expected,  Fails gets a data structure, not a buffer
+    //await test_files_cat(cid, len);             // Works in node and in Chrome
+    await test_universal_get(cid, len);
 }
 
-function test_ipfs() {
-    p_ipfsstart(true)
-    .then(() => test_httpapi_short())
-    .then(() => test_httpapi_long())
-    //.then(() => test_block()) // Run last because fails and never returns from files.cat
-    //.then(() => test_dag_string()) // Gets 1 byte extra with block.get (node type); fails on file - that is to be expected, note CIDs are dag-cbor, version 1
-    //.then(() => test_dag_json()) // Gets 1 byte extra with block.get (node type); fails on file - that is to be expected, note CIDs are dag-cbor, version 1
+async function sandbox() {
+    console.log("--------Sandbox");
+    // Just a place to try things - dont expect them to work or make sense !
+    m = "zdpuB2nDXFEoAMVCiKLLqrdHEqpdhvTD2qwtxymA3V9fAb68g";
+    console.log(new CID(m))
+}
+
+async function test_ipfs() {
+    await p_ipfsstart(true);
+    //await sandbox();
+    await test_httpapi_short();     // No solution: *IPFS BUG* on files.cat; (work around also has bug of adding 14 bytes)
+    await test_httpapi_long();      // Works only on files.cat; Fails as expected on others
+    await test_block();             // Works on block.get; Fails *IPFS BUG REALLY BAD* on anything other than block.get
+    await test_dag_string();        // Works on dag.get; fails (as expected) on others
+    await test_dag_json();         // Works on dag.get; fails as expected on others
 }
 
 test_ipfs()
+
+//TODO - try building CID from multihash on test_dag_string & json

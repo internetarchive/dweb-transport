@@ -7,6 +7,8 @@
     "crypto": ">=0.0.3",
     "ipfs": "git+https://git@github.com/ipfs/js-ipfs.git",
     "jsdom": "^11.3.0",
+    "leveldown": "^2.0.0",
+    "levelup": "^2.0.0",
     "libsodium-wrappers": "git+https://git@github.com/mitra42/libsodium.js.git",
     "multihashes": "^0.4.12",
     "node-fetch-npm": "^2.0.2",
