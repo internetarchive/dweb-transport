@@ -62,7 +62,7 @@ class SmartDict extends Transportable {
         let res = {};
         for (let i in dd) {
             if (i.indexOf('_') !== 0) { // Ignore any attributes starting _
-                if (dd[i] instanceof Transportable) {
+                if (dd[i] instanceof Transportable) { //TODO-IPFS-URL no longer trust this - generate error if not already stored
                     dd[i].p_store(false);  // Stores async, but sets url first if you need it stored first then do so before calling p_store
                     res[i] = dd[i]._url
                 } else {

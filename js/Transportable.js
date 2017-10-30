@@ -41,18 +41,21 @@ class Transportable {
         return this._data;  // Default behavior - opaque bytes
     }
 
-    p_store(verbose) {    // Python has a "data" parameter to override this._data but probably not needed
+    stored() {  // Check if stored
+        return this._url ? true : false
+    }
+    p_store(verbose) {    // Python has a "data" parameter to override this._data but probably not needed //TODO-IPFS make sure callers not using _url before stored
         /*
         Store the data on Dweb, if it hasn’t already been.
 
         It calculates and store the url in _url immediately before starting the asynchronous storage and returning the Promise, and then checks the underlying transport agrees on the url variable. This allows a caller to use the url before the storage has completed.
         Resolves to	string: url of data stored
          */
-        if (this._url)
+        if (this.stored())
             return new Promise((resolve, reject)=> resolve(this));  // Noop if already stored, use dirty() if change after retrieved
         let data = this._getdata();
         if (verbose) console.log("Transportable.p_store data=", data);
-        this._url = this.transport().url(data); //store the url since the HTTP is async (has form "ipfs:/ipfs/xyz123" or "BLAKE2.xyz123"
+        this._url = this.transport().url(data); //TODO-IPFS-URL //store the url since the HTTP is async (has form "ipfs:/ipfs/xyz123" or "BLAKE2.xyz123" //TODO-IPFS-URL needs to set from result and not be used by caller
         if (verbose) console.log("Transportable.p_store url=", this._url);
         let self = this;
         return this.transport().p_rawstore(data, verbose)

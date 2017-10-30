@@ -41,7 +41,7 @@ class Signature extends SmartDict {
         return this.date.toISOString() + this.url;
     }
 
-    static sign(commonlist, url, verbose) {
+    static async p_sign(commonlist, url, verbose) { //TODO-API
         /*
         Sign and date a url, returning a new Signature
 
@@ -50,7 +50,8 @@ class Signature extends SmartDict {
         :return: Signature (dated with current time on browser)
          */
         let date = new Date(Date.now());
-        if (!commonlist._publicurl) commonlist.p_store(verbose); // Sets _publicurl sync, while storing async
+        if (!commonlist._publicurl)
+            await commonlist.p_store(verbose);
         if (!commonlist._publicurl) throw new Dweb.errors.CodingError("Signature.sign should be a publicurl by here");
         let sig = new Signature({"date": date, "url": url, "signedby": commonlist._publicurl});
         sig.signature = commonlist.keypair.sign(sig.signable());
@@ -88,7 +89,7 @@ class Signature extends SmartDict {
         }
     }
 
-    static p_test(verbose) {
+    static async p_test(verbose) {
         // Test Signatures
         //verbose=True
         let mydic = { "a": "AAA", "1":100, "B_date": Date.now()}; // Dic can't contain integer field names
@@ -104,13 +105,11 @@ class Signature extends SmartDict {
         if (verbose) console.log("test_Signatures sign");
         commonlist._allowunsafestore = true;
         let sig;
-        return signedblock.p_store(verbose)
-            .then(()=> {
-            sig = Dweb.Signature.sign(commonlist,signedblock._url, verbose); //commonlist, url, verbose
-            commonlist._allowunsafestore = false;
-            if (verbose) console.log("test_Signatures verification");
-            if (!commonlist.verify(sig, verbose)) throw new Dweb.errors.CodingError("Should verify");
-            })
+        await signedblock.p_store(verbose);
+        sig = await Dweb.Signature.p_sign(commonlist,signedblock._url, verbose); //commonlist, url, verbose
+        commonlist._allowunsafestore = false;
+        if (verbose) console.log("test_Signatures verification");
+        if (!commonlist.verify(sig, verbose)) throw new Dweb.errors.CodingError("Should verify");
     }
 
 }

@@ -7,8 +7,8 @@
     "crypto": ">=0.0.3",
     "ipfs": "git+https://git@github.com/ipfs/js-ipfs.git",
     "jsdom": "^11.3.0",
-    "leveldown": "^2.0.0",
-    "levelup": "^2.0.0",
+    "levelup": "^1.0.0-4",
+    "leveldown": "^1.7.0-0",
     "libsodium-wrappers": "git+https://git@github.com/mitra42/libsodium.js.git",
     "multihashes": "^0.4.12",
     "node-fetch-npm": "^2.0.2",
@@ -20,6 +20,7 @@
     "y-array": "^10.1.4",
     "y-indexeddb": "^8.1.9",
     "y-ipfs-connector": "^1.4.0",
+    "y-leveldb": "0.0.1",
     "y-memory": "^8.0.9",
     "y-text": "^9.5.1",
     "yjs": "^12.3.3"

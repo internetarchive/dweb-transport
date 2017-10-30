@@ -91,17 +91,16 @@ class KeyPair extends SmartDict {
     }
 
 
-    p_store(verbose) {
+    async p_store(verbose) {
         if (this._url)
             return; // Already stored
         if (!this._publicurl && KeyPair._key_has_private(this._key)) { // Haven't stored a public version yet.
             let publickp = new KeyPair({key:this.publicexport()}, verbose);
-            publickp.p_store(verbose); // Returns immediately while storing async, _url is set
+            await publickp.p_store(verbose);
             this._publicurl = publickp._url;
         }
         return super.p_store(verbose)
     }
-
 
     preflight(dd) {
         /*

@@ -22,8 +22,11 @@ require('y-array')(Y);
 require('y-text')(Y);
 require('y-ipfs-connector')(Y);
 require('y-indexeddb')(Y);
-//require('y-leveldb')(Y); - can't be there for browser, node seems to find it ok without this, though not sure why..
+require('y-leveldb')(Y); //- can't be there for browser, node seems to find it ok without this, though not sure why..
 const Url = require('url');
+const dagPB = require('ipld-dag-pb');
+const DAGNode = dagPB.DAGNode; // So can check its type
+
 
 
 
@@ -39,7 +42,7 @@ const Dweb = require('./Dweb');
 //Debugging only
 
 let defaultipfsoptions = {
-    repo: '/tmp/ipfs_dweb20170908', //TODO-IPFS think through where, esp for browser
+    repo: '/tmp/ipfs_dweb20171029', //TODO-IPFS think through where, esp for browser
     //init: false,
     //start: false,
     //TODO-IPFS-Q how is this decentralized - can it run offline? Does it depend on star-signal.cloud.ipfs.team
@@ -227,11 +230,14 @@ class TransportIPFS extends Transport {
             if (verbose) console.log("Found Y for",url);
             return new Promise((resolve, reject) => resolve(this.yarrays[url]));
         } else {
-            if (verbose) console.log("Creating Y for",url);
             let options = Transport.mergeoptions(this.options.yarray, {connector: { room: url}}); // Copies options
+            if (verbose) console.log("Creating Y for",url,"options=",options);
             options.connector.ipfs = this.ipfs;
+            if (verbose) console.log("Creating Y for",url,"options=",options);
             return Y(options)
-                .then((y) => this.yarrays[url] = y);
+                .then((y) => {console.log("XXX@237"); return y;})
+                .then((y) => this.yarrays[url] = y)
+                .catch((err) => {console.log("Failed to initialize Y"); throw err;});
         }
     }
 
@@ -282,13 +288,14 @@ class TransportIPFS extends Transport {
         return new Promise(resolve => resolve(this.ipfs.isOnline() ? "IPFS Online" : "IPFS Offline"));
     }
 
-    url(data) {
+    url(data) { //TODO-IPFS-URL
         /*
          Return an identifier for the data without storing typically ipfs:/ipfs/a1b2c3d4...
 
          :param string|Buffer data   arbitrary data
          :return string              valid url to retrieve data via p_rawfetch
          */
+        throw new Error("url is obsoleted because cant figure out how to get it on IPFS pre-storage");
         return "ipfs:/ipfs/" + Dweb.KeyPair.multihashsha256_58(data)
     }
 
@@ -313,41 +320,53 @@ class TransportIPFS extends Transport {
         return new CID(arr[2])
     }
 
-    p_rawfetch(url, verbose) {
+    async p_rawfetch(url, verbose) {
         /*
-        Fetch some bytes based on a url, no assumption is made about the data in terms of size or structure.
+        Fetch some bytes based on a url of the form ipfs:/ipfs/Qm..... or ipfs:/ipfs/z....  .
+        No assumption is made about the data in terms of size or structure, nor can we know whether it was created with dag.put or ipfs add or http /api/v0/add/
+
         Where required by the underlying transport it should retrieve a number if its "blocks" and concatenate them.
         Returns a new Promise that resolves currently to a string.
-        There may also be need for a streaming version of this call, at this point undefined.
+        There may also be need for a streaming version of this call, at this point undefined since we havent (currently) got a use case..
+
+        TODO - there is still the failure case of short files like  ipfs/QmTds3bVoiM9pzfNJX6vT2ohxnezKPdaGHLd4Ptc4ACMLa
+        TODO - added with http /api/v0/add/ but unretrievable on a browser (it retrieves below in Node).
 
         :param string url: URL of object being retrieved
         :param boolean verbose: True for debugging output
-        :resolve string: Return the object being fetched, (note currently returned as a string, may refactor to return Buffer)
+        :resolve buffer: Return the object being fetched. (may in the future return a stream and buffer externally)
         :throws:        TransportError if url invalid - note this happens immediately, not as a catch in the promise
          */
-        if (verbose) console.log("IPFS p_rawfetch",url);
+        if (verbose) console.log("IPFS p_rawfetch", url);
         if (!url) throw new Dweb.errors.CodingError("TransportIPFS.p_rawfetch: requires url");
         let cid = (url instanceof CID) ? url : TransportIPFS.url2cid(url);  // Throws TransportError if url bad
-        //return this.promisified.ipfs.block.get(cid).then((result) => result.data) // OLD way, works below 250k bytes, where files.cat doesnt !
-        if (verbose) console.log("ipfs.files.cat",cid);
-        return this.ipfs.files.cat(cid)
-            .then((stream) => Dweb.utils.p_streamToBuffer(stream, verbose))
-            .then((data) => {   // Horrible Kludge - stream returns 0 length if short file not IPLD
-                if (data.length) {
-                    return data
-                } else {
-                    if (verbose) console.log("Kludge alert - files.cat failed, trying block.get");
-                    return this.promisified.ipfs.block.get(cid)
-                        .then((blk) => blk.data);
-                }
-            })
 
-            //.then((data)=> { if (verbose) console.log("fetched ",data.toString()); return data; })
-            .then((data)=> { if (verbose) console.log("fetched ",data.length); return data; })
-            .catch((err) => {
-                console.log("Caught misc error in TransportIPFS.p_rawfetch", err);
-                throw(err);
-            })
+        try {
+            let res = await this.ipfs.dag.get(cid);
+            if (res.remainderPath.length)
+                throw new Error("Not yet supporting paths in p_rawfetch"); //TODO-PATH
+            let buff;
+            if (res.value instanceof DAGNode) { // Its file or something added with the HTTP API for example, TODO not yet handling multiple files
+                //console.log("Case a or b" - we can tell the difference by looking at (res.value._links.length > 0) but dont need to
+                // as since we dont know if we are on node or browser best way is to try the file.get and if it fails try the block to get an approximate file);
+                // Works on Node, but fails on Chrome, cant figure out how to get data from the DAGNode otherwise (its the wrong size)
+                buff = await p_streamToBuffer(await this.ipfs.files.cat(cid), true);
+                if (buff.length === 0) {    // Hit the Chrome bug
+                    // This will get a file padded with ~14 bytes - 4 at front, 4 at end and cant find the other 6 !
+                    // but it seems to work for PDFs which is what I'm testing on.
+                    if (verbose) console.log("Kludge alert - files.cat fails in Chrome, trying block.get");
+                    let blk = await this.promisified.ipfs.block.get(cid)
+                    buff = blk.data;
+                }
+            } else { //c: not a file
+                buff = res.value;
+            }
+            if (verbose) console.log("fetched ", buff.length)
+            return buff;
+        } catch (err) {
+            console.log("Caught misc error in TransportIPFS.p_rawfetch");
+            throw err;
+        }
     }
 
     p_rawlist(url, verbose) {
@@ -460,9 +479,9 @@ class TransportIPFS extends Transport {
         console.assert(data, "TransportIPFS.p_rawstore: requires data");
         console.log('XXX@p_rawstore',data)
         let buf = (data instanceof Buffer) ? data : new Buffer(data);
-        return this.promisified.ipfs.block.put(buf).then((block) => block.cid)
+        //return this.promisified.ipfs.block.put(buf).then((block) => block.cid)
         //https://github.com/ipfs/interface-ipfs-core/blob/master/SPEC/DAG.md#dagput
-        //return this.ipfs.dag.put(buf,{ format: 'dag-cbor', hashAlg: 'sha2-256' })
+        return this.ipfs.dag.put(buf,{ format: 'dag-cbor', hashAlg: 'sha2-256' })
             .then((xxx) => { console.log(xxx.constructor.name, xxx); return xxx;})
             .then((cid) => TransportIPFS.cid2url(cid));
         //return this.ipfs.files.put(buf).then((block) => TransportIPFS.cid2url(block.cid));
@@ -520,6 +539,7 @@ class TransportIPFS extends Transport {
             try {
                 let urlqbf;
                 let qbf = "The quick brown fox";
+                let qbf_url = "ipfs:/ipfs/zdpuAscRnisRkYnEyJAp1LydQ3po25rCEDPPEDMymYRfN1yPK" // Expected url
                 let testurl = "1114";  // Just a predictable number can work with
                 let listlen;    // Holds length of list run intermediate
                 let cidmultihash;   // Store cid from first block in form of multihash
@@ -527,7 +547,7 @@ class TransportIPFS extends Transport {
                     .then((url) => {
                         if (verbose) console.log("rawstore returned", url);
                         let newcid = TransportIPFS.url2cid(url);  // Its a CID which has a buffer in it
-                        console.assert(url === transport.url(qbf),"url should match url from rawstore");
+                        console.assert(url === qbf_url,"url should match url from rawstore");
                         cidmultihash = url.split('/')[2];
                         let newurl = TransportIPFS.cid2url(newcid);
                         console.assert(url === newurl, "Should round trip");

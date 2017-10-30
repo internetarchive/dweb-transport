@@ -207,17 +207,16 @@ async function sandbox() {
     console.log("--------Sandbox");
     // Just a place to try things - dont expect them to work or make sense !
     m = "zdpuB2nDXFEoAMVCiKLLqrdHEqpdhvTD2qwtxymA3V9fAb68g";
-    console.log(new CID(m))
 }
 
 async function test_ipfs() {
     await p_ipfsstart(true);
-    //await sandbox();
-    await test_httpapi_short();     // No solution: *IPFS BUG* on files.cat; (work around also has bug of adding 14 bytes)
-    await test_httpapi_long();      // Works only on files.cat; Fails as expected on others
-    await test_block();             // Works on block.get; Fails *IPFS BUG REALLY BAD* on anything other than block.get
-    await test_dag_string();        // Works on dag.get; fails (as expected) on others
-    await test_dag_json();         // Works on dag.get; fails as expected on others
+    await sandbox();
+    //await test_httpapi_short();     // No solution: *IPFS BUG* on files.cat; (work around also has bug of adding 14 bytes)
+    //await test_httpapi_long();      // Works only on files.cat; Fails as expected on others
+    //await test_block();             // Works on block.get; Fails *IPFS BUG REALLY BAD* on anything other than block.get
+    //await test_dag_string();        // Works on dag.get; fails (as expected) on others
+    //await test_dag_json();         // Works on dag.get; fails as expected on others
 }
 
 test_ipfs()

@@ -103,8 +103,9 @@ Further examples will demonstrate using the lock.
 
 ## Installing a compilable version
 - Checkout the repository
-- If you haven't already, then install [npm](https://nodejs.org/en/download)
+- If you haven't already, then install [npm](https://nodejs.org/en/download) and upgrade node to Node 7 or later (for support of async/wait).
 - And on a Mac you'll need Xcode from the App store. 
+- No idea what you need on Windows (Please update this if you know)
 - Then install the dependencies: ```> npm install --dev```
 - Note that this gets a forked version of libsodium-wrappers from [Mitra's repository][https://github.com/mitra42/libsodium.js], 
 as the current libsodium-wrappers release doesn't have urlsafebase54.

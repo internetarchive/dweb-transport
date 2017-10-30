@@ -66,7 +66,7 @@ class TransportHTTP extends Transport {
         })
     }
 
-    url(data) {
+    url(data) { //TODO-IPFS-URL
         /*
          Return an identifier for the data without storing
 

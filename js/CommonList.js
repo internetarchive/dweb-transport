@@ -116,18 +116,17 @@ class CommonList extends SmartDict {
         return dd;
     }
 
-    p_fetchlist(verbose) {
+    async p_fetchlist(verbose) {
         /*
         Load the list from the Dweb,
         Use p_list_then_elements instead if wish to load the individual items in the list
         */
         let self = this;
-        if (!this._publicurl) this._p_storepublic(verbose); // Async, but sets _publicurl immediately
-        return this.transport().p_rawlist(this._publicurl, verbose)
-            .then((lines) => { // lines should be an array
-                if (verbose) console.log("CommonList:p_fetchlist.success", self._url, "len=", lines.length);
-                self._list = lines.map((l) => new Dweb.Signature(l, verbose));    // Turn each line into a Signature
-            })
+        if (!this._publicurl)
+            await this._p_storepublic(verbose);
+        let lines = await this.transport().p_rawlist(this._publicurl, verbose);   // lines should be an array
+        if (verbose) console.log("CommonList:p_fetchlist.success", self._url, "len=", lines.length);
+        self._list = lines.map((l) => new Dweb.Signature(l, verbose));    // Turn each line into a Signature
     }
 
     p_list_then_elements(verbose) {
@@ -143,45 +142,35 @@ class CommonList extends SmartDict {
                 .map((sig) => sig.p_fetchdata(verbose)))) // Return is array result of p_fetch which is array of new objs (suitable for storing in keys etc)
         }
 
-    _p_storepublic(verbose) {
+    async _p_storepublic(verbose) {
         // Build a copy of the data, then create a new !master version
-        let oo = Object.assign({}, this, {_master: false})
+        let oo = Object.assign({}, this, {_master: false});
         let ee = new this.constructor(this.preflight(oo), false, null, verbose);
-        ee.p_store(verbose); //Runs async, but returns immediately setting _url
+        await ee.p_store(verbose);
         this._publicurl = ee._url;
     }
 
-    OBS_p_storepublic(verbose) { // THis is the old version, has problem if not subclassed where it creates CommonList *and* that it ignores extra fields
-        /*
-         Store a public version of the object, just stores name field and public key
-         Typically subclassed to save specific fields
-         Note that this returns immediately after setting url, so caller may not need to wait for success
-         */
-        //CL(data, master, key, verbose, options)
-        let cl = new CommonList(null, false, this.keypair, verbose, {"name": this.name});
-        cl.p_store(verbose);    // Returns immediately but sets _url first
-        this._publicurl = cl._url;
+    stored() {
+        return (!this._master || this._publicurl) && ( (this._master && this.dontstoremaster) || super.stored())
+        return ( (!this._master && ( (this._master && this.dontstoremaster) || super.stored())  )  || ( ( this._publicurl && ( (this._master && this.dontstoremaster) || super.stored())  )
     }
-
-    p_store(verbose) {
+    async p_store(verbose) {
         /*
             Store on Dweb, if _master will ensure that stores a public version as well, and saves in _publicurl
             Will store master unless dontstoremaster is set.
          */
         if (this._master && ! this._publicurl) {
-            this._p_storepublic(verbose); //Stores asynchronously, but _publicurl set immediately
+            await this._p_storepublic(verbose);
         }
         if ( ! (this._master && this.dontstoremaster)) {
-            return super.p_store(verbose);    // Transportable.store(verbose)
-        } else {
-            return new Promise((resolve, reject)=> resolve(null));  // I think this should be a noop - fetched already
+            await super.p_store(verbose);    // Transportable.store(verbose)
         }
     }
 
     publicurl() { throw new Dweb.errors.ToBeImplementedError("Undefined function CommonList.publicurl"); }   // For access via web
     privateurl() { throw new Dweb.errors.ToBeImplementedError("Undefined function CommonList.privateurl"); }   // For access via web
 
-    p_push(obj, verbose ) {
+    async p_push(obj, verbose ) {
         /*
          Equivalent to Array.push but returns a promise because asynchronous
          Sign and store a object on a list, stores both locally on _list and sends to Dweb
@@ -194,30 +183,31 @@ class CommonList extends SmartDict {
         if (!obj) throw new Dweb.errors.CodingError("CL.p_push obj should never be non-empty");
         let self = this;
         let sig;
-        return this.p_store(verbose) // Make sure stored
-            .then(() => {if (typeof obj !== 'string') obj.p_store(verbose)} )
-            .then(() => {
-                if (!(self._master && self.keypair)) throw new Dweb.errors.ForbiddenError("Signing a new entry when not a master list");
-                let url = (typeof obj === 'string') ? obj : obj._url;
-                sig = self.sign(url, verbose);
-                sig.data = obj;         // Keep a copy of the signed obj on the sig, saves retrieving it again
-                self._list.push(sig);   // Keep copy locally on _list
-            })
-            .then(() => self.p_add(sig, verbose))    // Add to list in dweb
-            .then(() => sig);
+        await this.p_store(verbose); // Make sure stored
+        if (typeof obj !== 'string') {
+            await obj.p_store(verbose)
+        }
+        if (!(self._master && self.keypair))
+            throw new Dweb.errors.ForbiddenError("Signing a new entry when not a master list");
+        let url = (typeof obj === 'string') ? obj : obj._url;
+        sig = await p_self.sign(url, verbose);
+        sig.data = obj;                     // Keep a copy of the signed obj on the sig, saves retrieving it again
+        self._list.push(sig);               // Keep copy locally on _list
+        await self.p_add(sig, verbose);     // Add to list in dweb
+        return sig;
     }
 
-    sign(url, verbose) {
+    async p_sign(url, verbose) { //TODO-API
         /*
         Create a signature -
         Normally better to use p_push as stores signature and puts on _list and on Dweb
 
-        :param url:    URL of object to sign
+        :param url:    URL of object to sign    //TODO-URL-MULTI
         :returns:       Signature
         */
         if (!url) throw new Dweb.errors.CodingError("Empty url is a coding error");
         if (!this._master) throw new Dweb.errors.ForbiddenError("Must be master to sign something");
-        let sig = Dweb.Signature.sign(this, url, verbose); //returns a new Signature
+        let sig = await Dweb.Signature.p_sign(this, url, verbose); //returns a new Signature
         if (!sig.signature) throw new Dweb.errors.CodingError("Must be a signature");
         return sig
     }

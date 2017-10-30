@@ -35,7 +35,7 @@ class Transport {
         return this.urlschemes.includes(url.protocol.slice(0,-1))
     }
 
-    url(data) {
+    url(data) { //TODO-IPFS-URL
         /*
          Return an identifier for the data without storing
 
