@@ -35,9 +35,9 @@ class Transport {
         return this.urlschemes.includes(url.protocol.slice(0,-1))
     }
 
-    url(data) { //TODO-IPFS-URL
+    url(data) { //
         /*
-         Return an identifier for the data without storing
+         Return an identifier for the data without storing - note doesnt work on IPFS so shouldnt be used
 
          :param string|Buffer data   arbitrary data
          :return string              valid id to retrieve data via p_rawfetch
@@ -90,7 +90,7 @@ class Transport {
          */
         console.assert(false, "Intentionally undefined  function Transport.p_rawfetch should have been subclassed");
     }
-    p_fetch() { throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally Undefined function Transport.p_fetch - may define higher level semantics here (see Python)"); }
+    p_fetch() { throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_fetch - may define higher level semantics here (see Python)"); }
 
     p_rawadd(url, date, signature, signedby, verbose) {
         /*

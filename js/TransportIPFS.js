@@ -22,7 +22,7 @@ require('y-array')(Y);
 require('y-text')(Y);
 require('y-ipfs-connector')(Y);
 require('y-indexeddb')(Y);
-require('y-leveldb')(Y); //- can't be there for browser, node seems to find it ok without this, though not sure why..
+//require('y-leveldb')(Y); //- can't be there for browser, node seems to find it ok without this, though not sure why..
 const Url = require('url');
 const dagPB = require('ipld-dag-pb');
 const DAGNode = dagPB.DAGNode; // So can check its type
@@ -231,11 +231,10 @@ class TransportIPFS extends Transport {
             return new Promise((resolve, reject) => resolve(this.yarrays[url]));
         } else {
             let options = Transport.mergeoptions(this.options.yarray, {connector: { room: url}}); // Copies options
-            if (verbose) console.log("Creating Y for",url,"options=",options);
+            if (verbose) console.log("Creating Y for",url); //"options=",options);
+            //console.trace();
             options.connector.ipfs = this.ipfs;
-            if (verbose) console.log("Creating Y for",url,"options=",options);
             return Y(options)
-                .then((y) => {console.log("XXX@237"); return y;})
                 .then((y) => this.yarrays[url] = y)
                 .catch((err) => {console.log("Failed to initialize Y"); throw err;});
         }
@@ -288,7 +287,7 @@ class TransportIPFS extends Transport {
         return new Promise(resolve => resolve(this.ipfs.isOnline() ? "IPFS Online" : "IPFS Offline"));
     }
 
-    url(data) { //TODO-IPFS-URL
+    url(data) { //TODO need a way to get an URL from IPFS without storing, for now made sure no code calling this.
         /*
          Return an identifier for the data without storing typically ipfs:/ipfs/a1b2c3d4...
 
@@ -305,8 +304,6 @@ class TransportIPFS extends Transport {
         /*
         Convert a CID into a standardised URL e.g. ipfs:/ipfs/abc123
          */
-        console.log("XXX@cid2url",cid);
-
         return "ipfs:/ipfs/"+cid.toBaseEncodedString()
     }
 
@@ -331,6 +328,7 @@ class TransportIPFS extends Transport {
 
         TODO - there is still the failure case of short files like  ipfs/QmTds3bVoiM9pzfNJX6vT2ohxnezKPdaGHLd4Ptc4ACMLa
         TODO - added with http /api/v0/add/ but unretrievable on a browser (it retrieves below in Node).
+        TODO - see https://github.com/ipfs/interface-ipfs-core/issues/164 but since can't get acknowledgement from David that this is even an issue its unlikely to get fixed
 
         :param string url: URL of object being retrieved
         :param boolean verbose: True for debugging output
@@ -350,7 +348,7 @@ class TransportIPFS extends Transport {
                 //console.log("Case a or b" - we can tell the difference by looking at (res.value._links.length > 0) but dont need to
                 // as since we dont know if we are on node or browser best way is to try the file.get and if it fails try the block to get an approximate file);
                 // Works on Node, but fails on Chrome, cant figure out how to get data from the DAGNode otherwise (its the wrong size)
-                buff = await p_streamToBuffer(await this.ipfs.files.cat(cid), true);
+                buff = await Dweb.utils.p_streamToBuffer(await this.ipfs.files.cat(cid), true);
                 if (buff.length === 0) {    // Hit the Chrome bug
                     // This will get a file padded with ~14 bytes - 4 at front, 4 at end and cant find the other 6 !
                     // but it seems to work for PDFs which is what I'm testing on.
@@ -477,12 +475,10 @@ class TransportIPFS extends Transport {
         :resolve string: url of data stored
          */
         console.assert(data, "TransportIPFS.p_rawstore: requires data");
-        console.log('XXX@p_rawstore',data)
         let buf = (data instanceof Buffer) ? data : new Buffer(data);
         //return this.promisified.ipfs.block.put(buf).then((block) => block.cid)
         //https://github.com/ipfs/interface-ipfs-core/blob/master/SPEC/DAG.md#dagput
         return this.ipfs.dag.put(buf,{ format: 'dag-cbor', hashAlg: 'sha2-256' })
-            .then((xxx) => { console.log(xxx.constructor.name, xxx); return xxx;})
             .then((cid) => TransportIPFS.cid2url(cid));
         //return this.ipfs.files.put(buf).then((block) => TransportIPFS.cid2url(block.cid));
     }

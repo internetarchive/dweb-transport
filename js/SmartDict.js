@@ -1,8 +1,6 @@
 const Transportable = require("./Transportable");   //Superclass
 const Dweb = require("./Dweb");
 
-//TODO-IPFS change to go direct to Dag rather than Block - maybe by making Transport.p_store decide ?
-
 // See CommonBlock.py for Python version
 
 class SmartDict extends Transportable {
@@ -62,8 +60,8 @@ class SmartDict extends Transportable {
         let res = {};
         for (let i in dd) {
             if (i.indexOf('_') !== 0) { // Ignore any attributes starting _
-                if (dd[i] instanceof Transportable) { //TODO-IPFS-URL no longer trust this - generate error if not already stored
-                    dd[i].p_store(false);  // Stores async, but sets url first if you need it stored first then do so before calling p_store
+                if (dd[i] instanceof Transportable) {
+                    if (!dd[i].stored()) throw new Dweb.errors.CodingError("Should store subobjects before calling preflight");
                     res[i] = dd[i]._url
                 } else {
                     res[i] = dd[i];

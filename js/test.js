@@ -21,7 +21,7 @@ htmlfake = '<!DOCTYPE html><ul><li id="myList.0">Failed to load sb via Structure
 const dom = new JSDOM(htmlfake);
 document = dom.window.document;   // Note in JS can't see "document" like can in python
 
-let verbose = true;
+let verbose = false;
 let sb;
 let acl;
     // Note that this test setup is being mirror in test_ipfs.html
@@ -35,12 +35,11 @@ let acl;
     }, verbose) // Note browser requires indexeddb
     .then(() => { if (verbose) console.log("setup returned and transport set - including annoationList"); })
     .then(() => transportclass.test(Dweb.transport(), verbose))
-    .then(() => verbose=true)
     .then(() => Dweb.Block.test(verbose))
     .then(() => Dweb.Signature.p_test(verbose))
     .then(() => Dweb.KeyPair.test(verbose))
     .then(() => Dweb.AccessControlList.p_test(verbose))
-    .then((newacl) => acl = newacl)
+        .then((newacl) => acl = newacl)
     //TODO-REL4 comment out before REL4
     //* - tests for later modules
     .then(() => Dweb.StructuredBlock.test(document, verbose))

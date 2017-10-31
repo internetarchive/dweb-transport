@@ -44,7 +44,7 @@ class Transportable {
     stored() {  // Check if stored
         return this._url ? true : false
     }
-    p_store(verbose) {    // Python has a "data" parameter to override this._data but probably not needed //TODO-IPFS make sure callers not using _url before stored
+    async p_store(verbose) {    // Python has a "data" parameter to override this._data but probably not needed //TODO-IPFS make sure callers not using _url before stored
         /*
         Store the data on Dweb, if it hasn’t already been.
 
@@ -52,21 +52,13 @@ class Transportable {
         Resolves to	string: url of data stored
          */
         if (this.stored())
-            return new Promise((resolve, reject)=> resolve(this));  // Noop if already stored, use dirty() if change after retrieved
+            return this;  // Noop if already stored, use dirty() if change after retrieved
         let data = this._getdata();
         if (verbose) console.log("Transportable.p_store data=", data);
-        this._url = this.transport().url(data); //TODO-IPFS-URL //store the url since the HTTP is async (has form "ipfs:/ipfs/xyz123" or "BLAKE2.xyz123" //TODO-IPFS-URL needs to set from result and not be used by caller
-        if (verbose) console.log("Transportable.p_store url=", this._url);
         let self = this;
-        return this.transport().p_rawstore(data, verbose)
-            .then((msg) => {
-                //if (msg !== self._url) {
-                if (false) { //TODO match URLs but only match bottom half e.g. localhost:4243 -> sandbox.dweb.me:80 is fine
-                    console.log("Transportable.p_store: ERROR URL returned ",msg,"doesnt match url expected",self._url);
-                    throw new Dweb.errors.TransportError("URL returned "+msg+" doesnt match url expected "+self._url)
-                }
-                return(msg); // Note this will be a return from the promise.
-            }) // Caller should handle error and success
+        this._url = await this.transport().p_rawstore(data, verbose);   //TODO-URLMULTI make this an array
+        if (verbose) console.log("Transportable.p_store url=", this._url);
+        return this;
     }
 
     dirty() {

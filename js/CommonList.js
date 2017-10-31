@@ -138,8 +138,10 @@ class CommonList extends SmartDict {
         let self=this;
         return this.p_fetchlist(verbose)
             .then(() => self.listmonitor(verbose))  // Track any future objects  - will call event Handler on any added
-            .then(() => Promise.all(Dweb.Signature.filterduplicates(self._list) // Dont load multiple copies of items on list (might need to be an option?)
-                .map((sig) => sig.p_fetchdata(verbose)))) // Return is array result of p_fetch which is array of new objs (suitable for storing in keys etc)
+            .then(() => Promise.all(
+                Dweb.Signature.filterduplicates(self._list) // Dont load multiple copies of items on list (might need to be an option?)
+                .map((sig) => sig.p_fetchdata(verbose))
+            )) // Return is array result of p_fetch which is array of new objs (suitable for storing in keys etc)
         }
 
     async _p_storepublic(verbose) {
@@ -151,8 +153,7 @@ class CommonList extends SmartDict {
     }
 
     stored() {
-        return (!this._master || this._publicurl) && ( (this._master && this.dontstoremaster) || super.stored())
-        return ( (!this._master && ( (this._master && this.dontstoremaster) || super.stored())  )  || ( ( this._publicurl && ( (this._master && this.dontstoremaster) || super.stored())  )
+        return (!this._master || this._publicurl) && ((this._master && this.dontstoremaster) || super.stored())
     }
     async p_store(verbose) {
         /*
@@ -190,7 +191,7 @@ class CommonList extends SmartDict {
         if (!(self._master && self.keypair))
             throw new Dweb.errors.ForbiddenError("Signing a new entry when not a master list");
         let url = (typeof obj === 'string') ? obj : obj._url;
-        sig = await p_self.sign(url, verbose);
+        sig = await self.p_sign(url, verbose);
         sig.data = obj;                     // Keep a copy of the signed obj on the sig, saves retrieving it again
         self._list.push(sig);               // Keep copy locally on _list
         await self.p_add(sig, verbose);     // Add to list in dweb

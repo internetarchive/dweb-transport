@@ -82,8 +82,8 @@ class StructuredBlock extends SmartDict {
     file() { throw new Dweb.errors.ToBeImplementedError("Undefined function StructuredBlock.file"); }
     size() { throw new Dweb.errors.ToBeImplementedError("Undefined function StructuredBlock.size"); }
 
-    /* OBS - moved into MB.p_signandstore
-    sign(commonlist, verbose) { //TODO-IPFS-URL2 this is now async  check callers
+    /* OBS - moved into MB.p_signandstore remove Dec2017
+    async p_sign(commonlist, verbose) {
         /-*
          Add a signature to a StructuredBlock and add it to a list
          Note if the SB has a _acl field it will be encrypted first, then the url of the encrypted block used for signing.
@@ -93,7 +93,7 @@ class StructuredBlock extends SmartDict {
         //TODO should probaly disable storage here, and do assertion OR make it p_sign , either way avoids a race.
         //if (!this._url) this.p_store(verbose);  // Sets _url immediately which is needed for signatures
         //if (!commonlist._publicurl) commonlist.p_store(verbose);    // Set _publicurl immediately (required for Signature.sign)
-        let sig = super.sign(commonlist, verbose);  // Checks this, and commonlist are stored //TODO-IPFS-URL2 this is now async
+        let sig = await super.p_sign(commonlist, verbose);  // Checks this, and commonlist are stored
         this._signatures.push(sig);
         return sig;  // so that CommonList can add to _list
     }

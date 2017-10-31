@@ -66,7 +66,7 @@ class TransportHTTP extends Transport {
         })
     }
 
-    url(data) { //TODO-IPFS-URL
+    url(data) { // For now made sure no code calling this because TransportIPFS cant generate URL before storing
         /*
          Return an identifier for the data without storing
 

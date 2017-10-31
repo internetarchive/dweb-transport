@@ -56,12 +56,12 @@ class AccessControlList extends CommonList {
         if ((!this._master) && this.keypair._key.sign.publicKey) {
             dd["publickey"] = dd.publickey || dd.keypair.publicexport();   // Store publickey for verification
         }
-        if (!dd._master)  delete dd.accesskey   // Dont store the accesskey on the public version
+        if (!dd._master)  delete dd.accesskey;   // Dont store the accesskey on the public version
         // Super has to come after above as overrights keypair, also cant put in CommonList as MB's dont have a publickey and are only used for signing, not encryption
         return super.preflight(dd);
     }
 
-    p_add_acle(viewerpublicurl, data, verbose) {
+    async p_add_acle(viewerpublicurl, data, verbose) {
         /*
         Add a new ACL entry - that gives a viewer the ability to see the accesskey of this URL
 
@@ -73,16 +73,16 @@ class AccessControlList extends CommonList {
         if (!this._master) {
             throw new Dweb.errors.ForbiddenError("Cant add viewers to a public copy of an ACL");
         }
-        return Dweb.SmartDict.p_fetch(viewerpublicurl, verbose) // Fetch the public key will be KeyPair
+        let viewerpublickeypair = await Dweb.SmartDict.p_fetch(viewerpublicurl, verbose); // Fetch the public key will be KeyPair
             // Create a new ACLE with access key, encrypted by publickey
-            .then((viewerpublickeypair) => new SmartDict({
+        let acle = new SmartDict({
                     //Need to go B64->binary->encrypt->B64
                     "token": viewerpublickeypair.encrypt(Dweb.KeyPair.b64dec(self.accesskey), true, self),
                     "viewer": viewerpublicurl,
                     "name": data["name"]
-                }, verbose) //data,verbose
-            )
-            .then((acle) => { self.p_push(acle, verbose); return acle;})
+                }, verbose); //data,verbose
+        await self.p_push(acle, verbose);
+        return acle;
     }
 
     p_tokens(verbose) { //TODO-BACKPORT
@@ -105,7 +105,7 @@ class AccessControlList extends CommonList {
         :throws:    CodingError if not yet fetched
         */
 
-        if (verbose) console.log("AccessControlList.tokens decrypt=",decrypt);
+        if (verbose) console.log(`ACL._findtokens viewerkeypair=${viewerkeypair}, decrypt=${decrypt}`);
         let viewerurl = viewerkeypair._url;
         if (! this._list.length) { return []}
         let toks = this._list
@@ -114,6 +114,7 @@ class AccessControlList extends CommonList {
         if (decrypt) {  // If requested, decrypt each of them
             toks = toks.map((tok) => viewerkeypair.decrypt(tok, this, "uint8array"));
         }
+        if (verbose) console.log(`ACL._findtokens found ${toks.length}`);
         return toks;
     }
 
@@ -155,20 +156,7 @@ class AccessControlList extends CommonList {
         throw new Dweb.errors.AuthenticationError("ACL.decrypt: No valid keys found");
     };
 
-    OBS_p_storepublic(verbose) { //TODO remove, its same as new CL._p_storepublic
-        /*
-        Store a public version of the ACL - should not include accesskey, or privatekey
-        Note - does not return a promise, the store is happening in the background
-        Sets _publicurl to the URL stored under.
-        */
-        if (verbose) console.log("AccessControlList._p_storepublic");
-        //AC(data, master, key, verbose, options) {
-        let acl = new AccessControlList({"name": this.name}, false, this.keypair, verbose, {});
-        acl.p_store(verbose); // Async, but will set _url immediately
-        this._publicurl = acl._url;  //returns immediately with precalculated url
-    }
-
-    static p_decryptdata(value, verbose) {
+    static async p_decryptdata(value, verbose) {
         /*
          Takes a dict,
          checks if encrypted (by presence of "encrypted" field, and returns immediately if not
@@ -182,31 +170,34 @@ class AccessControlList extends CommonList {
          :return: data or promise that resolves to data
          :throws: AuthenticationError if cannot decrypt
          */
-        if (! value.encrypted) {
-            return value;
-        } else {
-            if (verbose) console.log("ACL.p_decryptdata");
-            let aclurl = value.acl;
-            let kc = Dweb.KeyChain.keychains_find({_publicurl: aclurl});  // Matching KeyChain or None
-            if (kc) {
-                return Dweb.transport().loads(kc.decrypt(value.encrypted, verbose)); // DecryptionFailError - unlikely since publicurl matches
+        try {
+            if (!value.encrypted) {
+                return value;
             } else {
-                // TODO-AUTHENTICATION probably add person - to - person version
-                let acl;
-                return Dweb.SmartDict.p_fetch(aclurl, verbose) // Will be AccessControlList
-                    .then((newacl) => acl = newacl)
-                    .then(() => console.log("XXX@p_decryptdata acl=",acl))
-                    .then(() => {
-                        if (acl instanceof Dweb.KeyChain) {
-                            // Typically its encrypted, but user not logged in - will be public KC
-                            throw new Dweb.errors.AuthenticationError(`Must be logged in as ${acl.name}`);
-                        }
-                    })
-                    .then(() => acl.p_tokens(verbose)) // Will load blocks in sig as well
-                    .then(() => acl.decrypt(value.encrypted, null, verbose))  // Resolves to data or throws AuthentictionError
-                    .then((data) => Dweb.transport().loads(data))
-                    .catch((err) => { console.log("Unable to decrypt:",value); throw(err);});
+                if (verbose) console.log("ACL.p_decryptdata of:",value);
+                let aclurl = value.acl;
+                let kc = Dweb.KeyChain.keychains_find({_publicurl: aclurl});  // Matching KeyChain or None
+                if (kc) {
+                    if (verbose) console.log("ACL.p_decryptdata: found matching KeyChain")
+                    return Dweb.transport().loads(kc.decrypt(value.encrypted, verbose)); // DecryptionFailError - unlikely since publicurl matches
+                } else {
+                    // TODO-AUTHENTICATION probably add person - to - person version
+                    if (verbose) console.log("ACL.p_decryptdata: fetching ACL:",aclurl);
+                    let acl = await Dweb.SmartDict.p_fetch(aclurl, verbose); // Will be AccessControlList
+                    if (verbose) console.log("ACL.p_decryptdata: fetched ACL:",acl);
+                    if (acl instanceof Dweb.KeyChain) {
+                        if (verbose) console.log(`ACL.p_decryptdata: encrypted with KC name=${acl.name}, but not logged in`);
+                        throw new Dweb.errors.AuthenticationError(`Must be logged in as ${acl.name}`);
+                    }
+                    if (verbose) console.log("ACL.p_decryptdata: fetching ACL tokens");
+                    await acl.p_tokens(verbose); // Will load blocks in sig as well
+                    if (verbose) console.log("ACL.p_decryptdata: fetched ACL tokens",acl._list.map((sig) => sig.data) );
+                    return Dweb.transport().loads(acl.decrypt(value.encrypted, null, verbose));  // Resolves to data or throws AuthentictionError
+                }
             }
+        } catch(err) {
+            console.log("Unable to decrypt:",value);
+            throw(err);
         }
     }
 

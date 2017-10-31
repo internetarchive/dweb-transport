@@ -1,6 +1,8 @@
 const CommonList = require("./CommonList");  // Superclass
 const Dweb = require("./Dweb");
 
+function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { resolve(val); },ms)})}
+
 class KeyChain extends CommonList {
     /*
     KeyChain extends CommonList to store a users keys, MutableBlocks and AccessControlLists
@@ -26,7 +28,7 @@ class KeyChain extends CommonList {
         resolves to:    KeyChain created
          */
         let kc = new KeyChain(data, true, key, verbose);
-        return kc.p_store(verbose) // Dont need to wait on store to load and fetchlist but will do so to avoid clashes
+        return kc.p_store(verbose)
             .then(() => KeyChain.addkeychains(kc))
             .then(() => kc.p_list_then_elements(verbose))
             .then(() => kc)
@@ -98,19 +100,6 @@ class KeyChain extends CommonList {
         return Dweb.keychains.length ? Dweb.keychains[Dweb.keychains.length-1] : undefined;
     }
 
-    OBS_p_storepublic(verbose) { //TODO delete Dec2017 taken care of by new CL._p_storepublic
-        /*
-        Subclasses CommonList._storepublic
-        Store a publicly viewable version of KeyChain - note the keys should be encrypted
-        Note - does not return a promise, the store is happening in the background
-        Sets this_publicurl to the URL of this stored version.
-        */
-        if (verbose) console.log("KeyChain._p_storepublic");
-        let kc = new KeyChain({name: this.name}, false, this.keypair, verbose);
-        kc.p_store(verbose); // Async, but will set _url immediately
-        this._publicurl = kc._url;  //returns immediately with precalculated url
-    }
-
     p_store(verbose) {
         /*
         Unlike other p_store this ONLY stores the public version, and sets the _publicurl, on the assumption that the private key of a KeyChain should never be stored.
@@ -144,103 +133,74 @@ class KeyChain extends CommonList {
     }
 
 
-    static p_test(acl, verbose) {
+    static async p_test(acl, verbose) {
         /* Fairly broad test of AccessControlList and KeyChain */
         if (verbose) console.log("KeyChain.test");
+        let testasync = false;  // Set to true to wait between chunks to check for async functions that haven't been await-ed
         console.assert(Dweb.MutableBlock, "KeyChain.p_test depends on Mutable Block, although KeyChain itself doesnt");
-        return new Promise((resolve, reject) => {
-            try {
-                // Set mnemonic to value that generates seed "01234567890123456789012345678901"
-                const mnemonic = "coral maze mimic half fat breeze thought champion couple muscle snack heavy gloom orchard tooth alert cram often ask hockey inform broken school cotton"; // 32 byte
-        // Test sequence extracted from test.py
-        const qbf="The quick brown fox ran over the lazy duck";
-        const vkpname="test_keychain viewerkeypair";
-        let kc, mb, mblockm, mbmaster, mbm3, mm, sb, viewerkeypair;
-        const keypairexport =  "NACL SEED:w71YvVCR7Kk_lrgU2J1aGL4JMMAHnoUtyeHbqkIi2Bk="; // So same result each time
-        if (verbose) {
-            console.log("Keychain.test 0 - create");
-        }
-        KeyChain.p_new({name: "test_keychain kc" },{mnemonic: mnemonic}, verbose)    //Note in KEYCHAIN 4 we recreate exactly same way.
-            .then((kc1) => {
-            kc = kc1;
-        if (verbose) console.log("KEYCHAIN 1 - add MB to KC");
-    })
-    .then(() => Dweb.MutableBlock.p_new(kc, null, "test_keychain mblockm", true, qbf, true, verbose)) //acl, contentacl, name, _allowunsafestore, content, signandstore, verbose, options
-    .then((mbm) => {mbmaster=mbm;  kc.p_push(mbmaster, verbose)})   //Sign and store on KC's list (returns immediately with Sig)
-    .then(() => {
+        try {
+            // Set mnemonic to value that generates seed "01234567890123456789012345678901"
+            const mnemonic = "coral maze mimic half fat breeze thought champion couple muscle snack heavy gloom orchard tooth alert cram often ask hockey inform broken school cotton"; // 32 byte
+            // Test sequence extracted from test.py
+            const qbf = "The quick brown fox ran over the lazy duck";
+            const vkpname = "test_keychain viewerkeypair";
+            const keypairexport = "NACL SEED:w71YvVCR7Kk_lrgU2J1aGL4JMMAHnoUtyeHbqkIi2Bk="; // So same result each time
+            if (verbose) console.log("Keychain.test 0 - create");
+            let kc = await KeyChain.p_new({name: "test_keychain kc"}, {mnemonic: mnemonic}, verbose);    //Note in KEYCHAIN 4 we recreate exactly same way.
+            if (verbose) console.log("KEYCHAIN 1 - add MB to KC");
+            let mbmaster = await Dweb.MutableBlock.p_new(kc, null, "test_keychain mblockm", true, qbf, true, verbose); //acl, contentacl, name, _allowunsafestore, content, signandstore, verbose, options
+            await kc.p_push(mbmaster, verbose);   //Sign and store on KC's list (returns immediately with Sig)
+            if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
             if (verbose) console.log("KEYCHAIN 2 - add viewerkeypair to it");
-        viewerkeypair = new Dweb.KeyPair({name: vkpname, key: keypairexport}, verbose);
-        viewerkeypair._acl = kc;
-        viewerkeypair.p_store(verbose); // Defaults to store private=True (which we want)   // Sets url, dont need to wait for it to store
-    })
-    .then(() =>  kc.p_push(viewerkeypair, verbose))
-    .then(() => {
+            let viewerkeypair = new Dweb.KeyPair({name: vkpname, key: keypairexport}, verbose);
+            viewerkeypair._acl = kc;
+            await viewerkeypair.p_store(verbose); // Defaults to store private=True (which we want)
+            await kc.p_push(viewerkeypair, verbose);
+            if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
             if (verbose) console.log("KEYCHAIN 3: Fetching mbm url=", mbmaster._url);
-        return Dweb.SmartDict.p_fetch(mbmaster._url, verbose); //Will be MutableBlock
-    })
-    .then((mbm2) => console.assert(mbm2.name === mbmaster.name, "Names should survive round trip",mbm2.name,"!==",mbmaster.name))
-    .then(() => {
+            let mbm2 = await Dweb.SmartDict.p_fetch(mbmaster._url, verbose); //Will be MutableBlock
+            console.assert(mbm2.name === mbmaster.name, "Names should survive round trip", mbm2.name, "!==", mbmaster.name);
+            if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
             if (verbose) console.log("KEYCHAIN 4: reconstructing KeyChain and fetch");
-        Dweb.keychains = []; // Clear Key Chains
-    })
-        //p_new(data, key, verbose)
-    .then(() => KeyChain.p_new({name: "test_keychain kc"},{mnemonic: mnemonic}, verbose))
-        // Note success is run AFTER all keys have been loaded
-    .then(() => {
-        mm = KeyChain.mykeys(Dweb.MutableBlock);
-        console.assert(mm.length, "Should find mblockm");
-        mbm3 = mm[mm.length - 1];
-        console.assert(mbm3 instanceof Dweb.MutableBlock, "Should be a mutable block", mbm3);
-        console.assert(mbm3.name === mbmaster.name, "Names should survive round trip");
-    })
-    .then(() => {
+            Dweb.KeyChain.logout();     // Clear Key Chains
+            //p_new(data, key, verbose)
+            await KeyChain.p_new({name: "test_keychain kc"}, {mnemonic: mnemonic}, verbose);
+            // Note success is run AFTER all keys have been loaded
+            let mm = KeyChain.mykeys(Dweb.MutableBlock);
+            console.assert(mm.length, "Should find mblockm");
+            let mbm3 = mm[mm.length - 1];
+            console.assert(mbm3 instanceof Dweb.MutableBlock, "Should be a mutable block", mbm3);
+            console.assert(mbm3.name === mbmaster.name, "Names should survive round trip");
+            if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
             if (verbose) console.log("KEYCHAIN 5: Check can user ViewerKeyPair");
-        // Uses acl passed in from AccessControlList.acl
-        acl._allowunsafestore = true;
-    })
-    .then(() => acl.p_add_acle(viewerkeypair._url, {"name":"my token"}, verbose))   //Add us as viewer - resolves to tok
-    .then(() => {
-            console.assert("acl._list.length === 1", "Should have added exactly 1 viewerkeypair",acl);
-        sb = new Dweb.StructuredBlock({"name": "test_sb", "data": qbf, "_acl": acl}, verbose); //url,data,verbose
-    })
-    .then(() => sb.p_store(verbose))
-    .then(() => {
+            // Uses acl passed in from AccessControlList.acl
+            acl._allowunsafestore = true;
+            await acl.p_add_acle(viewerkeypair._url, {"name": "my token"}, verbose);   //Add us as viewer - resolves to tok
+            console.assert("acl._list.length === 1", "Should have added exactly 1 viewerkeypair", acl);
+            let sb = new Dweb.StructuredBlock({"name": "test_sb", "data": qbf, "_acl": acl}, verbose); //url,data,verbose
+            await sb.p_store(verbose);
+            if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
             let mvk = KeyChain.mykeys(Dweb.KeyPair);
             if (mvk[0].name !== vkpname) throw new Dweb.errors.CodingError("Should find viewerkeypair stored above");
-        if (verbose) console.log("KEYCHAIN 6: Check can fetch and decrypt - should use viewerkeypair stored above");
-        return Dweb.SmartDict.p_fetch(sb._url, verbose); // Will be StructuredBlock, fetched and decrypted
-    })
-    .then((sb2) => {
+            if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
+            if (verbose) console.log("KEYCHAIN 6: Check can fetch and decrypt - should use viewerkeypair stored above");
+            let sb2 = await Dweb.SmartDict.p_fetch(sb._url, verbose); // Will be StructuredBlock, fetched and decrypted
             if (sb2.data !== qbf) throw new Dweb.errors.CodingError("Data should survive round trip");
-        if (verbose) console.log("KEYCHAIN 7: Check can store content via an MB");
-        //MB.new(acl, contentacl, name, _allowunsafestore, content, signandstore, verbose)
-    })
-    .then(() => Dweb.MutableBlock.p_new(null, acl, "mblockm", true, qbf, true, verbose))
-    .then((newmblockm) => {
-            mblockm = newmblockm;
-        //data, master, key, contenturl, contentacl, verbose, options
-        return Dweb.SmartDict.p_fetch(mblockm._publicurl, verbose); // Will be MutableBlock
-    })
-    .then((newpublicmb) => mb = newpublicmb)
-    .then(() => mb.p_list_then_current(verbose))
-    .then(() => {
+            if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
+            if (verbose) console.log("KEYCHAIN 7: Check can store content via an MB");
+            //MB.new(acl, contentacl, name, _allowunsafestore, content, signandstore, verbose)
+            let mblockm = await Dweb.MutableBlock.p_new(null, acl, "mblockm", true, qbf, true, verbose);
+            //data, master, key, contenturl, contentacl, verbose, options
+            let mb = await Dweb.SmartDict.p_fetch(mblockm._publicurl, verbose); // Will be MutableBlock
+            await mb.p_list_then_current(verbose);
             if (mb.content() !== qbf) throw new Dweb.errors.CodingError("Data should round trip through ACL");
-    })
-
-    .then(() => {
             if (verbose) console.log("KeyChain.test promises complete");
-        //console.log("KeyChain.test requires more tests defined");
-        resolve({kc: kc, mbmaster: mbmaster});
-    })
-    .catch((err) => {
-            console.log("Error in KeyChain.p_test", err);   // Log since maybe "unhandled" if just throw
-        reject(err);
-    })
-    } catch (err) {
+            //console.log("KeyChain.test requires more tests defined");
+            return {kc: kc, mbmaster: mbmaster};
+        } catch (err) {
             console.log("Caught exception in KeyChain.p_test", err);
             throw err;
         }
-    })
     }
 }
 
