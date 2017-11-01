@@ -18,7 +18,7 @@
             }
         }
         function p_submit_searchbox_doisearch(dict) {
-            let url = `https://scholar.archivelab.org/search?q=${dict.name}`
+            let url = `https://scholar.archivelab.org/search?boost_fulltext=true&q=${dict.name}`
             console.log("p_submit_searchbox: ---", dict, "fetching", url);
             return p_httpget(url, {Accept: "application/json"})
                 .then((json) => { if (verbose) console.log(json); return json } )
