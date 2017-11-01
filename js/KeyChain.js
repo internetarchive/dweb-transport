@@ -20,34 +20,37 @@ class KeyChain extends CommonList {
         this.table = "kc";
     }
 
-    static p_new(data, key, verbose) {
+    static async p_new(data, key, verbose) {
         /*
         Create a new KeyChain object based on a new or existing key.
         Store and add to the Dweb.keychains, list any elements already on the KeyChain (relevant for existing keys)
         data, key:  See CommonList for parameters
         resolves to:    KeyChain created
          */
-        let kc = new KeyChain(data, true, key, verbose);
-        return kc.p_store(verbose)
-            .then(() => KeyChain.addkeychains(kc))
-            .then(() => kc.p_list_then_elements(verbose))
-            .then(() => kc)
-            // Note kc returned from promise NOT from p_new so have to catch in a ".then"
+            let kc = new KeyChain(data, true, key, verbose);
+            await kc.p_store(verbose);
+            KeyChain.addkeychains(kc);
+            await kc.p_list_then_elements(verbose);
+            return kc;
     }
 
     keytype() { return Dweb.KeyPair.KEYTYPESIGNANDENCRYPT; }  // Inform keygen
 
-    p_list_then_elements(verbose) {
+    async p_list_then_elements(verbose) {
         /*
         Subclasses CommonList to store elements in a _keys array.
 
         resolves to:    Array of KeyPair
+        throws: AuthenticationError if cant decrypt keys
          */
-        let self = this;
-        return super.p_list_then_elements(verbose)
-            .then((keys) => self._keys = keys)
-            .then(() => { if (verbose) console.log("KC.p_list_then_elements Got keys", ...Dweb.utils.consolearr(self._keys))})
-            .then(() => self._keys)
+        try {
+            this._keys = await super.p_list_then_elements(verbose);
+            if (verbose) console.log("KC.p_list_then_elements Got keys", ...Dweb.utils.consolearr(this._keys))
+            return this._keys;
+        } catch(err) {
+            console.log("KeyChains.p_list_then_elements: Unable to retrieve keys", err);
+            throw(err);
+        }
     }
 
     encrypt(data, b64) {
@@ -116,7 +119,7 @@ class KeyChain extends CommonList {
         :param dict:    dictionary to check against the keychain (see CommonList.match() for interpretation
         :return:        AccessControlList or KeyChain or null
         */
-        return Dweb.keychains.find((kc) => kc.match(dict))  // Returns undefined if none match or keychains is empty
+        return Dweb.keychains.find((kc) => kc.match(dict))  // Returns undefined if none match or keychains is empty, else first match
     }
 
     static mykeys(clstarget) {

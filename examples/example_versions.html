@@ -18,13 +18,16 @@
             <!--VersionList(data, master, keypair, keygen, mnemonic, verbose, options)-->
             //TODO require logged in, and immediately secure
             //TODO replace {passphrase:  with {keygen: true}
+            console.log("XXX@21 dict=",dict)
             let obj;
             dict._allowunsafestore = true; //TODO remove _allowunsafestore once secured
             Dweb.VersionList.p_new(dict, true, {passphrase: "TODO-REPLACE"}, verbose)
                 .then((o) => obj=o)
+                .then(() => console.log("XXX@nvl.25 obj contentacl should be defined=",obj.contentacl))
                 .then(() => obj.p_store(verbose))
             // Now re fetch it from Dweb and display the object
                 .then(() => {
+                    console.log("XXX@nvl30 ",{textarea: "", _acl: obj.contentacl})
                     obj._working = new obj._entryclass({textarea: "", _acl: obj.contentacl});
                     tinyMCE.activeEditor.setContent(obj._working.textarea); // Set actual MCE editing text
                     tinyMCE.activeEditor.setDirty(true);                    // Allow saving this restored text
@@ -154,15 +157,13 @@
         Note working version has not been published
     List of Versions
         Selecting one of the versions loads Current with it.
-
-    TODO-PUB add lock editing etc here OR link to page where can
     TODO-PUB make sure list added to KeyChains, allow visibility and selection
 -->
 
 <!-- Way to create new list -->
 <form method="post" style="display:inline" id="newform" onsubmit="newversionlist(this); return false;">
     <input class="propval" type="text" name="name" placeholder="Name of new version list" size="70" value="foo bar"/><!--TODO remove placeholder foo bar-->
-    <input class="propval" type="text" name="contentacl" value="https://gateway.dweb.me:443/contenthash/rawfetch/QmUf7SFHv3RPgfhjCf45WnJ8zqkJjAkGbDVirFp5P4PqNU"/><!--TODO replace with drop down of ACLs--><!--TODO remove value after testing-->
+    <input class="propval" type="text" name="contentacl" value="https://gateway.dweb.me/content/rawfetch/Qmd1Ymhc52Hq8gayKiadeCtrHk7xZmqtbNMJgoUj384vyy"/><!--TODO replace with drop down of ACLs--><!--TODO remove value after testing-->
     <input class="button" type="submit" value="Create"/>
 </form>
 <!-- Meta info about the list -->
@@ -199,12 +200,11 @@ TODO
     .then(() => {
         // Any code you want to run once online goes here.
         var url = searchparams.get("url");   //TODO determine what to do with parms in url
-        // starteditor();
+        starteditor();
     })
-    //.then(() => _login({name: "Mary Smith", passphrase: "had a little lamb"}))
-    .then(() =>Dweb.transport("ipfs:/ipfs/QmPojzKmxqngapSH8Gjd25fCiaDScHnawNcdt42TB48zfi").p_rawfetch("ipfs:/ipfs/QmPojzKmxqngapSH8Gjd25fCiaDScHnawNcdt42TB48zfi", true))
-    //.then(() =>Dweb.transport("ipfs:/ipfs/QmWR4F6sDRM7TVHBK3LVF785ibNJ1PUTdh1SRrF2qb3WJk").p_rawfetch("ipfs:/ipfs/QmWR4F6sDRM7TVHBK3LVF785ibNJ1PUTdh1SRrF2qb3WJk", true))
-    //.then(() => newversionlist("newform"))
+    .then(() => _login({name: "Mary Smith", passphrase: "had a little lamb"}))
+    .then(() => newversionlist("newform"))
+    .then(() => console.log("==Login should have finished-== output after here implies async issue ==="))
     .catch((err) => { console.log("App Error:",err); alert(err.message); });
 </script>
 </body>

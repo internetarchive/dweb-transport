@@ -176,6 +176,8 @@ class AccessControlList extends CommonList {
             } else {
                 if (verbose) console.log("ACL.p_decryptdata of:",value);
                 let aclurl = value.acl;
+                console.log("XXX@ACL.p_decryptdata aclurl = ",aclurl);
+                console.log("XXX@ACL.p_decryptata keychains=",Dweb.keychains);
                 let kc = Dweb.KeyChain.keychains_find({_publicurl: aclurl});  // Matching KeyChain or None
                 if (kc) {
                     if (verbose) console.log("ACL.p_decryptdata: found matching KeyChain")
@@ -196,7 +198,7 @@ class AccessControlList extends CommonList {
                 }
             }
         } catch(err) {
-            console.log("Unable to decrypt:",value);
+            console.log("Unable to decrypt:", value, err);
             throw(err);
         }
     }

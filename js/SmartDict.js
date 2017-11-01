@@ -85,7 +85,7 @@ class SmartDict extends Transportable {
         }
         let res = this.transport().dumps(this.preflight(dd));
         if (this._acl) { //Need to encrypt
-            let encdata = this._acl.encrypt(res, true);  // data, b64
+            let encdata = this._acl.encrypt(res, true);  // data, b64   TODO-BUG it nees signer <<<
             let dic = { "encrypted": encdata, "acl": this._acl._publicurl, "table": this.table};
             res = this.transport().dumps(dic);
         }
@@ -127,7 +127,7 @@ class SmartDict extends Transportable {
         return new this.constructor(this, verbose)
     }
 
-    static p_fetch(url, verbose) {
+    static async p_fetch(url, verbose) {
         /*
         Fetches the object from Dweb, passes to p_decrypt in case it needs decrypting,
         and creates an object of the appropriate class and passes data to _setdata
@@ -139,27 +139,26 @@ class SmartDict extends Transportable {
         :errors: Authentication Error
 
          */
-        if (verbose) console.log("SmartDict.p_fetch", url);
-        let cls;
-        return super.p_fetch(url, verbose) // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
-            .then((data) => {
-                data = Dweb.transport(url).loads(data);      // Parse JSON //TODO-REL3 maybe function in Transportable
-                let table = data.table;              // Find the class it belongs to
-                cls = Dweb[Dweb.table2class[table]];         // Gets class name, then looks up in Dweb - avoids dependency
-                if (!cls) throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: "+table+" isnt implemented in table2class");
-                //console.log(cls);
-                if (!((Dweb.table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict))) throw new Dweb.errors.ForbiddenError("Avoiding data driven hacks to other classes - seeing "+table);
-                return data;
-            })
-            .then((data) => cls.p_decrypt(data, verbose))    // decrypt - may return string or obj , note it can be suclassed for different encryption
-            .then((data) => {
-                    data._url = url;                         // Save where we got it - preempts a store - must do this afer decrypt
-                    return new cls(data);
-            })                // Returns new block that should be a subclass of SmartDict
-            .catch((err) => {console.log(`cant fetch and decrypt ${url}`); throw(err)});
+        try {
+            if (verbose) console.log("SmartDict.p_fetch", url);
+            let data = await super.p_fetch(url, verbose); // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
+            data = Dweb.transport(url).loads(data);      // Parse JSON //TODO-REL3 maybe function in Transportable
+            let table = data.table;              // Find the class it belongs to
+            let cls = Dweb[Dweb.table2class[table]];         // Gets class name, then looks up in Dweb - avoids dependency
+            if (!cls) throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: " + table + " isnt implemented in table2class");
+            //console.log(cls);
+            if (!((Dweb.table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict))) throw new Dweb.errors.ForbiddenError("Avoiding data driven hacks to other classes - seeing " + table);
+            data = await cls.p_decrypt(data, verbose);    // decrypt - may return string or obj , note it can be suclassed for different encryption
+            data._url = url;                         // Save where we got it - preempts a store - must do this afer decrypt
+            return new cls(data);
+            // Returns new object that should be a subclass of SmartDict
+        } catch(err) {
+            console.log(`cant fetch and decrypt ${url}`);
+            throw(err);
+        }
     }
 
-    static p_decrypt(data, verbose) {
+    static async p_decrypt(data, verbose) {
         /*
          This is a hook to an upper layer for decrypting data, if the layer isn't there then the data wont be decrypted.
          Chain is SD.p_fetch > SD.p_decryptdata > ACL|KC.decrypt, then SD.setdata
@@ -167,7 +166,7 @@ class SmartDict extends Transportable {
          :param data: possibly encrypted object produced from json stored on Dweb
          :return: same object if not encrypted, or decrypted version
          */
-        return (Dweb.AccessControlList && Dweb.AccessControlList.p_decryptdata) ?  Dweb.AccessControlList.p_decryptdata(data, verbose) : data
+        return await Dweb.AccessControlList.p_decryptdata(data, verbose);
     }
 
 }

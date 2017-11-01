@@ -90,16 +90,33 @@ class KeyPair extends SmartDict {
         }
     }
 
-
+    //TODO-XXX need storepublic
     async p_store(verbose) {
         if (super.stored())
             return; // Already stored
         if (!this._publicurl && KeyPair._key_has_private(this._key)) { // Haven't stored a public version yet.
+            await this._p_storepublic(verbose);
+            /* OBS old way
             let publickp = new KeyPair({key:this.publicexport()}, verbose);
             await publickp.p_store(verbose);
+            console.log("XXX@KP.100 setting",publickp._url)
             this._publicurl = publickp._url;
+            */
         }
         return super.p_store(verbose)
+    }
+
+    async _p_storepublic(verbose) {
+        // Build a copy of the data, then create a new !master version
+        let oo = Object.assign({}, this) // Copy obj
+        delete oo._key
+        delete oo._acl // Dont secure public key
+        oo.key = this.publicexport();    //Copy key except for use public version instead of private
+        console.log("XXX@_p_storepublic@112",oo)
+        let ee = new this.constructor(oo, verbose);
+        await ee.p_store(verbose);
+        console.log("XXX@CL.154",ee.constructor.name, ee._url)
+        this._publicurl = ee._url;
     }
 
     preflight(dd) {
@@ -228,8 +245,11 @@ class KeyPair extends SmartDict {
          :return: str, binary encryption of data or urlsafebase64
          */
         // Assumes nacl.public.PrivateKey or nacl.signing.SigningKey
-        if (!signer) throw new Dweb.errors.CodingError("Until PyNaCl bindings have secretbox we require a signer and have to add authentication");
-        //box = nacl.public.Box(signer.keypair._key.encrypt.privateKey, self._key.encrypt.publicKey)
+        if (!signer) {
+            console.log("KP.encrypt no signer:", this);
+            throw new Dweb.errors.CodingError("Until PyNaCl bindings have secretbox we require a signer and have to add authentication");
+            //box = nacl.public.Box(signer.keypair._key.encrypt.privateKey, self._key.encrypt.publicKey)
+        }
         //return box.encrypt(data, encoder=(nacl.encoding.URLSafeBase64Encoder if b64 else nacl.encoding.RawEncoder))
         const nonce = sodium.randombytes_buf(sodium.crypto_box_NONCEBYTES);
         const ciphertext = sodium.crypto_box_easy(data, nonce, this._key.encrypt.publicKey, signer.keypair._key.encrypt.privateKey, "uint8array"); //(message, nonce, publicKey, secretKey, outputFormat)

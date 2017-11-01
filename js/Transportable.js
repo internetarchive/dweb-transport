@@ -51,14 +51,19 @@ class Transportable {
         It calculates and store the url in _url immediately before starting the asynchronous storage and returning the Promise, and then checks the underlying transport agrees on the url variable. This allows a caller to use the url before the storage has completed.
         Resolves to	string: url of data stored
          */
-        if (this.stored())
-            return this;  // Noop if already stored, use dirty() if change after retrieved
-        let data = this._getdata();
-        if (verbose) console.log("Transportable.p_store data=", data);
-        let self = this;
-        this._url = await this.transport().p_rawstore(data, verbose);   //TODO-URLMULTI make this an array
-        if (verbose) console.log("Transportable.p_store url=", this._url);
-        return this;
+        try {
+            if (this.stored())
+                return this;  // Noop if already stored, use dirty() if change after retrieved
+            let data = this._getdata();
+            if (verbose) console.log("Transportable.p_store data=", data);
+            let self = this;
+            this._url = await this.transport().p_rawstore(data, verbose);   //TODO-URLMULTI make this an array
+            if (verbose) console.log("Transportable.p_store url=", this._url);
+            return this;
+        } catch (err) {
+            console.log("p_store failed",err);
+            throw err;
+        }
     }
 
     dirty() {
@@ -75,7 +80,9 @@ class Transportable {
         url:	string of url to retrieve
         returns:	string - arbitrary bytes retrieved.
          */
-        return Dweb.transport(url).p_rawfetch(url, verbose) // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
+        let t = Dweb.transport(url);
+        if (!t) throw new Dweb.errors.TransportError("Transport.p_fetch cant find transport for url: "+url);
+        return t.p_rawfetch(url, verbose) // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
     }
 
     file() { throw new Dweb.errors.ToBeImplementedError("Undefined function Transportable.file"); } //TODO-BACKPORT from Python

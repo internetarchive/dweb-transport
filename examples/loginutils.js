@@ -21,18 +21,21 @@ function logout_click() {
     hide('logout');                 // Nothing remains to logout so hide button
 }
 
-function _login(dict) {
+async function _login(dict) {
     /* common routine to login someone by name and passphrase, and display in KeyChains list - note
     :param dict: {name: passprase: }
     :resolves to: undefined
      */
     // concatenate them so that a common passphrase isn't sufficient to guess an id.
-    let passphrase = dict.name + "/" + dict.passphrase;
-    return Dweb.KeyChain.p_new({ name: dict.name}, {passphrase: passphrase}, verbose)
-        .then((kc) => {
-            addtemplatedchild("keychains_ul", kc );    // returns el, but unused
-            show('logout');                         // And show the logout button
-        })
+    try {
+        let passphrase = dict.name + "/" + dict.passphrase;
+        let kc = await Dweb.KeyChain.p_new({name: dict.name}, {passphrase: passphrase}, verbose);
+        addtemplatedchild("keychains_ul", kc);    // returns el, but unused
+        show('logout');                         // And show the logout button
+    } catch(err) {
+        console.log("Unable to _login",err);
+        alert(err);
+    }
 }
 
 function registrationsubmit() {
@@ -105,7 +108,7 @@ function keynew_click() {
     if (verbose) console.log("keynew_click ---");
     hide('keynew_form');
     let dict = form2dict("keynew_form"); //name
-    let keychain = document.getElementById('keychain_header').source;
+    let keychain = document.getElementById('keychain_header').source;   // Keychain of parent of this dialog
     let key = new Dweb.KeyPair({name: dict.name, key: {keygen: true}, _acl: keychain}, verbose );
     _showkeyorlock("keychain_ul", key);   // Put in UI, as listmonitor response will be deduplicated.
     keychain.p_push(key, verbose);
@@ -152,6 +155,7 @@ function p_connect(options) {
         This is a standardish starting process, feel free to copy and reuse !
         options = { defaulttransport: "IPFS"; }
      */
+    options = options || {};
     let transportclass = Dweb["Transport" + (searchparams.get("transport") || options.defaulttransport || "IPFS").toUpperCase()]; // e.g. Dweb["TransportHTTP"]
     return transportclass.p_setup({}, verbose) //TODO may take some options
         .then((t) => t.p_status())

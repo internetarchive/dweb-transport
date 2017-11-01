@@ -36,6 +36,7 @@ class CommonList extends SmartDict {
         }
         this._master = (typeof master === "undefined")  ? this.keypair.has_private() : master;  // Note this must be AFTER _setkeypair since that sets based on keypair found and _p_storepublic for example wants to force !master
         if (!this._master && !this._publicurl) {
+            console.log("XXX@CL.39 setting",this._url);
             this._publicurl = this._url;  // We aren't master, so publicurl is same as url - note URL will only have been set if constructor called from SmartDict.p_fetch
         }
         this.table = "cl";
@@ -90,6 +91,7 @@ class CommonList extends SmartDict {
 
     preflight(dd) {
         /*
+        p_store, p_storepublic and preflight work in tandem to store private and public versions of the data
         Prepare a dictionary of data for storage,
         Subclasses SmartDict to:
             convert the keypair for export and check not unintentionally exporting a unencrypted public key
@@ -107,6 +109,7 @@ class CommonList extends SmartDict {
             dd.keypair = dd._master ? dd.keypair.privateexport() : dd.keypair.publicexport();
         }
         // Note same code on KeyPair
+        console.log("XXX@CL.111",dd._publicurl)
         let publicurl = dd._publicurl; // Save before preflight
         let master = dd._master;
         dd = super.preflight(dd);  // Edits dd in place
@@ -149,6 +152,7 @@ class CommonList extends SmartDict {
         let oo = Object.assign({}, this, {_master: false});
         let ee = new this.constructor(this.preflight(oo), false, null, verbose);
         await ee.p_store(verbose);
+        console.log("XXX@CL.154",ee.constructor.name, ee._url)
         this._publicurl = ee._url;
     }
 
@@ -180,22 +184,27 @@ class CommonList extends SmartDict {
          :resolves: sig created in process - for adding to lists etc.
          :throws:   ForbiddenError if not master;
          */
-        if (verbose) console.log("CL.p_push",obj._url,"onto",this._url);
-        if (!obj) throw new Dweb.errors.CodingError("CL.p_push obj should never be non-empty");
-        let self = this;
-        let sig;
-        await this.p_store(verbose); // Make sure stored
-        if (typeof obj !== 'string') {
-            await obj.p_store(verbose)
+        try {
+            if (verbose) console.log("CL.p_push", obj._url, "onto", this._url);
+            if (!obj) throw new Dweb.errors.CodingError("CL.p_push obj should never be non-empty");
+            let sig;
+            await this.p_store(verbose); // Make sure stored
+            if (verbose) console.log("CL.p_push", obj._url, "onto", this._url);
+            if (typeof obj !== 'string') {
+                await obj.p_store(verbose)
+            }
+            if (!(this._master && this.keypair))
+                throw new Dweb.errors.ForbiddenError("Signing a new entry when not a master list");
+            let url = (typeof obj === 'string') ? obj : obj._url;
+            sig = await this.p_sign(url, verbose);
+            sig.data = obj;                     // Keep a copy of the signed obj on the sig, saves retrieving it again
+            this._list.push(sig);               // Keep copy locally on _list
+            await this.p_add(sig, verbose);     // Add to list in dweb
+            return sig;
+        } catch(err) {
+            console.log("CL.p_push failed",err);
+            throw err;
         }
-        if (!(self._master && self.keypair))
-            throw new Dweb.errors.ForbiddenError("Signing a new entry when not a master list");
-        let url = (typeof obj === 'string') ? obj : obj._url;
-        sig = await self.p_sign(url, verbose);
-        sig.data = obj;                     // Keep a copy of the signed obj on the sig, saves retrieving it again
-        self._list.push(sig);               // Keep copy locally on _list
-        await self.p_add(sig, verbose);     // Add to list in dweb
-        return sig;
     }
 
     async p_sign(url, verbose) { //TODO-API
