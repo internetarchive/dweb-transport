@@ -11,35 +11,28 @@
 
     <script type="text/javascript">
 
-        function newversionlist(el) {
-            console.log("newversionlist ---");
-            // Get the data from the form
-            let dict = form2dict(el);
-            <!--VersionList(data, master, keypair, keygen, mnemonic, verbose, options)-->
-            //TODO require logged in, and immediately secure
-            //TODO replace {passphrase:  with {keygen: true}
-            console.log("XXX@21 dict=",dict)
-            let obj;
-            dict._allowunsafestore = true; //TODO remove _allowunsafestore once secured
-            Dweb.VersionList.p_new(dict, true, {passphrase: "TODO-REPLACE"}, verbose)
-                .then((o) => obj=o)
-                .then(() => console.log("XXX@nvl.25 obj contentacl should be defined=",obj.contentacl))
-                .then(() => obj.p_store(verbose))
-            // Now re fetch it from Dweb and display the object
-                .then(() => {
-                    console.log("XXX@nvl30 ",{textarea: "", _acl: obj.contentacl})
-                    obj._working = new obj._entryclass({textarea: "", _acl: obj.contentacl});
-                    tinyMCE.activeEditor.setContent(obj._working.textarea); // Set actual MCE editing text
-                    tinyMCE.activeEditor.setDirty(true);                    // Allow saving this restored text
-                    replacetexts("listmeta", obj, {
-                        readlockimg: icon_images[obj._working._acl ? "locked" : "unlocked"],
-                        writelockimg: icon_images[obj._acl ? "locked" : "unlocked"],
-                        readlockname: obj._working._acl ? obj._working._acl.name : "",
-                        writelockname: obj._acl ? obj._acl.name : ""
-
+        async function newversionlist(el) {
+            try {
+                console.log("newversionlist ---");
+                // Get the data from the form
+                let dict = form2dict(el);
+                <!--VersionList(data, master, keypair, keygen, mnemonic, verbose, options)-->
+                //TODO replace {passphrase:  with {keygen: true}
+                let obj = await Dweb.VersionList.p_new(dict, true, {passphrase: "TODO-REPLACE"}, verbose);
+                await obj.p_store(verbose);
+                // Now re fetch it from Dweb and display the object
+                obj._working = new obj._entryclass({textarea: "", _acl: obj.contentacl});
+                tinyMCE.activeEditor.setContent(obj._working.textarea); // Set actual MCE editing text
+                tinyMCE.activeEditor.setDirty(true);                    // Allow saving this restored text
+                replacetexts("listmeta", obj, {
+                    readlockimg: icon_images[obj._working._acl ? "locked" : "unlocked"],
+                    writelockimg: icon_images[obj._acl ? "locked" : "unlocked"],
+                    readlockname: obj._working._acl ? obj._working._acl.name : "",
+                    writelockname: obj._acl ? obj._acl.name : ""
                 });
-                })
-                .catch((err) => { console.log("ERROR in newversionlist:",err); alert(err.message); });
+            } catch(err) {
+                console.log("ERROR in newversionlist:",err); alert(err.message);
+            }
             return false; // Stop form submission and page reloading reloading
         }
 
@@ -190,6 +183,9 @@ TODO
 * Add to KeyChain so can re-open
 * Show docs in KeyChain
 * Click on doc to open
+* Favorites
+* Listmonitor on versions
+* Open list from link
 
 <script type="text/javascript">
     // This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
@@ -202,8 +198,8 @@ TODO
         var url = searchparams.get("url");   //TODO determine what to do with parms in url
         starteditor();
     })
-    .then(() => _login({name: "Mary Smith", passphrase: "had a little lamb"}))
-    .then(() => newversionlist("newform"))
+    //.then(() => _login({name: "Mary Smith", passphrase: "had a little lamb"}))
+    //.then(() => newversionlist("newform"))
     .then(() => console.log("==Login should have finished-== output after here implies async issue ==="))
     .catch((err) => { console.log("App Error:",err); alert(err.message); });
 </script>
