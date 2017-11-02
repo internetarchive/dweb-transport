@@ -43,12 +43,13 @@ class VersionList extends CommonList {
         });
     }
 
-    static p_new(data, master, key, verbose) {
-        data._acl = Dweb.KeyChain.default()
-        console.log("XXX@VL.p_new",data._acl)
-        return VersionList.p_expanddata(data, verbose)
-            .then(() => new VersionList(data, master, key, verbose));
+    static async p_new(data, master, key, verbose) {
+        data._acl = Dweb.KeyChain.default();
+        if (verbose) console.log("VL.p_new acl=",data._acl);
+        await VersionList.p_expanddata(data, verbose);  // Expands _contentacl
+        return new VersionList(data, master, key, verbose);
     }
+
     //TODO-API here or elsewhere make sure not encrypting to a KEY - must be to a LOCK
     p_saveversion(verbose) {
         // Update the content edited i.e. sign a copy and store on the list, then make a new copy to work with. Triggered by Save.
