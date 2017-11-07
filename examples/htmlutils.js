@@ -3,6 +3,15 @@
     There is nothing specific to Dweb at all here, feel free to copy and modify.
  */
 
+function resolve(el) {
+    return (typeof(el) === "string") ? document.getElementById(el) : el;
+}
+async function p_resolveobj(url) {
+    if (typeof vl === 'string')
+        vl = await Dweb.SmartDict.p_fetch(vl, verbose);
+    return vl;
+}
+
 function form2dict(frm) {
     /* Convert a form into a dictionary
        its mindblowing that Javascript even at EC6 doesnt have this !
@@ -28,7 +37,7 @@ function togglevis(el, displayvis) {
     if (Array.isArray(el)) {
         el.map((e) => togglevis(e, displayvis))
     } else {
-        el = (typeof(el) === "string") ? document.getElementById(el) : el;
+        el = resolve(el);
         el.style.display = (el.style && el.style.display === "none" ? displayvis : "none");
     }
 }
@@ -57,7 +66,7 @@ function replacetext(el, text) {
     /* Replace the text of el with text, removing all other children
     :param el:  An HTML element, or a string with id of an HTML element
     */
-    el = (typeof(el) === "string") ? document.getElementById(el) : el;
+    el = resolve(el);
     //console.log("replacetext",text,el.constructor.name) // Uncomment to get class name of different things want to edit
     if (el instanceof HTMLImageElement) {
         el.src = text;
@@ -76,39 +85,46 @@ function replacetexts(el, ...dict) {
     :param dict: A dictionary, object, or array of them
      */
     // First combine with a raw dict so that "prop" doesnt get functions and handles dict like things
-    el = (typeof(el) === "string") ? document.getElementById(el) : el;
-    el.source = dict[0];    // Usually used with one object, if append fields its usually just calculated for display
-    _replacetexts("", el, Object.assign({}, ...dict))
+    el = resolve(el);
+    if (Array.isArray(dict[0])) {
+        _replacetexts("", el, dict[0])
+    } else {
+        el.source = dict[0];    // Usually used with one object, if append fields its usually just calculated for display
+        _replacetexts("", el, Object.assign({}, ...dict))
+    }
     return el;
 }
 function _replacetexts(prefix, el, oo) {
     /*
     Inner function for replacetexts to allow crawling depth of oo
      */
-    for (let prop in oo) {
-        let p = prefix + prop
-        let val = oo[prop];
-        if (val instanceof Date) {  // Convert here because otherwise treated as an object
-            val = val.toString();
-        }
-        if (typeof val === "object" && !Array.isArray(val)) {
-            // Look for current level, longer names e.g. prefixprop_xyz
-            _replacetexts(`${p}_`, el, val)
-            // And nowif found any prefixprop look at xyz under it
-            Array.prototype.slice.call(el.querySelectorAll(`[name=${p}]`)).map((i) => _replacetexts("", i, val));
-        }
-        else if (typeof val === "object" && Array.isArray(val)) {
-            dests = el.querySelectorAll(`[name=${p}]`);
-            Array.prototype.slice.call(dests)
-                .map((i) => {
-                    deletechildren(i);
-                    val.map((f) => addtemplatedchild(i, f))
-                })
-        } else {
-            if (el.getAttribute("name") === p) replacetext(el, val); //Do the parent as well
-            Array.prototype.slice.call(el.querySelectorAll(`[name=${p}]`)).map((i) => replacetext(i, val));
-            if (el.getAttribute("href") === p) el.href = val;
-            Array.prototype.slice.call(el.querySelectorAll(`[href=${p}]`)).map((i) => i.href = val)
+    if (Array.isArray(oo)) {
+        deletechildren(el);
+        oo.map((f) => addtemplatedchild(el, f))
+    } else {
+        for (let prop in oo) {
+            let p = prefix + prop
+            let val = oo[prop];
+            if (val instanceof Date) {  // Convert here because otherwise treated as an object
+                val = val.toString();
+            }
+            if (typeof val === "object" && !Array.isArray(val)) {
+                // Look for current level, longer names e.g. prefixprop_xyz
+                _replacetexts(`${p}_`, el, val)
+                // And nowif found any prefixprop look at xyz under it
+                Array.prototype.slice.call(el.querySelectorAll(`[name=${p}]`)).map((i) => _replacetexts("", i, val));
+            }
+            else if (typeof val === "object" && Array.isArray(val)) {
+                dests = el.querySelectorAll(`[name=${p}]`);
+                Array.prototype.slice.call(dests).map((i) => replacetexts(i, val));
+            } else {
+                if (el.getAttribute("name") === p) replacetext(el, val); //Do the parent as well
+                if (el.getAttribute("value") === p) el.value = val; //Do the parent as well
+                Array.prototype.slice.call(el.querySelectorAll(`[name=${p}]`)).map((i) => replacetext(i, val));
+                if (el.getAttribute("href") === p) el.href = val;
+                Array.prototype.slice.call(el.querySelectorAll(`[href=${p}]`)).map((i) => i.href = val)
+                Array.prototype.slice.call(el.querySelectorAll(`[value=${p}]`)).map((i) => i.value = val)
+            }
         }
     }
 }
@@ -124,7 +140,7 @@ function addtemplatedchild(el, ...dict) {
     html: html to add under outerelement
     dict: Dictionary with parameters to replace in html, it looks for nodes with name="xyz" and replaces text inside it with dict[xyz]
     */
-    el = (typeof(el) === "string") ? document.getElementById(el) : el;
+    el = resolve(el);
     let el_li = el.getElementsByClassName("template")[0].cloneNode(true);   // Copy first child with class=Template
     el_li.classList.remove("template");                                 // Remove the "template" class so it displays
     replacetexts(el_li, ...dict);                          // Safe since only replace text - sets el_li.source to dict
@@ -142,7 +158,7 @@ function addhtml(el, htmleach, dict) { //TODO merge into addtemplatechild - note
     html: html to add under outerelement
     dict: Dictionary with parameters to replace in html, it looks for nodes with name="xyz" and replaces text inside it with dict[xyz]
     */
-    el = (typeof(el) === "string") ? document.getElementById(el) : el;
+    el = resolve(el);
     let el_li = document.createElement('div');   // usually a 'li' but could be a 'div'
     if (htmleach) {
         el_li.innerHTML = htmleach;                           //Note safe since html from above, not from net
@@ -162,14 +178,12 @@ function addhtml(el, htmleach, dict) { //TODO merge into addtemplatechild - note
 function show(el, displayvalue) {
     displayvalue = displayvalue || "";
     if (Array.isArray(el)) el.map((e) => show(e, displayvalue));
-    el = (typeof(el) === "string") ? document.getElementById(el) : el;
-    el.style.display = displayvalue;
+    resolve(el).style.display = displayvalue;
 }
 
 function hide(el) {
     if (Array.isArray(el)) el.map((e) => hide(e));
-    el = (typeof(el) === "string") ? document.getElementById(el) : el;
-    el.style.display = "none";
+    resolve(el).style.display = "none";
 }
 
 function p_httpget(url, headers) {
@@ -217,3 +231,23 @@ function display_blob(bb, options) {//TODO-STREAMS figure out how to pass stream
     //URL.revokeObjectURL(objectURL)    //TODO figure out when can do this - maybe last one, or maybe dont care?
 }
 
+//------- For dealing with MCE editor ----------
+
+function seteditor(content) {
+    tinyMCE.activeEditor.setContent(content);   // Set actual MCE editing text
+    tinyMCE.activeEditor.setDirty(true);        // Allow saving this restored text
+}
+
+function starteditor() {
+    //TODO maybe add some options that can override fields if needed (e.g. with a Object.assign
+    tinymce.init({
+        selector: '#mytextarea',
+        menubar: "true",
+        plugins: [ "save",
+            'advlist autolink lists link image charmap print preview anchor',
+            'searchreplace visualblocks code fullscreen',
+            'insertdatetime media table contextmenu paste code' ],
+        toolbar: 'save | undo redo | insert | styleselect | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image',
+        save_onsavecallback: () => p_updatecontent(tinyMCE.get('mytextarea').getContent())  // This function must be provided
+    });
+}

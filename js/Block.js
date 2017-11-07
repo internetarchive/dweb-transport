@@ -29,7 +29,7 @@ class Block extends Transportable {
         return super.p_fetch(url, verbose) // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
             .then((data) => new Block(data));
     }
-    static test(verbose) {
+    static p_test(verbose) {
         if (verbose) {console.log("Block.test")}
         return new Promise((resolve, reject) => {
             let blk;

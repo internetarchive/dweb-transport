@@ -99,7 +99,6 @@ class KeyPair extends SmartDict {
             /* OBS old way
             let publickp = new KeyPair({key:this.publicexport()}, verbose);
             await publickp.p_store(verbose);
-            console.log("XXX@KP.100 setting",publickp._url)
             this._publicurl = publickp._url;
             */
         }
@@ -112,10 +111,8 @@ class KeyPair extends SmartDict {
         delete oo._key
         delete oo._acl // Dont secure public key
         oo.key = this.publicexport();    //Copy key except for use public version instead of private
-        console.log("XXX@_p_storepublic@112",oo)
         let ee = new this.constructor(oo, verbose);
         await ee.p_store(verbose);
-        console.log("XXX@CL.154",ee.constructor.name, ee._url)
         this._publicurl = ee._url;
     }
 
@@ -351,6 +348,7 @@ class KeyPair extends SmartDict {
         :returns:       encrypted data
          */
         // May need to handle different forms of sym_key for now assume urlbase64 encoded string
+        if (!sym_key) throw new Dweb.errors.CodingError('KP.sym_encrypt sym_key cant be empty');
         sym_key = sodium.from_urlsafebase64(sym_key);
         const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
         const ciphertext = sodium.crypto_secretbox_easy(data, nonce, sym_key, "uint8array");  // message, nonce, key, outputFormat

@@ -29,8 +29,11 @@ class KeyChain extends CommonList {
          */
             let kc = new KeyChain(data, true, key, verbose);
             await kc.p_store(verbose);
-            KeyChain.addkeychains(kc);
+            // The order here is important - kc has to be on keychains to decrypt the elements, and eventhandler has to be
+            // after elements are loaded so cant be inside addkeychains()
+            KeyChain.addkeychains(kc);  // Add after fetching elements as triggers events
             await kc.p_list_then_elements(verbose);
+            Dweb.eventHandler.callEventListeners({type: "login", values: keychain})
             return kc;
     }
 
@@ -80,29 +83,6 @@ class KeyChain extends CommonList {
 
     accesskey() { throw new Dweb.errors.CodingError("KeyChain doesnt have an accesskey"); }
 
-    static addkeychains(keychains) {
-        /*
-        Add keys I can use for viewing to Dweb.keychains where it will be iterated over during decryption.
-
-        :param keychains:   keychain or Array of keychains
-        */
-        if (keychains instanceof Array) {
-            Dweb.keychains = Dweb.keychains.concat(keychains);
-        } else {
-            Dweb.keychains.push(keychains);
-        }
-    }
-
-    static logout() {
-        /*
-        Logout user - which means removing from Dweb.keychains
-         */
-        Dweb.keychains = []
-    }
-    static default() {  //TODO-API
-        return Dweb.keychains.length ? Dweb.keychains[Dweb.keychains.length-1] : undefined;
-    }
-
     p_store(verbose) {
         /*
         Unlike other p_store this ONLY stores the public version, and sets the _publicurl, on the assumption that the private key of a KeyChain should never be stored.
@@ -112,6 +92,30 @@ class KeyChain extends CommonList {
         return super.p_store(verbose);  // Stores public version and sets _publicurl
     }
 
+    // ====  Stuff to do with managing Dweb.keychains - this could be a separate class at some point ======
+    static addkeychains(keychain) {
+        /*
+        Add keys I can use for viewing to Dweb.keychains where it will be iterated over during decryption.
+
+        :param keychains:   keychain or Array of keychains
+        */
+        if (keychain instanceof Array) {
+            keychain.map((kc) => KeyChain.addkeychains(kc));
+        } else {
+            Dweb.keychains.push(keychain);
+        }
+    }
+
+    static logout() {
+        /*
+        Logout user - which means removing from Dweb.keychains
+         */
+        Dweb.keychains = []
+    }
+
+    static default() {  //TODO-API
+        return Dweb.keychains.length ? Dweb.keychains[Dweb.keychains.length-1] : undefined;
+    }
     static keychains_find(dict, verbose) {
         /*
         Locate a needed KeyChain on Dweb.keychains by some filter.
@@ -120,6 +124,9 @@ class KeyChain extends CommonList {
         :return:        AccessControlList or KeyChain or null
         */
         return Dweb.keychains.find((kc) => kc.match(dict))  // Returns undefined if none match or keychains is empty, else first match
+    }
+    static acl_find(dict, verbose) {
+        return Dweb.KeyChain.mykeys(Dweb.AccessControlList).find((acl) => acl.match(dict));  // Returns undefined if none match or keychains is empty, else first match
     }
 
     static mykeys(clstarget) {
@@ -134,7 +141,6 @@ class KeyChain extends CommonList {
             (kc) => kc._keys.filter(                                // Filter only members of _keys
                 (key) => key.match({".instanceof": clstarget}))))   // That are instances of the target
     }
-
 
     static async p_test(acl, verbose) {
         /* Fairly broad test of AccessControlList and KeyChain */
@@ -152,7 +158,7 @@ class KeyChain extends CommonList {
             let kc = await KeyChain.p_new({name: "test_keychain kc"}, {mnemonic: mnemonic}, verbose);    //Note in KEYCHAIN 4 we recreate exactly same way.
             if (verbose) console.log("KEYCHAIN 1 - add MB to KC");
             let mbmaster = await Dweb.MutableBlock.p_new(kc, null, "test_keychain mblockm", true, qbf, true, verbose); //acl, contentacl, name, _allowunsafestore, content, signandstore, verbose, options
-            await kc.p_push(mbmaster, verbose);   //Sign and store on KC's list (returns immediately with Sig)
+            await kc.p_push(mbmaster, verbose);   //Sign and store on KC's list
             if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
             if (verbose) console.log("KEYCHAIN 2 - add viewerkeypair to it");
             let viewerkeypair = new Dweb.KeyPair({name: vkpname, key: keypairexport}, verbose);
@@ -178,7 +184,7 @@ class KeyChain extends CommonList {
             if (verbose) console.log("KEYCHAIN 5: Check can user ViewerKeyPair");
             // Uses acl passed in from AccessControlList.acl
             acl._allowunsafestore = true;
-            await acl.p_add_acle(viewerkeypair._url, {"name": "my token"}, verbose);   //Add us as viewer - resolves to tok
+            await acl.p_add_acle(viewerkeypair._publicurl, {"name": "my token"}, verbose);   //Add us as viewer - resolves to tok
             console.assert("acl._list.length === 1", "Should have added exactly 1 viewerkeypair", acl);
             let sb = new Dweb.StructuredBlock({"name": "test_sb", "data": qbf, "_acl": acl}, verbose); //url,data,verbose
             await sb.p_store(verbose);
@@ -206,7 +212,5 @@ class KeyChain extends CommonList {
         }
     }
 }
-
-
 
 exports = module.exports = KeyChain;

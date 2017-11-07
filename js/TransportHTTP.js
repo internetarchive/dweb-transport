@@ -22,7 +22,9 @@ if (typeof(Window) === "undefined") {
 defaulthttpoptions = {
     //ipandport: [ 'localhost',4243]
     //ipandport: [ 'sandbox.dweb.me', 443]
-    ipandport: [ 'gateway.dweb.me', 443]
+
+    urlbase: 'https://gateway.dweb.me:443'
+
 };
 
 class TransportHTTP extends Transport {
@@ -30,7 +32,7 @@ class TransportHTTP extends Transport {
     constructor(options, verbose) {
         super(options, verbose);
         this.options = options;
-        this.ipandport = options.http.ipandport;
+        this.urlbase = options.http.urlbase;
         this.urlschemes = ['http','https'];
     }
 
@@ -105,7 +107,7 @@ class TransportHTTP extends Transport {
         // Locate and return a block, based on its url
         // Throws Error if fails - should be TransportError but out of scope
         //TODO-HTTP could check that rest of URL conforms to expectations.
-        let httpurl=`https://${this.ipandport[0]}:${this.ipandport[1]}/${command}`;
+        let httpurl=`${this.urlbase}/${command}`;
         if (url) {
             let parsedurl = Url.parse(url);
             let multihash = parsedurl.pathname.split('/').slice(-1);

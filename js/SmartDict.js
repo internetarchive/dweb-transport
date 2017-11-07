@@ -142,15 +142,15 @@ class SmartDict extends Transportable {
         try {
             if (verbose) console.log("SmartDict.p_fetch", url);
             let data = await super.p_fetch(url, verbose); // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
-            data = Dweb.transport(url).loads(data);      // Parse JSON //TODO-REL3 maybe function in Transportable
-            let table = data.table;              // Find the class it belongs to
+            let maybeencrypted = Dweb.transport(url).loads(data);      // Parse JSON //TODO-REL3 maybe function in Transportable
+            let table = maybeencrypted.table;              // Find the class it belongs to
             let cls = Dweb[Dweb.table2class[table]];         // Gets class name, then looks up in Dweb - avoids dependency
             if (!cls) throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: " + table + " isnt implemented in table2class");
             //console.log(cls);
             if (!((Dweb.table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict))) throw new Dweb.errors.ForbiddenError("Avoiding data driven hacks to other classes - seeing " + table);
-            data = await cls.p_decrypt(data, verbose);    // decrypt - may return string or obj , note it can be suclassed for different encryption
-            data._url = url;                         // Save where we got it - preempts a store - must do this afer decrypt
-            return new cls(data);
+            let decrypted = await cls.p_decrypt(maybeencrypted, verbose);    // decrypt - may return string or obj , note it can be suclassed for different encryption
+            decrypted._url = url;                         // Save where we got it - preempts a store - must do this afer decrypt
+            return new cls(decrypted);
             // Returns new object that should be a subclass of SmartDict
         } catch(err) {
             console.log(`cant fetch and decrypt ${url}`);

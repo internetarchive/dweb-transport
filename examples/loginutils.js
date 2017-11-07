@@ -9,10 +9,20 @@
 
     Needs a login and registration HTML
 
+    Naming conventions:
+
+
  */
 
 // Array of images can use
-const icon_images = {acl: "noun_1093404_cc.png", kp: "noun_1146472_cc.png", "tok": "noun_708669_cc.png", "locked": "noun_1093404_cc.png", "unlocked": "noun_1093404_cc_unlocked.png" }; /* If change here - see also Keys on KeyChain code below*/
+const icon_images = {   //!SEE-OTHER-KC-CLASSES
+    acl: "noun_1093404_cc.png",
+    kp: "noun_1146472_cc.png",
+    "tok": "noun_708669_cc.png",
+    "vl": "log.gif",    // TODO replace by better icon
+    "locked": "noun_1093404_cc.png",
+    "unlocked": "noun_1093404_cc_unlocked.png",
+}; /* If change here - see also Keys on KeyChain code below*/
 
 function logout_click() {
     /* Logout button clicked  - logged out*/
@@ -30,11 +40,12 @@ async function _login(dict) {
     try {
         let passphrase = dict.name + "/" + dict.passphrase;
         let kc = await Dweb.KeyChain.p_new({name: dict.name}, {passphrase: passphrase}, verbose);
-        addtemplatedchild("keychains_ul", kc);    // returns el, but unused
-        show('logout');                         // And show the logout button
+        addtemplatedchild("keychains_ul", kc);      // returns el, but unused
+        show('logout');                             // And show the logout button
     } catch(err) {
         console.log("Unable to _login",err);
         alert(err);
+        return;
     }
 }
 
@@ -75,33 +86,40 @@ function keychain_click(el) {
     kc.p_list_then_elements()                            // Retrieve the keys for the keylist
         .then(() => kc._keys.map((key)=> _showkeyorlock("keychain_ul", key)));  // And add to the HTML
 }
-function keyorlock_click(el) {
+function kcitem_click(el) { //!SEE-OTHER-KC-CLASSES
     // Clicked on a key or a lock, determine which and forward
     let obj = el.source;
     if (obj instanceof Dweb.AccessControlList)
         lock_click(el);
     else if (obj instanceof Dweb.KeyPair)
         key_click(el);
+    else if (obj instanceof Dweb.VersionList)
+        versionlist_click(el);
     else if ((obj instanceof Dweb.SmartDict) && obj.token)  // Its a token - like a key
         token_click(el);
      else
-        throw new Dweb.errors.ToBeImplementedError(`keyorlock_click doesnt support ${obj.constructor.name}`)
+        throw new Dweb.errors.ToBeImplementedError(`kcitem_click doesnt support ${obj.constructor.name}`)
 }
 
+//!SEE-OTHER-KC-CLASSES
+
+// Clicked on a key, display a prompt to copy it for sharing
 function locklink_click(el) {
-    // Clicked on a key, display a prompt to copy it for sharing
-    if (verbose) console.log("locklink_click ---");
-    el = (typeof(el) === "string") ? document.getElementById(el) : el;
-    window.prompt("Copy to clipboard for locking (Ctrl-C + OK)", el.source._url);
+    window.prompt("Copy to clipboard for locking (Ctrl-C + OK)", resolve(el).source._url);
 }
 function key_click(el) {
-    // Clicked on a key, display a prompt to copy it for sharing
-    if (verbose) console.log("key_click ---");
-    window.prompt("Copy to clipboard for sharing (Ctrl-C + OK)", el.source._publicurl);
+    window.prompt("Copy to clipboard for sharing (Ctrl-C + OK)", resolve(el).source._publicurl);
 }
 function token_click(el) {
-    if (verbose) console.log("token_click ---");
-    window.prompt("Copy to clipboard for sharing (Ctrl-C + OK)", el.source.viewer);
+    window.prompt("Copy to clipboard for sharing (Ctrl-C + OK)", resolve(el).source.viewer);
+}
+function versionlist_click(el) {
+    target=resolve("vl_target")
+    if (target) {
+        p_vl_target_display(target, resolve(el).source);    // Application dependent
+    } else {
+        window.prompt("Copy to clipboard for sharing (Ctrl-C + OK)", resolve(el).source._url);  // In some cases should load form
+    }
 }
 
 function keynew_click() {
@@ -156,8 +174,16 @@ function p_connect(options) {
         options = { defaulttransport: "IPFS"; }
      */
     options = options || {};
-    let transportclass = Dweb["Transport" + (searchparams.get("transport") || options.defaulttransport || "IPFS").toUpperCase()]; // e.g. Dweb["TransportHTTP"]
-    return transportclass.p_setup({}, verbose) //TODO may take some options
+    let setupoptions = {};
+    let transp = (searchparams.get("transport") || options.defaulttransport || "IPFS").toUpperCase();
+    console.log("XXX transp=",transp)
+    if (transp === "LOCAL") {
+        transp = "HTTP";
+        setupoptions = {http: {urlbase: "http://localhost:4244"}}
+    }
+    console.log("XXX setupoptions=",setupoptions)
+    let transportclass = Dweb["Transport" + transp]; // e.g. Dweb["TransportHTTP"]
+    return transportclass.p_setup(setupoptions, verbose) //TODO may take some options
         .then((t) => t.p_status())
         .then((msg) => setstatus(msg))
         .catch((err) => { console.log("ERROR in p_connect:",err); throw(err); });

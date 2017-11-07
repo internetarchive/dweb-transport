@@ -11,59 +11,86 @@
 
     <script type="text/javascript">
 
+        async function p_vl_target_display(el, vl) {
+            vl = await p_resolve(vl);
+            await vl.p_fetchlistandworking(verbose);    // Get list and most recent version;
+            if (!vl._working) {                         // If no recent version then create a new blank one.
+                vl._working = newversion();             // Locally defined as to what new version is.
+            }
+            seteditor(vl._working.textarea);            // Load the editor with the content (existing or blank)
+            replacetexts("vl_target", vl, {             // Load the header of the editor, especially the lock symbols
+                readlockimg: icon_images[vl._working._acl ? "locked" : "unlocked"],
+                writelockimg: icon_images[vl._acl ? "locked" : "unlocked"],
+                readlockname: vl._working._acl ? vl._working._acl.name : "",
+                writelockname: vl._acl ? vl._acl.name : ""
+            });
+        }
+        function newversion() {  // Create a new blank version - this is where to configure what each one looks like - by setting fields etc.
+            return new Dweb.SmartDict({textarea: ""})
+        }
         async function newversionlist(el) {
+            // Create a new versionlist.
             try {
                 console.log("newversionlist ---");
-                // Get the data from the form
-                let dict = form2dict(el);
-                <!--VersionList(data, master, keypair, keygen, mnemonic, verbose, options)-->
-                //TODO replace {passphrase:  with {keygen: true}
-                let obj = await Dweb.VersionList.p_new(dict, true, {passphrase: "TODO-REPLACE"}, verbose);
-                await obj.p_store(verbose);
-                // Now re fetch it from Dweb and display the object
-                obj._working = new obj._entryclass({textarea: "", _acl: obj.contentacl});
-                tinyMCE.activeEditor.setContent(obj._working.textarea); // Set actual MCE editing text
-                tinyMCE.activeEditor.setDirty(true);                    // Allow saving this restored text
-                replacetexts("listmeta", obj, {
-                    readlockimg: icon_images[obj._working._acl ? "locked" : "unlocked"],
-                    writelockimg: icon_images[obj._acl ? "locked" : "unlocked"],
-                    readlockname: obj._working._acl ? obj._working._acl.name : "",
-                    writelockname: obj._acl ? obj._acl.name : ""
-                });
+                let dict = form2dict(el);                               // Get the data from the form
+                // VersionList(data, master, keypair, keygen, mnemonic, verbose, options)
+                let obj = await Dweb.VersionList.p_new(dict, true, {keygen: true}, newversion(), verbose);
+                await p_vl_target_display(el, obj)                      // Display in the HTML target defined below
             } catch(err) {
                 console.log("ERROR in newversionlist:",err); alert(err.message);
             }
             return false; // Stop form submission and page reloading reloading
         }
-
-        function updatecontent(content) {
-            // Update the content edited i.e. sign a copy and store on the list, then make a new copy to work with. Triggered by Save.
-            //TODO move some of this to VersionList
-            let vl = document.getElementById("listmeta").source;
+        async function p_updatecontent(content) {
+            // Update the content edited i.e. sign a copy and store on the list, then make a new copy to work with.
+            // Triggered by Save in the Editor
+            let vl = document.getElementById("vl_target").source;
+            // Stuff specific to this implementation of VersionList, with a particular set of fields in  "_working"
             let working = vl._working;
             working.textarea = content;
-            vl.p_saveversion(verbose)
-                .then((sig) => addtemplatedchild("list_ul", sig) );
+            working.dirty();                // Make sure saved
+            let sig = await vl.p_saveversion(verbose);
+            addtemplatedchild("vl_list", sig);
         }
-        function starteditor() {
-            tinymce.init({
-                selector: '#mytextarea',
-                menubar: "true",
-                plugins: [ "save",
-                    'advlist autolink lists link image charmap print preview anchor',
-                    'searchreplace visualblocks code fullscreen',
-                    'insertdatetime media table contextmenu paste code' ],
-                toolbar: 'save | undo redo | insert | styleselect | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image',
-                save_onsavecallback: () => updatecontent(tinyMCE.get('mytextarea').getContent())
-            });
-        }
-        function clickrestore(el) {
+
+        async function clickrestore(el) {
             console.log("clickrestore ---");
-            let vl = document.getElementById("listmeta").source;
-            vl._working = el.source.data.copy(verbose);
-            replacetexts("workingform", vl._working);
-            tinyMCE.activeEditor.setContent(vl._working.textarea); // Set actual MCE editing text
-            tinyMCE.activeEditor.setDirty(true);                    // Allow saving this restored text
+            let vl = document.getElementById("vl_target").source;
+            await vl.p_restoreversion(el.source, verbose);          // Reset to the specific version
+            replacetexts("workingform", vl._working);               // Display texts from the new version
+            seteditor(vl._working.textarea);                        // And show in the editor
+        }
+        function vl_select(el) {
+            // Called when the drop-down select for a previous VL is changed
+            p_vl_target_display("vl_target", el.options[el.selectedIndex].source);
+        }
+        function onlogin(kc) {
+            console.log("XXX@68 ----->",             Dweb.KeyChain.mykeys(Dweb.VersionList).length)
+            // Populate drop-downs
+            replacetexts("vls_list", Dweb.KeyChain.mykeys(Dweb.VersionList))
+            replacetexts("lock_list", Dweb.KeyChain.mykeys(Dweb.AccessControlList))
+            console.log("XXX@68 -----<")
+        }
+        async function main() {
+            //This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
+            // These next two lines reqd at this level to get the global scope
+            try {
+                await p_connect(); // Default startup beavior from loginutils.js
+                // Any code you want to run once online goes here.
+                var url = searchparams.get("url");   //TODO determine what to do with parms in url
+                starteditor();
+                //TODO - cant populate Drop-downs if not logged in, need a callback when log in.
+                Dweb.eventHandler.addEventListener((event) => {
+                    console.log("event",event);
+                    if (event.type === "login") { onlogin(event.values); }
+                });
+                //await _login({name: "Mary Smith", passphrase: "had a little lamb"});
+                //await newversionlist("newform");  // Testing - simulate new list
+                console.log("==Login should have finished-== output after here implies async issue ===");
+            } catch(err) {
+                console.log("App Error:", err);
+                alert(err.message);
+            }
         }
 
     </script>
@@ -102,7 +129,7 @@
         </div>
         <!-- List of all keys in keychain-->
         <ul id="keychain_ul" class="inline_ul">
-            <li class="inline_li template" onclick="keyorlock_click(this);"><img class="keylist_icon" name="objsym"/><span class="keylist_name" name="name"></span></li>';
+            <li class="inline_li template" onclick="kcitem_click(this);"><img class="keylist_icon" name="objsym"/><span class="keylist_name" name="name"></span></li>';
         </ul>
     </div>
     <form id="keynew_form" name="keynew_form" onsubmit="keynew_click(); return false;" style="display:none">
@@ -115,7 +142,7 @@
     </form>
     <div id="lock_div" class="displayedblock" style="display:none">
         <div class="displayedblockheader" id="lock_header"><!--note source will be set on lock_header-->
-            Lock: <img class="keylist_icon" src="noun_1176543_cc.png" onclick='locklink_click("lock_header");' alt="link"/><span name="name"></span>
+            Lock: <img class="keylist_icon" src="noun_1176543_cc.png" onclick='kcitem_click("lock_header");' alt="link"/><span name="name"></span>
             <form class="dialogform" style="display:inline-block;">
                 <img class="keylist_icon" src="noun_708669_cc.png" alt="Key"/><input class="button" type="button" onclick="show('tokennew_form');" value="new token"/>
                 <img class="keylist_icon" src="noun_83161_cc.svg" alt="Close" onclick="hide('lock_div');"/>
@@ -123,7 +150,7 @@
         </div>
         <!-- List of all tokens in AccessControlList-->
         <ul id="lock_ul" class="inline_ul">
-            <li class="inline_li template" onclick="keyorlock_click(this)">
+            <li class="inline_li template" onclick="kcitem_click(this)">
                 <img class="keylist_icon" name="objsym" alt="key"/>
                 <span class="keylist_name" name="name"></span>
             </li>
@@ -150,18 +177,29 @@
         Note working version has not been published
     List of Versions
         Selecting one of the versions loads Current with it.
-    TODO-PUB make sure list added to KeyChains, allow visibility and selection
 -->
 
 <!-- Way to create new list -->
-<form method="post" style="display:inline" id="newform" onsubmit="newversionlist(this); return false;">
-    <input class="propval" type="text" name="name" placeholder="Name of new version list" size="70" value="foo bar"/><!--TODO remove placeholder foo bar-->
-    <input class="propval" type="text" name="contentacl" value="https://gateway.dweb.me/content/rawfetch/Qmd1Ymhc52Hq8gayKiadeCtrHk7xZmqtbNMJgoUj384vyy"/><!--TODO replace with drop down of ACLs--><!--TODO remove value after testing-->
+<div style="display:table">
+<form  style="display:table-cell;padding-right:50px;">
+    <h4>Open&nbsp;existing, </h4>
+    <select id="vls_list" onChange="vl_select(this);">
+        <option class="template" value="_url" name="name"></option>
+    </select>
+</form>
+<form method="post" style="display:inline" id="newform" onsubmit="newversionlist(this); return false;" style="display:table-cell;">
+    <h4>or create new list.</h4>
+    <input class="propval" type="text" name="name" placeholder="Name of new version list" size="70" value=""/>
+    <br/><img  class="keylist_icon" src="noun_1093404_cc_unlocked.png" alt="lock">
+    <select id="lock_list" name="contentacl">
+        <option class="template" value="_url" name="name"></option>
+    </select>
+    <!--<input class="propval" type="text" name="contentacl" value="https://gateway.dweb.me/content/rawfetch/Qmd1Ymhc52Hq8gayKiadeCtrHk7xZmqtbNMJgoUj384vyy"/>-->
     <input class="button" type="submit" value="Create"/>
 </form>
+</div>
 <!-- Meta info about the list -->
-<!--TODO Visibility of block only when have a list to work with -->
-<div id="listmeta" class="displayedblock">
+<div id="vl_target" class="displayedblock"> <!-- Note "vl_target" will make sure loginutils loads it by default-->
     <span style="float:right;display:table;margin-top:3px;margin-right:10px">
         <span style="display:table-row;"><span style="display:table-cell;">Read:</span><img  style="display:table-cell;" name="readlockimg" class="keylist_icon" src="noun_1093404_cc_unlocked.png" alt="unlocked"><span style="display:table-cell;" name="readlockname"></span></span>
         <span style="display:table-row;"><span style="display:table-cell;">Write:</span><img  style="display:table-cell;" name="writelockimg" class="keylist_icon" src="noun_1093404_cc_unlocked.png" alt="unlocked"><span style="display:table-cell;" name="writelockname"></span></span>
@@ -172,36 +210,22 @@
     <form method="post" id="workingform" name="_working">
         <textarea id="mytextarea" name="textarea" width="60%">Testing</textarea>
     </form>
-    <ul id="list_ul" name="_list">
+    <ul id="vl_list" name="_list">
         <li  onclick="clickrestore(this);" class="template" ><span name="date"></span></li><!-- alternative name="data_textarea"-->
 </div>
 
-<!--TODO-->
-TODO
-* click lock to select a lock to lock it with
-* click locked key to edit that lock ?
-* Add to KeyChain so can re-open
-* Show docs in KeyChain
-* Click on doc to open
-* Favorites
-* Listmonitor on versions
-* Open list from link
+<!--
+TODO click lock to select a lock to lock it with
+TODO  click locked key to edit that lock ?
+TODO Favorites
+TODO Listmonitor on versions-
+-->
 
 <script type="text/javascript">
-    // This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
-    // These next two lines reqd at this level to get the global scope
+    // These have to be at global level so they can be found anywhere.
     var searchparams = new URL(window.location.href).searchParams;
     var verbose = searchparams.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)  //TODO-document this and Transport in Readme
-    p_connect() // Default startup beavior from loginutils.js
-    .then(() => {
-        // Any code you want to run once online goes here.
-        var url = searchparams.get("url");   //TODO determine what to do with parms in url
-        starteditor();
-    })
-    //.then(() => _login({name: "Mary Smith", passphrase: "had a little lamb"}))
-    //.then(() => newversionlist("newform"))
-    .then(() => console.log("==Login should have finished-== output after here implies async issue ==="))
-    .catch((err) => { console.log("App Error:",err); alert(err.message); });
+    main();
 </script>
 </body>
 </html>

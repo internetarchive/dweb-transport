@@ -64,7 +64,7 @@ class Signature extends SmartDict {
 
     static filterduplicates(arr) {
         /*
-        Utility function to allow filtering out of duplciates
+        Utility function to allow filtering out of duplicates
 
         :param arr: Array of Signature
         :returns: Array of Signature containing on the first occuring instance of a signature (note first in array, not necessarily first by date)
@@ -74,19 +74,16 @@ class Signature extends SmartDict {
         return arr.filter((x) => (!res[x.url] && (res[x.url] = true)))
     }
 
-    p_fetchdata(verbose) {
+    async p_fetchdata(verbose) {
         /*
         Fetch the data related to a Signature, store on .data
 
         :resolves to: obj - object that was signed
          */
-        let self = this;
-        if (!this.data) {
-            return Dweb.SmartDict.p_fetch(this.url, verbose)
-                .then((obj) => self.data = obj); // Reslves to new obj
-        } else { // Return data if we've aleady fetched it
-            return new Promise((resolve, reject) => resolve(self.data));
+        if (!this.data) {   // Fetch data if have not aleady fetched it
+            this.data = await Dweb.SmartDict.p_fetch(this.url, verbose); // Resolves to new obj
         }
+        return this.data;
     }
 
     static async p_test(verbose) {

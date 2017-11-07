@@ -9,8 +9,9 @@ exports.KeyChain = require('./KeyChain');
 exports.TransportIPFS = require('./TransportIPFS');
 exports.VersionList = require('./VersionList');
 //* Later libraries //TODO-REL4 comment out before REL4
-exports.StructuredBlock = require('./StructuredBlock');
+exports.StructuredBlock = require('./StructuredBlock'); //TODO move most tests to VersionList
 exports.MutableBlock = require("./MutableBlock");
+exports.EventListenerHandler = require("./EventListenerHandler")
 //*/
 
 exports.table2class = { // Each of these needs a constructor that takes data and is ok with no other parameters, (otherwise define a set of these methods as factories)
@@ -41,6 +42,8 @@ exports.transports = {}; // Transports - instances NOT CLASSES of loaded transpo
     exports.dwebport = '4243';
 */
 exports.keychains = [];
+exports.eventHandler = new exports.EventListenerHandler();
+
 exports.transportpriority = []; // First on list is top priority
 
 // ==== OBJECT ORIENTED JAVASCRIPT ===============

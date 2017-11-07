@@ -1,15 +1,14 @@
 const CommonList = require("./CommonList"); // VersionList extends this
-const SmartDict = require("./SmartDict");   // VersionListEntry extends this   //TODO do we need this subclass
 const Dweb = require("./Dweb");
 
+//TODO-API document VersionList
 
 class VersionList extends CommonList {
     /*
     Superclass for any kind of Version List, though in many cases will be able to use this directly.
 
     Fields:
-    contentacl: ACL that should be used to lock content //TODO make sure only stored on master
-    _entryclass: Class to be used for instances
+    contentacl: ACL that should be used to lock content
     _working:   Version currently working on
 
 
@@ -21,41 +20,48 @@ class VersionList extends CommonList {
     constructor(data, master, key, verbose, options) {
         super(data, master, key, verbose, options);
         this.table = "vl";
-        this._entryclass = _VersionListEntry;
     }
 
-    static p_expanddata(data, verbose) {
+    static async p_expanddata(data, verbose) {
         // Expand any known URLs in the data
-        return new Promise((resolve, reject) => {
-            try {
-                if (data.contentacl) {
-                    SmartDict.p_fetch(data.contentacl, verbose)
-                        .then((acl) => {
-                            data.contentacl = acl;
-                            resolve();
-                        })
-                        .catch((err) => { console.log("unable to p_expanddata",err); reject(err);}) // THis is the one that gets "Must be logged in as Mary Smith"
-                } else resolve();
-            } catch(err) {
-                console.log("Uncaught error in p_expanddata",err);
-                reject(err);
-            }
-        });
+        try {
+            if (data.contentacl) data.contentacl = await Dweb.SmartDict.p_fetch(data.contentacl, verbose); // THis is the one that gets "Must be logged in as Mary Smith"
+        } catch(err) {
+                console.log("Unable to expand data in p_expanddata",err);
+        }
     }
 
-    static async p_new(data, master, key, verbose) {
+    static async p_new(data, master, key, firstinstance, verbose) {
         data._acl = Dweb.KeyChain.default();
         if (verbose) console.log("VL.p_new acl=",data._acl);
-        await VersionList.p_expanddata(data, verbose);  // Expands _contentacl
-        return new VersionList(data, master, key, verbose);
+        await VersionList.p_expanddata(data, verbose);  // Expands _contentacl url
+        let vl = new VersionList(data, master, key, verbose);
+        await vl.p_store(verbose);
+        data._acl.p_push(vl)    // Store on the KeyChain so can find again
+        vl._working = firstinstance;
+        vl._working["_acl"] = vl.contentacl;
+        return vl;
     }
 
-    //TODO-API here or elsewhere make sure not encrypting to a KEY - must be to a LOCK
-    p_saveversion(verbose) {
+    async p_saveversion(verbose) {
         // Update the content edited i.e. sign a copy and store on the list, then make a new copy to work with. Triggered by Save.
-        return this.p_push(this._working, verbose)
-            .then((sig) => { this._working = this._working.copy(verbose); return sig}); // New copy to work with, should copy _acl as well.
+        let sig = await this.p_push(this._working, verbose);
+        this._working = this._working.copy(verbose);
+        return sig;             // New copy to work with, should copy _acl as well.
     }
+
+    async p_restoreversion(sig, verbose) {
+        // Go back to version from a specific sig
+        await sig.p_fetchdata(verbose); // Get data - we won't necessarily have fetched it, since it could be large.
+        this._working = sig.data.copy(verbose);
+    }
+    async p_fetchlistandworking(verbose) {
+        await this.p_fetchlist(verbose);    // Get the list
+        if (this._list.length) { // There was some data
+            this._working = await this._list[this._list.length - 1].p_fetchdata(verbose);    // Find last sig, fetch the data
+        }
+    }
+
     preflight(dd) {
         /*
         Prepare data for storage, ensure publickey available
@@ -67,18 +73,6 @@ class VersionList extends CommonList {
             delete dd.contentacl;   // Contentacl is the private ACL, no need to send at all
         }
         return super.preflight(dd); //CL preservers _master and _publicurl
-    }
-}
-
-class _VersionListEntry extends SmartDict {
-    /*
-    Superclass for all kinds of Version Lists
-
-    Inherited Fields worth commenting on:
-    _acl:   Used to lock the content - set from VL.contentacl
-     */
-    constructor(data, verbose, options) {
-        super(data, verbose, options);
     }
 }
 
