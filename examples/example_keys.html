@@ -1,267 +1,207 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title>DWEB KeyChains and Access Control List example</title>
+    <meta charset="UTF-8">
+    <title>Dweb example - Versioning</title>
     <link rel='stylesheet' href='example_styles.css'>
     <script type="text/javascript" src="dweb_transport_ipfs_bundled.js"></script><!-- Load bundle - assigns to "Dweb"-->
-    <script type="text/javascript" src="objbrowser.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript" src="htmlutils.js"></script><!--Non Dweb specific utility functions for working with HTML-->
+    <script type="text/javascript" src="loginutils.js"></script><!--Dweb login functions, useful in multiple places-->
 
     <script type="text/javascript">
 
-        /* NOTES
-         * As with the browser library, the convention p_xyz means the function is asynchronous and returns a Promise
-         */
-
-        // Array of images can use
-        const images = {acl: "noun_1093404_cc.png", kp: "noun_1146472_cc.png"}; /* If change here - see also Keys on KeyChain code below*/
-
-        function _p_login(dict) {
-            /* common routine to login someone by name and passphrase, and display in KeyChain list - note
-            :param dict: {name: passprase: }
-             */
-            // concatenate them so that a common passphrase isn't sufficient to guess an id.
-            let passphrase = dict.name + "/" + dict.passphrase;
-            return Dweb.KeyChain.p_new({ name: dict.name}, {passphrase: passphrase}, verbose)
-                .then((kc) => {
-                    addtemplatedchild("kclist_ul", kc );    // returns el, but unused
-                    show('logout');                         // And show the logout button
-                })
+        async function onlogin(kc) {
+            console.log("XXX@onlogin",kc);
+            alert(`${kc.name} just logged in`)
         }
-
-        function p_registrationsubmit() {
-            /* User has filled in and submitted the registration button */
-            if (verbose) console.log("p_registrationsubmit ---");
-            hide('registrationdiv');                                // Hide after submission
-            return _p_login(form2dict("registrationform"));         // { name, passphrase }
-        }
-
-        function p_loginformsubmit() {
-            /* Login button clicked - User has logged in */
-            // At the moment this is identical behavior to p_registrationsubmit, but that could change
-            //TODO-REL4 - check if user already exists, require "registration if not
-            if (verbose) console.log("loginformsubmit ---");
-            hide('logindiv');                           // Hide after submission
-            return _p_login(form2dict("loginform"));    // { name, passphrase }
-        }
-
-        function clicklogout() {
-            /* Logout button clicked  - logged out*/
-            Dweb.KeyChain.logout();         // Empty keychains
-            deletechildren("kclist_ul");    // Delete any visible children
-            hide('logout');                 // Nothing remains to logout so hide button
-        }
-
-        function _showkeyorlock(obj) {
-            // Utility function to add new or existing element to Key List
-            let objtype = obj.table; // acl = AccessControlList, kp = KeyPair
-            let objsym = images[objtype];
-            let objclick = {acl: 'p_acl_click(this);', kp: 'p_key_click(this);'}[objtype];
-            let htmleach = '<li class="inline_li" onclick="'+objclick+'"><img class="keylist_icon" src="'+objsym+'"/><span class="keylist_name" name="name"></span></li>';
-            return addhtml("keylist_ul", htmleach, obj);
-        }
-        function p_kc_click(el) {
-            /* Click on a KeyChain i.e. on a login - display list of Keys and Locks for that login */
-            let kc = el.source;                                         // Find KeyChain clicked on
-            show('keys');                                               // Show the div 'keys' for showing keylist
-            let el_keylistheader = replacetexts("keylist_header", kc);  // Set name fields etc in keylistdiv, sets source
-            deletechildren("keylist_ul");                               // Delete any locks or eys currently displayed
-            kc.addEventListener("insert", (event) => {                  // Setup a listener that will trigger when anything added to the list and update HTML
-                if (verbose) console.log("p_kc_click.eventlistener",event);
-                let sig = event.detail;
-                if (kc._publicurl === el_keylistheader.source._publicurl)  // Check its still this KeyChain being displayed in keylist
-                    sig.p_fetchdata(verbose)                            // Get the data from a sig, its not done automatically as in other cases could be large
-                        .then((obj) => _showkeyorlock(obj))             // Show on the list
-            });
-            return kc.p_list_then_elements()                            // Retrieve the keys for the keylist
-                .then(() => kc._keys.map((key)=> _showkeyorlock(key)));  // And add to the HTML
-        }
-        function p_newkey() {
-            if (verbose) console.log("p_newkey ---");
-            hide('keynew_div');
-            let dict = form2dict("newkeyform"); //name
-            let kc = document.getElementById('keylist_header').source;
-            let key = new Dweb.KeyPair({name: dict.name, key: {keygen: true}, _acl: kc}, verbose );
-            _showkeyorlock(key);   // Dont put in UI, as listmonitor gets it as well.
-            return key.p_store(verbose)
-                .then(() => kc.p_push(key, verbose));
-        }
-        function p_newtoken() { //Called by "Add" button on new token dialog
-            if (verbose) console.log("p_newtoken ---");
-            hide('tokennew_div');
-            let dict = form2dict("newtokenform"); //url
-            acl = document.getElementById('acl_header').source;
-            return acl.p_add_acle(dict.url, {name: dict["name"]}, verbose)
-                .then((tok) => acllist_push(tok)) // Push to visual list, as listmonitor will be a duplicate
-        }
-        function p_newacl() {
-            if (verbose) console.log("p_newacl ---");
-            hide('aclnew_div');
-            let dict = form2dict("newaclform"); //name
-            let kc = document.getElementById('keylist_header').source;  // The KeyChain being added to.
-            return Dweb.AccessControlList.p_new({name: dict.name, _acl: kc}, true, {keygen: true}, verbose, null, kc )    //(data, master, key, verbose, options, kc)
-            .then((acl) => _showkeyorlock(acl)); // Put in UI, as listmonitor return rejected as duplicate
-        }
-        function p_key_click(el) {
-            if (verbose) console.log("p_key_click ---");
-            source = el.source;
-            window.prompt("Copy to clipboard (Ctrl-C + OK)", el.source._publicurl);
-        }
-        function acllist_push(obj) {
-            // Add an key to list showing an ACL, clicking on it will display key's public key (just as for a KeyChain).
-            let htmleach = `<li class="inline_li" onclick="p_key_click(this)"><img class="keylist_icon" src="${images['kp']}"/><span class="keylist_name" name="name"></span></li>`;
-            return addhtml("acl_ul", htmleach, obj);    // returns element
-        }
-        function p_acl_click(el) {
-            if (verbose) console.log("p_acl_click ---");
-            let acl = el.source;                                    // The ACL clicked on
-            show('tokens_div');                                     // Show the HTML with a list of tokens in ACL
-            let el_aclheader = replacetexts("acl_header", acl);     // Set name fields etc in keylistdiv, sets source
-            deletechildren("acl_ul");                               // Remove any existing HTML children
-            return acl.p_tokens()                                       // Retrieve the keys for the keylist
-                .then((toks) => toks.map((tok) => acllist_push(tok)))   // And add to the HTML
-                .then(() => acl.addEventListener("insert", (event) => {                  // Setup a listener that will trigger when anything added to the list and update HTML
-                    if (verbose) console.log("p_acl_click.eventlistener",event);
-                    let sig = event.detail;
-                    if (acl._publicurl === el_aclheader.source._publicurl)  // Check its still this ACL being displayed in keylist
-                        sig.p_fetchdata(verbose)                    // Get the data from a sig, its not done automatically as in other cases could be large
-                        .then((tok) => acllist_push(tok))           // Show on the list
-                }));
-        }
-
-    </script>
-</head>
-<body class="exampleskeys">
-    <div class="floatright">
-        <div id="status">Starting</div>
-        <ul id="kclist_ul"><!-- List of all existing keychains-->
-        <li class='template vertical_li' onclick='p_kc_click(this);'><span class='kclist_name' name='name'>PLACEHOLDER</span></li>
-        </ul>
-        <form><input id="logout" class="button" type="button" onclick="clicklogout();" style="display:none;" value="Logout"/></form><!--logout all keychains-->
-        <img src="noun_186903_cc.png" alt="keychain" class="iconopener" onclick="togglevis('logindiv','');"/>
-    </div>
-    <h1>Dweb - KeyChains and Access Control List Example</h1>
-    <!-- General design
-    Key Chains icon - opens / closes to
-        List of Key Chains - names - click -> Key Chain management opens
-        Passphrase & Login button - fill and login -> retrieved and listed above
-        Register button -> click -> registration dialogue
-    Registration dialogue [x]
-        Name of KeyChain/Login, Pass Phrase
-        Submit -> create KeyChain, add to KeyChains,
-    Key Chain Management screen [x]
-        Name of chain at top
-        List of items in chain: Name; publickey; some links ->
-        New Key button -> New Key Form
-        New ACL button -> TBD
-    New Key Form:
-        Name,
-        Generate button -> Generate key, add to KeyChain
-    ACL screen [x]
-        List of keys in ACL
-        Way to add new Key based on string
-        Need way to add this key to smartdict or list
-    //TODO - need some example of using them
-    -->
-    <div id="logindiv" style="position:relative; left:25px; display:none;"><!-- needs position:relative, so parent for overdiv below-->
-        <div class="displayedblock"><!--inline next to keychain-->
-            <form class="dialogform" name="loginform" onsubmit="p_loginformsubmit(); return false;">
-                <input class="propval" type="text" name="name" size="20" placeholder="Your id"/>
-                <input class="propval" type="text" name="passphrase" size="70" placeholder="Passphrase"/>
-                <input class="button" type="submit" value="Login"/>
-                <input class="button" type="button" onclick="togglevis('registrationdiv','block');" value="Register"/>
-            </form>
-        </div>
-        <div id="registrationdiv" class="overdiv" style="display:none">
-            <form class="dialogform" name="registrationform" onsubmit="p_registrationsubmit(); return false;">
-                <input class="propval" type="text" name="name" size="50" placeholder="Your id - it doesnt have to be unique"/>
-                <input class="propval" type="text" name="passphrase" size="70" placeholder="Type a complex phrase, easy for you to remember, hard for others to guess, mixed case, numbers, punctuation are all good"/>
-                <input class="button" type="submit" value="Register"/>
-            </form>
-        </div>
-
-    </div>
-
-
-    <div id="keys" style="position:relative; display:none;"><!-- needs position:relative, so parent for overdiv below-->
-        <div id="keynew_div" class="overdiv" style="display:none">
-            <form name="newkeyform" onsubmit="p_newkey(); return false;">
-                <input class="propval" type="text" name="name" size="50" placeholder="Name of the key"/>
-                <input class="button" type="submit" value="Generate"/>
-            </form>
-        </div>
-        <div id="aclnew_div" class="overdiv" style="display:none">
-            <form name="newaclform" onsubmit="p_newacl(); return false;">
-                <input class="propval" type="text" name="name" size="50" placeholder="Name of the ACL"/>
-                <input class="button" type="submit" value="Generate"/>
-            </form>
-        </div>
-        <div id="keylist_div" class="displayedblock">
-            <div class="displayedblockheader" id="keylist_header">
-                <form class="dialogform">
-                    Keys on KeyChain:
-                    <span name="name"></span>
-                    <!--If change icons, see images above-->
-                    <img class="keylist_icon" src="noun_1146472_cc.png" alt="Key"/><input class="button" type="button" onclick="show('keynew_div');" value="new key"/>
-                    <img class="keylist_icon" src="noun_1093404_cc.png" alt="Lock"/><input class="button" type="button" onclick="show('aclnew_div');" value="new lock"/>
-                    <img class="keylist_icon" src="noun_83161_cc.svg" alt="Close" onclick="hide('keys');"/>
-                </form>
-            </div>
-            <ul id="keylist_ul" class="inline_ul"><!-- List of all keys in keychain--></ul>
-        </div>
-        <!--ACL display -->
-    </div>
-    <div id="acl" style="position:relative;"><!-- needs position:relative, so parent for overdiv below-->
-        <div id="tokens_div" class="displayedblock" style="display:none">
-            <div class="displayedblockheader" id="acl_header">
-                Keys valid in lock: <span name="name"></span>
-
-                <form class="dialogform">
-                    <img class="keylist_icon" src="noun_1146472_cc.png" alt="Key"/><input class="button" type="button" onclick="show('tokennew_div');" value="new key"/>
-                    <img class="keylist_icon" src="noun_83161_cc.svg" alt="Close" onclick="hide('keys');"/>
-                </form>
-            </div>
-            <ul id="acl_ul" class="inline_ul"><!-- List of all tokens in AccessControlList--></ul>
-        </div>
-        <!--Dialogue to enter a new key for an ACL -->
-        <div id="tokennew_div" class="overdiv" style="display:none">
-            <form name="newtokenform" onsubmit="p_newtoken(); return false;">
-                <input class="propval" type="text" name="name" size="20" placeholder="Name of key"/>
-                <input class="propval" type="text" name="url" size="50" placeholder="URL of key"/>
-                <input class="button" type="submit" value="Add"/>
-            </form>
-        </div>
-
-
-    </div>
-
-    <hr><!-- Object Browser gives a way to look at the data structures being displayed -->
-
-    <div class="container">
-    <h4>Object browser <span class="hoverclue">....</span></h4>
-    <div class="hoveronly">
-    <ul class="hoveronly" id="ObjBrowser"></ul>
-    </div>
-    </div>
-
-    <script type="text/javascript">
-        // This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
-        const searchparms = new URL(window.location.href).searchParams;
-        const url = searchparms.get("url");
-        var verbose = searchparms.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)
-        let transportclass = Dweb["Transport"+(searchparms.get("transport") || "IPFS").toUpperCase()]; // e.g. Dweb["TransportHTTP"]
-
-        transportclass.p_setup({}, verbose)
-            .then((t) => t.p_status())
-            .then((msg) => setstatus(msg))
-            .then(() => {
+       async function main() {
+            //This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
+            // These next two lines reqd at this level to get the global scope
+            try {
+                await p_connect(); // Default startup beavior from loginutils.js
                 // Any code you want to run once online goes here.
-                //if(url) fetchanddisplay(url);  // In this app, ignoring any URL passed in call
-            })
-            .catch((err) => { console.log("ERROR:",err); alert(err.message); });
+                var url = searchparams.get("url");   //TODO determine what to do with parms in url
+                Dweb.eventHandler.addEventListener((event) => {
+                    console.log("event",event);
+                    if (event.type === "login") { onlogin(event.values); }
+                });
+                console.log("==Login should have finished-== output after here implies async issue ===");
+            } catch(err) {
+                console.log("App Error:", err);
+                alert(err.message);
+            }
+        }
+
     </script>
+
+</head>
+<body class="examplesversions">
+<!--Login and network status box - this is standard for any app requiring logging in -->
+<div class="floatright" style="position:relative;">
+    <div id="status">Starting</div>
+    <ul id="keychains_ul"><li class='template vertical_li' onclick='keychain_click(this);'><span name='name'>PLACEHOLDER</span></li></ul>
+    <form><input id="logout" class="button" type="button" onclick="logout_click();" style="display:none;" value="Logout"/></form><!--logout all keychains-->
+    <img src="noun_186903_cc.png" alt="keychain" class="iconopener" onclick="show('loginform','');"/>
+    <form class="dialogform" id="loginform" onsubmit="loginformsubmit(); return false;" style="display:none;">
+        <img class="keylist_icon" src="noun_83161_cc.svg" alt="Close" onclick="hide('loginform');"/>
+        <input class="propval" type="text" name="name" size="20" placeholder="Your id"/>
+        <input class="propval" type="text" name="passphrase" size="70" placeholder="Passphrase"/>
+        <input class="button" type="submit" value="Login"/>
+        <input class="button" type="button" onclick="show('registrationform');" value="Register"/>
+    </form>
+    <form class="dialogform" id="registrationform" name="registrationform" onsubmit="registrationsubmit(); return false;" style="display:none;">
+        <img class="keylist_icon" src="noun_83161_cc.svg" alt="Close" onclick="hide('registrationform');"/>
+        <input class="propval" type="text" name="name" size="50" placeholder="Your id - it doesnt have to be unique"/>
+        <input class="propval" type="text" name="passphrase" size="70" placeholder="Type a complex phrase, easy for you to remember, hard for others to guess, mixed case, numbers, punctuation are all good"/>
+        <input class="button" type="submit" value="Register"/>
+    </form>
+    <!-- KeyChain -->
+    <div id="keychain" class="displayedblock" style="display:none;">
+        <div class="displayedblockheader" id="keychain_header">
+            <form class="dialogform">
+                <img class="keylist_icon" src="noun_83161_cc.svg" alt="Close" onclick="hide('keychain');" style="float:right;"/>
+                <span name="name" style="display: inline-block;"></span>
+                <!--If change icons, see icon_images above-->
+                <span style="display: inline-block;"><img class="keylist_icon" src="noun_1146472_cc.png" alt="Key"/><input class="button" type="button" onclick="show('keynew_form');" value="new key"/></span>
+                <span style="display: inline-block;"><img class="keylist_icon" src="noun_1093404_cc.png" alt="Lock"/><input class="button" type="button" onclick="show('locknew_form');" value="new lock"/></span>
+            </form>
+        </div>
+        <!-- List of all keys in keychain-->
+        <ul id="keychain_ul" class="inline_ul">
+            <li class="inline_li template" onclick="kcitem_click(this);"><img class="keylist_icon" name="objsym"/><span class="keylist_name" name="name"></span></li>';
+        </ul>
+    </div>
+    <form id="keynew_form" name="keynew_form" onsubmit="keynew_click(); return false;" style="display:none">
+        <input class="propval" type="text" name="name" size="50" placeholder="Name of the key"/>
+        <input class="button" type="submit" value="Generate"/>
+    </form>
+    <form id="locknew_form" name="locknew_form" onsubmit="locknew_click(); return false;" style="display:none">
+        <input class="propval" type="text" name="name" size="50" placeholder="Name of the Lock"/>
+        <input class="button" type="submit" value="Generate"/>
+    </form>
+    <div id="lock_div" class="displayedblock" style="display:none">
+        <div class="displayedblockheader" id="lock_header"><!--note source will be set on lock_header-->
+            Lock: <img class="keylist_icon" src="noun_1176543_cc.png" onclick='kcitem_click("lock_header");' alt="link"/><span name="name"></span>
+            <form class="dialogform" style="display:inline-block;">
+                <img class="keylist_icon" src="noun_708669_cc.png" alt="Key"/><input class="button" type="button" onclick="show('tokennew_form');" value="new token"/>
+                <img class="keylist_icon" src="noun_83161_cc.svg" alt="Close" onclick="hide('lock_div');"/>
+            </form>
+        </div>
+        <!-- List of all tokens in AccessControlList-->
+        <ul id="lock_ul" class="inline_ul">
+            <li class="inline_li template" onclick="kcitem_click(this)">
+                <img class="keylist_icon" name="objsym" alt="key"/>
+                <span class="keylist_name" name="name"></span>
+            </li>
+        </ul>
+    </div>
+    <!--Dialogue to enter a new key for an ACL -->
+    <form id='tokennew_form' name="tokennew_form" onsubmit="tokennew_click(); return false;" style="display:none;">
+        <input class="propval" type="text" name="name" size="20" placeholder="Name of key" style="align:right;" />
+        <img class="keylist_icon" src="noun_83161_cc.svg" alt="Close" onclick="hide('tokennew_form');"/>
+        <input class="propval" type="text" name="url" size="50" placeholder="URL of key"/><br/>
+        <input class="button" type="submit" value="Add" style="align:right;"/>
+    </form>
+</div><!--End of standard network status and login panel-->
+
+<div>
+
+<h1>Dweb - Authentication and Key management example</h1>
+<p>
+    This page is user documentation of the Authentication and Key management library.
+<ul>
+    <li>For API documentation see _____</li>
+    <li>For other examples see <a href="./index.html">index.html</a></li>
+    <li>For Version List example which uses this see <a href="./example_versions.html">example_versions.html</a></li>
+</ul>
+</p>
+<p>
+    There are a few key concepts.
+    <ul>
+    <li><strong>Key:</strong> A Public/Private key pair owned by a user.</li>
+    <li><strong>Lock or ACL:</strong> A control put on an object to control who can access it.</li>
+    <li><strong>Token:</strong> Controls access for one Key to one Lock.</li>
+    <li><strong>KeyChain:</strong> A collection of Keys, Locks, and Master items.</li>
+    <li><string>Locked Items:</string> something locked with a Lock.</li>
+    <li><string>Master Items:</string> are thing that you control access to, this means owning the private key that they are locked with.</li>
+    <li><string>Dweb.keychains:</string> is the list of KeyChains currently logged into.</li>
+    <li><string>Login Key:</string> The private key pair generated for each user, the private part is really private - never stored online.</li>
+    </ul>
+</p>
+<p>
+    These concepts interleave, for example a Token is a symetric key, encrypted with one of the Public keys in the accessing person's KeyChain.
+</p>
+<h3>Usage</h3>
+<h4>Registration</h4>
+<p>
+    First step is to register.
+</p>
+<ul>
+    <li>Click on the Bundle of Keys at the top right.</li>
+    <li>A login box should appear; click on "Register"</li>
+    <li>A registration dialogue should appear;</li>
+    <li>Select a user name, this name may be seen by other people, it doesn't have to be unique, but its probably a good idea to use a longer one as others may see it.</li>
+    <li>Enter a long passphrase which should be easy for you to remember, and hard for others to guess. This is not stored anywhere (not even on your computer) and so cannot be recovered.<li>
+    <li>Hit Register</li>
+    <li>- At the moment nothing happens when you do so, more functionality will be built here</li><!--TODO registration-->
+</ul>
+<h4>Login</h4>
+<p>
+   To access anything you need to login with one or more of your identities.
+</p>
+<ul>
+    <li>If you just registered you will already be Logged in</li>
+    <li>- At the moment, the Login dialogue doesnt close, though you've been logged in, and can close the dialog to check.</li>
+    <li>Next time you can just login with the user name and passphrase.</li>
+    <li>- At the moment it doesnt check that this user exists (see note above about nothing happening on registration)</li><!--TODO -->
+    <li>Everything now is happening within the context of this User.</li>
+    <li>Note you can login more than once (e.g. with a personal, and company id), and most things will use the combination of the two KeyChains, with the most recent being the default for Locking.</li>
+    <li>We call each of these a Login Key and its never stored online, or (unless you cut and paste it somewhere) on your own machine.</li>
+</ul>
+<h4>Creating Keys</h4>
+<p>
+    Now you need a key
+</p>
+<ul>
+    <li>Click on the name for your id</li>
+    <li>A list of your Keys, Locks, and Master Items appears, it will be empty if you've just registered.</li>
+    <li>Click "New Key" - the "New Key" dialogue appears</li>
+    <li>Enter a name for the key, this is a name personal to you, for example everyone might have a key called "Front Door"</li>
+    <li>A new private/public key pair is generated, the private part will only ever be stored encrypted with your Login key.</li>
+    <li>Click on the newly made key and you'll see a URL with a long cryptic key, you can copy this to your clipboard, and share it with someone trying to give you access.</li>
+    <li>Go ahead and create another key.</li>
+</ul>
+<h4>Creating Locks</h4>
+<p>
+    Anything your protect needs a lock, a single lock can be used with multiple Locked Items. Now lets create a lock.
+</p>
+<ul>
+    <li>Clock on yor name, and then on "New Lock"</li>
+    <li>As for the key, give it a name that means something to you.</li>
+    <li>The private key for this lock controls who can add people to the lock, and the public key is how others can refer to it.</li>
+</ul>
+<h4>Adding Keys to Locks</h4>
+<p>
+    You can add people to a lock, only people you add can access a Locked Item.
+</p>
+<ul>
+    <li>Click on the newly created lock</li>
+    <li>The link icon <img class="keylist_icon" src="noun_1176543_cc.png" alt="link"> gives a copy dialogue so you can get the Lock's URL.</li><!--TODO lock link click broken-->
+    <li>Click on "New Token", a dialogue opens.</li>
+    <li>Give the Token a name, this is what you know them by, so for example "Mary at work".</li>
+    <li>Paste the URL you got from the Key</li>
+    <li>If you want to add the same person to a different lock then you can click on the Token and copy the URL from the box that opens.</li>
+    <li>- the plan is to add a drop-down of existing used tokens here.</li><!--TODO add dropdown of existing tokens-->
+    <li>Note that if you don't add one of your own keys to a resource then you won't be able to read it yourself.</li>
+</ul>
+<h4>Creating locked resources.</h4>
+<p>See <a href="./example_versions.html">example_versions.html</a> for creating a locked version list. </p>
+</div>
+<script type="text/javascript">
+    // These have to be at global level so they can be found anywhere.
+    var searchparams = new URL(window.location.href).searchParams;
+    var verbose = searchparams.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)  //TODO-document this and Transport in Readme
+    main();
+</script>
 </body>
 </html>
-
-

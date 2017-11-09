@@ -33,7 +33,7 @@ class KeyChain extends CommonList {
             // after elements are loaded so cant be inside addkeychains()
             KeyChain.addkeychains(kc);  // Add after fetching elements as triggers events
             await kc.p_list_then_elements(verbose);
-            Dweb.eventHandler.callEventListeners({type: "login", values: keychain})
+            Dweb.eventHandler.callEventListeners({type: "login", values: kc})
             return kc;
     }
 

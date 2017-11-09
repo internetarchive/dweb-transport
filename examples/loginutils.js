@@ -1,6 +1,6 @@
 /*
     A set of common scripts for use in Dweb code to add key management and login functionality
-    See example_keys.html for some usage
+    See example_versions.html for some usage and example_keys.html for instructions.
 
     Requires Dweb to point to top level (e.g. by loading src="dweb_transport_ipfs_bundled.js"
 
