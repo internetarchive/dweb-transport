@@ -3,7 +3,7 @@ const SmartDict = require("./SmartDict");
 const Dweb = require("./Dweb");
 const crypto = require('crypto'); // Needed to do a simple sha256 which doesnt appear to be in libsodium
 //Buffer seems to be built in, require('Buffer') actually breaks things
-const multihashes = require('multihashes'); // TODO-IPFS only required because IPFS makes it hard to get this
+const multihashes = require('multihashes');
 
 class KeyPair extends SmartDict {
     /*
@@ -55,7 +55,11 @@ class KeyPair extends SmartDict {
         /*
         Set a key, convert formats or generate key if required.
 
-        value:  Dictionary in local format, or Uint8Array or urlsafebase64 string TODO-API doc this
+        value:  Dictionary in local format, or Uint8Array or urlsafebase64 string {
+            mnemonic: BIP39 style mnemonic (currently unsupported except one fake test case
+            passphrase: A phrase to hash to get a seed
+            keygen:     True to generate a new key
+            seed:       32 byte string or buffer
          */
         let verbose = false;
         if (verbose) console.log("KP._key_setter");
@@ -90,7 +94,6 @@ class KeyPair extends SmartDict {
         }
     }
 
-    //TODO-XXX need storepublic
     async p_store(verbose) {
         if (super.stored())
             return; // Already stored
@@ -308,7 +311,7 @@ class KeyPair extends SmartDict {
 
         let sig = sodium.from_urlsafebase64(urlb64sig);
         let tested = sodium.crypto_sign_verify_detached(sig, signable, this._key.sign.publicKey);
-        if (!tested) throw new Dweb.errors.SigningError("Signature not verified");   //TODO decide what to do at this point - might throw exception
+        if (!tested) throw new Dweb.errors.SigningError("Signature not verified");
         return true;
     }
 

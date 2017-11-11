@@ -41,7 +41,7 @@ class Signature extends SmartDict {
         return this.date.toISOString() + this.url;
     }
 
-    static async p_sign(commonlist, url, verbose) { //TODO-API
+    static async p_sign(commonlist, url, verbose) {
         /*
         Sign and date a url, returning a new Signature
 

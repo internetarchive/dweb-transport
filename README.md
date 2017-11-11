@@ -8,20 +8,24 @@ VERBOSE
 The examples can run either from the [dweb.me/examples](https://dweb.me/examples) server, 
 or once the source is checked out, locally from your file system.
 
-- example_block.html: [IPFS](https://dweb.me/examples/example_block.html)
+- Simple text creation and retrieval: example_block.html: [IPFS](https://dweb.me/examples/example_block.html)
     or [HTTP](https://dweb.me/examples/example_block.html?transport=HTTP)
-- example_smartdict.html: [IPFS](https://dweb.me/examples/example_smartdict.html)
+- Simple dict creation and retrieval: example_smartdict.html: [IPFS](https://dweb.me/examples/example_smartdict.html)
     or [HTTP](https://dweb.me/examples/example_smartdict.html?transport=HTTP); 
-- example_list.html: [IPFS](https://dweb.me/examples/example_list.html)
+- List creation and retrieval: example_list.html: [IPFS](https://dweb.me/examples/example_list.html)
     or [HTTP](https://dweb.me/examples/example_list.html?transport=HTTP)
-- example_academic.html: [IPFS](https://dweb.me/examples/example_academic.html)
+- UI for Academic docs - centralised search; decentralized retrieval: example_academic.html: [IPFS](https://dweb.me/examples/example_academic.html)
     or [HTTP](https://dweb.me/examples/example_academic.html?transport=HTTP)
-- example_keys.html: [IPFS](https://dweb.me/examples/example_keys.html)
+- Authentication: Managing locks and keys example_keys.html: [IPFS](https://dweb.me/examples/example_keys.html)
     or [HTTP](https://dweb.me/examples/example_keys.html?transport=HTTP); 
+- Versions of a single document: example_versions.html: [IPFS](https://dweb.me/examples/example_versions.html)
+    or [HTTP](https://dweb.me/examples/example_versions.html?transport=HTTP); 
 - [objbrowser.html](https://dweb.me/examples/objbrowser.html); 
 
 **Browser Support**: This should work on Chrome and Firefox (Safari doesn't support many newer features), 
 see below for IPFS bugs, 
+
+**Transport choice**: As you can see from the URLs above ylj ca  select between IPFS (default) and HTTP as the transport
 
 **Verbosity**: You can get debugging output by appending verbose=true to the URLs, 
 this shows up in your console and also (for HTTP) in our server logs.

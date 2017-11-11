@@ -204,7 +204,7 @@ class CommonList extends SmartDict {
         }
     }
 
-    async p_sign(url, verbose) { //TODO-API
+    async p_sign(url, verbose) {
         /*
         Create a signature -
         Normally better to use p_push as stores signature and puts on _list and on Dweb
@@ -268,7 +268,7 @@ class CommonList extends SmartDict {
         return !event.defaultPrevented;
     }
 
-    listmonitor(verbose) {    //TODO-EVENT API will need updating
+    listmonitor(verbose) {
         this.transport().listmonitor(this._publicurl, (obj) => {
             if (verbose) console.log("CL.listmonitor",this._publicurl,"Added",obj);
             let sig = new Dweb.Signature(obj, verbose);
@@ -285,5 +285,12 @@ class CommonList extends SmartDict {
         }, verbose);
     }
     //TODO add many of the methods of Array to CommonList see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array
+    //TODO - concat; filter; find;
+    concat(arr) {   // Note that any metadata in new arr is ignored, and it blindly copies even if members of list are different classes
+        let newcl = this.copy(); // Shallow copy - i.e. pointers to items in _list not copies of them
+        newcl._list.concat(arr._list);    // Append items from new _list
+        return newcl;
+    }
+
 }
 exports = module.exports = CommonList;

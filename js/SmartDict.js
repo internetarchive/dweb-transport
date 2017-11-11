@@ -122,9 +122,12 @@ class SmartDict extends Transportable {
         })
     }
 
-    copy(verbose) { //TODO-API
-        // The constructor will treat "this" as a dict and add to fields, note will shallowcopy, not deep copy.
-        return new this.constructor(this, verbose)
+    copy(verbose) {
+        /*
+        Copy a SmartDict or subclass, will treat "this" as a dict and add to fields, note will shallowcopy, not deep copy.
+        returns: new instance of SmartDict or subclass
+        */
+        return new this.constructor(this, verbose);
     }
 
     static async p_fetch(url, verbose) {

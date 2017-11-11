@@ -65,11 +65,13 @@
             p_vl_target_display("vl_target", el.options[el.selectedIndex].source);
         }
         function onlogin(kc) {
-            console.log("XXX@68 ----->",             Dweb.KeyChain.mykeys(Dweb.VersionList).length)
             // Populate drop-downs
-            replacetexts("vls_list", Dweb.KeyChain.mykeys(Dweb.VersionList))
-            replacetexts("lock_list", Dweb.KeyChain.mykeys(Dweb.AccessControlList))
-            console.log("XXX@68 -----<")
+            replacetexts("vls_list", Dweb.KeyChain.mykeys(Dweb.VersionList));
+            replacetexts("lock_list", Dweb.KeyChain.mykeys(Dweb.AccessControlList));
+            el = resolve("vl_target");
+            if (url && ! el.source) {   // Were asked to load a VL but had to wait for login.
+                p_vl_target_display(el, url); // Asynchronous
+            }
         }
         async function main() {
             //This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
@@ -77,9 +79,9 @@
             try {
                 await p_connect(); // Default startup beavior from loginutils.js
                 // Any code you want to run once online goes here.
-                var url = searchparams.get("url");   //TODO determine what to do with parms in url
+                var url = searchparams.get("url");   //Will load after login, TODO warn user to login if this is set.
                 starteditor();
-                //TODO - cant populate Drop-downs if not logged in, need a callback when log in.
+                //Setup a callback so once logged in it will populate drop-downs
                 Dweb.eventHandler.addEventListener((event) => {
                     console.log("event",event);
                     if (event.type === "login") { onlogin(event.values); }
@@ -224,7 +226,7 @@ TODO Listmonitor on versions-
 <script type="text/javascript">
     // These have to be at global level so they can be found anywhere.
     var searchparams = new URL(window.location.href).searchParams;
-    var verbose = searchparams.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)  //TODO-document this and Transport in Readme
+    var verbose = searchparams.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)
     main();
 </script>
 </body>

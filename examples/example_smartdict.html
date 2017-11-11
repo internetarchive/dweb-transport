@@ -80,7 +80,7 @@
     var url = searchparms.get("url");
     let transportclass = Dweb["Transport"+(searchparms.get("transport") || "IPFS").toUpperCase()]; // e.g. Dweb["TransportHTTP"]
 
-    var verbose = searchparms.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)  //TODO-document this and Transport in Readme
+    var verbose = searchparms.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)
     transportclass.p_setup({}, verbose)
         .then((t) => t.p_status())
         .then((msg) => setstatus(msg))

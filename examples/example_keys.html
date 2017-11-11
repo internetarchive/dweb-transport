@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Dweb example - Versioning</title>
+    <title>Dweb example - Keys, Locks and Authentication</title>
     <link rel='stylesheet' href='example_styles.css'>
     <script type="text/javascript" src="dweb_transport_ipfs_bundled.js"></script><!-- Load bundle - assigns to "Dweb"-->
     <script type="text/javascript" src="htmlutils.js"></script><!--Non Dweb specific utility functions for working with HTML-->
@@ -20,7 +20,7 @@
             try {
                 await p_connect(); // Default startup beavior from loginutils.js
                 // Any code you want to run once online goes here.
-                var url = searchparams.get("url");   //TODO determine what to do with parms in url
+                var url = searchparams.get("url"); // Unused in this example
                 Dweb.eventHandler.addEventListener((event) => {
                     console.log("event",event);
                     if (event.type === "login") { onlogin(event.values); }
@@ -106,7 +106,7 @@
 
 <div>
 
-<h1>Dweb - Authentication and Key management example</h1>
+<h1>Dweb - Keys, Locks and Authentication</h1>
 <p>
     This page is user documentation of the Authentication and Key management library.
 <ul>
@@ -200,7 +200,7 @@
 <script type="text/javascript">
     // These have to be at global level so they can be found anywhere.
     var searchparams = new URL(window.location.href).searchParams;
-    var verbose = searchparams.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)  //TODO-document this and Transport in Readme
+    var verbose = searchparams.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)
     main();
 </script>
 </body>

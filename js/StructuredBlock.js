@@ -127,7 +127,7 @@ class StructuredBlock extends SmartDict {
         if (verbose) console.log("StructuredBlock.test");
         return new Promise((resolve, reject) => {
             let el = document.getElementById("myList.0");
-            console.log("el=", el);
+            if (verbose) console.log("el=", el);
             try {
                 let teststr = "The well structured block";
                 let sb = new StructuredBlock({"data": teststr});

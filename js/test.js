@@ -30,7 +30,7 @@ let acl;
 async function p_test() {
     try {
         await transportclass.p_setup({
-            iiif: {store: "leveldb"}, // Note browser requires indexeddb
+            http: {urlbase: "http://localhost:4244"},   // Localhost - comment out if want to use remote
             yarray: {db: {name: "leveldb", dir: "../dbtestjs", cleanStart: true}},  // Cleanstart clears db
             listmethod: "yarrays"
             //http uses default arguments in TransportHTTP for now TODO-HTTP bring them here
@@ -44,9 +44,9 @@ async function p_test() {
         //TODO-REL4 comment out before REL4
         //* - tests for later modules
         let sb = (await Dweb.StructuredBlock.test(document, verbose)).sb;
-        console.log("sb=",sb);
-        await Dweb.MutableBlock.test(sb, verbose);
-        await Dweb.KeyChain.p_test(acl, verbose); // depends on MutableBlock for test, though not for KeyChain itself
+        //await Dweb.MutableBlock.test(sb, verbose);
+        await Dweb.VersionList.test(verbose);
+        await Dweb.KeyChain.p_test(acl, verbose); // depends on VersionList for test, though not for KeyChain itself
      //*/ /TODO-REL4 comment out before REL4
         console.log("delaying 10 secs");
         await delay(2000);

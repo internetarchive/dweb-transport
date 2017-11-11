@@ -61,7 +61,7 @@ function loginformsubmit() {
     // At the moment this is identical behavior to p_registrationsubmit, but that could change
     //TODO-REL4 - check if user already exists, require "registration if not
     if (verbose) console.log("loginformsubmit ---");
-    hide('loginform');                           // Hide after submission   //TODO-KEYS change form or this wont hide it
+    hide('loginform');                           // Hide after submission
     return _login(form2dict("loginform"));    // { name, passphrase }
 }
 

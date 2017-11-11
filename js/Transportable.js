@@ -92,7 +92,7 @@ class Transportable {
 
     // ==== UI method =====
 
-    p_elem(el, verbose, successmethodeach) {    //TODO-REL5 may delete this dependiong on MutableBlock and StructuredBlock changes
+    p_elem(el, verbose, successmethodeach) {    //TODO-REL5 may delete this dependiong on and StructuredBlock changes
         /*
         If the content() of this object is a string, store it into a Browser element,
             If the content() is an array, pass to to p_updatelist (which is only implemented on sublasses of CommonList)

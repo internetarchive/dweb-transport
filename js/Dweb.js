@@ -10,7 +10,6 @@ exports.TransportIPFS = require('./TransportIPFS');
 exports.VersionList = require('./VersionList');
 //* Later libraries //TODO-REL4 comment out before REL4
 exports.StructuredBlock = require('./StructuredBlock'); //TODO move most tests to VersionList
-exports.MutableBlock = require("./MutableBlock");
 exports.EventListenerHandler = require("./EventListenerHandler")
 //*/
 
@@ -19,7 +18,6 @@ exports.table2class = { // Each of these needs a constructor that takes data and
     "sb": "StructuredBlock",
     "kc": "KeyChain",
     "kp": "KeyPair",
-    "mb": "MutableBlock",
     "acl": "AccessControlList",
     "sd": "SmartDict",
     "vl": "VersionList",

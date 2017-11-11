@@ -166,7 +166,7 @@
     // This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
     var searchparms = new URL(window.location.href).searchParams;
     var url = searchparms.get("url");
-    var verbose = searchparms.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)  //TODO-document this and Transport in Readme
+    var verbose = searchparms.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)
     let transportclass = Dweb["Transport"+(searchparms.get("transport") || "IPFS").toUpperCase()]; // e.g. Dweb["TransportHTTP"]
     transportclass.p_setup({}, verbose)
         .then((t) => t.p_status())
