@@ -15,6 +15,7 @@ function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { reso
 let transportclass = TransportHTTP
 
 // Fake a browser like environment for some tests
+//TODO can remove this when rebuild StructuredBlock as its the only thing that uses "document"
 const jsdom = require("jsdom");
 const { JSDOM } = jsdom;        //TODO - figure out what this does, dont understand the Javascript
 htmlfake = '<!DOCTYPE html><ul><li id="myList.0">Failed to load sb via StructuredBlock</li><li id="myList.1">Failed to load mb via MutableBlock</li><li id="myList.2">Failed to load sb via dwebfile</li><li id="myList.3">Failed to load mb via dwebfile</li></ul>';
@@ -30,10 +31,9 @@ let acl;
 async function p_test() {
     try {
         await transportclass.p_setup({
-            http: {urlbase: "http://localhost:4244"},   // Localhost - comment out if want to use remote
+            http: {urlbase: "http://localhost:4244"},   // Localhost - comment out if want to use gateway.dweb.me (default args use this)
             yarray: {db: {name: "leveldb", dir: "../dbtestjs", cleanStart: true}},  // Cleanstart clears db
             listmethod: "yarrays"
-            //http uses default arguments in TransportHTTP for now TODO-HTTP bring them here
         }, verbose); // Note browser requires indexeddb
         if (verbose) console.log("setup returned and transport set - including annoationList");
         await transportclass.test(Dweb.transport(), verbose);
@@ -41,13 +41,11 @@ async function p_test() {
         await Dweb.Signature.p_test(verbose);
         await Dweb.KeyPair.test(verbose);
         let acl = await Dweb.AccessControlList.p_test(verbose);
-        //TODO-REL4 comment out before REL4
         //* - tests for later modules
         let sb = (await Dweb.StructuredBlock.test(document, verbose)).sb;
         //await Dweb.MutableBlock.test(sb, verbose);
         await Dweb.VersionList.test(verbose);
         await Dweb.KeyChain.p_test(acl, verbose); // depends on VersionList for test, though not for KeyChain itself
-     //*/ /TODO-REL4 comment out before REL4
         console.log("delaying 10 secs");
         await delay(2000);
         console.log("Completed test - running IPFS in background, hit Ctrl-C to exit");

@@ -33,11 +33,6 @@ class SmartDict extends Transportable {
     __setattr__(name, value) { // Call chain is ... success or constructor > _setdata > _setproperties > __setattr__
         // Subclass this to catch any field (other than _data) which has its own setter
         //Note how Signature transforms date to a string
-        // if (name[0] != "_") {
-        //    if "date" in name and isinstance(value,basestring):
-        //        value = dateutil.parser.parse(value)
-        //}
-        //TODO - instead of calling "setter" automatically, assuming that __setattr__ in each class does so.
         this[name] = value;
     }
 
@@ -85,7 +80,7 @@ class SmartDict extends Transportable {
         }
         let res = this.transport().dumps(this.preflight(dd));
         if (this._acl) { //Need to encrypt
-            let encdata = this._acl.encrypt(res, true);  // data, b64   TODO-BUG it nees signer <<<
+            let encdata = this._acl.encrypt(res, true);  // data, b64
             let dic = { "encrypted": encdata, "acl": this._acl._publicurl, "table": this.table};
             res = this.transport().dumps(dic);
         }

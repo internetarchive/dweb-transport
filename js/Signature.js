@@ -22,7 +22,7 @@ class Signature extends SmartDict {
         //TODO-DATE turn s.date into java date
         //if isinstance(s.date, basestring):
         //    s.date = dateutil.parser.parse(s.date)
-        this.table = "sig"; //TODO- consider passing as options to super, need to do across all classes
+        this.table = "sig";
     }
 
     __setattr__(name, value) {

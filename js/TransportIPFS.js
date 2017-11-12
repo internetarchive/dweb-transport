@@ -8,7 +8,7 @@ Y Lists have listeners and generate events - see docs at ...
 // Library packages other than IPFS
 // IPFS components
 
-//TODO-REL4-API scan this file and add documentation
+//TODO-API scan this file and add documentation
 
 const IPFS = require('ipfs');
 const CID = require('cids');
@@ -78,7 +78,7 @@ let defaultyarrayoptions = {    // Based on how IIIF uses them in bootstrap.js i
 let defaultiiifoptions = {
         //store: "leveldb", // leveldb is needed on Node, indexeddb on browser, see test.js for how overridden in node.
         store: "indexeddb",
-        partition: "dweb20170828" //TODO-IIIF try making parition a variable and connecting to multiple lists.
+        partition: "dweb20170828",
         //ipfs: ..., //Will have ipfsoptions stored during startup
 };
 
@@ -129,7 +129,7 @@ class TransportIPFS extends Transport {
 
     /* OBS Aug2017 - using "yarrays" now to support multiple connections not IIIF, leave code here for month or two in case go back.
     // This starts up IPFS under IIIF
-    p_iiifstart(verbose) { //TODO-REL4-API
+    p_iiifstart(verbose) { //TODO-API
 
         //let ipfs = new IPFS(ipfsoptions); // Without CRDT (for lists)
         // Next line is for browser compatibility - there is a bug in browserify so IIIF has to be loaded separately in browser, by test.js for node
@@ -144,10 +144,10 @@ class TransportIPFS extends Transport {
             self.ipfs.version()
                 .then((version) => console.log("Version=", version))
                 .then(() => {
-                    console.log("IPFS/IIIF node",self.ipfs.isOnline() ? "and online" : "but offline");    //TODO throw error if not online
+                    console.log("IPFS/IIIF node",self.ipfs.isOnline() ? "and online" : "but offline");    //TODO-MULTI throw error if not online
                     this.annotationList = this.iiif.annotationList(annotationlistexample);    //inefficient ... move this to the list command - means splitting stuff under it that calls bootstrap
                     this.annotationList.on('started', (event) => {
-                        console.log("IPFS node after annotation list start",self.ipfs.isOnline() ? "now online" : "but still offline");   //TODO throw error if not online
+                        console.log("IPFS node after annotation list start",self.ipfs.isOnline() ? "now online" : "but still offline");   //TODO-MULTI throw error if not online
                         if (verbose) { console.log("annotationList started, list at start = ", ...Dweb.utils.consolearr(this.annotationList.getResources()));}
                         resolve();  // Cant resolve till annotation list online
                     }) // Note delayed resole after really online
@@ -160,7 +160,7 @@ class TransportIPFS extends Transport {
     }
     */
 
-    p_ipfsstart(verbose) { //TODO-REL4-API
+    p_ipfsstart(verbose) { //TODO-API
     /*
     Just start IPFS - not Y or IIIF (note used with "yarrays" and will be used for non-IPFS list management)
 
@@ -183,7 +183,7 @@ class TransportIPFS extends Transport {
     }
 
     /* OBS Aug2017 - using "yarrays" now to support multiple connections, leave code here for month or two in case go back.
-    p_yarraystart(verbose) { //TODO-REL4-API
+    p_yarraystart(verbose) { //TODO-API
         // Singular version - one Yarray, on one IPFS connection, monitoring everything.
         let yarrayoptions = this.options.yarray;
         let self = this;
@@ -203,7 +203,7 @@ class TransportIPFS extends Transport {
         //Lots of issues with "init" not knowing state before it//  this.ipfs.init({emptyRepo: true, bits: 2048})     //.then((unused) => ipfs.init({emptyRepo: true, bits: 2048}))
     }
     */
-    p_yarraysstart(verbose) { //TODO-REL4-API
+    p_yarraysstart(verbose) { //TODO-API
         /*
         This starts IPFS, but only sets up for Y connections, which are opened each time a resource is listed, added to, or listmonitored.
          */
@@ -265,7 +265,7 @@ class TransportIPFS extends Transport {
             .then(() => t);
     }
 
-    supports(url) { //TODO-REL4-API
+    supports(url) { //TODO-API
         /*
         Determine if this transport supports a certain set of URLs
 
@@ -285,17 +285,6 @@ class TransportIPFS extends Transport {
         Return a string for the status of a transport. No particular format, but keep it short as it will probably be in a small area of the screen.
          */
         return new Promise(resolve => resolve(this.ipfs.isOnline() ? "IPFS Online" : "IPFS Offline"));
-    }
-
-    url(data) { //TODO need a way to get an URL from IPFS without storing, for now made sure no code calling this.
-        /*
-         Return an identifier for the data without storing typically ipfs:/ipfs/a1b2c3d4...
-
-         :param string|Buffer data   arbitrary data
-         :return string              valid url to retrieve data via p_rawfetch
-         */
-        throw new Dweb.errors.TrasportError("url is obsoleted because cant figure out how to get it on IPFS pre-storage");
-        return "ipfs:/ipfs/" + Dweb.KeyPair.multihashsha256_58(data)
     }
 
     // Everything else - unless documented here - should be opaque to the actual structure of a CID

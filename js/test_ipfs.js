@@ -87,8 +87,9 @@ function check_result(name, buff, expected) {
 }
 
 async function test_block_get(cid, expected) {
+    // Note we don't use block.get anymore , but its here for testing
     try {
-        let block = await promisified.ipfs.block.get(cid)  //TODO remove promisification
+        let block = await promisified.ipfs.block.get(cid);
         data = block.data;
         check_result("block.get", data, expected);
         await delay(500);    // Allow error on other stream to appear
@@ -143,7 +144,7 @@ async function test_block() {
     let qbf = "The quick brown fox" // String for testing
     console.log("--------testing block.put:",qbf);
     // Store with block.put
-    let block = await promisified.ipfs.block.put(new Buffer(qbf));    //TODO try remove promisified
+    let block = await promisified.ipfs.block.put(new Buffer(qbf));
     let cid = block.cid;       // Will hold CID of string stored with block.put
     let len = qbf.length;      // Will hold length expected
     //await test_block_get(cid,len);                  // Works
@@ -220,5 +221,3 @@ async function test_ipfs() {
 }
 
 test_ipfs()
-
-//TODO - try building CID from multihash on test_dag_string & json

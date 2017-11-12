@@ -90,10 +90,8 @@ class TransportHTTP extends Transport {
         Fetch a url based from default server at command/multihash
 
         url: optional - contains multihash as last component (Maybe TODO handle already parsed URL if provided).
-        throws: TODO if fails to fetch
+        throws: TransportError if fails to fetch
          */
-        // Locate and return a block, based on its url
-        // Throws TransportError if fails
         //TODO-HTTP could check that rest of URL conforms to expectations.
         try {
             let httpurl = `${this.urlbase}/${command}`;

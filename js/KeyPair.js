@@ -203,8 +203,6 @@ class KeyPair extends SmartDict {
         return res;
     }
 
-    //private() { throw new Dweb.errors.ToBeImplementedError("Undefined function KeyPair.private"); }    //TODO private is a reserved word in JS
-    //public() { throw new Dweb.errors.ToBeImplementedError("Undefined function KeyPair.public"); }  //TODO public is a reserved word in JS
     mnemonic() { throw new Dweb.errors.ToBeImplementedError("Undefined function KeyPair.mnemonic"); }
 
     privateexport() {
@@ -216,7 +214,8 @@ class KeyPair extends SmartDict {
         if (key.seed) {
             return "NACL SEED:" + (typeof(key.seed) === "string" ? key.seed : sodium.to_urlsafebase64(key.seed));
         } else {
-            throw new Dweb.errors.ToBeImplementedError("Undefined function KeyPair.privateexport witghout seed", key);  //TODO should export full set of keys prob as JSON
+            throw new Dweb.errors.ToBeImplementedError("Undefined function KeyPair.privateexport without seed", key);
+            //TODO should export full set of keys prob as JSON
         }
     }
 
@@ -295,7 +294,7 @@ class KeyPair extends SmartDict {
         if (! this._key.sign.privateKey) {
             throw new Dweb.errors.EncryptionError("Can't sign with out private key. Key =" + JSON.stringify(this._key));
         }
-        let sig = sodium.crypto_sign_detached(signable, this._key.sign.privateKey, "urlsafebase64");    //TODO may need to be crypto_sign_detached to match verify (better anyway)
+        let sig = sodium.crypto_sign_detached(signable, this._key.sign.privateKey, "urlsafebase64");
         //Can implement and uncomment next line if seeing problems verifying things that should verify ok - tests immediate verification
         this.verify(signable, sig);
         return sig;

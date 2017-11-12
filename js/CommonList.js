@@ -216,7 +216,7 @@ class CommonList extends SmartDict {
         Create a signature -
         Normally better to use p_push as stores signature and puts on _list and on Dweb
 
-        :param url:    URL of object to sign    //TODO-URL-MULTI
+        :param url:    URL of object to sign    //TODO-MULTI
         :returns:       Signature
         */
         if (!url) throw new Dweb.errors.CodingError("Empty url is a coding error");

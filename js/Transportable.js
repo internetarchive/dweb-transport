@@ -18,7 +18,7 @@ class Transportable {
         this._setdata(data); // The data being stored - note _setdata usually subclassed
     }
 
-    transport() { //TODO-REL4-API
+    transport() { //TODO-API
         /*
         Find transport for this object,
         if not yet stored this._url will be undefined and will return default transport
@@ -44,7 +44,7 @@ class Transportable {
     stored() {  // Check if stored
         return this._url ? true : false
     }
-    async p_store(verbose) {    // Python has a "data" parameter to override this._data but probably not needed //TODO-IPFS make sure callers not using _url before stored
+    async p_store(verbose) {    // Python has a "data" parameter to override this._data but probably not needed
         /*
         Store the data on Dweb, if it hasn’t already been.
 
@@ -86,7 +86,6 @@ class Transportable {
     }
 
     file() { throw new Dweb.errors.ToBeImplementedError("Undefined function Transportable.file"); } //TODO-BACKPORT from Python
-    xurl() { throw new Dweb.errors.ToBeImplementedError("Undefined function Transportable.url"); }  //TODO-BACKPORT from Python if not deleted there.
     content() { throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally undefined function Transportable.content - superclass should define"); }
     p_updatelist() { throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally undefined function Transportable.p_updatelist - meaningless except on CL"); }
 
