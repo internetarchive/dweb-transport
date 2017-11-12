@@ -16,6 +16,13 @@ class CommonList extends SmartDict {
     _listeners      Any event listeners
     */
 
+    //TODO extend to cover array functions, but carefully as the semantics require signing and storing.
+    //concat - hard to do well as unclear semantics, do you really want a new list with the contents of both ? The signatures on 2nd might not work
+    //filter - could be done - just filter list, but do you filter sig or data ?
+    //reverse - can do locally, but this wont effect stored version
+    //push - see p_push
+    //map - can do, but sig or data ?  Maybe mapSig and mapData
+
     constructor(data, master, key, verbose, options) {
         /*
             Create a new instance of CommonList
@@ -284,13 +291,5 @@ class CommonList extends SmartDict {
             }
         }, verbose);
     }
-    //TODO add many of the methods of Array to CommonList see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array
-    //TODO - concat; filter; find;
-    concat(arr) {   // Note that any metadata in new arr is ignored, and it blindly copies even if members of list are different classes
-        let newcl = this.copy(); // Shallow copy - i.e. pointers to items in _list not copies of them
-        newcl._list.concat(arr._list);    // Append items from new _list
-        return newcl;
-    }
-
 }
 exports = module.exports = CommonList;

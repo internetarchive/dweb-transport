@@ -8,8 +8,7 @@ exports.AccessControlList = require("./AccessControlList");
 exports.KeyChain = require('./KeyChain');
 exports.TransportIPFS = require('./TransportIPFS');
 exports.VersionList = require('./VersionList');
-//* Later libraries //TODO-REL4 comment out before REL4
-exports.StructuredBlock = require('./StructuredBlock'); //TODO move most tests to VersionList
+exports.StructuredBlock = require('./StructuredBlock'); //TODO - will remove SB once have path traversal.
 exports.EventListenerHandler = require("./EventListenerHandler")
 //*/
 
@@ -114,7 +113,6 @@ exports.transport = function(url) {
     returns subclass of Transport that can support this kind of URL or undefined if none.
     throws  Error (should be TransportError but out of scope) if URL parsing fails
     */
-    //TODO-efficiency, could parse URL once at higher level and pass URL down
     if (url && (typeof url === 'string')) {
         url = Url.parse(url);    // For efficiency, only parse once.
     }
