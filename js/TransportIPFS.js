@@ -12,8 +12,6 @@ Y Lists have listeners and generate events - see docs at ...
 
 const IPFS = require('ipfs');
 const CID = require('cids');
-// Leave IpfsIiiifDb commented out as there is (or at least "was") a bug where browserify crashes if included directly - include seperately in the app.
-//const IpfsIiifDb = require('ipfs-iiif-db');  //https://github.com/pgte/ipfs-iiif-db
 
 // The following only required for Y version
 const Y = require('yjs');
@@ -47,11 +45,10 @@ let defaultipfsoptions = {
     //start: false,
     //TODO-IPFS-Q how is this decentralized - can it run offline? Does it depend on star-signal.cloud.ipfs.team
     config: {
-//        Addresses: { Swarm: [ '/p2p-webrtc-star/dns4/star-signal.cloud.ipfs.team/wss' ] },   // For IIIF or Y - same as defaults (Old pre IPFS26)
-        Addresses: { Swarm: [ '/dns4/star-signal.cloud.ipfs.team/wss/p2p-webrtc-star']},
-//      Addresses: { Swarm: [ ] },   // Disable WebRTC to test browser crash, note disables IIIF or Y so doesnt work.
+        Addresses: { Swarm: [ '/dns4/star-signal.cloud.ipfs.team/wss/p2p-webrtc-star']},  // For Y - same as defaults
+//      Addresses: { Swarm: [ ] },   // Disable WebRTC to test browser crash, note disables Y so doesnt work.
     },
-    //init: true, // Comment out for IIIF or Y
+    //init: true, // Comment out for Y
     EXPERIMENTAL: {
         pubsub: true
     }
@@ -72,27 +69,7 @@ let defaultyarrayoptions = {    // Based on how IIIF uses them in bootstrap.js i
     }
 };
 
-
-/* OBS - only required for IIIF
-// See https://github.com/pgte/ipfs-iiif-db for options
-let defaultiiifoptions = {
-        //store: "leveldb", // leveldb is needed on Node, indexeddb on browser, see test.js for how overridden in node.
-        store: "indexeddb",
-        partition: "dweb20170828",
-        //ipfs: ..., //Will have ipfsoptions stored during startup
-};
-
-const annotationlistexample = { //TODO-IPFS update this to better example, not required for Y, only IIIF
-    "@id": "foobar",    // Only required field is @id
-    "url": "ipfs:/ipfs/A1B2C3D4E5",
-    "date": "20170104T1234",
-    "signature": "123456ABC",
-    "signedby": "123456ABC"
-};
-*/
-
 let defaultoptions = {
-    //iiif:   defaultiiifoptions,   // Stopping support for IIIF, using Y directly
     yarray: defaultyarrayoptions,
     ipfs:   defaultipfsoptions,
     listmethod: "yarrays"
@@ -105,14 +82,13 @@ class TransportIPFS extends Transport {
 
     Fields:
     ipfs: object returned when starting IPFS
-    iiif: object returned when starting iiif
     yarray: object returned when starting yarray
      */
 
     constructor(options, verbose) {
         super(options, verbose);
         this.ipfs = undefined;          // Undefined till start IPFS
-        this.options = options;         // Dictionary of options { ipfs: {...}, iiif: {...}, yarray: {...} }
+        this.options = options;         // Dictionary of options { ipfs: {...}, listmethod: "yarrays", yarray: {...} }
     }
 
 
@@ -127,42 +103,9 @@ class TransportIPFS extends Transport {
         }}}
     }
 
-    /* OBS Aug2017 - using "yarrays" now to support multiple connections not IIIF, leave code here for month or two in case go back.
-    // This starts up IPFS under IIIF
-    p_iiifstart(verbose) { //TODO-API
-
-        //let ipfs = new IPFS(ipfsoptions); // Without CRDT (for lists)
-        // Next line is for browser compatibility - there is a bug in browserify so IIIF has to be loaded separately in browser, by test.js for node
-        let IIIF = typeof IpfsIiifDb === "undefined" ? TransportIPFS.IpfsIiifDb : IpfsIiifDb;
-        let iiifoptions = Object.assign(this.options.iiif, {ipfs: this.options.ipfs}); // IIIF wants to see the IPFS options.
-        const res = IIIF(iiifoptions); //Note this doesn't start either IPFS or annotationlist
-        this.iiif = res;
-        this.ipfs = res.ipfs;
-        this._makepromises()
-        let self = this;
-        return new Promise((resolve, reject) => {
-            self.ipfs.version()
-                .then((version) => console.log("Version=", version))
-                .then(() => {
-                    console.log("IPFS/IIIF node",self.ipfs.isOnline() ? "and online" : "but offline");    //TODO-MULTI throw error if not online
-                    this.annotationList = this.iiif.annotationList(annotationlistexample);    //inefficient ... move this to the list command - means splitting stuff under it that calls bootstrap
-                    this.annotationList.on('started', (event) => {
-                        console.log("IPFS node after annotation list start",self.ipfs.isOnline() ? "now online" : "but still offline");   //TODO-MULTI throw error if not online
-                        if (verbose) { console.log("annotationList started, list at start = ", ...Dweb.utils.consolearr(this.annotationList.getResources()));}
-                        resolve();  // Cant resolve till annotation list online
-                    }) // Note delayed resole after really online
-                })
-                .catch((err) => {
-                    console.log("UNCAUGHT ERROR in TransportIPFS.iiifstart", err);
-                    reject(err)
-                })
-        })
-    }
-    */
-
     p_ipfsstart(verbose) { //TODO-API
     /*
-    Just start IPFS - not Y or IIIF (note used with "yarrays" and will be used for non-IPFS list management)
+    Just start IPFS - not Y (note used with "yarrays" and will be used for non-IPFS list management)
 
      */
         let self = this;
@@ -189,7 +132,7 @@ class TransportIPFS extends Transport {
         let self = this;
         return p_ipfsstart(verbose)
         .then(() => {
-            yarrayoptions.connector.ipfs = this.ipfs; // Note that Y needs the IPFS instance, while IIIF needs the IPFS options.
+            yarrayoptions.connector.ipfs = this.ipfs; // Note that Y needs the IPFS instance, while IIIF needed the IPFS options.
             return Y(yarrayoptions)
         })
         .then((y) => {
@@ -254,12 +197,11 @@ class TransportIPFS extends Transport {
          */
         let combinedoptions = Transport.mergeoptions(defaultoptions, options);
         console.log("IPFS options", JSON.stringify(combinedoptions));
-        let t = new TransportIPFS(combinedoptions, verbose);   // Note doesnt start IPFS or IIIF or Y
+        let t = new TransportIPFS(combinedoptions, verbose);   // Note doesnt start IPFS or Y
         Dweb.transports.ipfs = t;
         Dweb.transportpriority.push(t);    // Sets to default transport if nothing else set otherwise on a list
-        //Switch the comments on the next two lines to switch back and forth between IIIF or Y for testing
-        return  (   (t.options.listmethod === "iiif")    ? t.p_iiifstart(verbose)   // Not currently supported
-                :   (t.options.listmethod === "yarray")  ? t.p_yarraystart(verbose)  // Not currently supported
+        //Switch the comments on the next two lines to switch back and forth between Yarray (one connection) or Yarrays (one per list) for testing
+        return  (   (t.options.listmethod === "yarray")  ? t.p_yarraystart(verbose)  // Not currently supported
                 :   (t.options.listmethod === "yarrays") ? t.p_yarraysstart(verbose)
                 :   undefined   )
             .then(() => t);
@@ -381,27 +323,6 @@ class TransportIPFS extends Transport {
             })
     }
 
-    /*OBS - not supporting IIIF or YARRAY (singular)
-    p_rawlist(url, verbose) {
-        console.assert(url, "TransportHTTP.p_rawlist: requires url");
-        //The listmethods are handled slightly differently as iiif & yarray is sync while the other is potentially async as may have to connect first
-
-        return new Promise((resolve, reject) => {  //XXXREJECT
-            try {
-                let res = (
-                      (this.options.listmethod === "iiif")      ? this.annotationList.getResources()    // IIIF
-                    : (this.options.listmethod === "yarray")    ? this.yarray.share.array.toArray() : undefined)    // YARRAY (singular)
-                    .filter((obj) => (obj.signedby === url));
-                if (verbose) console.log("p_rawlist found", ...Dweb.utils.consolearr(res));
-                resolve(res);
-            } catch(err) {
-                console.log("Uncaught error in TransportIPFS.p_rawlist",err);
-                reject(err);
-            }
-        })
-    }
-    */
-
     listmonitor(url, callback, verbose) {
     /*
     Setup a callback called whenever an item is added to a list, typically it would be called immediately after a p_rawlist to get any more items not returned by p_rawlist.
@@ -422,22 +343,14 @@ class TransportIPFS extends Transport {
         })
     }
 
-    /*OBS - not supporting IIIF or YARRAY(Singular)
+    /*OBS - not supporting YARRAY(Singular)
     listmonitor(url, callback, verbose) {
-        if ( this.options.listmethod === "iiif") {
-            this.annotationList.on('resource inserted', (event) => {
-                let obj = event.value;
-                if (verbose) console.log('resource inserted', obj);
-                if (callback && (obj.signedby === url)) callback(obj);
-            });
-        } else {
-            this.yarray.share.array.observe((event) => {
-                if (event.type === 'insert') { // Currently ignoring deletions.
-                    if (verbose) console.log('resources inserted', event.values);
-                    event.values.filter((obj) => obj.signedby === url).map(callback)
-                }
-            });
-        }
+        this.yarray.share.array.observe((event) => {
+            if (event.type === 'insert') { // Currently ignoring deletions.
+                if (verbose) console.log('resources inserted', event.values);
+                event.values.filter((obj) => obj.signedby === url).map(callback)
+            }
+        });
     }
     */
 
@@ -491,17 +404,12 @@ class TransportIPFS extends Transport {
         return this.p__yarray(signedby, verbose)
             .then((y) => y.share.array.push([value]));
     }
-    /*OBS - not supporting IIIF or YARRAY singular
+    /*OBS - not supporting YARRAY singular
     rawadd(url, date, signature, signedby, verbose) {
         console.assert(url && signature && signedby, "p_rawadd args",url,signature,signedby);
         if (verbose) console.log("p_rawadd", url, date, signature, signedby);
         let value = {"url": url, "date": date, "signature": signature, "signedby": signedby};
-        if ( this.options.listmethod === "iiif") {
-            value["@id"] = signature;
-            this.annotationList.pushResource(value);
-        } else {
-            this.yarray.share.array.push([value]);
-        }
+        this.yarray.share.array.push([value]);
     }
 
     p_rawadd(url, date, signature, signedby, verbose) {
