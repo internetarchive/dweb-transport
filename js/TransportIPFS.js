@@ -294,7 +294,7 @@ class TransportIPFS extends Transport {
          :param string|Buffer data   arbitrary data
          :return string              valid url to retrieve data via p_rawfetch
          */
-        throw new Error("url is obsoleted because cant figure out how to get it on IPFS pre-storage");
+        throw new Dweb.errors.TrasportError("url is obsoleted because cant figure out how to get it on IPFS pre-storage");
         return "ipfs:/ipfs/" + Dweb.KeyPair.multihashsha256_58(data)
     }
 
@@ -342,7 +342,7 @@ class TransportIPFS extends Transport {
         try {
             let res = await this.ipfs.dag.get(cid);
             if (res.remainderPath.length)
-                throw new Error("Not yet supporting paths in p_rawfetch"); //TODO-PATH
+                throw new Dweb.errors.TransportError("Not yet supporting paths in p_rawfetch"); //TODO-PATH
             let buff;
             if (res.value instanceof DAGNode) { // Its file or something added with the HTTP API for example, TODO not yet handling multiple files
                 //console.log("Case a or b" - we can tell the difference by looking at (res.value._links.length > 0) but dont need to
@@ -524,10 +524,6 @@ class TransportIPFS extends Transport {
         } })
     }
     */
-    async_update(self, url, type, data, verbose, success, error) {
-        throw new Dweb.errors.ObsoleteError("OBSOLETE"); //TODO-IPFS obsolete with p_*
-        this.async_post("update", url, type, data, verbose, success, error);
-    }
 
     static test(transport, verbose) {
         if (verbose) {console.log("TransportIPFS.test")}

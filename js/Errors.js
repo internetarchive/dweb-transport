@@ -17,7 +17,6 @@ class ObsoleteError extends Error {
 }
 errors.ObsoleteError = ObsoleteError;
 
-//TODO TransportError is wanted in TransportHTTP but its out of scope there. Think about moving to Transport class
 class TransportError extends Error {
     constructor(message) {
         super(message || "Transport failure");

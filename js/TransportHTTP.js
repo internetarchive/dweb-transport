@@ -36,7 +36,7 @@ class TransportHTTP extends Transport {
         this.urlschemes = ['http','https'];
     }
 
-    static p_setup(options, verbose) {
+    static async p_setup(options, verbose) {
     /*
     Setup the resource and open any P2P connections etc required to be done just once.
     In almost all cases this will call the constructor of the subclass
@@ -48,24 +48,15 @@ class TransportHTTP extends Transport {
     :resolve Transport: Instance of subclass of Transport
      */
         let combinedoptions = Transport.mergeoptions({ http: defaulthttpoptions },options);
-        return new Promise((resolve, reject) => {
-                try {
-                    let t = new TransportHTTP(combinedoptions, verbose);
-                    resolve(t);
-                } catch (err) {
-                    console.log("Exception thrown in TransportHTTP.p_setup");
-                    reject(err);
-                }
-            })
-        .then((t) => {
+        try {
+            let t = new TransportHTTP(combinedoptions, verbose);
             Dweb.transports.http = t;
             Dweb.transportpriority.push(t);    // Sets to default transport if nothing else set otherwise on a list
             return t;
-        })
-        .catch((err) => {
-            console.log("Caught error in TransportHTTP.setup", err);
-            throw(err);
-        })
+        } catch (err) {
+            console.log("Exception thrown in TransportHTTP.p_setup");
+            throw err;
+        }
     }
 
     url(data) { // For now made sure no code calling this because TransportIPFS cant generate URL before storing
@@ -79,25 +70,22 @@ class TransportHTTP extends Transport {
         return `https://${this.ipandport[0]}:${this.ipandport[1]}/contenthash/rawfetch/${Dweb.KeyPair.multihashsha256_58(data)}`;
     }
 
-    p_status() {    //TODO-BACKPORT
+    async p_status() {    //TODO-BACKPORT
         /*
         Return a string for the status of a transport. No particular format, but keep it short as it will probably be in a small area of the screen.
         resolves to: String representing type connected (always HTTP) and online if online.
          */
-        let self = this;
-        return this.p_info()
-            .then((info) => {
-                self.info = info;
-                return self.info.type.toUpperCase() + " online"
-            })
-            .catch((err) => {
-                console.log("Error in p_status.info",err);
-                return "OFFLINE ERROR";
-            })
+        try {
+            this.info = await this.p_info();
+            return self.info.type.toUpperCase() + " online"
+        } catch(err) {
+            console.log("Error in p_status.info",err);
+            return "OFFLINE ERROR";
+        }
     }
 
 
-    p_httpfetch(command, url, init, verbose) { // Embrace and extend "fetch" to check result etc.
+    async p_httpfetch(command, url, init, verbose) { // Embrace and extend "fetch" to check result etc.
         /*
         Fetch a url based from default server at command/multihash
 
@@ -105,35 +93,43 @@ class TransportHTTP extends Transport {
         throws: TODO if fails to fetch
          */
         // Locate and return a block, based on its url
-        // Throws Error if fails - should be TransportError but out of scope
+        // Throws TransportError if fails
         //TODO-HTTP could check that rest of URL conforms to expectations.
-        let httpurl=`${this.urlbase}/${command}`;
-        if (url) {
-            let parsedurl = Url.parse(url);
-            let multihash = parsedurl.pathname.split('/').slice(-1);
-            if (multihash) httpurl += "/" + multihash;
+        try {
+            let httpurl = `${this.urlbase}/${command}`;
+            if (url) {
+                let parsedurl = Url.parse(url);
+                let multihash = parsedurl.pathname.split('/').slice(-1);
+                if (multihash) httpurl += "/" + multihash;
+            }
+            if (verbose) console.log(command, "httpurl=", httpurl);
+            if (verbose) console.log(command, "init=", init);
+            //console.log('CTX=',init["headers"].get('Content-Type'))
+            // Using window.fetch, because it doesn't appear to be in scope otherwise in the browser.
+            let response = await fetch(new Request(httpurl, init));
+            // fetch throws (on Chrome, untested on Ffox or Node) TypeError: Failed to fetch)
+            if (response.ok) {
+                if (response.headers.get('Content-Type') === "application/json") {
+                    return response.json(); // promise resolving to JSON
+                } else {
+                    return response.text(); // promise resolving to text
+                }
+            }   // TODO-HTTP may need to handle binary as a buffer instead of text
+            throw new Dweb.errors.TransportError(`Transport Error ${response.status}: ${response.statusText}`); // Should be TransportError but out of scope
+        } catch (err) {
+            // Error here is particularly unhelpful - if rejected during the COrs process it throws a TypeError
+            console.log("Probably misleading error from fetch:",httpurl);
+            if (err instanceof Dweb.errors.TransportError) {
+                throw err;
+            } else {
+                throw new Dweb.errors.TransportError(`Transport error thrown by ${httpurl}`)
+            }
         }
-        if (verbose) console.log(command, "httpurl=",httpurl);
-        if (verbose) console.log(command, "init=",init);
-        //console.log('CTX=',init["headers"].get('Content-Type'))
-        // Using window.fetch, because it doesn't appear to be in scope otherwise in the browser.
-        return fetch(new Request(httpurl, init)) // A promise, throws (on Chrome, untested on Ffox or Node) TypeError: Failed to fetch)
-            .then((response) => {
-                if(response.ok) {
-                    if (response.headers.get('Content-Type') === "application/json") {
-                        return response.json(); // promise resolving to JSON
-                    } else {
-                        return response.text(); // promise resolving to text
-                    }
-                }   // TODO-HTTP may need to handle binary as a buffer instead of text
-                throw new Error(`Transport Error ${response.status}: ${response.statusText}`); // Should be TransportError but out of scope
-            })
-            .catch((err) => { console.log("Probably misleading error from fetch:",httpurl,err); throw new Error(`Transport error thrown by ${httpurl}`)})   // Error here is particularly unhelpful - if rejected during the COrs process it throws a TypeError
     }
 
     p_get(command, url, verbose) {
         // Locate and return a block, based on its url
-        // Throws Error if fails - should be TransportError but out of scope
+        // Throws TransportError if fails
         let init = {    //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
             method: 'GET',
             headers: new Headers(),
@@ -146,7 +142,7 @@ class TransportHTTP extends Transport {
 
     p_post(command, url, type, data, verbose) {
         // Locate and return a block, based on its url
-        // Throws Error if fails - should be TransportError but out of scope
+        // Throws TransportError if fails
         //let headers = new window.Headers();
         //headers.set('content-type',type); Doesn't work, it ignores it
         let init = {
@@ -188,10 +184,6 @@ class TransportHTTP extends Transport {
         if (verbose) console.log("rawadd", url, date, signature, signedby);
         let value = this._add_value( url, date.toISOString(), signature, signedby, verbose)+ "\n";
         return this.p_post("void/rawadd", null, "application/json", value, verbose); // Returns immediately
-    }
-
-    async_update(self, url, type, data, verbose, success, error) { console.trace(); console.assert(false, "OBSOLETE"); //TODO-IPFS obsolete with p_*
-        this.async_post("update", url, type, data, verbose, success, error);
     }
 
     static test() {
