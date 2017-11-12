@@ -70,19 +70,16 @@ This is a work in progress, dependent on the incompleteness of both the Academic
 the bugs/issues in IPFS.
 
 - In your browser, open the file:  example_academic.html:
-[IPFS](https://dweb.me/examples/example_academic.html)
+[IPFS](https://dweb.me/examples/example_academic.html) (recommended)
 or [HTTP](https://dweb.me/examples/example_academic.html?transport=HTTP)
 - Enter a search term 
-(use just one word, as there are problems with multi-word search)
 - A list of papers should be returned, along with their DOI.
-- Clicking on a DOI will find metadata on it. 
-(Currently (24Oct2017) we don't have most of those DOI's, so you probably won't see a location)
-- Instead try DOI: 10.1001/jama.2009.1064 or DOI: 10.1002/asjc.98
+- Choose one that hs a check-mark next to it, we don't have the others at the Archive.
+- Clicking on the DOI will find metadata on it. 
 - As you search for these DOI's the paper is pushed into our contenthash server, and IPFS.
 - You should see metadata on that paper, and a list of ways to receive it.
 - The first three fetch from: the Archive's contenthash server; and from two IPFS http gateways.
 - The last link fetches directly in the browser without coming to the Archive or any other single point of failure.
-- (Unfortunately there is currently (24Oct2017) a problem with the IPFS API which means only one of those two DOI's above will work)
 
 ###AUTHENTICATION example
 - In your browser, open the file:  examples/example_keys.html:

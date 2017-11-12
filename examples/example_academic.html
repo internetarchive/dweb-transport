@@ -9,6 +9,11 @@
     <script type="text/javascript" src="objbrowser.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript">
 
+        const icon_images = {   //!SEE-OTHER-KC-CLASSES
+            "check": "icon-48-checkin.png",
+            "deny": "icon-48-deny.png"
+        }
+
         function p_submit_searchbox() {
             let dict = form2dict("searchbox");
             if (["doisearch"].includes(dict.namespace)) {
@@ -17,21 +22,22 @@
                 return p_submit_searchbox_gateway(dict);
             }
         }
-        function p_submit_searchbox_doisearch(dict) {
+        async function p_submit_searchbox_doisearch(dict) {
             let url = `https://scholar.archivelab.org/search?boost_fulltext=true&q=${dict.name}`
-            console.log("p_submit_searchbox: ---", dict, "fetching", url);
-            return p_httpget(url, {Accept: "application/json"})
-                .then((json) => { if (verbose) console.log(json); return json } )
-                .then((json) => display_searchresults(json))
-                .catch((err) => {
-                    console.log("Probably misleading error from fetch:", url, err);
-                    throw new Error(`Transport error thrown by ${url}`)
-                });  // Error here is particularly unhelpful - if rejected during the COrs process it throws a TypeError
+            try {
+                console.log("p_submit_searchbox: ---", dict, "fetching", url);
+                let json = await p_httpget(url, {Accept: "application/json"});
+                if (verbose) console.log(json);
+                display_searchresults(json);
+            } catch(err) {
+                console.log("Probably misleading error from fetch:", url, err);
+                throw new Error(`Transport error thrown by ${url}`)
+            }  // Error here is particularly unhelpful - if rejected during the COrs process it throws a TypeError
         }
         function display_searchresults(j) {
             //Try curl -H "Accept: application/json" 'https://scholar.archivelab.org/search?q=heart' to see example of return
             if (verbose) console.log("display_searchresults",j);
-            j.results.map((r) => r.authors = r.authors.join(', '))  // Array of strings to one string
+            j.results.map((r) => { r.authors = r.authors.join(', '); r.imgcheck = icon_images[r.files.length ? "check" : "deny"]})  // Array of strings to one string
             replacetexts("searchresults", j);   // Expands results inside searchresults
             show("searchresults");
             hide("metadataresults");
@@ -130,7 +136,7 @@
                 <span name="journal"></span>,
                 <span name="publisher"></span>,
                 <!--lazy - omitting topic cos could be empty-->
-                <a href="doi" target="_blank" onclick="display_doi(this); return false;"><span name="doi"></span></a>
+                <a href="doi" target="_blank" onclick="display_doi(this); return false;"><span name="doi"></span></a><img class="keylist_icon" name="imgcheck"/>
             </li>
         </ul>
     </div>
