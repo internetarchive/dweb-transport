@@ -5,7 +5,7 @@
   "dependencies": {
     "cids": "^0.5.2",
     "crypto": ">=0.0.3",
-    "ipfs": "git+https://git@github.com/ipfs/js-ipfs.git",
+    "ipfs": "git+https://git@github.com/ipfs/js-ipfs.git#319c1c9830262ab5c05bf99fc525d8883d3178cb",
     "jsdom": "^11.3.0",
     "leveldown": "^1.7.0-0",
     "levelup": "^1.0.0-4",
