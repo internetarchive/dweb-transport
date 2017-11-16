@@ -12,18 +12,24 @@
     <script type="text/javascript">
 
         async function p_vl_target_display(el, vl) {
-            vl = await p_resolve(vl);
-            await vl.p_fetchlistandworking(verbose);    // Get list and most recent version;
-            if (!vl._working) {                         // If no recent version then create a new blank one.
-                vl._working = newversion();             // Locally defined as to what new version is.
+            // vl is a VirtualList or a url that resolves to one
+            try {
+                vl = await p_resolveobj(vl);                // Transport Error if vl is a URL we cant resolve
+                await vl.p_fetchlistandworking(verbose);    // Get list and most recent version;
+                if (!vl._working) {                         // If no recent version then create a new blank one.
+                    vl._working = newversion();             // Locally defined as to what new version is.
+                }
+                seteditor(vl._working.textarea);            // Load the editor with the content (existing or blank)
+                replacetexts("vl_target", vl, {             // Load the header of the editor, especially the lock symbols
+                    readlockimg: icon_images[vl._working._acl ? "locked" : "unlocked"],
+                    writelockimg: icon_images[vl._acl ? "locked" : "unlocked"],
+                    readlockname: vl._working._acl ? vl._working._acl.name : "",
+                    writelockname: vl._acl ? vl._acl.name : ""
+                });
+            } catch(err) {
+                console.log("p_vl_target_display: cannot display",vl,"in element",el);
+                throw err;
             }
-            seteditor(vl._working.textarea);            // Load the editor with the content (existing or blank)
-            replacetexts("vl_target", vl, {             // Load the header of the editor, especially the lock symbols
-                readlockimg: icon_images[vl._working._acl ? "locked" : "unlocked"],
-                writelockimg: icon_images[vl._acl ? "locked" : "unlocked"],
-                readlockname: vl._working._acl ? vl._working._acl.name : "",
-                writelockname: vl._acl ? vl._acl.name : ""
-            });
         }
         function newversion() {  // Create a new blank version - this is where to configure what each one looks like - by setting fields etc.
             return new Dweb.SmartDict({textarea: ""})
@@ -65,12 +71,19 @@
             p_vl_target_display("vl_target", el.options[el.selectedIndex].source);
         }
         function onlogin(kc) {
-            // Populate drop-downs
-            replacetexts("vls_list", Dweb.KeyChain.mykeys(Dweb.VersionList));
-            replacetexts("lock_list", Dweb.KeyChain.mykeys(Dweb.AccessControlList));
-            el = resolve("vl_target");
-            if (url && ! el.source) {   // Were asked to load a VL but had to wait for login.
-                p_vl_target_display(el, url); // Asynchronous
+            try {
+                // Populate drop-downs
+                replacetexts("vls_list", Dweb.KeyChain.mykeys(Dweb.VersionList));
+                replacetexts("lock_list", Dweb.KeyChain.mykeys(Dweb.AccessControlList));
+                el = resolve("vl_target");
+                if (url && !el.source) {   // Were asked to load a VL but had to wait for login.
+                    p_vl_target_display(el, url) // Asynchronous
+                    .catch((err) => alert("Unable to fetch and display "+url));
+                }
+            } catch(err) {
+                console.log("onlogin: Cannot complete post-login activities for",kc);
+                alert("Logged in, but cannot complete post-login activities"+err);
+                //throw err;
             }
         }
         async function main() {
@@ -79,7 +92,6 @@
             try {
                 await p_connect(); // Default startup beavior from loginutils.js
                 // Any code you want to run once online goes here.
-                var url = searchparams.get("url");   //Will load after login, TODO warn user to login if this is set.
                 starteditor();
                 //Setup a callback so once logged in it will populate drop-downs
                 Dweb.eventHandler.addEventListener((event) => {
@@ -226,6 +238,8 @@ TODO Listmonitor on versions-
 <script type="text/javascript">
     // These have to be at global level so they can be found anywhere.
     var searchparams = new URL(window.location.href).searchParams;
+    var url = searchparams.get("url");   //Will load after login, TODO warn user to login if this is set.
+    console.log("url=",url);
     var verbose = searchparams.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)
     main();
 </script>

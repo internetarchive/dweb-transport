@@ -7,9 +7,14 @@ function resolve(el) {
     return (typeof(el) === "string") ? document.getElementById(el) : el;
 }
 async function p_resolveobj(url) {
-    if (typeof vl === 'string')
-        vl = await Dweb.SmartDict.p_fetch(vl, verbose);
-    return vl;
+    try {
+        if (typeof url === 'string')
+            url = await Dweb.SmartDict.p_fetch(url, verbose);
+        return url;
+    } catch(err) {
+        console.log("p_resolveobj: Cannot resolve",url);
+        throw err;
+    }
 }
 
 function form2dict(frm) {
