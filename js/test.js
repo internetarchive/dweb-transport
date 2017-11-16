@@ -11,8 +11,8 @@ const Dweb = require('./Dweb');
 function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { resolve(val); },ms)})}
 
 //Comment out one of these next two lines
-//let transportclass = Dweb.TransportIPFS;
-let transportclass = TransportHTTP
+let transportclass = Dweb.TransportIPFS;
+//let transportclass = TransportHTTP
 
 // Fake a browser like environment for some tests
 //TODO can remove this when rebuild StructuredBlock as its the only thing that uses "document"
@@ -30,13 +30,16 @@ let acl;
 
 async function p_test() {
     try {
-        await transportclass.p_setup({
+        let t = await transportclass.p_setup({
             http: {urlbase: "http://localhost:4244"},   // Localhost - comment out if want to use gateway.dweb.me (default args use this)
             yarray: {db: {name: "leveldb", dir: "../dbtestjs", cleanStart: true}},  // Cleanstart clears db
             listmethod: "yarrays"
         }, verbose); // Note browser requires indexeddb
         if (verbose) console.log("setup returned and transport set - including annoationList");
-        await transportclass.test(Dweb.transport(), verbose);
+        await transportclass.test(t, verbose); //TODO-MULTI figure out how to test some transport - maybe all
+        console.log("------END OF CURRENT TESTING=====")
+        await delay(1000);
+        console.log("------AWAITED ANY BACKGROUND OUTPUT =====")
         await Dweb.Block.p_test(verbose);
         await Dweb.Signature.p_test(verbose);
         await Dweb.KeyPair.test(verbose);

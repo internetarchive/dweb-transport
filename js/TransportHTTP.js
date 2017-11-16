@@ -1,7 +1,7 @@
 const Transport = require('./Transport.js');
 const Dweb = require('./Dweb.js');
-const sodium = require("libsodium-wrappers");   // Note for now this has to be Mitra's version as live version doesn't support urlsafebase64
 const nodefetch = require('node-fetch-npm');
+const Url = require('url');
 var fetch,Headers,Request;
 if (typeof(Window) === "undefined") {
     //var fetch = require('whatwg-fetch').fetch; //Not as good as node-fetch-npm, but might be the polyfill needed for browser.safari
@@ -19,12 +19,10 @@ if (typeof(Window) === "undefined") {
 }
 //TODO-HTTP to work on Safari or mobile will require a polyfill, see https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch for comment
 
+//TODO-MULTI file edited
+
 defaulthttpoptions = {
-    //ipandport: [ 'localhost',4243]
-    //ipandport: [ 'sandbox.dweb.me', 443]
-
     urlbase: 'https://gateway.dweb.me:443'
-
 };
 
 class TransportHTTP extends Transport {
@@ -50,24 +48,12 @@ class TransportHTTP extends Transport {
         let combinedoptions = Transport.mergeoptions({ http: defaulthttpoptions },options);
         try {
             let t = new TransportHTTP(combinedoptions, verbose);
-            Dweb.transports.http = t;
-            Dweb.transportpriority.push(t);    // Sets to default transport if nothing else set otherwise on a list
+            Transport.addtransport(t);
             return t;
         } catch (err) {
             console.log("Exception thrown in TransportHTTP.p_setup");
             throw err;
         }
-    }
-
-    url(data) { // For now made sure no code calling this because TransportIPFS cant generate URL before storing
-        /*
-         Return an identifier for the data without storing
-
-         :param string|Buffer data   arbitrary data
-         :return string              valid id to retrieve data via p_rawfetch
-         */
-        throw new Dweb.errors.CodingError("TransportHTTP.url obsoleted, code should use URL returned from rawstore")
-        return `https://${this.ipandport[0]}:${this.ipandport[1]}/contenthash/rawfetch/${Dweb.KeyPair.multihashsha256_58(data)}`;
     }
 
     async p_status() {    //TODO-BACKPORT
@@ -84,17 +70,17 @@ class TransportHTTP extends Transport {
         }
     }
 
-
     async p_httpfetch(command, url, init, verbose) { // Embrace and extend "fetch" to check result etc.
         /*
         Fetch a url based from default server at command/multihash
 
         url: optional - contains multihash as last component (Maybe TODO handle already parsed URL if provided).
+        resolves to: data as text or json depending on Content-Type header
         throws: TransportError if fails to fetch
          */
         //TODO-HTTP could check that rest of URL conforms to expectations.
+        let httpurl = `${this.urlbase}/${command}`;
         try {
-            let httpurl = `${this.urlbase}/${command}`;
             if (url) {
                 let parsedurl = Url.parse(url);
                 let multihash = parsedurl.pathname.split('/').slice(-1);
@@ -113,6 +99,7 @@ class TransportHTTP extends Transport {
                     return response.text(); // promise resolving to text
                 }
             }   // TODO-HTTP may need to handle binary as a buffer instead of text
+            // noinspection ExceptionCaughtLocallyJS
             throw new Dweb.errors.TransportError(`Transport Error ${response.status}: ${response.statusText}`); // Should be TransportError but out of scope
         } catch (err) {
             // Error here is particularly unhelpful - if rejected during the COrs process it throws a TypeError
@@ -184,8 +171,8 @@ class TransportHTTP extends Transport {
         return this.p_post("void/rawadd", null, "application/json", value, verbose); // Returns immediately
     }
 
-    static test() {
-        return new Promise((resolve, reject)=> resolve(this));  // I think this should be a noop - fetched already
+    static async test() {
+        return this;  // I think this should be a noop - fetched already
     }
 
     p_info() { return this.p_get("info"); } //TODO-BACKPORT

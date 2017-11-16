@@ -1,12 +1,14 @@
 // ######### Parallel development to CommonBlock.py ########
 const Dweb = require("./Dweb");
 
+//FILE REVIEWED FOR URLS STILL HAS STUFF NEEDED SEE COMMENTS
+
 class Transportable {
     /*
     Based on Transportable class in python - generic base for anything transportable.
 
     Fields
-    _url   URL of data stored
+    _urls   Array of URLs of data stored
     _data   Data (if its opaque)
      */
 
@@ -18,14 +20,14 @@ class Transportable {
         this._setdata(data); // The data being stored - note _setdata usually subclassed
     }
 
-    transport() { //TODO-API
+    transports() { //TODO-API  //TODO-API-MULTI //TODO-MULTI check all callers (was "transport")
         /*
         Find transport for this object,
-        if not yet stored this._url will be undefined and will return default transport
+        if not yet stored this._url will be undefined and will return any available transports
 
         returns: instance of subclass of Transport
         */
-        return Dweb.transport(this._url);
+        return Dweb.Transport.validFor(this._urls); //TODO-MULTI check Dweb.transport=>transports to handle plural
     }
 
     _setdata(data) {
@@ -41,27 +43,26 @@ class Transportable {
         return this._data;  // Default behavior - opaque bytes
     }
 
-    stored() {  // Check if stored
-        return this._url ? true : false
+    stored() {  // Check if stored  //TODO-MULTI all checks for stored should use this rather than testing this._url
+        return (this._urls && this._urls.length) ? true : false
     }
     async p_store(verbose) {    // Python has a "data" parameter to override this._data but probably not needed
         /*
-        Store the data on Dweb, if it hasn’t already been.
+        Store the data on Dweb, if it has not already been.
 
         It calculates and store the url in _url immediately before starting the asynchronous storage and returning the Promise, and then checks the underlying transport agrees on the url variable. This allows a caller to use the url before the storage has completed.
         Resolves to	string: url of data stored
          */
         try {
             if (this.stored())
-                return this;  // Noop if already stored, use dirty() if change after retrieved
+                return this;  // No-op if already stored, use dirty() if change after retrieved
             let data = this._getdata();
             if (verbose) console.log("Transportable.p_store data=", data);
-            let self = this;
-            this._url = await this.transport().p_rawstore(data, verbose);   //TODO-URLMULTI make this an array
-            if (verbose) console.log("Transportable.p_store url=", this._url);
+            this._urls = await Promise.all(this.transports().map((t)=>t.p_rawstore(data, verbose)));   //TODO-MULTI might be smarter about not waiting
+            if (verbose) console.log("Transportable.p_store urls=", this._urls);
             return this;
         } catch (err) {
-            console.log("p_store failed",err);
+            console.log("p_store failed");
             throw err;
         }
     }
@@ -71,59 +72,25 @@ class Transportable {
         Mark an object as needing storing again, for example because one of its fields changed.
         Flag as dirty so needs uploading - subclasses may delete other, now invalid, info like signatures
         */
-        this._url = null;
+        this._urls = [];    //TODO-MULTI make sure at initialization it does this
     }
 
-    static p_fetch(url, verbose) {
+    static p_fetch(urls, verbose) { //TODO-API-MULTI //TODO-MULTI check all callers and subclasses and switch to using urls
         /*
         Fetch the data for a url, subclasses act on the data, typically storing it.
-        url:	string of url to retrieve
+        urls:	array of urls to retrieve (any are valid)
         returns:	string - arbitrary bytes retrieved.
          */
-        let t = Dweb.transport(url);
-        if (!t) throw new Dweb.errors.TransportError("Transport.p_fetch cant find transport for url: "+url);
-        return t.p_rawfetch(url, verbose) // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
+        let tt = Dweb.Transport.validFor(urls);
+        if (!t.length) throw new Dweb.errors.TransportError("Transport.p_fetch cant find any transport for urls: "+urls);
+        //With multiple transports, it should return when the first one returns something.
+        return Promise.any(tt.map((t)=>t.p_rawfetch(urls, verbose))) // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
     }
 
     file() { throw new Dweb.errors.ToBeImplementedError("Undefined function Transportable.file"); } //TODO-BACKPORT from Python
     content() { throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally undefined function Transportable.content - superclass should define"); }
     p_updatelist() { throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally undefined function Transportable.p_updatelist - meaningless except on CL"); }
 
-    // ==== UI method =====
-
-    p_elem(el, verbose, successmethodeach) {    //TODO-REL5 may delete this dependiong on and StructuredBlock changes
-        /*
-        If the content() of this object is a string, store it into a Browser element,
-            If the content() is an array, pass to to p_updatelist (which is only implemented on sublasses of CommonList)
-        */
-        // NOte this looks a little odd from the Promise perspective and might need work, assuming nothing following this and nothing to return
-        // TODO-IPFS may want to get rid of successmethodeach and use a Promise.all in the caller.
-        // Called from success methods
-        //successeach is function to apply to each element, will be passed "this" for the object being stored at the element.
-        if (typeof el === 'string') {
-            el = document.getElementById(el);
-        }
-        let data = this.content(verbose);
-        if (typeof data === 'string') {
-            if (verbose) {
-                console.log("elem:Storing data to element", el, encodeURI(data.substring(0, 20)));
-            }
-            el.innerHTML = data;
-            if (successmethodeach) {
-                let methodname = successmethodeach.shift();
-                //if (verbose) console.log("p_elem",methodname, successmethodeach);
-                this[methodname](...successmethodeach); // Spreads successmethod into args, like *args in python
-            }
-        } else if (Array.isArray(data)) {
-            if (verbose) {
-                console.log("elem:Storing list of len", data.length, "to element", el);
-            }
-            this.p_updatelist(el, verbose, successmethodeach);  //Note cant do success on updatelist as multi-thread //TODO using updatelist not replacing
-        } else {
-            console.log("ERROR: unknown type of data to elem", typeof data, data);
-        }
-        if (verbose) console.log("EL set to", el.textContent);
-    }
 
     // Note for tests, best to use Block.test()
 }

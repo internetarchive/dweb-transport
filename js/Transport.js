@@ -1,6 +1,9 @@
 const Url = require('url');
 
+//TODO-MULTI file edited
+
 class Transport {
+
     constructor(options, verbose) {
         /*
         Doesnt do anything, its all done by SuperClasses,
@@ -35,15 +38,6 @@ class Transport {
         return this.urlschemes.includes(url.protocol.slice(0,-1))
     }
 
-    url(data) { //
-        /*
-         Return an identifier for the data without storing - note doesnt work on IPFS so shouldnt be used
-
-         :param string|Buffer data   arbitrary data
-         :return string              valid id to retrieve data via p_rawfetch
-         */
-        throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally undefined function Transport.url should have been subclassed");
-    }
     dumps(obj) {
         /*
          Encode an obj into a JSON string - this is in Transport as some systems have a canonical form of JSON they prefer to store
@@ -95,7 +89,7 @@ class Transport {
     p_rawadd(url, date, signature, signedby, verbose) {
         /*
         Store a new list item, it should be stored so that it can be retrieved either by "signedby" (using p_rawlist) or
-        by "url" (with p_rawreverse). The underlying transport does not need to guarrantee the signature,
+        by "url" (with p_rawreverse). The underlying transport does not need to guarantee the signature,
         an invalid item on a list should be rejected on higher layers.
 
         :param string url: String identifying an object being added to the list.
@@ -169,6 +163,35 @@ class Transport {
         return c;
     }
 
+    static validFor(url) { //TODO-API-MULTI use this instead of Dweb.transport(url)
+        /*
+        Finds an array or Transports that can support this URL.  url => [TransportInstanceA, TransportInstanceB]
 
+        If passed an array of urls, returns a dict; [url1,url2] => {url1: [TransportInstanceA], url2: [TransportInstanceA, TransportInstanceB]}
+        (note replaces old Dweb.transport() )
+
+        urls:       URL or array of urls
+        returns:    Array of Transport instances, or dictionary of arrays
+         */
+        if (Array.isArray(url)) {
+            o = {};
+            return url.map((u) => o[u] = Transport.validFor(u));
+        } else if (url) {
+            if (typeof url === 'string') {
+                url = Url.parse(url);    // For efficiency, only parse once.
+            }
+            return Transport._transports.filter((t) => t.supports(url));
+        } else {    // No Url, it must be storage - TODO-MULTI may later restrict to transports that support storage.
+            return Transport._transports;
+        }
+    }
+    static addtransport(t) {
+        /*
+        Add a transport to _transports,
+         */
+        Transport._transports.push(t);
+    }
 }
+Transport._transports = [];    // Array of transport instances connected
+
 exports = module.exports = Transport;

@@ -132,7 +132,7 @@ class CommonList extends SmartDict {
         let self = this;
         if (!this._publicurl)
             await this._p_storepublic(verbose);
-        let lines = await this.transport().p_rawlist(this._publicurl, verbose);   // lines should be an array
+        let lines = await this.transport().p_rawlist(this._publicurl, verbose);   // lines should be an array  //TODO-MULTI this.transport not applicable
         if (verbose) console.log("CommonList:p_fetchlist.success", self._url, "len=", lines.length);
         self._list = lines.map((l) => new Dweb.Signature(l, verbose));    // Turn each line into a Signature
     }
@@ -149,7 +149,7 @@ class CommonList extends SmartDict {
             .then(() => Promise.all(
                 Dweb.Signature.filterduplicates(self._list) // Dont load multiple copies of items on list (might need to be an option?)
                 .map((sig) => sig.p_fetchdata(verbose))
-            )) // Return is array result of p_fetch which is array of new objs (suitable for storing in keys etc)
+            )) // Return is array result of p_fetchdata which is array of new objs (suitable for storing in keys etc)
         }
 
     async _p_storepublic(verbose) {
@@ -233,7 +233,7 @@ class CommonList extends SmartDict {
         :resolves:  undefined
          */
         if (!sig) throw new Dweb.errors.CodingError("CommonList.p_add is meaningless without a sig");
-        return this.transport().p_rawadd(sig.url, sig.date, sig.signature, sig.signedby, verbose);
+        return this.transport().p_rawadd(sig.url, sig.date, sig.signature, sig.signedby, verbose); //TODO-MULTI this.transport not applicable
     }
 
     verify(sig, verbose) {
@@ -276,7 +276,7 @@ class CommonList extends SmartDict {
     }
 
     listmonitor(verbose) {
-        this.transport().listmonitor(this._publicurl, (obj) => {
+        this.transport().listmonitor(this._publicurl, (obj) => { //TODO-MULTI this.transport
             if (verbose) console.log("CL.listmonitor",this._publicurl,"Added",obj);
             let sig = new Dweb.Signature(obj, verbose);
             if ((sig.signedby === this._publicurl) && this.verify(sig)) { // Ignore if not signed by this node, and verifies

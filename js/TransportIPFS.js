@@ -9,6 +9,7 @@ Y Lists have listeners and generate events - see docs at ...
 // IPFS components
 
 //TODO-API scan this file and add documentation
+//TODO-MULTI scanned and edited file
 
 const IPFS = require('ipfs');
 const CID = require('cids');
@@ -22,13 +23,15 @@ require('y-ipfs-connector')(Y);
 require('y-indexeddb')(Y);
 //require('y-leveldb')(Y); //- can't be there for browser, node seems to find it ok without this, though not sure why..
 const Url = require('url');
+// noinspection NpmUsedModulesInstalled
 const dagPB = require('ipld-dag-pb');
+// noinspection Annotator
 const DAGNode = dagPB.DAGNode; // So can check its type
 
 
 
 
-// Utility packages (ours) Aand one-loners
+// Utility packages (ours) And one-liners
 const promisify = require('promisify-es6');
 //const makepromises = require('./utils/makepromises'); // Replaced by direct call to promisify
 function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { resolve(val); },ms)})}
@@ -156,30 +159,32 @@ class TransportIPFS extends Transport {
                 self.yarrays = {};
             })
             .catch((err) => {
-                console.log("Error caught in p_yarraystart",err);
+                console.log("Error caught in p_yarraysstart",err);
                 throw(err);
             })
         //Lots of issues with "init" not knowing state before it//  this.ipfs.init({emptyRepo: true, bits: 2048})     //.then((unused) => ipfs.init({emptyRepo: true, bits: 2048}))
     }
 
-    p__yarray(url, verbose) {
+    async p__yarray(url, verbose) {
         /*
         Utility function to get Yarray for this URL and open a new connection if not already
 
         url:        URL string to find list of
         resolves:   Y
         */
-        if (this.yarrays[url]) {
-            if (verbose) console.log("Found Y for",url);
-            return new Promise((resolve, reject) => resolve(this.yarrays[url]));
-        } else {
-            let options = Transport.mergeoptions(this.options.yarray, {connector: { room: url}}); // Copies options
-            if (verbose) console.log("Creating Y for",url); //"options=",options);
-            //console.trace();
-            options.connector.ipfs = this.ipfs;
-            return Y(options)
-                .then((y) => this.yarrays[url] = y)
-                .catch((err) => {console.log("Failed to initialize Y"); throw err;});
+        try {
+            if (this.yarrays[url]) {
+                if (verbose) console.log("Found Y for", url);
+                return this.yarrays[url];
+            } else {
+                let options = Transport.mergeoptions(this.options.yarray, {connector: {room: url}}); // Copies options
+                if (verbose) console.log("Creating Y for", url); //"options=",options);
+                options.connector.ipfs = this.ipfs;
+                return this.yarrays[url] = await Y(options);
+            }
+        } catch(err) {
+            console.log("Failed to initialize Y");
+            throw err;
         }
     }
 
@@ -198,12 +203,11 @@ class TransportIPFS extends Transport {
         let combinedoptions = Transport.mergeoptions(defaultoptions, options);
         console.log("IPFS options", JSON.stringify(combinedoptions));
         let t = new TransportIPFS(combinedoptions, verbose);   // Note doesnt start IPFS or Y
-        Dweb.transports.ipfs = t;
-        Dweb.transportpriority.push(t);    // Sets to default transport if nothing else set otherwise on a list
+        Transport.addtransport(t);
         //Switch the comments on the next two lines to switch back and forth between Yarray (one connection) or Yarrays (one per list) for testing
-        return  (   (t.options.listmethod === "yarray")  ? t.p_yarraystart(verbose)  // Not currently supported
-                :   (t.options.listmethod === "yarrays") ? t.p_yarraysstart(verbose)
-                :   undefined   )
+        return  (   //(t.options.listmethod === "yarray")  ? t.p_yarraystart(verbose) : // Not currently supported
+                    (t.options.listmethod === "yarrays") ? t.p_yarraysstart(verbose) :
+                    undefined   )
             .then(() => t);
     }
 
@@ -273,7 +277,9 @@ class TransportIPFS extends Transport {
         try {
             let res = await this.ipfs.dag.get(cid);
             if (res.remainderPath.length)
-                throw new Dweb.errors.TransportError("Not yet supporting paths in p_rawfetch"); //TODO-PATH
+                { // noinspection ExceptionCaughtLocallyJS
+                    throw new Dweb.errors.TransportError("Not yet supporting paths in p_rawfetch");
+                } //TODO-PATH
             let buff;
             if (res.value instanceof DAGNode) { // Its file or something added with the HTTP API for example, TODO not yet handling multiple files
                 //console.log("Case a or b" - we can tell the difference by looking at (res.value._links.length > 0) but dont need to

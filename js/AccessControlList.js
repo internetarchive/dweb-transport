@@ -198,7 +198,7 @@ class AccessControlList extends CommonList {
                     await decryptor.p_tokens(verbose); // Will load blocks in sig as well
                     if (verbose) console.log("ACL.p_decryptdata: fetched ACL tokens for",decryptor._publicurl, decryptor._list.map((sig) => sig.data) );
                 }
-                let decrypted = Dweb.transport().loads(decryptor.decrypt(value.encrypted, verbose));  // Resolves to data or throws AuthentictionError
+                let decrypted = Transport.loads(decryptor.decrypt(value.encrypted, verbose));  // Resolves to data or throws AuthentictionError
                 if (!decrypted._acl) decrypted._acl = decryptor;    // Save the _acl used for encryption in case write it back TODO not sure we can encrypt it back
                 return decrypted;
             }

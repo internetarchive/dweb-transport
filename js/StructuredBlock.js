@@ -160,4 +160,42 @@ class StructuredBlock extends SmartDict {
             }
         })
     }
-}exports = module.exports = StructuredBlock;
+    // ==== UI method =====
+
+    p_elem(el, verbose, successmethodeach) {    //TODO-REL5 may delete this dependiong on and StructuredBlock changes
+        /*
+        If the content() of this object is a string, store it into a Browser element,
+            If the content() is an array, pass to to p_updatelist (which is only implemented on sublasses of CommonList)
+        */
+        // NOte this looks a little odd from the Promise perspective and might need work, assuming nothing following this and nothing to return
+        // TODO-IPFS may want to get rid of successmethodeach and use a Promise.all in the caller.
+        // Called from success methods
+        //successeach is function to apply to each element, will be passed "this" for the object being stored at the element.
+        if (typeof el === 'string') {
+            el = document.getElementById(el);
+        }
+        let data = this.content(verbose);
+        if (typeof data === 'string') {
+            if (verbose) {
+                console.log("elem:Storing data to element", el, encodeURI(data.substring(0, 20)));
+            }
+            el.innerHTML = data;
+            if (successmethodeach) {
+                let methodname = successmethodeach.shift();
+                //if (verbose) console.log("p_elem",methodname, successmethodeach);
+                this[methodname](...successmethodeach); // Spreads successmethod into args, like *args in python
+            }
+        } else if (Array.isArray(data)) {
+            if (verbose) {
+                console.log("elem:Storing list of len", data.length, "to element", el);
+            }
+            this.p_updatelist(el, verbose, successmethodeach);  //Note cant do success on updatelist as multi-thread //TODO using updatelist not replacing
+        } else {
+            console.log("ERROR: unknown type of data to elem", typeof data, data);
+        }
+        if (verbose) console.log("EL set to", el.textContent);
+    }
+
+}
+
+exports = module.exports = StructuredBlock;

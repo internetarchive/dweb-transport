@@ -12,6 +12,8 @@ exports.StructuredBlock = require('./StructuredBlock'); //TODO - will remove SB 
 exports.EventListenerHandler = require("./EventListenerHandler")
 //*/
 
+//TODO-MULTI scanned
+
 exports.table2class = { // Each of these needs a constructor that takes data and is ok with no other parameters, (otherwise define a set of these methods as factories)
     "cl": "CommonList",
     "sb": "StructuredBlock",
@@ -24,14 +26,12 @@ exports.table2class = { // Each of these needs a constructor that takes data and
 
 
 
-Url = require("url"); // Doesnt appear to be needed - also gets node interface which looks different
-
 // Javascript library for dweb
 // The crypto uses https://github.com/jedisct1/libsodium.js but https://github.com/paixaop/node-sodium may also be suitable if we move to node
 
 exports.utils = {}; //utility functions
 exports.errors = require("./Errors");
-exports.transports = {}; // Transports - instances NOT CLASSES of loaded transports
+exports.transports = {}; // Transports - instances NOT CLASSES of loaded transports //TODO-MULTI name clash with transports(), maybe this should be inside Transport class
 
 /* Only applicable to HTTP...
     exports.dwebserver = 'localhost';
@@ -41,7 +41,7 @@ exports.transports = {}; // Transports - instances NOT CLASSES of loaded transpo
 exports.keychains = [];
 exports.eventHandler = new exports.EventListenerHandler();
 
-exports.transportpriority = []; // First on list is top priority
+exports.transportpriority = []; // First on list is top priority TODO-MULTI not clear if need
 
 // ==== OBJECT ORIENTED JAVASCRIPT ===============
 
@@ -105,16 +105,3 @@ exports.utils.p_streamToBlob = function(stream, mimeType, verbose) {
     })
 }
 
-exports.transport = function(url) {
-    /*
-    Pick between associated transports based on URL
-
-    url     URL or string that can be parsed into a URL
-    returns subclass of Transport that can support this kind of URL or undefined if none.
-    throws  Error (should be TransportError but out of scope) if URL parsing fails
-    */
-    if (url && (typeof url === 'string')) {
-        url = Url.parse(url);    // For efficiency, only parse once.
-    }
-    return exports.transportpriority.find((t) => t.supports(url))  // First transport that can support this URL
-};
