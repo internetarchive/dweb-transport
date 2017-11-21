@@ -8,9 +8,9 @@ class Signature extends SmartDict {
 
     Fields:
     date:       Date stamp (according to browser) when item signed
-    url:       URL of object signed
+    urls:       URLs of object signed - note this is intentionally "urls" not "_urls" since its a stored field. //TODO-API-MULTI
     signature:  Signature of the date and url
-    signedby:   Public URL of list signing this (list should have a public key)
+    signedby:   Public URLs of list signing this (list should have a public key) //TODO-API-MULTI
      */
     constructor(dic, verbose) {
         /*
@@ -35,25 +35,26 @@ class Signature extends SmartDict {
     signable() {
         /*
         Returns a string suitable for signing and dating, current implementation includes date and storage url of data.
+        The string makeup is fairly arbitrary its a one way check, the parts are never pulled apart again
 
         :return: Signable or comparable string
         */
-        return this.date.toISOString() + this.url;
+        return this.date.toISOString() + " "+this.urls;
     }
 
-    static async p_sign(commonlist, url, verbose) {
+    static async p_sign(commonlist, urls, verbose) { //TODO-API-MULTI
         /*
         Sign and date a url, returning a new Signature
 
         :param commonlist: Subclass of CommonList containing a private key to sign with.
-        :param url: of item being signed
+        :param urls: of item being signed
         :return: Signature (dated with current time on browser)
          */
         let date = new Date(Date.now());
-        if (!commonlist._publicurl)
+        if (!commonlist.stored) {
             await commonlist.p_store(verbose);
-        if (!commonlist._publicurl) throw new Dweb.errors.CodingError("Signature.sign should be a publicurl by here");
-        let sig = new Signature({"date": date, "url": url, "signedby": commonlist._publicurl});
+        }
+        let sig = new Signature({"date": date, "urls": urls, "signedby": commonlist._publicurls});
         sig.signature = commonlist.keypair.sign(sig.signable());
         return sig
     }
@@ -67,11 +68,11 @@ class Signature extends SmartDict {
         Utility function to allow filtering out of duplicates
 
         :param arr: Array of Signature
-        :returns: Array of Signature containing on the first occuring instance of a signature (note first in array, not necessarily first by date)
+        :returns: Array of Signature containing only the first occurring instance of a signature (note first in array, not necessarily first by date)
          */
         let res = {};
         // Remove duplicate signatures
-        return arr.filter((x) => (!res[x.url] && (res[x.url] = true)))
+        return arr.filter((x) => (!res[x.urls] && (res[x.urls] = true)))
     }
 
     async p_fetchdata(verbose) {
@@ -80,8 +81,8 @@ class Signature extends SmartDict {
 
         :resolves to: obj - object that was signed
          */
-        if (!this.data) {   // Fetch data if have not aleady fetched it
-            this.data = await Dweb.SmartDict.p_fetch(this.url, verbose); // Resolves to new obj
+        if (!this.data) {   // Fetch data if have not already fetched it
+            this.data = await Dweb.SmartDict.p_fetch(this.urls, verbose); // Resolves to new obj
         }
         return this.data;
     }
@@ -103,7 +104,7 @@ class Signature extends SmartDict {
         commonlist._allowunsafestore = true;
         let sig;
         await signedblock.p_store(verbose);
-        sig = await Dweb.Signature.p_sign(commonlist,signedblock._url, verbose); //commonlist, url, verbose
+        sig = await Dweb.Signature.p_sign(commonlist, signedblock._urls, verbose); //commonlist, urls, verbose
         commonlist._allowunsafestore = false;
         if (verbose) console.log("test_Signatures verification");
         if (!commonlist.verify(sig, verbose)) throw new Dweb.errors.CodingError("Should verify");

@@ -10,6 +10,7 @@
     <script type="text/javascript" src='https://cloud.tinymce.com/stable/tinymce.min.js'></script><!-- TinyMCE -->
     <script type="text/javascript" src="htmlutils.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript">
+        //TODO-MULTI-needs-scanning
 
     tinymce.init({
         selector: '#mytextarea',
@@ -44,7 +45,7 @@
         console.log("Fetching url=", url);
         let destn = document.getElementById("retrievaldestn");
         destn.innerHTML = ""; // Clear it first
-        Dweb.Block.p_fetch(url, verbose)
+        Dweb.Block.p_fetch(url, verbose) //TODO-MULTI use urls plural
             .then((blk) => {
                 console.log("content=",blk.content());
                 destn.innerHTML = blk.content()

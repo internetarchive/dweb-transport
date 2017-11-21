@@ -11,6 +11,7 @@
     <script type="text/javascript">
 
     var cl; // Will hold the list after fetching
+    //TODO-MULTI-needs-scanning
 
     function createit() {     // Send form data to Dweb, and display the url
         console.log("createit ---");
@@ -54,7 +55,7 @@
         /* Fetch a URL, display the meta data and a box for adding to it*/
         console.log("fetchanddisplay",url);
         try {
-            Dweb.SmartDict.p_fetch(url, verbose)   // Throws TransportError immediately if url invalid
+            Dweb.SmartDict.p_fetch(url, verbose)   // Throws TransportError immediately if url invalid //TODO-MULTI use urls plural
                 .then((obj) => cl = obj) // Save it for adding to in sendentry
                 .then(() => {
                     console.log("Fetched=", cl);
@@ -92,7 +93,7 @@
         // Now set up links to the urls for sharing
         let publicurl = new URL(window.location.href);
         let privateurl = new URL(window.location.href);
-        publicurl.search=(obj._publicurl ? "url="+obj._publicurl : "");
+        publicurl.search=(obj._publicurls.length ? "url="+obj._publicurls : ""); //TODO-MULTI publicurl test may not work well on multi
         document.getElementById("publiclink").href=publicurl.href;
         privateurl.search=obj._privateurl ? "url="+obj._privateurl : "";
         document.getElementById("privatelink").href=privateurl.href;
@@ -136,9 +137,9 @@
 
 <!-- Object will be displayed here in fields with names that match-->
 <ul class="props" id="retrievaldestn">
-    <li class="prop"><span class="propname">Name:</span><span class="propval" name="name"></span></li>
-    <li class="prop"><span class="propname">Private url:</span><span class="propval" name="_privateurl"></span><a id="privatelink"> <img alt="link" src="link.png"/></a></li>
-    <li class="prop"><span class="propname">Public url:</span><span class="propval" name="_publicurl"></span><a id="publiclink"> <img alt="link" src="link.png"/></a></li>
+    <li class="prop"><span class="propname">Name:</span><span class="propval" name="name"></span></li><!--TODO-MULTI check privateurls is plural-->
+    <li class="prop"><span class="propname">Private url:</span><span class="propval" name="_privateurls"></span><a id="privatelink"> <img alt="link" src="link.png"/></a></li>
+    <li class="prop"><span class="propname">Public url:</span><span class="propval" name="_publicurls"></span><a id="publiclink"> <img alt="link" src="link.png"/></a></li>
 </ul>
 
 <table class="displayedblock">

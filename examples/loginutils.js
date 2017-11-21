@@ -13,6 +13,7 @@
 
 
  */
+//TODO-MULTI-needs-scanning
 
 // Array of images can use
 const icon_images = {   //!SEE-OTHER-KC-CLASSES
@@ -79,7 +80,7 @@ function keychain_click(el) {
     kc.addEventListener("insert", (event) => {                  // Setup a listener that will trigger when anything added to the list and update HTML
         if (verbose) console.log("keychain.eventlistener",event);
         let sig = event.detail;
-        if (kc._publicurl === el_keychain_header.source._publicurl)  // Check its still this KeyChain being displayed in keylist
+        if (kc._publicurl === el_keychain_header.source._publicurl)  // Check its still this KeyChain being displayed in keylist //TODO-MULTI
             sig.p_fetchdata(verbose)                            // Get the data from a sig, its not done automatically as in other cases could be large
                 .then((obj) => _showkeyorlock("keychain_ul", obj))             // Show on the list
     });
@@ -108,7 +109,7 @@ function locklink_click(el) {
     window.prompt("Copy to clipboard for locking (Ctrl-C + OK)", resolve(el).source._url);
 }
 function key_click(el) {
-    window.prompt("Copy to clipboard for sharing (Ctrl-C + OK)", resolve(el).source._publicurl);
+    window.prompt("Copy to clipboard for sharing (Ctrl-C + OK)", resolve(el).source._publicurl); //TODO-MULTI
 }
 function token_click(el) {
     window.prompt("Copy to clipboard for sharing (Ctrl-C + OK)", resolve(el).source.viewer);
@@ -152,7 +153,7 @@ function lock_click(el) {
         .then(() => acl.addEventListener("insert", (event) => {                  // Setup a listener that will trigger when anything added to the list and update HTML
             if (verbose) console.log("lock.eventlistener",event);
             let sig = event.detail;
-            if (acl._publicurl === el_lockheader.source._publicurl)  // Check its still this ACL being displayed in keylist
+            if (acl._publicurl === el_lockheader.source._publicurl)  // Check its still this ACL being displayed in keylist //TODO-MULTI
                 sig.p_fetchdata(verbose)                    // Get the data from a sig, its not done automatically as in other cases could be large
                     .then((tok) => _showkeyorlock("lock_ul", tok))           // Show on the list
         }));
@@ -164,7 +165,7 @@ function tokennew_click() { //Called by "Add" button on new token dialog
     hide('tokennew_form');
     let dict = form2dict("tokennew_form"); //url
     acl = document.getElementById('lock_header').source;
-    return acl.p_add_acle(dict.url, {name: dict["name"]}, verbose)
+    return acl.p_add_acle([dict.urls], {name: dict["name"]}, verbose)
         .then((tok) => _showkeyorlock("lock_ul", tok)) // Push to visual list, as listmonitor will be a duplicate
 }
 

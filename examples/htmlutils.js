@@ -2,6 +2,7 @@
     This file is a set of utility functions used in the manipulation of HTML pages
     There is nothing specific to Dweb at all here, feel free to copy and modify.
  */
+//TODO-MULTI-needs-scanning
 
 function resolve(el) {
     return (typeof(el) === "string") ? document.getElementById(el) : el;
@@ -9,7 +10,7 @@ function resolve(el) {
 async function p_resolveobj(url) {
     try {
         if (typeof url === 'string')
-            url = await Dweb.SmartDict.p_fetch(url, verbose);
+            url = await Dweb.SmartDict.p_fetch(url, verbose); //TODO-MULTI use urls plural
         return url;
     } catch(err) {
         console.log("p_resolveobj: Cannot resolve",url);

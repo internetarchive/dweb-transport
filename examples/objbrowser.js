@@ -64,7 +64,7 @@ function objbrowser(self, url, path, ul, verbose) {
                         }
                     } else {
                         //noinspection JSUnfilteredForInLoop
-                        if (self[prop]._url) {
+                        if (self[prop]._url) { //TODO-MULTI
                             //noinspection JSUnfilteredForInLoop,JSUnfilteredForInLoop
                             objbrowser(self[prop], self[prop]._url, null, ul3, verbose)
                         } else {
@@ -74,7 +74,7 @@ function objbrowser(self, url, path, ul, verbose) {
                     }
                 } else {    // Any other field
                     let spanval;
-                    if (["url","_publicurl","signedby"].includes(prop)) {
+                    if (["url","_publicurl","signedby"].includes(prop)) { //TODO-MULTI
                         //noinspection ES6ConvertVarToLetConst
                         spanval = document.createElement('span');
                         //noinspection JSUnfilteredForInLoop
@@ -118,7 +118,7 @@ function p_objbrowserfetch(el) {
     let parent = el.parentNode;
     parent.removeChild(el); //Remove elem from parent
     if (typeof source === "string") {
-        return Dweb.SmartDict.p_fetch(source, verbose)
+        return Dweb.SmartDict.p_fetch(source, verbose) //TODO-MULTI use urls plural
             .then((obj) => objbrowser(obj, obj._url, null, parent, false));
     } else {
         return objbrowser(source, source._url, null, parent, false); //TODO its possible this needs to be a promise

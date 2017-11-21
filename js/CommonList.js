@@ -1,6 +1,7 @@
 const SmartDict = require("./SmartDict"); //for extends
 const Dweb = require("./Dweb");
 
+
 class CommonList extends SmartDict {
     /*
     CommonList is a superclass for anything that manages a storable list of other urls
@@ -10,7 +11,7 @@ class CommonList extends SmartDict {
     keypair         Holds a KeyPair used to sign items
     _list           Holds an array of signatures of items put on the list
     _master         True if this is a master list, i.e. can add things
-    _publicurl     Holds the url of publicly available version of the list.
+    _publicurls     Holds the urls of publicly available version of the list. //TODO-API-MULTI
     _allowunsafestore True if should override protection against storing unencrypted private keys (usually only during testing)
     dontstoremaster True if should not store master key
     _listeners      Any event listeners
@@ -27,7 +28,6 @@ class CommonList extends SmartDict {
         /*
             Create a new instance of CommonList
 
-            :param url: url of list to fetch from Dweb
             :param data: json string or dict to load fields from
             :param master: boolean, true if should create a master list with private key etc
             :param key: A KeyPair, or a dict of options for creating a key: valid = mnemonic, seed, keygen:true
@@ -42,8 +42,10 @@ class CommonList extends SmartDict {
             this._setkeypair(key, verbose);
         }
         this._master = (typeof master === "undefined")  ? this.keypair.has_private() : master;  // Note this must be AFTER _setkeypair since that sets based on keypair found and _p_storepublic for example wants to force !master
-        if (!this._master && !this._publicurl) {
-            this._publicurl = this._url;  // We aren't master, so publicurl is same as url - note URL will only have been set if constructor called from SmartDict.p_fetch
+        if (!this._master && (!this._publicurls || !this._publicurls.length)) {
+            this._publicurls = this._urls;  // We aren't master, so publicurl is same as url - note URL will only have been set if constructor called from SmartDict.p_fetch
+        } else {
+            if (!this._publicurls) this._publicurls = [];
         }
         this.table = "cl";
     }
@@ -101,7 +103,7 @@ class CommonList extends SmartDict {
         Prepare a dictionary of data for storage,
         Subclasses SmartDict to:
             convert the keypair for export and check not unintentionally exporting a unencrypted public key
-            ensure that _publicurl is stored (by default it would be removed)
+            ensure that _publicurls is stored (by default it would be removed)
         and subclassed by AccessControlList
 
         :param dd: dict of attributes of this, possibly changed by superclass
@@ -115,13 +117,21 @@ class CommonList extends SmartDict {
             dd.keypair = dd._master ? dd.keypair.privateexport() : dd.keypair.publicexport();
         }
         // Note same code on KeyPair
-        let publicurl = dd._publicurl; // Save before preflight
+        let publicurls = dd._publicurls; // Save before preflight
         let master = dd._master;
         dd = super.preflight(dd);  // Edits dd in place
-        if (master) { // Only store on Master, on !Master will be None and override storing url as _publicurl
-            dd._publicurl = publicurl;   // May be None, have to do this AFTER the super call as super filters out "_*"
+        if (master) { // Only store on Master, on !Master will be None and override storing urls as _publicurls
+            dd._publicurls = publicurls;   // May be None, have to do this AFTER the super call as super filters out "_*"
         }
         return dd;
+    }
+
+    _transportsexpand(ttobj) {
+        /*
+        ttobj:         { url: [t1, t2], url2: [t3, t4] }
+        returns     [[ url t1] [ url t2] [url2 t3], [url2 t4]]
+         */
+        return [].concat(...Object.entries(ttobj).map(([url, tt]) => tt.map((t) => [ url, t])));
     }
 
     async p_fetchlist(verbose) {
@@ -129,46 +139,63 @@ class CommonList extends SmartDict {
         Load the list from the Dweb,
         Use p_list_then_elements instead if wish to load the individual items in the list
         */
-        let self = this;
-        if (!this._publicurl)
+        if (!this.storedpublic())
             await this._p_storepublic(verbose);
-        let lines = await this.transport().p_rawlist(this._publicurl, verbose);   // lines should be an array  //TODO-MULTI this.transport not applicable
-        if (verbose) console.log("CommonList:p_fetchlist.success", self._url, "len=", lines.length);
-        self._list = lines.map((l) => new Dweb.Signature(l, verbose));    // Turn each line into a Signature
+        let ttlines = await Promise.all(  // Wait for all the p_rawlist to return array of lines
+            Dweb.Transport.validFor(this._publicurls, "list") //[[ url t1] [ url t2] [url2 t3], [url2 t4]]
+            .map(([url,t]) => t.p_rawlist(url, verbose))
+        ); // [[sig,sig],[sig,sig]]
+        let uniques = {}; // Used to filter duplicates
+        let lines = [].concat(...ttlines)
+            .filter((x) => (!uniques[x.signature] && (uniques[x.signature] = true)));
+        //TODO-MULTI should probably sort results, in case get some from each
+        //TODO-MULTI will need to handle errors, in particular one transport failing while others succeed.
+        if (verbose) console.log("CommonList:p_fetchlist.success", this._urls, "len=", lines.length);
+        this._list = lines.map((l) => new Dweb.Signature(l, verbose));    // Turn each line into a Signature
     }
 
-    p_list_then_elements(verbose) {
+    async p_list_then_elements(verbose) {
         /*
          Utility function to simplify nested functions, fetches body, list and each element in the list.
 
          :resolves: list of objects signed and added to the list
         */
-        let self=this;
-        return this.p_fetchlist(verbose)
-            .then(() => self.listmonitor(verbose))  // Track any future objects  - will call event Handler on any added
-            .then(() => Promise.all(
-                Dweb.Signature.filterduplicates(self._list) // Dont load multiple copies of items on list (might need to be an option?)
-                .map((sig) => sig.p_fetchdata(verbose))
-            )) // Return is array result of p_fetchdata which is array of new objs (suitable for storing in keys etc)
+        try {
+            await this.p_fetchlist(verbose);
+            this.listmonitor(verbose);  // Track any future objects  - will call event Handler on any added
+            return await Promise.all(
+                Dweb.Signature.filterduplicates(this._list) // Dont load multiple copies of items on list (might need to be an option?)
+                    .map((sig) => sig.p_fetchdata(verbose))
+            ); // Return is array result of p_fetchdata which is array of new objs (suitable for storing in keys etc)
+        } catch(err) {
+            console.log("CL.p_list_then_elements: failed",err.message);
+            throw err;
         }
+    }
 
     async _p_storepublic(verbose) {
         // Build a copy of the data, then create a new !master version
         let oo = Object.assign({}, this, {_master: false});
         let ee = new this.constructor(this.preflight(oo), false, null, verbose);
         await ee.p_store(verbose);
-        this._publicurl = ee._url;
+        this._publicurls = ee._urls;
     }
 
+    storedpublic() {    //TODO-API
+        return this._publicurls.length > 0
+    }
     stored() {
-        return (!this._master || this._publicurl) && ((this._master && this.dontstoremaster) || super.stored())
+        // Its stored if:
+        //  its either !master or we've stored the !master version
+        //  and we've either stored it already, OR  its a master flagged as dontstoremaster
+        return (!this._master || this._publicurls.length) && ((this._master && this.dontstoremaster) || super.stored())
     }
     async p_store(verbose) {
         /*
-            Store on Dweb, if _master will ensure that stores a public version as well, and saves in _publicurl
+            Store on Dweb, if _master will ensure that stores a public version as well, and saves in _publicurls
             Will store master unless dontstoremaster is set.
          */
-        if (this._master && ! this._publicurl) {
+        if (this._master && ! this._publicurls.length) {
             await this._p_storepublic(verbose);
         }
         if ( ! (this._master && this.dontstoremaster)) {
@@ -176,64 +203,69 @@ class CommonList extends SmartDict {
         }
     }
 
-    publicurl() { throw new Dweb.errors.ToBeImplementedError("Undefined function CommonList.publicurl"); }   // For access via web
-    privateurl() { throw new Dweb.errors.ToBeImplementedError("Undefined function CommonList.privateurl"); }   // For access via web
-
     async p_push(obj, verbose ) {
         /*
          Equivalent to Array.push but returns a promise because asynchronous
          Sign and store a object on a list, stores both locally on _list and sends to Dweb
 
-         :param obj: Should be subclass of SmartDict, (Block is not supported), can be URL of such an obj
+         :param obj: Should be subclass of SmartDict, (Block is not supported), can be an array of URLs of such an obj
          :resolves: sig created in process - for adding to lists etc.
          :throws:   ForbiddenError if not master;
          */
         try {
-            if (verbose) console.log("CL.p_push", obj._url, "onto", this._url);
-            if (!obj) throw new Dweb.errors.CodingError("CL.p_push obj should never be non-empty");
+            if (!obj) { // noinspection ExceptionCaughtLocallyJS
+                throw new Dweb.errors.CodingError("CL.p_push obj should never be non-empty");
+            }
             let sig;
-            await this.p_store(verbose); // Make sure stored
-            if (verbose) console.log("CL.p_push", obj._url, "onto", this._url);
-            if (typeof obj !== 'string') {
-                await obj.p_store(verbose)
+            await this.p_store(verbose);        // Make sure stored
+            if (verbose) console.log("CL.p_push", obj._urls, "onto", this._urls);
+            let urls = obj;
+            if (obj instanceof Dweb.Transportable) {
+                await obj.p_store(verbose);     // Make sure any object is stored
+                urls = obj._urls;
             }
             if (!(this._master && this.keypair))
-                throw new Dweb.errors.ForbiddenError("Signing a new entry when not a master list");
-            let url = (typeof obj === 'string') ? obj : obj._url;
-            sig = await this.p_sign(url, verbose);
+                { // noinspection ExceptionCaughtLocallyJS
+                    throw new Dweb.errors.ForbiddenError("Signing a new entry when not a master list");
+                }
+            sig = await this.p_sign(urls, verbose);
             sig.data = obj;                     // Keep a copy of the signed obj on the sig, saves retrieving it again
             this._list.push(sig);               // Keep copy locally on _list
             await this.p_add(sig, verbose);     // Add to list in dweb
             return sig;
         } catch(err) {
-            console.log("CL.p_push failed",err);
+            console.log("CL.p_push failed",err.message);
             throw err;
         }
     }
 
-    async p_sign(url, verbose) {
+    async p_sign(urls, verbose) {
         /*
         Create a signature -
         Normally better to use p_push as stores signature and puts on _list and on Dweb
 
-        :param url:    URL of object to sign    //TODO-MULTI
+        :param urls:    URL of object to sign    //TODO-API-MULTI
         :returns:       Signature
         */
-        if (!url) throw new Dweb.errors.CodingError("Empty url is a coding error");
+        if (!urls || !urls.length) throw new Dweb.errors.CodingError("Empty url is a coding error");
         if (!this._master) throw new Dweb.errors.ForbiddenError("Must be master to sign something");
-        let sig = await Dweb.Signature.p_sign(this, url, verbose); //returns a new Signature
+        let sig = await Dweb.Signature.p_sign(this, urls, verbose); //returns a new Signature
         if (!sig.signature) throw new Dweb.errors.CodingError("Must be a signature");
         return sig
     }
+
     p_add(sig, verbose) {
         /*
         Add a signature to the Dweb for this list
+        Note, there is an assumption that sig.signedby is the same as the commonlist
 
         :param sig: Signature
         :resolves:  undefined
          */
         if (!sig) throw new Dweb.errors.CodingError("CommonList.p_add is meaningless without a sig");
-        return this.transport().p_rawadd(sig.url, sig.date, sig.signature, sig.signedby, verbose); //TODO-MULTI this.transport not applicable
+        if (! Dweb.utils.intersects(sig.signedby, this._publicurls)) throw new Dweb.errors.CodingError(`CL.p_add: sig.signedby ${sig.signedby} should overlap with this._publicurls ${this._publicurls}`)
+        return Promise.all(Dweb.Transport.validFor(this._publicurls, "add") //[[ Url t1] [ Url t2] [Url2 t3], [Url2 t4]]
+            .map(([u, t]) => t.p_rawadd(sig.urls, sig.date, sig.signature, u.href, verbose)) )  //TODO-MULTI could turn this into the array to sign, and the list, since signedby could be multiple
     }
 
     verify(sig, verbose) {
@@ -243,17 +275,28 @@ class CommonList extends SmartDict {
         sig:    Signature object
         returns:    True if verifies
         throws:     assertion error if doesn't //TODO handle that gracefully depending on caller
+        TODO-MULTI think thru verification with multiple signers. In case where they weren't same Key then verification should fail, but what if can only find one key.
+        TODO-MULTI I think it should strip the other keys, from the "Signedby", and check that one of the remaining ones matches "this"
          */
         return this.keypair.verify(sig.signable(), sig.signature)    //TODO currently throws assertion error if doesnt - not sure thats correct
     }
     // ----- Listener interface ----- see https://developer.mozilla.org/en-US/docs/Web/API/EventTarget for the pattern
 
-    addEventListener(type, callback) {
+    addEventListener(type, callback) { //TODO-API
+        /*
+        Add an event monitor for this list, for example if the UI wants to monitor when things are added.
+        type:  Currently supports "insert"
+        callback:   function({target: this, detail: sig})
+         */
         if (!(type in this._listeners)) this._listeners[type] = [];
         this._listeners[type].push(callback);
     }
 
-    removeEventListener(type, callback) {
+    removeEventListener(type, callback) { //TODO-API
+        /*
+        Remove an eventListener,
+        type, callback should be as supplied to addEventListener
+         */
         if (!(type in this._listeners)) return;
         let stack = this._listeners[type];
         for (let i = 0, l = stack.length; i < l; i++) {
@@ -263,7 +306,7 @@ class CommonList extends SmartDict {
             }
         }
     }
-    dispatchEvent(event) {
+    dispatchEvent(event) { //TODO-API
         console.log("CL.dispatchEvent",event);
         if (!(event.type in this._listeners)) return true;
         let stack = this._listeners[event.type];
@@ -275,21 +318,27 @@ class CommonList extends SmartDict {
         return !event.defaultPrevented;
     }
 
-    listmonitor(verbose) {
-        this.transport().listmonitor(this._publicurl, (obj) => { //TODO-MULTI this.transport
-            if (verbose) console.log("CL.listmonitor",this._publicurl,"Added",obj);
-            let sig = new Dweb.Signature(obj, verbose);
-            if ((sig.signedby === this._publicurl) && this.verify(sig)) { // Ignore if not signed by this node, and verifies
-                if (!this._list.some((othersig) => othersig.signature === sig.signature)) {    // Check not duplicate (esp of locally pushed one
-                    this._list.push(sig);
-                    this.dispatchEvent(new CustomEvent("insert", {target: this, detail: sig}));   // Note target doesnt get set here.
-                } else {
-                    console.log("Duplicate signature: ",sig);
-                }
+    _listmonitorevent(obj) {
+        if (verbose) console.log("CL.listmonitor", this._publicurls, "Added", obj);
+        let sig = new Dweb.Signature(obj, verbose);
+        if ((sig.signedby === this._publicurls) && this.verify(sig)) { // Ignore if not signed by this node, and verifies //TODO-MULTI wont be  since signedby and publicurls are arrays correct, see verify - prob have verify do the signedby/publicurls check
+            if (!this._list.some((othersig) => othersig.signature === sig.signature)) {    // Check not duplicate (esp of locally pushed one
+                this._list.push(sig);
+                this.dispatchEvent(new CustomEvent("insert", {target: this, detail: sig}));   // Note target doesnt get set here.
             } else {
-                console.log("Rejected signature: ",sig);
+                console.log("Duplicate signature: ",sig);
             }
-        }, verbose);
+        } else {
+            console.log("Rejected signature: ",sig);
+        }
+    }
+
+    listmonitor(verbose) { //TODO-API
+        /*
+        Add a listmonitor for each transport - note this means if multiple transports support it, then will get duplicate events back if everyone else is notifying all of them.
+         */
+        Dweb.Transport.validFor(this._publicurls, "listmonitor")
+            .map((u, t) => t.listmonitor(u, this._listmonitorevent, verbose));
     }
 }
 exports = module.exports = CommonList;

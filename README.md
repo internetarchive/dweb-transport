@@ -121,8 +121,9 @@ virtually clean run gives more confidence that the install worked.
 
 Please not there is an issue with IPFS on some Firefox versions (seen on 54.0.1, not on 49.0.2 for example)
 that is currently leaking Threads and slowing the machine down drastically. This is being explored!  
-Use it on Chrome for now, and expect it to crash every 5 minutes. 
+Use it on Chrome for now, and expect it to crash every 5 minutes.
 The HTTP versions don't have this problem, but also don't support live notification of changes.
+This is reported on IPFS at [JSIPFS issue#950](https://github.com/ipfs/js-ipfs/issues/950), dweb-transport issue@ and supposedly being fixed 
 
 ##See also:
 

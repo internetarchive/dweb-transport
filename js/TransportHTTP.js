@@ -19,8 +19,6 @@ if (typeof(Window) === "undefined") {
 }
 //TODO-HTTP to work on Safari or mobile will require a polyfill, see https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch for comment
 
-//TODO-MULTI file edited
-
 defaulthttpoptions = {
     urlbase: 'https://gateway.dweb.me:443'
 };
@@ -31,7 +29,9 @@ class TransportHTTP extends Transport {
         super(options, verbose);
         this.options = options;
         this.urlbase = options.http.urlbase;
-        this.urlschemes = ['http','https'];
+        this.supportURLs = ['http','https'];
+        this.supportFunctions = ['fetch', 'store', 'add', 'list', 'reverse']; //Does not support: listmonitor
+        this.name = "HTTP";             // For console log etc
     }
 
     static async p_setup(options, verbose) {
@@ -107,7 +107,7 @@ class TransportHTTP extends Transport {
             if (err instanceof Dweb.errors.TransportError) {
                 throw err;
             } else {
-                throw new Dweb.errors.TransportError(`Transport error thrown by ${httpurl}`)
+                throw new Dweb.errors.TransportError(`Transport error thrown by ${httpurl}: ${err.message}`);
             }
         }
     }
@@ -145,6 +145,8 @@ class TransportHTTP extends Transport {
     }
 
     p_rawfetch(url, verbose) {
+        //if (!(url && url.includes(':') ))
+        //    throw new Dweb.errors.CodingError("TransportHTTP.p_rawfetch bad url: "+url);
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
         return this.p_get("content/rawfetch", url, verbose)
     }
@@ -163,11 +165,11 @@ class TransportHTTP extends Transport {
         return this.p_post("contenturl/rawstore", null, "application/octet-stream", data, verbose) // Returns immediately with a promise
     }
 
-    p_rawadd(url, date, signature, signedby, verbose) { //TODO-BACKPORT turn date into ISO before adding
+    p_rawadd(urls, date, signature, signedby, verbose) { //TODO-BACKPORT turn date into ISO before adding
         //verbose=true;
-        console.assert(url && signature && signedby, "p_rawadd args",url,signature,signedby);
-        if (verbose) console.log("rawadd", url, date, signature, signedby);
-        let value = this._add_value( url, date.toISOString(), signature, signedby, verbose)+ "\n";
+        console.assert(urls && signature && signedby, "p_rawadd args",urls, signature,signedby);
+        if (verbose) console.log("rawadd", urls, date, signature, signedby);
+        let value = this._add_value( urls, date.toISOString(), signature, signedby, verbose)+ "\n";
         return this.p_post("void/rawadd", null, "application/json", value, verbose); // Returns immediately
     }
 

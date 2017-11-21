@@ -9,7 +9,6 @@ Y Lists have listeners and generate events - see docs at ...
 // IPFS components
 
 //TODO-API scan this file and add documentation
-//TODO-MULTI scanned and edited file
 
 const IPFS = require('ipfs');
 const CID = require('cids');
@@ -92,6 +91,9 @@ class TransportIPFS extends Transport {
         super(options, verbose);
         this.ipfs = undefined;          // Undefined till start IPFS
         this.options = options;         // Dictionary of options { ipfs: {...}, listmethod: "yarrays", yarray: {...} }
+        this.name = "IPFS";             // For console log etc
+        this.supportURLs = ['ipfs'];
+        this.supportFunctions = ['fetch', 'store', 'add', 'list', 'listmonitor'];   // Does not support reverse
     }
 
 
@@ -109,7 +111,7 @@ class TransportIPFS extends Transport {
     p_ipfsstart(verbose) { //TODO-API
     /*
     Just start IPFS - not Y (note used with "yarrays" and will be used for non-IPFS list management)
-
+    Note - can't figure out how to use async with this, as we resolve the promise based on the event callback
      */
         let self = this;
         return new Promise((resolve, reject) => {
@@ -123,7 +125,7 @@ class TransportIPFS extends Transport {
         .then(() => self.ipfs.version())
         .then((version) => console.log('IPFS READY',version))
         .catch((err) => {
-            console.log("Error caught in p_ipfsstart",err);
+            console.log("Error caught in p_ipfsstart");
             throw(err);
         })
     }
@@ -149,19 +151,18 @@ class TransportIPFS extends Transport {
         //Lots of issues with "init" not knowing state before it//  this.ipfs.init({emptyRepo: true, bits: 2048})     //.then((unused) => ipfs.init({emptyRepo: true, bits: 2048}))
     }
     */
-    p_yarraysstart(verbose) { //TODO-API
+    async p_yarraysstart(verbose) { //TODO-API
         /*
         This starts IPFS, but only sets up for Y connections, which are opened each time a resource is listed, added to, or listmonitored.
          */
-        let self = this;
-        return this.p_ipfsstart(verbose)
-            .then(() => {
-                self.yarrays = {};
-            })
-            .catch((err) => {
-                console.log("Error caught in p_yarraysstart",err);
-                throw(err);
-            })
+        try {
+            let self = this;
+            await this.p_ipfsstart(verbose);
+            self.yarrays = {};
+        } catch(err) {
+            console.log("Error caught in p_yarraysstart");
+            throw(err);
+        }
         //Lots of issues with "init" not knowing state before it//  this.ipfs.init({emptyRepo: true, bits: 2048})     //.then((unused) => ipfs.init({emptyRepo: true, bits: 2048}))
     }
 
@@ -189,7 +190,7 @@ class TransportIPFS extends Transport {
     }
 
 
-    static p_setup(options, verbose ) {
+    static async p_setup(options, verbose ) {
         /*
         Setup the resource and open any P2P connections etc required to be done just once.
         In almost all cases this will call the constructor of the subclass
@@ -205,25 +206,9 @@ class TransportIPFS extends Transport {
         let t = new TransportIPFS(combinedoptions, verbose);   // Note doesnt start IPFS or Y
         Transport.addtransport(t);
         //Switch the comments on the next two lines to switch back and forth between Yarray (one connection) or Yarrays (one per list) for testing
-        return  (   //(t.options.listmethod === "yarray")  ? t.p_yarraystart(verbose) : // Not currently supported
-                    (t.options.listmethod === "yarrays") ? t.p_yarraysstart(verbose) :
-                    undefined   )
-            .then(() => t);
-    }
-
-    supports(url) { //TODO-API
-        /*
-        Determine if this transport supports a certain set of URLs
-
-        url     String or parsed URL
-        returns True if this protocol supports these URLs
-         */
-        if (!url) return true; // Can handle default URLs
-        if (url && (typeof url === 'string')) {
-            url = Url.parse(url);    // For efficiency, only parse once.
-        }
-        let protocol = url.protocol;    // Lower case, Includes trailing :
-        return protocol === 'ipfs:';
+        //(t.options.listmethod === "yarray")  ? t.p_yarraystart(verbose) : // Not currently supported
+        if (t.options.listmethod === "yarrays") await t.p_yarraysstart(verbose);    // Only listmethod supported currently
+        return t;
     }
 
     p_status() {
@@ -276,6 +261,7 @@ class TransportIPFS extends Transport {
 
         try {
             let res = await this.ipfs.dag.get(cid);
+            // noinspection Annotator
             if (res.remainderPath.length)
                 { // noinspection ExceptionCaughtLocallyJS
                     throw new Dweb.errors.TransportError("Not yet supporting paths in p_rawfetch");
@@ -290,13 +276,13 @@ class TransportIPFS extends Transport {
                     // This will get a file padded with ~14 bytes - 4 at front, 4 at end and cant find the other 6 !
                     // but it seems to work for PDFs which is what I'm testing on.
                     if (verbose) console.log("Kludge alert - files.cat fails in Chrome, trying block.get");
-                    let blk = await this.promisified.ipfs.block.get(cid)
+                    let blk = await this.promisified.ipfs.block.get(cid);
                     buff = blk.data;
                 }
             } else { //c: not a file
                 buff = res.value;
             }
-            if (verbose) console.log("fetched ", buff.length)
+            if (verbose) console.log("fetched ", buff.length);
             return buff;
         } catch (err) {
             console.log("Caught misc error in TransportIPFS.p_rawfetch");
@@ -304,7 +290,7 @@ class TransportIPFS extends Transport {
         }
     }
 
-    p_rawlist(url, verbose) {
+    async p_rawlist(url, verbose) {
     /*
     Fetch all the objects in a list, these are identified by the url of the public key used for signing.
     (Note this is the 'signedby' parameter of the p_rawadd call, not the 'url' parameter
@@ -316,17 +302,17 @@ class TransportIPFS extends Transport {
     :param boolean verbose: True for debugging output
     :resolve array: An array of objects as stored on the list.
      */
-        if (this.options.listmethod !== "yarrays") throw new Dweb.errors.CodingError("Only support yarrays");
-        return this.p__yarray(url, verbose)
-            .then((y) => y.share.array.toArray().filter((obj) => (obj.signedby === url)))
-            .then((res) => {
-                if (verbose) console.log("p_rawlist found", ...Dweb.utils.consolearr(res));
-                return res;
-            })
-            .catch((err) => {
-                console.log("Uncaught error in TransportIPFS.p_rawlist", err);
-                throw(err);
-            })
+        try {
+            if (this.options.listmethod !== "yarrays") { // noinspection ExceptionCaughtLocallyJS
+                throw new Dweb.errors.CodingError("Only support yarrays");
+            }
+            let y = await this.p__yarray(url, verbose);
+            let res = y.share.array.toArray().filter((obj) => (obj.signedby.includes(url)));
+            if (verbose) console.log("p_rawlist found", ...Dweb.utils.consolearr(res));
+        } catch(err) {
+            console.log("TransportIPFS.p_rawlist failed",err.message);
+            throw(err);
+        }
     }
 
     listmonitor(url, callback, verbose) {
@@ -344,7 +330,7 @@ class TransportIPFS extends Transport {
         y.share.array.observe((event) => {
             if (event.type === 'insert') { // Currently ignoring deletions.
                 if (verbose) console.log('resources inserted', event.values);
-                event.values.filter((obj) => obj.signedby === url).map(callback)
+                event.values.filter((obj) => obj.signedby.includes(url)).map(callback);
             }
         })
     }
@@ -354,7 +340,7 @@ class TransportIPFS extends Transport {
         this.yarray.share.array.observe((event) => {
             if (event.type === 'insert') { // Currently ignoring deletions.
                 if (verbose) console.log('resources inserted', event.values);
-                event.values.filter((obj) => obj.signedby === url).map(callback)
+                event.values.filter((obj) => obj.signedby === url).map(callback) // Note - no longer works with multi urls
             }
         });
     }
@@ -373,7 +359,7 @@ class TransportIPFS extends Transport {
         //TODO-REVERSE this needs implementing once list structure on IPFS more certain
         throw new Dweb.errors.ToBeImplementedError("Undefined function TransportHTTP.rawreverse"); }
 
-    p_rawstore(data, verbose) {
+    async p_rawstore(data, verbose) {
         /*
         Store a blob of data onto the decentralised transport.
         Returns a promise that resolves to the url of the data
@@ -386,29 +372,29 @@ class TransportIPFS extends Transport {
         let buf = (data instanceof Buffer) ? data : new Buffer(data);
         //return this.promisified.ipfs.block.put(buf).then((block) => block.cid)
         //https://github.com/ipfs/interface-ipfs-core/blob/master/SPEC/DAG.md#dagput
-        return this.ipfs.dag.put(buf,{ format: 'dag-cbor', hashAlg: 'sha2-256' })
-            .then((cid) => TransportIPFS.cid2url(cid));
+        let cid = await this.ipfs.dag.put(buf,{ format: 'dag-cbor', hashAlg: 'sha2-256' });
+        return TransportIPFS.cid2url(cid);
         //return this.ipfs.files.put(buf).then((block) => TransportIPFS.cid2url(block.cid));
     }
 
-    p_rawadd(url, date, signature, signedby, verbose) {
+    async p_rawadd(urls, date, signature, signedby, verbose) {
         /*
         Store a new list item, it should be stored so that it can be retrieved either by "signedby" (using p_rawlist) or
         by "url" (with p_rawreverse). The underlying transport does not need to guarrantee the signature,
         an invalid item on a list should be rejected on higher layers.
 
-        :param string url: String identifying an object being added to the list.
+        :param string urls: String identifying places to find an object being added to the list.
         :param string date: Date (as returned by new Data.now() )
         :param string signature: Signature of url+date
         :param string signedby: url of the public key used for the signature.
         :param boolean verbose: True for debugging output
         :resolve undefined:
         */
-        console.assert(url && signature && signedby, "p_rawadd args",url,signature,signedby);
-        if (verbose) console.log("p_rawadd", url, date, signature, signedby);
-        let value = {url: url, date: date.toISOString(), signature: signature, signedby: signedby};
-        return this.p__yarray(signedby, verbose)
-            .then((y) => y.share.array.push([value]));
+        console.assert(urls && signature && signedby, "p_rawadd args",urls,signature,signedby);
+        if (verbose) console.log("p_rawadd", urls, date, signature, signedby);
+        let value = {urls: urls, date: date.toISOString(), signature: signature, signedby: signedby};
+        let y = await this.p__yarray(signedby, verbose);
+        y.share.array.push([value]);
     }
     /*OBS - not supporting YARRAY singular
     rawadd(url, date, signature, signedby, verbose) {
@@ -428,61 +414,39 @@ class TransportIPFS extends Transport {
     }
     */
 
-    static test(transport, verbose) {
+    static async test(transport, verbose) {
         if (verbose) {console.log("TransportIPFS.test")}
-        return new Promise((resolve, reject) => {
-            try {
-                let urlqbf;
-                let qbf = "The quick brown fox";
-                let qbf_url = "ipfs:/ipfs/zdpuAscRnisRkYnEyJAp1LydQ3po25rCEDPPEDMymYRfN1yPK" // Expected url
-                let testurl = "1114";  // Just a predictable number can work with
-                let listlen;    // Holds length of list run intermediate
-                let cidmultihash;   // Store cid from first block in form of multihash
-                transport.p_rawstore(qbf, verbose)
-                    .then((url) => {
-                        if (verbose) console.log("rawstore returned", url);
-                        let newcid = TransportIPFS.url2cid(url);  // Its a CID which has a buffer in it
-                        console.assert(url === qbf_url,"url should match url from rawstore");
-                        cidmultihash = url.split('/')[2];
-                        let newurl = TransportIPFS.cid2url(newcid);
-                        console.assert(url === newurl, "Should round trip");
-                        urlqbf = url;
-                        //console.log("urlqbf=",url);
-                    })
-                    /*
-                    .then(() => transport.p_rawstore(null, rold, verbose))
-                    .then((url) => {
-                            if (verbose) console.log("p_rawstore got", url);
-                            urlold = url;
-                        })
-                    */
-                    // Note above returns immediately and runs async, we don't wait for it before below
-                    .then(() => transport.p_rawfetch(urlqbf, verbose))
-                    .then((data) => console.assert(data.toString() === qbf, "Should fetch block stored above"))
-                    .then(() => transport.p_rawlist(testurl, verbose))
-                    .then((res) => {
-                        listlen = res.length;
-                        if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res))
-                    })
-                    .then(() => transport.listmonitor(testurl, (obj) => console.log("Monitored", obj), verbose))
-                    .then((res) => transport.p_rawadd("123", new Date(Date.now()), "Joe Smith", testurl, verbose))
-                    .then(() => { if (verbose) console.log("p_rawadd returned ")  })
-                    .then(() => transport.p_rawlist(testurl, verbose))
-                    .then((res) => { if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res)) }) // Note not showing return
-                    .then(() => delay(500))
-                    .then(() => transport.p_rawlist(testurl, verbose))
-                    .then((res) => console.assert(res.length === listlen + 1, "Should have added one item"))
-                    //.then(() => console.log("TransportIPFS test complete"))
-                    .then(() => resolve())
-                    .catch((err) => {
-                        console.log("test ERR=", err);
-                        reject(err)
-                    });
-            } catch (err) {
-                    console.log("Exception thrown in TransportIPFS.test", err);
-                    reject(err);
-            }
-        })
+        try {
+            let urlqbf;
+            let qbf = "The quick brown fox";
+            let qbf_url = "ipfs:/ipfs/zdpuAscRnisRkYnEyJAp1LydQ3po25rCEDPPEDMymYRfN1yPK"; // Expected url
+            let testurl = "1114";  // Just a predictable number can work with
+            let url = await transport.p_rawstore(qbf, verbose);
+            if (verbose) console.log("rawstore returned", url);
+            let newcid = TransportIPFS.url2cid(url);  // Its a CID which has a buffer in it
+            console.assert(url === qbf_url, "url should match url from rawstore");
+            let cidmultihash = url.split('/')[2];  // Store cid from first block in form of multihash
+            let newurl = TransportIPFS.cid2url(newcid);
+            console.assert(url === newurl, "Should round trip");
+            urlqbf = url;
+            let data = await transport.p_rawfetch(urlqbf, verbose);
+            console.assert(data.toString() === qbf, "Should fetch block stored above");
+            let res = await transport.p_rawlist(testurl, verbose);
+            let listlen = res.length;   // Holds length of list run intermediate
+            if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res));
+            transport.listmonitor(testurl, (obj) => console.log("Monitored", obj), verbose);
+            await transport.p_rawadd("123", new Date(Date.now()), "Joe Smith", testurl, verbose);
+            if (verbose) console.log("p_rawadd returned ");
+            res = await transport.p_rawlist(testurl, verbose);
+            if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res)); // Note not showing return
+            await delay(500);
+            res = await transport.p_rawlist(testurl, verbose);
+            console.assert(res.length === listlen + 1, "Should have added one item");
+            //console.log("TransportIPFS test complete");
+        } catch(err) {
+            console.log("Exception thrown in TransportIPFS.test:", err.message);
+            throw err;
+        }
     }
 
 }

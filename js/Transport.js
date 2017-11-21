@@ -1,7 +1,5 @@
 const Url = require('url');
 
-//TODO-MULTI file edited
-
 class Transport {
 
     constructor(options, verbose) {
@@ -21,7 +19,7 @@ class Transport {
          */
         throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally undefined function Transport.p_setup should have been subclassed");
     }
-    supports(url) {
+    supports(url, func) {
         /*
         Determine if this transport supports a certain set of URLs
 
@@ -34,27 +32,10 @@ class Transport {
             url = Url.parse(url);    // For efficiency, only parse once.
         }
         if (!url.protocol) { throw new Error("URL failed to specific a scheme (before :) "+url.href)} //Should be TransportError but out of scope here
-        // noinspection Annotator  urlschemes is defined in subclasses
-        return this.urlschemes.includes(url.protocol.slice(0,-1))
+        // noinspection Annotator  supportURLs is defined in subclasses
+        return (    (!url || this.supportURLs.includes(url.protocol.slice(0,-1)))
+                &&  (!func || this.supportFunctions.includes(func)))
     }
-
-    dumps(obj) {
-        /*
-         Encode an obj into a JSON string - this is in Transport as some systems have a canonical form of JSON they prefer to store
-         */
-        return JSON.stringify(obj);
-    }
-    loads(str) {
-        /*
-         Inverse of dumps - so if string encoded in transport specific way, should undo that.
-         */
-        try {
-            return JSON.parse(str);
-        } catch(err) {
-            console.log("Bad JSON:",str);
-            throw err;
-        }
-    };
 
     p_rawstore(data, verbose) {
         /*
@@ -142,9 +123,9 @@ class Transport {
         console.log("Undefined function Transport.listmonitor");    // Note intentionally a log, as legitamte to not implement it
     }
 
-    _add_value(url, date, signature, signedby, verbose) {
-        let store = {"url": url, "date": date, "signature": signature, "signedby": signedby};
-        return this.dumps(store);   // Note transport is that of signedby, not url
+    _add_value(urls, date, signature, signedby, verbose) {
+        let store = {"urls": urls, "date": date, "signature": signature, "signedby": signedby};
+        return JSON.stringify(store);   // Note transport is that of signedby, not url
     }
 
     static mergeoptions(a, b) {
@@ -163,28 +144,30 @@ class Transport {
         return c;
     }
 
-    static validFor(url) { //TODO-API-MULTI use this instead of Dweb.transport(url)
+    static validFor(urls, func) { //TODO-API
         /*
         Finds an array or Transports that can support this URL.  url => [TransportInstanceA, TransportInstanceB]
 
         If passed an array of urls, returns a dict; [url1,url2] => {url1: [TransportInstanceA], url2: [TransportInstanceA, TransportInstanceB]}
         (note replaces old Dweb.transport() )
 
-        urls:       URL or array of urls
-        returns:    Array of Transport instances, or dictionary of arrays
+        urls:       Array of urls
+        func:       Function to check support for: fetch, store, add, list, listmonitor, reverse - see supportFunctions on each Transport class
+        returns:    Array of pairs of url & transport instance [ [ u1, t1], [u1, t2], [u2, t1]]
          */
-        if (Array.isArray(url)) {
-            o = {};
-            return url.map((u) => o[u] = Transport.validFor(u));
-        } else if (url) {
-            if (typeof url === 'string') {
-                url = Url.parse(url);    // For efficiency, only parse once.
-            }
-            return Transport._transports.filter((t) => t.supports(url));
-        } else {    // No Url, it must be storage - TODO-MULTI may later restrict to transports that support storage.
-            return Transport._transports;
+        console.assert((urls && urls[0]) || ["store"].includes(func), "XXX@T.validFor failed - coding error - url=", urls, "func=", func) // FOr debugging old calling patterns with [ undefined ]
+        if (!(urls && urls.length > 0)) {
+            return Transport._transports.filter((t) => t.supports(undefined, func))
+                .map((t) => [undefined, t]);
+        } else {
+            return [].concat(
+                ...urls.map((url) => typeof url === 'string' ? Url.parse(url) : url) // parse URLs once
+                    .map((url) =>
+                        Transport._transports.filter((t) => t.supports(url, func)) // [ t1, t2 ]
+                            .map((t) => [url, t]))); // [[ u, t1], [u, t2]]
         }
     }
+
     static addtransport(t) {
         /*
         Add a transport to _transports,

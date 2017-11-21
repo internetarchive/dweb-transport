@@ -13,7 +13,7 @@
             let el = document.getElementById("retrievalarea");
             let hash = el.value;
             console.log("Fetching hash=",hash);
-            Dweb.SmartDict.p_fetch(hash, verbose)
+            Dweb.SmartDict.p_fetch(hash, verbose) //TODO-MULTI use urls plural
                 .then((sd) => {
                     console.log("Fetched=",sd);
                     return sd;

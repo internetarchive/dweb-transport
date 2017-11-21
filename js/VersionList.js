@@ -32,7 +32,10 @@ class VersionList extends CommonList {
         resolves to: expanded data
          */
         try {
-            if (data.contentacl && typeof data.contentacl === "string") data.contentacl = await Dweb.SmartDict.p_fetch(data.contentacl, verbose); // THis is the one that gets "Must be logged in as Mary Smith"
+            if (data.contentacl) {
+                if (typeof data.contentacl === "string") data.contentacl = [data.contentacl];
+                if (Array.isArray(data.contentacl)) data.contentacl = await Dweb.SmartDict.p_fetch(data.contentacl, verbose); // THis is the one that gets "Must be logged in as Mary Smith"
+            }
         } catch(err) {
                 console.log("Unable to expand data in p_expanddata",err);
         }
@@ -54,7 +57,7 @@ class VersionList extends CommonList {
         let vl = new VersionList(data, master, key, verbose);
         await vl.p_store(verbose);
         if (data._acl)  // If logged in (normally the case, but not when testing or some special cases)
-            data._acl.p_push(vl)    // Store on the KeyChain so can find again
+            await data._acl.p_push(vl);    // Store on the KeyChain so can find again
         vl._working = firstinstance;
         vl._working["_acl"] = vl.contentacl;
         return vl;
@@ -98,7 +101,7 @@ class VersionList extends CommonList {
         if (!this._master) {
             delete dd.contentacl;   // Contentacl is the private ACL, no need to send at all
         }
-        return super.preflight(dd); //CL preservers _master and _publicurl
+        return super.preflight(dd); //CL preservers _master and _publicurls
     }
 
 
@@ -114,7 +117,7 @@ class VersionList extends CommonList {
             await vl1.p_saveversion(verbose);
             //console.log("VL.test after saveversion=",vl1);
             console.assert(vl1._list.length === siglength+1);
-            let vl2 = await Dweb.SmartDict.p_fetch(vl1._publicurl, verbose);
+            let vl2 = await Dweb.SmartDict.p_fetch(vl1._publicurls, verbose);
             await vl2.p_fetchlistandworking(verbose);
             console.assert(vl2._list.length === siglength+1, "Expect list",siglength+1,"got",vl2._list.length);
             console.assert(vl2._working.textfield === vl1._working.textfield, "Should have retrieved");

@@ -11,8 +11,8 @@ const Dweb = require('./Dweb');
 function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { resolve(val); },ms)})}
 
 //Comment out one of these next two lines
-let transportclass = Dweb.TransportIPFS;
-//let transportclass = TransportHTTP
+//let transportclass = Dweb.TransportIPFS;
+let transportclass = TransportHTTP
 
 // Fake a browser like environment for some tests
 //TODO can remove this when rebuild StructuredBlock as its the only thing that uses "document"
@@ -37,18 +37,21 @@ async function p_test() {
         }, verbose); // Note browser requires indexeddb
         if (verbose) console.log("setup returned and transport set - including annoationList");
         await transportclass.test(t, verbose); //TODO-MULTI figure out how to test some transport - maybe all
-        console.log("------END OF CURRENT TESTING=====")
-        await delay(1000);
-        console.log("------AWAITED ANY BACKGROUND OUTPUT =====")
         await Dweb.Block.p_test(verbose);
         await Dweb.Signature.p_test(verbose);
         await Dweb.KeyPair.test(verbose);
-        let acl = await Dweb.AccessControlList.p_test(verbose);
-        //* - tests for later modules
-        let sb = (await Dweb.StructuredBlock.test(document, verbose)).sb;
-        //await Dweb.MutableBlock.test(sb, verbose);
+        let res = await Dweb.AccessControlList.p_test(verbose);
+        acl = res.acl;
         await Dweb.VersionList.test(verbose);
+        console.log("------END OF PREVIOUS TESTING PAUSING=====")
+        await delay(1000);
+        console.log("------AWAITED ANY BACKGROUND OUTPUT STARTING NEXT TEST =====");
+        //verbose = true;
         await Dweb.KeyChain.p_test(acl, verbose); // depends on VersionList for test, though not for KeyChain itself
+        console.log("------END OF NEW TESTING PAUSING=====")
+        await delay(1000);
+        console.log("------AWAITED ANY BACKGROUND OUTPUT =====")
+        //let sb = (await Dweb.StructuredBlock.test(document, verbose)).sb;
         console.log("delaying 10 secs");
         await delay(2000);
         console.log("Completed test - running IPFS in background, hit Ctrl-C to exit");

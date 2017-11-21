@@ -1,4 +1,6 @@
+exports.Transport = require('./Transport');
 exports.TransportHTTP = require('./TransportHTTP'); // Note this used to cause a problem in bundle I believe
+exports.Transportable = require('./Transportable');
 exports.Block = require('./Block');
 exports.SmartDict = require("./SmartDict");
 exports.KeyPair = require("./KeyPair");
@@ -11,8 +13,6 @@ exports.VersionList = require('./VersionList');
 exports.StructuredBlock = require('./StructuredBlock'); //TODO - will remove SB once have path traversal.
 exports.EventListenerHandler = require("./EventListenerHandler")
 //*/
-
-//TODO-MULTI scanned
 
 exports.table2class = { // Each of these needs a constructor that takes data and is ok with no other parameters, (otherwise define a set of these methods as factories)
     "cl": "CommonList",
@@ -31,7 +31,6 @@ exports.table2class = { // Each of these needs a constructor that takes data and
 
 exports.utils = {}; //utility functions
 exports.errors = require("./Errors");
-exports.transports = {}; // Transports - instances NOT CLASSES of loaded transports //TODO-MULTI name clash with transports(), maybe this should be inside Transport class
 
 /* Only applicable to HTTP...
     exports.dwebserver = 'localhost';
@@ -41,16 +40,18 @@ exports.transports = {}; // Transports - instances NOT CLASSES of loaded transpo
 exports.keychains = [];
 exports.eventHandler = new exports.EventListenerHandler();
 
-exports.transportpriority = []; // First on list is top priority TODO-MULTI not clear if need
-
 // ==== OBJECT ORIENTED JAVASCRIPT ===============
 
 // Utility function to print a array of items but just show number and last.
 exports.utils.consolearr  = (arr) => ((arr && arr.length >0) ? [arr.length+" items inc:", arr[arr.length-1]] : arr );
+//Return true if two shortish arrays a and b intersect or if b is not an array, then if b is in a
+//Note there are better solutions exist for longer arrays
+//This is intended for comparing two sets of probably equal, but possibly just interesecting URLs
+exports.utils.intersects = (a,b) =>  (Array.isArray(b) ? a.some(x => b.includes(x)) : a.includes(b));
 
 // Utility functions
 
-exports.utils.mergeTypedArraysUnsafe = function(a, b) { // Take care of inability to concatenate typed arrays
+exports.utils.mergeTypedArraysUnsafe = function(a, b) { // Take care of inability to concatenate typed arrays such as Uint8
     //http://stackoverflow.com/questions/14071463/how-can-i-merge-typedarrays-in-javascript also has a safe version
     const c = new a.constructor(a.length + b.length);
     c.set(a);

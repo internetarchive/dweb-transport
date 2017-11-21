@@ -3,6 +3,7 @@ const Dweb = require("./Dweb");
 
 // See CommonBlock.py for Python version
 
+
 class SmartDict extends Transportable {
     /*
     Subclass of Transport that stores a data structure, usually a single layer Javascript dictionary object.
@@ -14,14 +15,14 @@ class SmartDict extends Transportable {
     The hooks for encrypting and decrypting data are at this level, depending on the _acl field, but are implemented by code in CryptoLib.
 
     Fields:
-    _acl    if set (on master) defines storage as encrypted
+    _acl    if set (on master) to a AccessControlList or KeyChain, defines storage as encrypted -
      */
 
     constructor(data, verbose, options) {
         /*
         Creates and initialize a new SmartDict.
 
-        data	String|Object, If a string (typically JSON), then pass to Transport.loads first.
+        data	String|Object, If a string (typically JSON), then parse first.
                 A object with attributes to set on SmartDict via _setdata
         options	Passed to _setproperties, by default overrides attributes set by data
          */
@@ -56,8 +57,9 @@ class SmartDict extends Transportable {
         for (let i in dd) {
             if (i.indexOf('_') !== 0) { // Ignore any attributes starting _
                 if (dd[i] instanceof Transportable) {
+                    // Any field that contains an object will be turned into an array of urls for the object.
                     if (!dd[i].stored()) throw new Dweb.errors.CodingError("Should store subobjects before calling preflight");
-                    res[i] = dd[i]._url
+                    res[i] = dd[i]._urls
                 } else {
                     res[i] = dd[i];
                 }
@@ -78,11 +80,11 @@ class SmartDict extends Transportable {
             //noinspection JSUnfilteredForInLoop don't use "of" because want inherited attributes
             dd[i] = this[i];    // This just copies the attributes not functions
         }
-        let res = this.transport().dumps(this.preflight(dd)); //TODO-MUTLI-LOADS
-        if (this._acl) { //Need to encrypt
+        let res = JSON.stringify(this.preflight(dd));
+        if (this._acl) { //Need to encrypt, _acl is an object, not a url
             let encdata = this._acl.encrypt(res, true);  // data, b64
-            let dic = { "encrypted": encdata, "acl": this._acl._publicurl, "table": this.table};
-            res = this.transport().dumps(dic); //TODO-MUTLI-LOADS
+            let dic = { "encrypted": encdata, "acl": this._acl._publicurls, "table": this.table};
+            res = JSON.stringify(dic);
         }
         return res
     }    // Should be being called on outgoing _data includes dumps and encoding etc
@@ -95,7 +97,7 @@ class SmartDict extends Transportable {
         // Note SmartDict expects value to be a dictionary, which should be the case since the HTTP requester interprets as JSON
         // Call chain is ...  or constructor > _setdata > _setproperties > __setattr__
         // COPIED FROM PYTHON 2017-5-27
-        value = typeof(value) === "string" ? this.transport().loads(value) : value; // If its a string, interpret as JSON //TODO-MULTI redo loads
+        value = typeof(value) === "string" ? JSON.parse(value) : value; // If its a string, interpret as JSON
         if (value && value.encrypted)
             throw new Dweb.errors.EncryptionError("Should have been decrypted in p_fetch");
         this._setproperties(value); // Note value should not contain a "_data" field, so wont recurse even if catch "_data" at __setattr__()
@@ -111,21 +113,23 @@ class SmartDict extends Transportable {
         :returns: boolean, true if matches
          */
         return Object.keys(dict).every((key) => {
-            return      (key[0] !== '.'             ? (this[key] === dict[key])
+            return (
+                (["_publicurls","_urls"].includes(key))  ? Dweb.utils.intersects(this[key], dict[key])
+                :   (key[0] !== '.')            ? (this[key] === dict[key])
                 :   ( key === ".instanceof")    ? (this instanceof dict[key])
-                    :   false)
+                :   false)
         })
     }
 
     copy(verbose) {
         /*
-        Copy a SmartDict or subclass, will treat "this" as a dict and add to fields, note will shallowcopy, not deep copy.
+        Copy a SmartDict or subclass, will treat "this" as a dict and add to fields, note will shallow copy, not deep copy.
         returns: new instance of SmartDict or subclass
         */
         return new this.constructor(this, verbose);
     }
 
-    static async p_fetch(url, verbose) {
+    static async p_fetch(urls, verbose) {
         /*
         Fetches the object from Dweb, passes to p_decrypt in case it needs decrypting,
         and creates an object of the appropriate class and passes data to _setdata
@@ -138,20 +142,24 @@ class SmartDict extends Transportable {
 
          */
         try {
-            if (verbose) console.log("SmartDict.p_fetch", url);
-            let data = await super.p_fetch(url, verbose); // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
-            let maybeencrypted = Dweb.transport(url).loads(data);      // Parse JSON //TODO-REL3 maybe function in Transportable TODO-MULTI replace Dweb.transport
-            let table = maybeencrypted.table;              // Find the class it belongs to
-            let cls = Dweb[Dweb.table2class[table]];         // Gets class name, then looks up in Dweb - avoids dependency
-            if (!cls) throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: " + table + " isnt implemented in table2class");
+            if (verbose) console.log("SmartDict.p_fetch", urls);
+            let data = await super.p_fetch(urls, verbose);  // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
+            let maybeencrypted = JSON.parse(data);          // Parse JSON
+            let table = maybeencrypted.table;               // Find the class it belongs to
+            let cls = Dweb[Dweb.table2class[table]];        // Gets class name, then looks up in Dweb - avoids dependency
+            if (!cls) { // noinspection ExceptionCaughtLocallyJS
+                throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: " + table + " is not implemented in table2class");
+            }
             //console.log(cls);
-            if (!((Dweb.table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict))) throw new Dweb.errors.ForbiddenError("Avoiding data driven hacks to other classes - seeing " + table);
-            let decrypted = await cls.p_decrypt(maybeencrypted, verbose);    // decrypt - may return string or obj , note it can be suclassed for different encryption
-            decrypted._url = url;                         // Save where we got it - preempts a store - must do this afer decrypt
+            if (!((Dweb.table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict))) { // noinspection ExceptionCaughtLocallyJS
+                throw new Dweb.errors.ForbiddenError("Avoiding data driven hacks to other classes - seeing " + table);
+            }
+            let decrypted = await cls.p_decrypt(maybeencrypted, verbose);    // decrypt - may return string or obj , note it can be subclassed for different encryption
+            decrypted._urls = urls;                         // Save where we got it - preempts a store - must do this after decrypt
             return new cls(decrypted);
             // Returns new object that should be a subclass of SmartDict
         } catch(err) {
-            console.log(`cant fetch and decrypt ${url}`);
+            console.log(`cant fetch and decrypt ${urls}`);
             throw(err);
         }
     }

@@ -8,6 +8,7 @@
     <script type="text/javascript" src="objbrowser.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript" src="htmlutils.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript">
+        //TODO-MULTI-needs-scanning
 
     function sendit() {     // Send form data to Dweb, and display the url
         verbose = true;
@@ -32,7 +33,7 @@
         if (verbose) console.log("Fetching url=", url);
         let destn = document.getElementById("retrievaldestn");
         destn.innerHTML = ""; // Clear it first
-        Dweb.SmartDict.p_fetch(url, verbose)
+        Dweb.SmartDict.p_fetch(url, verbose) //TODO-MULTI use urls plural
             .then((sd) => {
                 if (verbose) console.log("Fetched=",sd);
                 destn.innerHTML = "My name is: "+sd.name;

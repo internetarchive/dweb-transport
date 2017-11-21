@@ -1,7 +1,6 @@
 const Transportable = require("./Transportable");
 const Dweb = require("./Dweb");
 
-
 // ######### Parallel development to Block.py ########
 
 class Block extends Transportable {
@@ -25,23 +24,20 @@ class Block extends Transportable {
          */
         return this._data;
     }
-    static p_fetch(url, verbose) {
-        return super.p_fetch(url, verbose) // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
-            .then((data) => new Block(data));
+    static async p_fetch(urls, verbose) {
+        return new Block(await super.p_fetch(urls, verbose)); // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
     }
-    static p_test(verbose) {
-        if (verbose) {console.log("Block.test")}
-        return new Promise((resolve, reject) => {
-            let blk;
-            blk = new Block("The dirty old chicken");       // Create a block with some data
-            blk.p_store(verbose)                            // Store it to transport
-            .then(() => Block.p_fetch(blk._url, verbose))
-            .then((blk2) => {
-                if (blk2._data.toString() !== blk._data) throw new Dweb.errors.CodingError("Block should survive round trip");
-                resolve(blk2);
-            })
-            .catch((err) => { console.log("Block Test failed", err); reject(err); })
-        })
+    static async p_test(verbose) {
+        try {
+            if (verbose) {console.log("Block.test")}
+            let blk = new Block("The dirty old chicken");       // Create a block with some data
+            await blk.p_store(verbose);                         // Store it to transport
+            let blk2 = await Block.p_fetch(blk._urls, verbose);
+            if (blk2._data.toString() !== blk._data) {          // noinspection ExceptionCaughtLocallyJS
+                throw new Dweb.errors.CodingError("Block should survive round trip");
+            }
+            return blk2;
+        } catch(err) { console.log("Block Test failed"); throw err; }
     }
 }
 

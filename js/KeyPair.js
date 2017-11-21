@@ -5,6 +5,7 @@ const crypto = require('crypto'); // Needed to do a simple sha256 which doesnt a
 //Buffer seems to be built in, require('Buffer') actually breaks things
 const multihashes = require('multihashes');
 
+
 class KeyPair extends SmartDict {
     /*
     Encapsulates public key cryptography
@@ -15,6 +16,7 @@ class KeyPair extends SmartDict {
     Libsodium implementation: Note that Uint8Array is the result of converting UrlSafeBase64 with sodium.to_urlsafebase64
 
     Fields:
+    _publicurls: list of urls holding public version
     _key = {
         sign: { publicKey: Uint8Array, privateKey: Uint8Array, keyType: "ed25519" }
         encrypt: { publicKey: Uint8Array, privateKey: Uint8Array},
@@ -29,6 +31,7 @@ class KeyPair extends SmartDict {
         :param data: or data to initialize with (see Fields above)
          */
         super(data, verbose);    // SmartDict takes data=json or dict
+        if (!this._publicurls) this._publicurls = [];   // Initialize to empty array if not restored with data (which will happen if its master that was previously stored)
         this.table = "kp";
     }
 
@@ -94,29 +97,28 @@ class KeyPair extends SmartDict {
         }
     }
 
+    storedpublic() {
+        return this._publicurls.length || ! KeyPair._key_has_private(this._key)
+    }
+
     async p_store(verbose) {
         if (super.stored())
             return; // Already stored
-        if (!this._publicurl && KeyPair._key_has_private(this._key)) { // Haven't stored a public version yet.
+        if (!this.storedpublic()) { // Haven't stored a public version yet
             await this._p_storepublic(verbose);
-            /* OBS old way
-            let publickp = new KeyPair({key:this.publicexport()}, verbose);
-            await publickp.p_store(verbose);
-            this._publicurl = publickp._url;
-            */
         }
         return super.p_store(verbose)
     }
 
     async _p_storepublic(verbose) {
         // Build a copy of the data, then create a new !master version
-        let oo = Object.assign({}, this) // Copy obj
-        delete oo._key
-        delete oo._acl // Dont secure public key
+        let oo = Object.assign({}, this); // Copy obj
+        delete oo._key;
+        delete oo._acl; // Dont secure public key
         oo.key = this.publicexport();    //Copy key except for use public version instead of private
         let ee = new this.constructor(oo, verbose);
         await ee.p_store(verbose);
-        this._publicurl = ee._url;
+        this._publicurls = ee._urls;
     }
 
     preflight(dd) {
@@ -133,11 +135,11 @@ class KeyPair extends SmartDict {
             dd.key = KeyPair._key_has_private(dd._key) ? this.privateexport() : this.publicexport();
         }
         // This code copied from CommonList
-        let publicurl = dd._publicurl; // Save before preflight super
+        let publicurls = dd._publicurls; // Save before preflight super
         let master = KeyPair._key_has_private(dd._key);
         dd = super.preflight(dd);  // Edits dd in place
-        if (master) { // Only store on Master, on !Master will be None and override storing url as _publicurl
-            dd._publicurl = publicurl;   // May be None, have to do this AFTER the super call as super filters out "_*"
+        if (master) { // Only store on Master, on !Master will be None and override storing url as _publicurls
+            dd._publicurls = publicurls;   // May be None, have to do this AFTER the super call as super filters out "_*"
         }
         return dd
     }
@@ -290,7 +292,7 @@ class KeyPair extends SmartDict {
         :param url: URL being signed, it could really be any data,
         :return: signature that can be verified with verify
         */
-        if (!signable) throw new Dweb.errors.CodingError("Needs signable")
+        if (!signable) throw new Dweb.errors.CodingError("Needs signable");
         if (! this._key.sign.privateKey) {
             throw new Dweb.errors.EncryptionError("Can't sign with out private key. Key =" + JSON.stringify(this._key));
         }

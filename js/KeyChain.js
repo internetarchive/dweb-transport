@@ -85,11 +85,11 @@ class KeyChain extends CommonList {
 
     p_store(verbose) {
         /*
-        Unlike other p_store this ONLY stores the public version, and sets the _publicurl, on the assumption that the private key of a KeyChain should never be stored.
+        Unlike other p_store this ONLY stores the public version, and sets the _publicurls, on the assumption that the private key of a KeyChain should never be stored.
         Private/master version should never be stored since the KeyChain is itself the encryption root.
         */
         this.dontstoremaster = true;    // Make sure p_store only stores public version
-        return super.p_store(verbose);  // Stores public version and sets _publicurl
+        return super.p_store(verbose);  // Stores public version and sets _publicurls
     }
 
     // ====  Stuff to do with managing Dweb.keychains - this could be a separate class at some point ======
@@ -169,27 +169,29 @@ class KeyChain extends CommonList {
             await kc.p_push(viewerkeypair, verbose);
             if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
 
-            if (verbose) console.log("KEYCHAIN 3: Fetching vlm url=", vlmaster._url);
-            let vlm2 = await Dweb.SmartDict.p_fetch(vlmaster._url, verbose); //Will be MutableBlock
+            if (verbose) console.log("KEYCHAIN 3: Fetching vlm url=", vlmaster._urls);
+            let vlm2 = await Dweb.SmartDict.p_fetch(vlmaster._urls, verbose); //Will be MutableBlock
             console.assert(vlm2.name === vlmaster.name, "Names should survive round trip", vlm2.name, "!==", vlmaster.name);
             if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
 
             if (verbose) console.log("KEYCHAIN 4: reconstructing KeyChain and fetch");
             Dweb.KeyChain.logout();     // Clear Key Chains
             //p_new(data, key, verbose)
-            await KeyChain.p_new({name: "test_keychain kc"}, {mnemonic: mnemonic}, verbose);
+            let kc2 = await KeyChain.p_new({name: "test_keychain kc"}, {mnemonic: mnemonic}, verbose);
+            console.assert(kc2._list[0].data._urls[0] === kc._list[0].data._urls[0])
+            console.assert(kc2._list[0].data._publicurls[0] === kc._list[0].data._publicurls[0])
             // Note success is run AFTER all keys have been loaded
             let mm = KeyChain.mykeys(Dweb.VersionList);
             console.assert(mm.length, "Should find vlmaster");
             let vlm3 = mm[mm.length - 1];
-            console.assert(vlm3 instanceof Dweb.VersionList, "Should be a mutable block", vlm3);
+            console.assert(vlm3 instanceof Dweb.VersionList, "Should be a Version List", vlm3);
             console.assert(vlm3.name === vlmaster.name, "Names should survive round trip");
             if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
 
             if (verbose) console.log("KEYCHAIN 5: Check can user ViewerKeyPair");
             // Uses acl passed in from AccessControlList.acl
             acl._allowunsafestore = true;
-            await acl.p_add_acle(viewerkeypair._publicurl, {"name": "my token"}, verbose);   //Add us as viewer - resolves to tok
+            await acl.p_add_acle(viewerkeypair, {"name": "my token"}, verbose);   //Add us as viewer - resolves to tok
             console.assert("acl._list.length === 1", "Should have added exactly 1 viewerkeypair", acl);
             let sb = new Dweb.StructuredBlock({"name": "test_sb", "data": qbf, "_acl": acl}, verbose); //url,data,verbose
             await sb.p_store(verbose);
@@ -199,17 +201,17 @@ class KeyChain extends CommonList {
             if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
 
             if (verbose) console.log("KEYCHAIN 6: Check can fetch and decrypt - should use viewerkeypair stored above");
-            let sb2 = await Dweb.SmartDict.p_fetch(sb._url, verbose); // Will be StructuredBlock, fetched and decrypted
+            let sb2 = await Dweb.SmartDict.p_fetch(sb._urls, verbose); // Will be StructuredBlock, fetched and decrypted
             if (sb2.data !== qbf) throw new Dweb.errors.CodingError("Data should survive round trip");
             if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
 
             if (verbose) console.log("KEYCHAIN 7: Check can store content via an VL");
-            let vlmasterwithacl = await Dweb.VersionList.p_new({name: "test_keychain vlmaster", contentacl: acl._url}, true, {passphrase: "TESTING VLMASTER"},
+            let vlmasterwithacl = await Dweb.VersionList.p_new({name: "test_keychain vlmaster", contentacl: acl._urls}, true, {passphrase: "TESTING VLMASTER"},
                 await new Dweb.SmartDict({content: qbf}, verbose),
                 verbose); //(data, master, key, firstinstance, verbose)
             await vlmasterwithacl.p_store(verbose);
             await vlmasterwithacl.p_saveversion(verbose);
-            let vl = await Dweb.SmartDict.p_fetch(vlmasterwithacl._publicurl, verbose); // Will be VersionList
+            let vl = await Dweb.SmartDict.p_fetch(vlmasterwithacl._publicurls, verbose); // Will be VersionList
             await vl.p_fetchlistandworking(verbose);
             if (vl._working.content !== qbf) throw new Dweb.errors.CodingError("Data should round trip through ACL");
             if (verbose) console.log("KeyChain.test promises complete");
