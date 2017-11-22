@@ -227,14 +227,25 @@ class TransportIPFS extends Transport {
         return "ipfs:/ipfs/"+cid.toBaseEncodedString()
     }
 
-    static url2cid(url) {
+    static cidFrom(url) { //TODO-API
         /*
         Convert a URL e.g. ipfs:/ipfs/abc123 into a CID structure suitable for retrieval
+        url: String of form "ipfs://ipfs/<hash>" or parsed URL or CID
+        returns: CID
+        throws:  TransportError if cant convert
          */
-        let arr = url.split('/');
-        if (!(arr.length===3 && arr[0] === "ipfs:" && arr[1]==="ipfs"))
-                throw new Dweb.errors.TransportError("TransportIPFS.url2cid bad format for url should be ipfs:/ipfs/...: "+url);
-        return new CID(arr[2])
+        if (url instanceof CID) return url;
+        if (typeof(url) === "string") url = Url.parse(url);
+        if (url && url["pathname"]) { // On browser "instanceof Url" isn't valid)
+            let patharr = url.pathname.split('/');
+            if ((url.protocol !== "ipfs:") || (patharr[1] != 'ipfs') || (patharr.length < 3))
+                throw new Dweb.errors.TransportError("TransportIPFS.cidFrom bad format for url should be ipfs:/ipfs/...: " + url.href);
+            if (patharr.length > 3)
+                throw new Dweb.errors.TransportError("TransportIPFS.cidFrom not supporting paths in url yet, should be ipfs:/ipfs/...: " + url.href);
+            return new CID(patharr[2]);
+        } else {
+            throw new Dweb.errors.CodingError("TransportIPFS.cidFrom: Cant convert url",url);
+        }
     }
 
     async p_rawfetch(url, verbose) {
@@ -257,7 +268,7 @@ class TransportIPFS extends Transport {
          */
         if (verbose) console.log("IPFS p_rawfetch", url);
         if (!url) throw new Dweb.errors.CodingError("TransportIPFS.p_rawfetch: requires url");
-        let cid = (url instanceof CID) ? url : TransportIPFS.url2cid(url);  // Throws TransportError if url bad
+        let cid = TransportIPFS.cidFrom(url);  // Throws TransportError if url bad
 
         try {
             let res = await this.ipfs.dag.get(cid);
@@ -303,12 +314,14 @@ class TransportIPFS extends Transport {
     :resolve array: An array of objects as stored on the list.
      */
         try {
+            if (!(typeof(url) === "string")) { url = url.href; } // Convert if its a parsed URL
             if (this.options.listmethod !== "yarrays") { // noinspection ExceptionCaughtLocallyJS
                 throw new Dweb.errors.CodingError("Only support yarrays");
             }
             let y = await this.p__yarray(url, verbose);
-            let res = y.share.array.toArray().filter((obj) => (obj.signedby.includes(url)));
+            let res = y.share.array.toArray().filter((obj) => (obj.signedby.includes(url))); //TODO-MULTI May do this at higher level when merge results from multi transports
             if (verbose) console.log("p_rawlist found", ...Dweb.utils.consolearr(res));
+            return res;
         } catch(err) {
             console.log("TransportIPFS.p_rawlist failed",err.message);
             throw(err);
@@ -325,6 +338,7 @@ class TransportIPFS extends Transport {
     :param verbose:     boolean - True for debugging output
      */
         console.assert(this.options.listmethod === "yarrays");
+        if (!(typeof(url) === "string")) { url = url.href; } // Convert if its a parsed URL
         let y = this.yarrays[url];
         console.assert(y,"Should always exist before calling listmonitor - async call p__yarray(url) to create");
         y.share.array.observe((event) => {
@@ -386,7 +400,7 @@ class TransportIPFS extends Transport {
         :param string urls: String identifying places to find an object being added to the list.
         :param string date: Date (as returned by new Data.now() )
         :param string signature: Signature of url+date
-        :param string signedby: url of the public key used for the signature.
+        :param string signedby: url of the public key used for the signature. TODO-MULTI this is currently singular
         :param boolean verbose: True for debugging output
         :resolve undefined:
         */
@@ -423,7 +437,7 @@ class TransportIPFS extends Transport {
             let testurl = "1114";  // Just a predictable number can work with
             let url = await transport.p_rawstore(qbf, verbose);
             if (verbose) console.log("rawstore returned", url);
-            let newcid = TransportIPFS.url2cid(url);  // Its a CID which has a buffer in it
+            let newcid = TransportIPFS.cidFrom(url);  // Its a CID which has a buffer in it
             console.assert(url === qbf_url, "url should match url from rawstore");
             let cidmultihash = url.split('/')[2];  // Store cid from first block in form of multihash
             let newurl = TransportIPFS.cid2url(newcid);
@@ -450,4 +464,5 @@ class TransportIPFS extends Transport {
     }
 
 }
+TransportIPFS.Y = Y; // Allow node tests to find it
 exports = module.exports = TransportIPFS;

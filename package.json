@@ -23,7 +23,8 @@
     "y-leveldb": "0.0.1",
     "y-memory": "^8.0.9",
     "y-text": "^9.5.1",
-    "yjs": "^12.3.3"
+    "yjs": "^12.3.3",
+    "custom-event": "~1.0.1"
   },
   "keywords": [],
   "license": "MIT",

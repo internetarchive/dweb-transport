@@ -155,7 +155,7 @@ class Transport {
         func:       Function to check support for: fetch, store, add, list, listmonitor, reverse - see supportFunctions on each Transport class
         returns:    Array of pairs of url & transport instance [ [ u1, t1], [u1, t2], [u2, t1]]
          */
-        console.assert((urls && urls[0]) || ["store"].includes(func), "XXX@T.validFor failed - coding error - url=", urls, "func=", func) // FOr debugging old calling patterns with [ undefined ]
+        console.assert((urls && urls[0]) || ["store"].includes(func), "T.validFor failed - coding error - url=", urls, "func=", func) // FOr debugging old calling patterns with [ undefined ]
         if (!(urls && urls.length > 0)) {
             return Transport._transports.filter((t) => t.supports(undefined, func))
                 .map((t) => [undefined, t]);

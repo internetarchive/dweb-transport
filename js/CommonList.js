@@ -1,6 +1,7 @@
 const SmartDict = require("./SmartDict"); //for extends
 const Dweb = require("./Dweb");
-
+//https://www.npmjs.com/package/custom-event && https://github.com/webmodules/custom-event
+var CustomEvent = require('custom-event'); // From web, Not present in node - this code uses global.CustomEvent if it exists so safe on browser/node
 
 class CommonList extends SmartDict {
     /*
@@ -318,27 +319,27 @@ class CommonList extends SmartDict {
         return !event.defaultPrevented;
     }
 
-    _listmonitorevent(obj) {
-        if (verbose) console.log("CL.listmonitor", this._publicurls, "Added", obj);
-        let sig = new Dweb.Signature(obj, verbose);
-        if ((sig.signedby === this._publicurls) && this.verify(sig)) { // Ignore if not signed by this node, and verifies //TODO-MULTI wont be  since signedby and publicurls are arrays correct, see verify - prob have verify do the signedby/publicurls check
-            if (!this._list.some((othersig) => othersig.signature === sig.signature)) {    // Check not duplicate (esp of locally pushed one
-                this._list.push(sig);
-                this.dispatchEvent(new CustomEvent("insert", {target: this, detail: sig}));   // Note target doesnt get set here.
-            } else {
-                console.log("Duplicate signature: ",sig);
-            }
-        } else {
-            console.log("Rejected signature: ",sig);
-        }
-    }
-
     listmonitor(verbose) { //TODO-API
         /*
         Add a listmonitor for each transport - note this means if multiple transports support it, then will get duplicate events back if everyone else is notifying all of them.
          */
         Dweb.Transport.validFor(this._publicurls, "listmonitor")
-            .map((u, t) => t.listmonitor(u, this._listmonitorevent, verbose));
+            .map(([u, t]) => t.listmonitor(u,
+                (obj) => {
+                    if (verbose) console.log("listmonitor added",obj,"to",this._publicurls);
+                    let sig = new Dweb.Signature(obj, verbose);
+                    if ((this._publicurls.includes(sig.signedby)) && this.verify(sig)) { // Ignore if not signed by this node, and verifies //TODO-MULTI wont be  since signedby and publicurls are arrays correct, see verify - prob have verify do the signedby/publicurls check
+                        if (!this._list.some((othersig) => othersig.signature === sig.signature)) {    // Check not duplicate (esp of locally pushed one
+                            this._list.push(sig);
+                            this.dispatchEvent(new CustomEvent("insert", {target: this, detail: sig}));   // Note target doesnt get set here.
+                        } else {
+                            console.log("Duplicate signature: ",sig);
+                        }
+                    } else {
+                        console.log("Rejected signature: ",sig);
+                    }
+                },
+                verbose));
     }
 }
 exports = module.exports = CommonList;
