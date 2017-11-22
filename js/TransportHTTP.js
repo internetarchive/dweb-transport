@@ -167,7 +167,7 @@ class TransportHTTP extends Transport {
 
     p_rawadd(urls, date, signature, signedby, verbose) { //TODO-BACKPORT turn date into ISO before adding
         //verbose=true;
-        console.assert(urls && signature && signedby, "p_rawadd args",urls, signature,signedby);
+        console.assert(urls && signature && signedby, "TransportHTTP.p_rawadd args",urls, signature,signedby);
         if (verbose) console.log("rawadd", urls, date, signature, signedby);
         let value = this._add_value( urls, date.toISOString(), signature, signedby, verbose)+ "\n";
         return this.p_post("void/rawadd", null, "application/json", value, verbose); // Returns immediately

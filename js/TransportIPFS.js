@@ -404,16 +404,16 @@ class TransportIPFS extends Transport {
         :param boolean verbose: True for debugging output
         :resolve undefined:
         */
-        console.assert(urls && signature && signedby, "p_rawadd args",urls,signature,signedby);
-        if (verbose) console.log("p_rawadd", urls, date, signature, signedby);
+        console.assert(urls && signature && signedby, "TransportIPFS.p_rawadd args",urls,signature,signedby);
+        if (verbose) console.log("TransportIPFS.p_rawadd", urls, date, signature, signedby);
         let value = {urls: urls, date: date.toISOString(), signature: signature, signedby: signedby};
         let y = await this.p__yarray(signedby, verbose);
         y.share.array.push([value]);
     }
     /*OBS - not supporting YARRAY singular
     rawadd(url, date, signature, signedby, verbose) {
-        console.assert(url && signature && signedby, "p_rawadd args",url,signature,signedby);
-        if (verbose) console.log("p_rawadd", url, date, signature, signedby);
+        console.assert(url && signature && signedby, "TransportIPFS.p_rawadd args",url,signature,signedby);
+        if (verbose) console.log("TransportUPFS.p_rawadd", url, date, signature, signedby);
         let value = {"url": url, "date": date, "signature": signature, "signedby": signedby};
         this.yarray.share.array.push([value]);
     }
@@ -450,7 +450,7 @@ class TransportIPFS extends Transport {
             if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res));
             transport.listmonitor(testurl, (obj) => console.log("Monitored", obj), verbose);
             await transport.p_rawadd("123", new Date(Date.now()), "Joe Smith", testurl, verbose);
-            if (verbose) console.log("p_rawadd returned ");
+            if (verbose) console.log("TransportIPFS.p_rawadd returned ");
             res = await transport.p_rawlist(testurl, verbose);
             if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res)); // Note not showing return
             await delay(500);

@@ -5,7 +5,6 @@ htmlfake = '<!DOCTYPE html><ul><li id="myList.0">Failed to load sb via Structure
 const dom = new JSDOM(htmlfake);
 document = dom.window.document;   // Note in JS can't see "document" like can in python
 
-const TransportHTTP = require('./TransportHTTP');
 const Dweb = require('./Dweb');
 
 /*
@@ -17,9 +16,6 @@ const Dweb = require('./Dweb');
 //UNUSED: const makepromises = require('./utils/makepromises');
 function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { resolve(val); },ms)})}
 
-//Comment out one of these next two lines
-//let transportclass = Dweb.TransportIPFS;
-let transportclass = TransportHTTP
 
 require('y-leveldb')(Dweb.TransportIPFS.Y); //- can't be there for browser, node seems to find it ok without this, though not sure why, though its the cause of the warning: YJS: Please do not depend on automatic requiring of modules anymore! Extend modules as follows `require('y-modulename')(Y)`
 let verbose = false;
@@ -30,26 +26,35 @@ let acl;
 
 async function p_test() {
     try {
-        let t = await transportclass.p_setup({
+        //Comment out one of these next two lines
+        //let transportclass = Dweb.TransportIPFS;
+        let opts = {
             http: {urlbase: "http://localhost:4244"},   // Localhost - comment out if want to use gateway.dweb.me (default args use this)
             yarray: {db: {name: "leveldb", dir: "../dbtestjs", cleanStart: true}},  // Cleanstart clears db
             listmethod: "yarrays"
-        }, verbose); // Note browser requires indexeddb
+        }; // Note browser requires indexeddb
+
+        // Note the order of these is significant, it will retrieve by preference from the first setup, try with both orders if in doubt.
+        let t_ipfs = await Dweb.TransportIPFS.p_setup(opts, verbose); // Note browser requires indexeddb
+        let t_http = await Dweb.TransportHTTP.p_setup(opts, verbose); // Note browser requires indexeddb
         if (verbose) console.log("setup returned and transport set - including annoationList");
-        await transportclass.test(t, verbose); //TODO-MULTI figure out how to test some transport - maybe all
+        await Dweb.TransportHTTP.test(t_http, verbose);
+        await Dweb.TransportIPFS.test(t_ipfs, verbose);
+        if (verbose) console.log("Transports tested");
         await Dweb.Block.p_test(verbose);
         await Dweb.Signature.p_test(verbose);
         await Dweb.KeyPair.test(verbose);
         let res = await Dweb.AccessControlList.p_test(verbose);
         acl = res.acl;
-        await Dweb.VersionList.test(verbose);
-        await Dweb.KeyChain.p_test(acl, verbose); // depends on VersionList for test, though not for KeyChain itself
         console.log("------END OF PREVIOUS TESTING PAUSING=====")
         await delay(1000);
         console.log("------AWAITED ANY BACKGROUND OUTPUT STARTING NEXT TEST =====");
-        //verbose = true;
+        verbose = true;
+        await Dweb.VersionList.test(verbose);
         console.log("------END OF NEW TESTING PAUSING=====")
         await delay(1000);
+        console.log("------AND FINISHED WAITING =====")
+        await Dweb.KeyChain.p_test(acl, verbose); // depends on VersionList for test, though not for KeyChain itself
         //let sb = (await Dweb.StructuredBlock.test(document, verbose)).sb;
         console.log("Completed test - running IPFS in background, hit Ctrl-C to exit");
 } catch(err) {
