@@ -35,8 +35,8 @@ async function p_test() {
         }; // Note browser requires indexeddb
 
         // Note the order of these is significant, it will retrieve by preference from the first setup, try with both orders if in doubt.
-        let t_ipfs = await Dweb.TransportIPFS.p_setup(opts, verbose); // Note browser requires indexeddb
         let t_http = await Dweb.TransportHTTP.p_setup(opts, verbose); // Note browser requires indexeddb
+        let t_ipfs = await Dweb.TransportIPFS.p_setup(opts, verbose); // Note browser requires indexeddb
         if (verbose) console.log("setup returned and transport set - including annoationList");
         await Dweb.TransportHTTP.test(t_http, verbose);
         await Dweb.TransportIPFS.test(t_ipfs, verbose);
@@ -49,7 +49,6 @@ async function p_test() {
         console.log("------END OF PREVIOUS TESTING PAUSING=====")
         await delay(1000);
         console.log("------AWAITED ANY BACKGROUND OUTPUT STARTING NEXT TEST =====");
-        verbose = true;
         await Dweb.VersionList.test(verbose);
         console.log("------END OF NEW TESTING PAUSING=====")
         await delay(1000);

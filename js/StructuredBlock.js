@@ -137,7 +137,7 @@ class StructuredBlock extends SmartDict {
                     console.log("StructuredBlock.test sb=", sb);
                 }
                 sb.p_store(verbose)
-                    .then(() => Dweb.SmartDict.p_fetch(sb._url)) // Will be StructuredBlock //TODO-MULTI use urls plural
+                    .then(() => Dweb.SmartDict.p_fetch(sb._urls)) // Will be StructuredBlock
                     .then((newsb) => sb2 = newsb)
                     .then(() => {
                         if (verbose) console.assert(sb2.data === teststr, "SB should round trip", sb2.data, "!==", teststr)

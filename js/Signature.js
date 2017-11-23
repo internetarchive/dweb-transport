@@ -32,6 +32,12 @@ class Signature extends SmartDict {
         super.__setattr__(name, value);
     }
 
+    preflight(dd) { // Called on outgoing dictionary of outgoing data prior to sending - note order of subclassing can be significant
+        delete dd.data; // Dont store any saved data
+        dd.date = dd.date.toISOString();
+        return super.preflight(dd);  // Edits dd in place
+    }
+
     signable() {
         /*
         Returns a string suitable for signing and dating, current implementation includes date and storage url of data.
@@ -51,11 +57,12 @@ class Signature extends SmartDict {
         :return: Signature (dated with current time on browser)
          */
         let date = new Date(Date.now());
-        if (!commonlist.stored) {
+        if (!commonlist.stored()) {
             await commonlist.p_store(verbose);
         }
         let sig = new Signature({"date": date, "urls": urls, "signedby": commonlist._publicurls});
         sig.signature = commonlist.keypair.sign(sig.signable());
+        //console.assert(sig.verify(commonlist, verbose)) //uncomment for testing
         return sig
     }
 

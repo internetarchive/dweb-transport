@@ -80,7 +80,7 @@ class SmartDict extends Transportable {
             //noinspection JSUnfilteredForInLoop don't use "of" because want inherited attributes
             dd[i] = this[i];    // This just copies the attributes not functions
         }
-        let res = JSON.stringify(this.preflight(dd));
+        let res = JSON.stringify(this.preflight(dd));   // This is where fields get deleted or updated (in subclasses etc)
         if (this._acl) { //Need to encrypt, _acl is an object, not a url
             let encdata = this._acl.encrypt(res, true);  // data, b64
             let dic = { "encrypted": encdata, "acl": this._acl._publicurls, "table": this.table};

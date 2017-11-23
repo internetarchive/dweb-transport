@@ -67,7 +67,7 @@ class Transport {
     }
     p_fetch() { throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_fetch - may define higher level semantics here (see Python)"); }
 
-    p_rawadd(url, date, signature, signedby, verbose) {
+    p_rawadd(url, sig, verbose) { //TODO-API-MULTI
         /*
         Store a new list item, it should be stored so that it can be retrieved either by "signedby" (using p_rawlist) or
         by "url" (with p_rawreverse). The underlying transport does not need to guarantee the signature,
@@ -121,11 +121,6 @@ class Transport {
         :param verbose:     boolean - True for debugging output
          */
         console.log("Undefined function Transport.listmonitor");    // Note intentionally a log, as legitamte to not implement it
-    }
-
-    _add_value(urls, date, signature, signedby, verbose) {
-        let store = {"urls": urls, "date": date, "signature": signature, "signedby": signedby};
-        return JSON.stringify(store);   // Note transport is that of signedby, not url
     }
 
     static mergeoptions(a, b) {

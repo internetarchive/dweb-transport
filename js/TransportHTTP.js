@@ -165,12 +165,12 @@ class TransportHTTP extends Transport {
         return this.p_post("contenturl/rawstore", null, "application/octet-stream", data, verbose) // Returns immediately with a promise
     }
 
-    p_rawadd(urls, date, signature, signedby, verbose) { //TODO-BACKPORT turn date into ISO before adding
+    p_rawadd(url, sig, verbose) { //TODO-BACKPORT turn date into ISO before adding //TODO-API-MULTI note url is now that of list
         //verbose=true;
-        console.assert(urls && signature && signedby, "TransportHTTP.p_rawadd args",urls, signature,signedby);
-        if (verbose) console.log("rawadd", urls, date, signature, signedby);
-        let value = this._add_value( urls, date.toISOString(), signature, signedby, verbose)+ "\n";
-        return this.p_post("void/rawadd", null, "application/json", value, verbose); // Returns immediately
+        if (!url || !sig) throw new Dweb.errors.CodingError("TransportHTTP.p_rawadd: invalid parms",url, sig);
+        if (verbose) console.log("rawadd", url, sig);
+        let value = JSON.stringify(sig.preflight(Object.assign({},sig)))+"\n"
+        return this.p_post("void/rawadd", url, "application/json", value, verbose); // Returns immediately
     }
 
     static async test() {

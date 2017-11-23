@@ -150,7 +150,7 @@ class CommonList extends SmartDict {
         let lines = [].concat(...ttlines)
             .filter((x) => (!uniques[x.signature] && (uniques[x.signature] = true)));
         //TODO-MULTI should probably sort results, in case get some from each
-        //TODO-MULTI will need to handle errors, in particular one transport failing while others succeed.
+        //TODO-MULTI-ERRORS will need to handle errors, in particular one transport failing while others succeed.
         if (verbose) console.log("CommonList:p_fetchlist.success", this._urls, "len=", lines.length);
         this._list = lines.map((l) => new Dweb.Signature(l, verbose));    // Turn each line into a Signature
     }
@@ -266,7 +266,7 @@ class CommonList extends SmartDict {
         if (!sig) throw new Dweb.errors.CodingError("CommonList.p_add is meaningless without a sig");
         if (! Dweb.utils.intersects(sig.signedby, this._publicurls)) throw new Dweb.errors.CodingError(`CL.p_add: sig.signedby ${sig.signedby} should overlap with this._publicurls ${this._publicurls}`)
         return Promise.all(Dweb.Transport.validFor(this._publicurls, "add") //[[ Url t1] [ Url t2] [Url2 t3], [Url2 t4]]
-            .map(([u, t]) => t.p_rawadd(sig.urls, sig.date, sig.signature, u.href, verbose)) )  //TODO-MULTI could turn this into the array to sign, and the list, since signedby could be multiple
+            .map(([u, t]) => t.p_rawadd(u, sig, verbose)) )
     }
 
     verify(sig, verbose) {
@@ -276,10 +276,9 @@ class CommonList extends SmartDict {
         sig:    Signature object
         returns:    True if verifies
         throws:     assertion error if doesn't //TODO handle that gracefully depending on caller
-        TODO-MULTI think thru verification with multiple signers. In case where they weren't same Key then verification should fail, but what if can only find one key.
-        TODO-MULTI I think it should strip the other keys, from the "Signedby", and check that one of the remaining ones matches "this"
          */
-        return this.keypair.verify(sig.signable(), sig.signature)    //TODO currently throws assertion error if doesnt - not sure thats correct
+        return Dweb.utils.intersects(this._publicurls, sig.signedby)    // Check signedby assertion is for this list -
+            && this.keypair.verify(sig.signable(), sig.signature)    //TODO currently throws assertion error if doesnt - not sure thats correct
     }
     // ----- Listener interface ----- see https://developer.mozilla.org/en-US/docs/Web/API/EventTarget for the pattern
 
@@ -328,7 +327,7 @@ class CommonList extends SmartDict {
                 (obj) => {
                     if (verbose) console.log("listmonitor added",obj,"to",this._publicurls);
                     let sig = new Dweb.Signature(obj, verbose);
-                    if ((this._publicurls.includes(sig.signedby)) && this.verify(sig)) { // Ignore if not signed by this node, and verifies //TODO-MULTI wont be  since signedby and publicurls are arrays correct, see verify - prob have verify do the signedby/publicurls check
+                    if (this.verify(sig)) { // Ignore if not signed by this node, and verifies thows Signing Error if correct list, but not verified
                         if (!this._list.some((othersig) => othersig.signature === sig.signature)) {    // Check not duplicate (esp of locally pushed one
                             this._list.push(sig);
                             this.dispatchEvent(new CustomEvent("insert", {target: this, detail: sig}));   // Note target doesnt get set here.

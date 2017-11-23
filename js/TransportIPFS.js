@@ -319,7 +319,7 @@ class TransportIPFS extends Transport {
                 throw new Dweb.errors.CodingError("Only support yarrays");
             }
             let y = await this.p__yarray(url, verbose);
-            let res = y.share.array.toArray().filter((obj) => (obj.signedby.includes(url))); //TODO-MULTI May do this at higher level when merge results from multi transports
+            let res = y.share.array.toArray().filter((obj) => (obj.signedby.includes(url)));
             if (verbose) console.log("p_rawlist found", ...Dweb.utils.consolearr(res));
             return res;
         } catch(err) {
@@ -391,36 +391,39 @@ class TransportIPFS extends Transport {
         //return this.ipfs.files.put(buf).then((block) => TransportIPFS.cid2url(block.cid));
     }
 
-    async p_rawadd(urls, date, signature, signedby, verbose) {
+    async p_rawadd(url, sig, verbose) { //TODO-API-MULTI
         /*
         Store a new list item, it should be stored so that it can be retrieved either by "signedby" (using p_rawlist) or
         by "url" (with p_rawreverse). The underlying transport does not need to guarrantee the signature,
         an invalid item on a list should be rejected on higher layers.
 
-        :param string urls: String identifying places to find an object being added to the list.
-        :param string date: Date (as returned by new Data.now() )
-        :param string signature: Signature of url+date
-        :param string signedby: url of the public key used for the signature. TODO-MULTI this is currently singular
+        :param string url: String identifying list to post to
+        :param Signature sig: Signature object containing at least:
+            date - date of signing in ISO format,
+            urls - array of urls for the object being signed
+            signature - verifiable signature of date+urls
+            signedby - urls of public key used for the signature
         :param boolean verbose: True for debugging output
         :resolve undefined:
         */
-        console.assert(urls && signature && signedby, "TransportIPFS.p_rawadd args",urls,signature,signedby);
-        if (verbose) console.log("TransportIPFS.p_rawadd", urls, date, signature, signedby);
-        let value = {urls: urls, date: date.toISOString(), signature: signature, signedby: signedby};
-        let y = await this.p__yarray(signedby, verbose);
+        if (typeof url !== "string") url = url.href; // Assume its an Url if its not a string
+        console.assert(url && sig.urls.length && sig.signature && sig.signedby.length, "TransportIPFS.p_rawadd args", url, sig);
+        if (verbose) console.log("TransportIPFS.p_rawadd", url, sig);
+        let value = sig.preflight(Object.assign({}, sig));
+        let y = await this.p__yarray(url, verbose);
         y.share.array.push([value]);
     }
     /*OBS - not supporting YARRAY singular
-    rawadd(url, date, signature, signedby, verbose) {
-        console.assert(url && signature && signedby, "TransportIPFS.p_rawadd args",url,signature,signedby);
-        if (verbose) console.log("TransportUPFS.p_rawadd", url, date, signature, signedby);
-        let value = {"url": url, "date": date, "signature": signature, "signedby": signedby};
+    rawadd(sig, verbose) {
+        console.assert(sig.urls && sig.signature && sig.signedby, "TransportIPFS.p_rawadd args",sig);
+        if (verbose) console.log("TransportUPFS.p_rawadd", sig.urls, sig.date, sig.signature, sig.signedby);
+        let value = {urls: sig.urls, date: sig.date, signature: sig.signature, signedby: sig.signedby};
         this.yarray.share.array.push([value]);
     }
 
-    p_rawadd(url, date, signature, signedby, verbose) {
+    p_rawadd(url, sig, verbose) {
         return new Promise((resolve, reject)=> { try {
-            this.rawadd(url, date, signature, signedby, verbose);
+            this.rawadd(url, sig, verbose);
             resolve(undefined);
         } catch(err) {
             reject(err);
@@ -449,7 +452,8 @@ class TransportIPFS extends Transport {
             let listlen = res.length;   // Holds length of list run intermediate
             if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res));
             transport.listmonitor(testurl, (obj) => console.log("Monitored", obj), verbose);
-            await transport.p_rawadd("123", new Date(Date.now()), "Joe Smith", testurl, verbose);
+            let sig = new Dweb.Signature({urls: ["123"], date: new Date(Date.now()), signature: "Joe Smith", signedby: [testurl]}, verbose);
+            await transport.p_rawadd(testurl, sig, verbose);
             if (verbose) console.log("TransportIPFS.p_rawadd returned ");
             res = await transport.p_rawlist(testurl, verbose);
             if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res)); // Note not showing return
