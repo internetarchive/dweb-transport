@@ -2,15 +2,42 @@
     This file is a set of utility functions used in the manipulation of HTML pages
     There is nothing specific to Dweb at all here, feel free to copy and modify.
  */
-//TODO-MULTI-needs-scanning
+
+
+function urlsFrom(url) {
+    /* Convert to urls,
+    url:    Array of urls, or string representing url or representing array of urls
+    return: Array of strings representing url
+     */
+    if (typeof(url) === "string") {
+        if (url[0] === '[')
+            url = JSON.parse(url);
+        else
+            url = [ url ];
+    }
+    if (!Array.isArray(url)) throw new Error(`Unparsable url: ${url}`);
+    return url;
+}
 
 function resolve(el) {
+    /* Make sure we have an element, if passed a string then find the element with that id.
+      el:       Element or string being the id of an element.
+      returns:  element.
+     */
     return (typeof(el) === "string") ? document.getElementById(el) : el;
 }
 async function p_resolveobj(url) {
+    /*
+    Asynchronously find an object
+    url:    An object, or a url representing an object, or an array of urls.
+    returns: Object
+    throws: Error if can't resolve object
+    */
     try {
         if (typeof url === 'string')
-            url = await Dweb.SmartDict.p_fetch(url, verbose); //TODO-MULTI use urls plural
+            url = [ url ];
+        if (Array.isArray(url))
+            url = await Dweb.SmartDict.p_fetch(url, verbose);
         return url;
     } catch(err) {
         console.log("p_resolveobj: Cannot resolve",url);
@@ -87,6 +114,17 @@ function replacetexts(el, ...dict) {
     Replace the text of all inner nodes of el from the dict
     Note this intentionally doesnt allow html as the values of the dict since probably from a network call and could be faked as "bad" html
 
+    Rules apply to el or any children.
+    <x name="yyy"></x>  Adds an inner text node with oo.yyy
+    <x name="aaa_bbb"></x> Replaces with ooo.aaa.bbb
+    <x name="aaa"><y name="bbb"></y></x> Replaces with ooo.aaa.bbb
+    <x name="aaa"><y class="template"/></x> Has y replecated withe each of ooo.aaa[]
+    <x value="ccc"></x>  Has value replaced with ooo.ccc (typically used for <option> etc inside <form>, arrays will be JSON stringified
+    <a href="ddd"></x> Has href replaced with ooo.ddd
+    <img name="eee"/> Has src replaced with ooo.eee (in replacetext)
+
+    This is intended to be easy to use, not necessarily bomb-proof, odd structures of HTML or oo may cause unpredictable results.
+
     :param el:  An HTML element, or a string with id of an HTML element
     :param dict: A dictionary, object, or array of them
      */
@@ -104,32 +142,34 @@ function _replacetexts(prefix, el, oo) {
     /*
     Inner function for replacetexts to allow crawling depth of oo
      */
-    if (Array.isArray(oo)) {
+    if (Array.isArray(oo)) {    // Add a templated element for each member of array
         deletechildren(el);
+        console.log("XXX@_replacetexts",el);
         oo.map((f) => addtemplatedchild(el, f))
     } else {
         for (let prop in oo) {
-            let p = prefix + prop
+            let p = prefix + prop;
             let val = oo[prop];
             if (val instanceof Date) {  // Convert here because otherwise treated as an object
                 val = val.toString();
             }
             if (typeof val === "object" && !Array.isArray(val)) {
                 // Look for current level, longer names e.g. prefixprop_xyz
-                _replacetexts(`${p}_`, el, val)
+                _replacetexts(`${p}_`, el, val);
                 // And nowif found any prefixprop look at xyz under it
                 Array.prototype.slice.call(el.querySelectorAll(`[name=${p}]`)).map((i) => _replacetexts("", i, val));
             }
-            else if (typeof val === "object" && Array.isArray(val)) {
-                dests = el.querySelectorAll(`[name=${p}]`);
+            else if (typeof val === "object" && Array.isArray(val)) {   // Exand an array into sub tags
+                if (el.getAttribute("value") === p) el.value = JSON.stringify(val); //Do the parent as well if its e.g. an option, convert to something that urlsFrom will understand
+                let dests = el.querySelectorAll(`[name=${p}]`);
                 Array.prototype.slice.call(dests).map((i) => replacetexts(i, val));
             } else {
                 if (el.getAttribute("name") === p) replacetext(el, val); //Do the parent as well
                 if (el.getAttribute("value") === p) el.value = val; //Do the parent as well
                 Array.prototype.slice.call(el.querySelectorAll(`[name=${p}]`)).map((i) => replacetext(i, val));
                 if (el.getAttribute("href") === p) el.href = val;
-                Array.prototype.slice.call(el.querySelectorAll(`[href=${p}]`)).map((i) => i.href = val)
-                Array.prototype.slice.call(el.querySelectorAll(`[value=${p}]`)).map((i) => i.value = val)
+                Array.prototype.slice.call(el.querySelectorAll(`[href=${p}]`)).map((i) => i.href = val);
+                Array.prototype.slice.call(el.querySelectorAll(`[value=${p}]`)).map((i) => i.value = val);
             }
         }
     }
@@ -164,31 +204,31 @@ function hide(el) {
     resolve(el).style.display = "none";
 }
 
-function p_httpget(url, headers) {
+async function p_httpget(url, headers) {
     //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
     /* Simple Get of a URL, resolves to either json or text depending on mimetype */
-    h = new Headers( headers ? headers : {} )
-    return fetch(new Request(url, {
+    h = new Headers( headers ? headers : {} );
+    try {
+        let response = await fetch(new Request(url, {
             method: 'GET',
             headers: h,
             mode: 'cors',
             cache: 'default',
             redirect: 'follow',  // Chrome defaults to manual
-        })) // A promise, throws (on Chrome, untested on Ffox or Node) TypeError: Failed to fetch)
-        .then((response) => {
-            if (response.ok) {
-                if (response.headers.get('Content-Type') === "application/json") {  // It should always be JSON
-                    return response.json(); // promise resolving to JSON
-                } else {
-                    return response.text(); // promise resolving to text
-                }
+        })); // A promise, throws (on Chrome, untested on Ffox or Node) TypeError: Failed to fetch)
+        if (response.ok) {
+            if (response.headers.get('Content-Type') === "application/json") {  // It should always be JSON
+                return response.json(); // promise resolving to JSON
+            } else {
+                return response.text(); // promise resolving to text
             }
-            throw new Error(`Transport Error ${response.status}: ${response.statusText}`); // Should be TransportError but out of scope
-        })
-        .catch((err) => {
+        }
+        throw new Error(`Transport Error ${response.status}: ${response.statusText}`); // Should be TransportError but out of scope
+    } catch(err) {
+            // Error here is particularly unhelpful - if rejected during the COrs process it throws a TypeError
             console.log("Probably misleading error from fetch:", url, err);
             throw new Error(`Transport error thrown by ${url}`)
-        });  // Error here is particularly unhelpful - if rejected during the COrs process it throws a TypeError
+    }
 }
 
 function display_blob(bb, options) {//TODO-STREAMS figure out how to pass streams to this and how to pass from IPFS
@@ -198,6 +238,7 @@ function display_blob(bb, options) {//TODO-STREAMS figure out how to pass stream
         bb = new Blob([bb], {type: options.type})
     }
     console.log("display_object",typeof bb);
+    // This next code is bizarre combination needed to open a blob from within an HTML window.
     let a = window.document.createElement('a');
     //bb = new Blob([datapdf], {type: 'application/pdf'});    //TODO-STREAMS make this work on streams
     let objectURL = URL.createObjectURL(bb);    //TODO-STREAMS make this work on streams

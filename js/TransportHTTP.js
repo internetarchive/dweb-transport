@@ -63,7 +63,7 @@ class TransportHTTP extends Transport {
          */
         try {
             this.info = await this.p_info();
-            return self.info.type.toUpperCase() + " online"
+            return this.info.type.toUpperCase() + " online"
         } catch(err) {
             console.log("Error in p_status.info",err);
             return "OFFLINE ERROR";

@@ -9,7 +9,6 @@
     <script type="text/javascript" src="loginutils.js"></script><!--Dweb login functions, useful in multiple places-->
 
     <script type="text/javascript">
-        //TODO-MULTI-needs-scanning
 
         async function onlogin(kc) {
             alert(`${kc.name} just logged in`)
@@ -99,7 +98,7 @@
     <form id='tokennew_form' name="tokennew_form" onsubmit="tokennew_click(); return false;" style="display:none;">
         <input class="propval" type="text" name="name" size="20" placeholder="Name of key" style="align:right;" />
         <img class="keylist_icon" src="noun_83161_cc.svg" alt="Close" onclick="hide('tokennew_form');"/>
-        <input class="propval" type="text" name="url" size="50" placeholder="URL of key"/><br/>
+        <input class="propval" type="text" name="urls" size="50" placeholder="URLs of key"/><br/>
         <input class="button" type="submit" value="Add" style="align:right;"/>
     </form>
 </div><!--End of standard network status and login panel-->

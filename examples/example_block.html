@@ -28,7 +28,7 @@
             blk.p_store(verbose)
                 .then(() => {
                     let el = document.getElementById("retrievalarea");
-                    el.value = blk._url; // Use as default on input
+                    el.value = blk._urls; // Use as default on input
                 })
                 .catch((err) => alert(err));
         }
@@ -36,20 +36,25 @@
 
     function fetchit() {
         let el = document.getElementById("retrievalarea");
-        let url = el.value;
-        fetchanddisplay(url);
+        let urls = urlsFrom(el.value);
+        fetchanddisplay(urls);
     }
 
-    function fetchanddisplay(url) {
-        verbose = true;
-        console.log("Fetching url=", url);
-        let destn = document.getElementById("retrievaldestn");
-        destn.innerHTML = ""; // Clear it first
-        Dweb.Block.p_fetch(url, verbose) //TODO-MULTI use urls plural
-            .then((blk) => {
-                console.log("content=",blk.content());
-                destn.innerHTML = blk.content()
-            })
+    async function fetchanddisplay(urls) {
+        try {
+            console.log("Fetching urls=", urls);
+            let destn = document.getElementById("retrievaldestn");
+            destn.innerHTML = ""; // Clear it first
+            Dweb.Block.p_fetch(urls, verbose)
+                .then((blk) => {
+                    console.log("content=", blk.content());
+                    destn.innerHTML = blk.content()
+                })
+        } catch(err) {
+            console.log("fetchanddisplay: Error",err.message);
+            alert(err.message);
+            throw err;
+        }
     }
 
     </script>
@@ -62,7 +67,7 @@
     <div id="status">Starting</div>
 </div>
 <h1>Dweb - Block Example</h1>
-<h4>Create something here, and when its saved its link will appear below</h4>
+<h4>Create something here, and when its saved its urls will appear below</h4>
 <form method="post">
     <textarea id="mytextarea" width="60%">Testing</textarea>
 </form>
@@ -87,7 +92,7 @@
         .then((msg) => setstatus(msg))
         .then(() => {
             // Any code you want to run once online goes here.
-            if(url) fetchanddisplay(url);
+            if(url) fetchanddisplay(urlsFrom(url));
         })
         .catch((err) => { console.log("ERROR:",err); alert(err.message); });
 </script>

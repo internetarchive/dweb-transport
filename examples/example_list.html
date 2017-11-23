@@ -13,32 +13,34 @@
     var cl; // Will hold the list after fetching
     //TODO-MULTI-needs-scanning
 
-    function createit() {     // Send form data to Dweb, and display the url
-        console.log("createit ---");
-        // Get the data from the form
-        let dict = form2dict("newform");
-        <!--CommonList(data, master, key, verbose, options)-->
-        let obj = new Dweb.CommonList(dict, true, {keygen: true}, verbose, {_allowunsafestore: true} );
-        // _allowunsafestore is set to true since AccessControlList not set yet, so storing unencrypted.
-        console.log("Created=",obj);
-        obj.p_store(verbose)
+    async function createit() {     // Send form data to Dweb, and display the url
+        try {
+            console.log("createit ---");
+            // Get the data from the form
+            let dict = form2dict("newform");
+            <!--CommonList(data, master, key, verbose, options)-->
+            let obj = new Dweb.CommonList(dict, true, {keygen: true}, verbose, {_allowunsafestore: true});
+            // _allowunsafestore is set to true since AccessControlList not set yet, so storing unencrypted.
+            console.log("Created=", obj);
+            await obj.p_store(verbose);
             // Now re fetch it from Dweb and display the object
-            .then(() => fetchanddisplay(obj._url))
-            .catch((err) => { console.log("ERROR:",err); alert(err.message); });
+            fetchanddisplay(obj._urls);
+        } catch(err) { console.log("ERROR:",err); alert(err.message); }
         return false; // Stop form submission and page reloading reloading
     }
 
-    function sendentry() {     // Send form data to Dweb, and display the url
-        console.log("sendit ---");
-        // Get the data from the form
-        let dict = form2dict("entryform");
-        // Create a new object and add to the list
-        let obj = new Dweb.SmartDict(dict, verbose );
-        cl.p_push(obj, verbose)
-            .then(() => console.log("Added:",obj))                            // Show on the Javascript console
-            .then(() => objbrowser(cl, cl._url, null, "ObjBrowser", false))   // Redisplay in objbrowser just for debugging
-            .then(() => addtemplatedchild("listresults", obj))                // Display locally as listmonitor will not pick up local entries
-            .catch((err) => { console.log("ERROR:",err); alert(err.message); });
+    async function sendentry() {     // Send form data to Dweb, and display the url
+        try {
+            console.log("sendit ---");
+            // Get the data from the form
+            let dict = form2dict("entryform");
+            // Create a new object and add to the list
+            let obj = new Dweb.SmartDict(dict, verbose );
+            await cl.p_push(obj, verbose);
+            console.log("Added:",obj);                             // Show on the Javascript console
+            //objbrowser(cl, cl._url, null, "ObjBrowser", false))   // Redisplay in objbrowser just for debugging
+            addtemplatedchild("listresults", obj);                  // Display locally as listmonitor will not pick up local entries
+        } catch(err){ console.log("ERROR:",err); alert(err.message); }
         return false; // Stop form submission and page reloading reloading
     }
 
@@ -51,36 +53,33 @@
         fetchanddisplay(dict.url);
     }
     
-    function fetchanddisplay(url) {
+    async function fetchanddisplay(urls) {
         /* Fetch a URL, display the meta data and a box for adding to it*/
-        console.log("fetchanddisplay",url);
+        console.log("fetchanddisplay",urls);
+        urls = urlsFrom(urls);
         try {
-            Dweb.SmartDict.p_fetch(url, verbose)   // Throws TransportError immediately if url invalid //TODO-MULTI use urls plural
-                .then((obj) => cl = obj) // Save it for adding to in sendentry
-                .then(() => {
-                    console.log("Fetched=", cl);
-                    // Only display the input prompt if its a master list.
-                    if (cl._master) { show("entryrow"); } else { hide("entryrow"); }
-                    // Display the name and urls of the list
-                    displayobj("retrievaldestn", cl);
-                    deletechildren("listresults");
-                    // Clear old text
-                })
-                // Fetch the current elements from the list if any
-                .then(() => cl.p_list_then_elements(verbose))   //This adds the listmonitor as a side effect, so updated as changes
-                .then((objs) => { console.log("objs=",JSON.stringify(objs)); return objs;})
-                //Add the elements to the list
-                .then((objs) => objs.map((obj) => addtemplatedchild("listresults", obj)))
-                // Setup a EventListener so anything new added to the list us added to the display
-                .then(() => cl.addEventListener("insert", (event) => {
-                    if (verbose) console.log("fetchanddisplay",event);
-                    let sig = event.detail;
-                    sig.p_fetchdata(verbose)
-                        .then((obj) => addtemplatedchild("listresults", obj))
-                }))
-                // Redisplay it in the object browser for debugging
-                .then(() => objbrowser(cl, cl._url, null, "ObjBrowser", verbose))
-                .catch((err) => { console.log("ERROR:",err); alert(err.message); });
+            //Note cl below is a global so can be accessed for push
+            cl = await Dweb.SmartDict.p_fetch(urls, verbose);   // Throws TransportError immediately if url invalid
+            console.log("Fetched=", cl);
+            // Only display the input prompt if its a master list.
+            if (cl._master) { show("entryrow"); } else { hide("entryrow"); }
+            // Display the name and urls of the list
+            displayobj("retrievaldestn", cl);
+            deletechildren("listresults");
+            // Fetch the current elements from the list if any
+            let objs = await cl.p_list_then_elements(verbose);   //This adds the listmonitor as a side effect, so updated as changes
+            console.log("objs=",JSON.stringify(objs));
+            //Add the elements to the list
+            objs.map((obj) => addtemplatedchild("listresults", obj));
+            // Setup a EventListener so anything new added to the list us added to the display
+            cl.addEventListener("insert", (event) => {
+                if (verbose) console.log("fetchanddisplay",event);
+                let sig = event.detail;
+                sig.p_fetchdata(verbose)
+                    .then((obj) => addtemplatedchild("listresults", obj))
+                });
+            // Redisplay it in the object browser for debugging
+            // objbrowser(cl, cl._url, null, "ObjBrowser", verbose));
         } catch(err) {
             console.log("ERROR:", err);
             alert(err.message); // bad url generates TransportError
@@ -89,14 +88,17 @@
     function displayobj(el, obj) {
         /* Display an obj, under an element in appropriately named fields */
         console.log(obj);
-        replacetexts(el, obj, { _privateurl: (obj._master ? obj._url : "")});
-        // Now set up links to the urls for sharing
+        // Now set up links to the urls for sharing - note these are singular URLs for going in an Anchor's href
         let publicurl = new URL(window.location.href);
         let privateurl = new URL(window.location.href);
-        publicurl.search=(obj._publicurls.length ? "url="+obj._publicurls : ""); //TODO-MULTI publicurl test may not work well on multi
-        document.getElementById("publiclink").href=publicurl.href;
-        privateurl.search=obj._privateurl ? "url="+obj._privateurl : "";
-        document.getElementById("privatelink").href=privateurl.href;
+        publicurl.search=(obj._publicurls.length ? "url="+obj._publicurls[0] : "");
+        privateurl.search=(obj._master ? "url="+obj._urls[0] : "");    //TODO-MULTI check it shows up, maybe should be "urls.length
+        replacetexts(el, obj, {
+            _publicurlsstr: JSON.stringify(obj._publicurls),
+            _privateurlsstr: (obj._master ? JSON.stringify(obj._urls) : ""),
+            privatelink: privateurl.href,
+            publiclink: publicurl.href,
+        });
     }
 
     </script>
@@ -138,8 +140,8 @@
 <!-- Object will be displayed here in fields with names that match-->
 <ul class="props" id="retrievaldestn">
     <li class="prop"><span class="propname">Name:</span><span class="propval" name="name"></span></li><!--TODO-MULTI check privateurls is plural-->
-    <li class="prop"><span class="propname">Private url:</span><span class="propval" name="_privateurls"></span><a id="privatelink"> <img alt="link" src="link.png"/></a></li>
-    <li class="prop"><span class="propname">Public url:</span><span class="propval" name="_publicurls"></span><a id="publiclink"> <img alt="link" src="link.png"/></a></li>
+    <li class="prop"><span class="propname">Private url:</span><span class="propval" name="_privateurlsstr"></span><a href="privatelink"> <img alt="link" src="link.png"/></a></li>
+    <li class="prop"><span class="propname">Public url:</span><span class="propval" name="_publicurlsstr"></span><a href="publiclink"> <img alt="link" src="link.png"/></a></li>
 </ul>
 
 <table class="displayedblock">

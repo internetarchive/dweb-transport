@@ -52,7 +52,7 @@ class VersionList extends CommonList {
         resolves to:    new instance of VersionList (note since static, it cant make subclasses)
          */
         if (!data.acl) data._acl = Dweb.KeyChain.default();
-        if (verbose) console.log("VL.p_new acl=",data._acl);
+        if (verbose) console.log("VL.p_new data=%o",data);
         await VersionList.p_expanddata(data, verbose);  // Expands _contentacl url
         let vl = new VersionList(data, master, key, verbose);
         await vl.p_store(verbose);

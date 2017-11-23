@@ -2,8 +2,6 @@ const CommonList = require("./CommonList"); // AccessControlList extends this
 const SmartDict = require("./SmartDict");   // _AccessControlListEntry extends this
 const Dweb = require("./Dweb");
 
-
-
 class AccessControlList extends CommonList {
     /*
     An AccessControlList is a list for each control domain, with the entries being who has access.

@@ -51,7 +51,7 @@ class KeyChain extends CommonList {
             if (verbose) console.log("KC.p_list_then_elements Got keys", ...Dweb.utils.consolearr(this._keys))
             return this._keys;
         } catch(err) {
-            console.log("KeyChains.p_list_then_elements: Unable to retrieve keys", err);
+            console.log("KeyChains.p_list_then_elements: Unable to retrieve keys", err.message);
             throw(err);
         }
     }

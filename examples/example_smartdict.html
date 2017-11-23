@@ -8,39 +8,33 @@
     <script type="text/javascript" src="objbrowser.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript" src="htmlutils.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript">
-        //TODO-MULTI-needs-scanning
 
     function sendit() {     // Send form data to Dweb, and display the url
-        verbose = true;
         if (verbose) console.log("sendit ---");
         let dict = form2dict("myform");
         let sd = new Dweb.SmartDict(dict, verbose );
         if (verbose) console.log("SD=",sd);
         // Now display link
         sd.p_store(verbose) // Store the edited dictionary
-        .then(() => document.getElementById("retrievalarea").value = sd._url); // Use url default on input
+        .then(() => document.getElementById("retrievalarea").value = sd._urls); // Use url default on input
         return false;
     }
 
     function fetchit() {
         let el = document.getElementById("retrievalarea");
-        let url = el.value;
-        fetchanddisplay(url);
+        let urls = urlsFrom(el.value);
+        fetchanddisplay(urls);
     }
 
-    function fetchanddisplay(url) {
-        verbose = true;
-        if (verbose) console.log("Fetching url=", url);
+    async function fetchanddisplay(urls) {
+        if (verbose) console.log("Fetching urls=", urls);
         let destn = document.getElementById("retrievaldestn");
         destn.innerHTML = ""; // Clear it first
-        Dweb.SmartDict.p_fetch(url, verbose) //TODO-MULTI use urls plural
-            .then((sd) => {
-                if (verbose) console.log("Fetched=",sd);
-                destn.innerHTML = "My name is: "+sd.name;
-                destn.style.color = sd.favcolor;
-                return sd;
-            })
-            .then((sd) => objbrowser(sd, sd._url, null, "ObjBrowser", verbose))
+        let sd = await Dweb.SmartDict.p_fetch(urls, verbose);
+        if (verbose) console.log("Fetched=",sd);
+        destn.innerHTML = "My name is: "+sd.name;
+        destn.style.color = sd.favcolor;
+        //objbrowser(sd, sd._urls, null, "ObjBrowser", verbose);
     }
 
 
@@ -51,7 +45,7 @@
     <div id="status">Starting</div>
 </div>
 <h1>Dweb - SmartDict Example</h1>
-<h4>Create something here, and when its saved its link will appear below</h4>
+<h4>Create something here, and when its saved its urls will appear below</h4>
 <form method="post" name="myform" onsubmit="sendit(); return false;">
     <ul>
     <li class="prop"><span class="propname">Name</span><input class="propval" type="text" name="name" size="150"/></li>
@@ -59,9 +53,9 @@
         <li><input type="submit" value="Store"/></li>
     </ul>
 </form>
-<h4>Enter a link here and it will be retrieved.</h4>
+<h4>Enter a url here and it will be retrieved.</h4>
 <form style="display:inline" onsubmit="fetchit(); return false;">
-    <input type="text" class="propval" id="retrievalarea" placeholder="/ipfs/12ab34cd" size="70"/>
+    <input type="text" class="propval" id="retrievalarea" placeholder="ipfs:/ipfs/12ab34cd" size="70"/>
     <input type="submit" value="Fetch"/>
 </form>
 <div class="displayedblock" id="retrievaldestn">retrieved data will go here</div>
@@ -82,12 +76,12 @@
     let transportclass = Dweb["Transport"+(searchparms.get("transport") || "IPFS").toUpperCase()]; // e.g. Dweb["TransportHTTP"]
 
     var verbose = searchparms.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)
-    transportclass.p_setup({}, verbose)
+    transportclass.p_setup({}, verbose)  // {http: {urlbase: "http://localhost:4244"}} if running server local
         .then((t) => t.p_status())
         .then((msg) => setstatus(msg))
         .then(() => {
             // Any code you want to run once online goes here.
-            if(url) fetchanddisplay(url);
+            if(url) fetchanddisplay(urlsFrom(url));
         })
         .catch((err) => { console.log("ERROR:",err); alert(err.message); });
 </script>
