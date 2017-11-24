@@ -28,7 +28,7 @@
                     writelockname: vl._acl ? vl._acl.name : ""
                 });
             } catch(err) {
-                console.log("p_vl_target_display: cannot display %o in element %o", vl, el);
+                console.log("p_vl_target_display: cannot display %o in element %o", vl, el, err.message);
                 throw err;
             }
         }
@@ -73,9 +73,15 @@
             console.groupEnd("clickrestore ---");
         }
         async function vl_select(el) {
-            // Called when the drop-down select for a previous VL is changed
             console.group("vl_select ---");
-            await p_vl_target_display("vl_target", el.options[el.selectedIndex].source);
+            let vl = el.options[el.selectedIndex].source;
+            try {
+                // Called when the drop-down select for a previous VL is changed
+                await p_vl_target_display("vl_target", vl);
+            } catch(err) {
+                console.error("vl_select: unable to open %o",vl,err);
+                alert(`Unable to open VersionList: ${vl.name} ${err.message}`);
+            }
             console.groupEnd("vl_select ---");
         }
         function onlogin(kc) {
@@ -83,6 +89,7 @@
                 // Populate drop-downs
                 replacetexts("vls_list", Dweb.KeyChain.mykeys(Dweb.VersionList));
                 replacetexts("lock_list", Dweb.KeyChain.mykeys(Dweb.AccessControlList));
+                //TODO add event listners here for VersionList and ACL
                 let el = resolve("vl_target");
                 if (url && !el.source) {   // Were asked to load a VL (indicated by global url being set) but had to wait for login.
                     p_vl_target_display(el, url) // Asynchronous

@@ -190,16 +190,20 @@ async function p_connect(options) {
     try {
         options = options || {};
         let setupoptions = {};
-        let transp = (searchparams.get("transport") || options.defaulttransport || "IPFS").toUpperCase(); //TODO-MULTI connect to multiple
-        console.log("XXX transp=", transp);
-        if (transp === "LOCAL") {
-            transp = "HTTP";
-            setupoptions = {http: {urlbase: "http://localhost:4244"}}
+        let transpparm = (searchparams.get("transport") || options.defaulttransport || "LOCAL,IPFS").toUpperCase(); //TODO-MULTI connect to multiple
+        let transparr = transpparm.split(',');
+        console.log("XXX transpparm=", transpparm);
+        for(let transp of transparr) { //TODO-MULTI connect in parallel
+            if (transp === "LOCAL") {
+                transp = "HTTP";
+                setupoptions = {http: {urlbase: "http://localhost:4244"}}
+            }
+            console.log("XXX setupoptions=", setupoptions);
+            let transportclass = Dweb["Transport" + transp]; // e.g. Dweb["TransportHTTP"]
+            let t = await transportclass.p_setup(setupoptions, verbose); //TODO may take some options
+            setstatus(await t.p_status()); //TODO-MULTI need multi status
+            console.log("XXX@205 finishing",transp)
         }
-        console.log("XXX setupoptions=", setupoptions);
-        let transportclass = Dweb["Transport" + transp]; // e.g. Dweb["TransportHTTP"]
-        let t = await transportclass.p_setup(setupoptions, verbose); //TODO may take some options
-        setstatus(await t.p_status());
     } catch(err) {
         console.log("ERROR in p_connect:",err);
         throw(err);
