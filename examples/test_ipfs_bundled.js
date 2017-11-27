@@ -4,15 +4,36 @@ const IPFS = require('ipfs');
 
 var ipfs;
 const CID = require('cids');
-const multibase = require('multibase')
-const dagPB = require('ipld-dag-pb')
-const DAGNode = dagPB.DAGNode
-const dagCBOR = require('ipld-dag-cbor')
-const IPLDResolver = require('ipld-resolver')
+const multibase = require('multibase');
+const multihash = require('multihashes');
+const dagPB = require('ipld-dag-pb');
+const DAGNode = dagPB.DAGNode;
+const dagCBOR = require('ipld-dag-cbor');
+//const IPLDResolver = require('ipld-resolver')
 var promisified;
 const promisify = require('promisify-es6');
 function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { resolve(val); },ms)})}
 
+// Note to get async / await working in node, I had to update node to the current (non-default version) as starts in V7
+// I also had to "npm install levelup leveldown" to upgrade them to match the current version of node.
+
+/*
+This file consists of:
+A set of test routines, each of which takes a CID and an expected length and tries a different way to fetch it.
+    test_block_get      using block.get
+    test_dag_get        using dag.get
+    test_files_cat      using files.cat
+    test_universal_get  a nasty kludge that tries different ways to fetch
+
+There are then a set of routines that upload with one method, and test retrieval by each of the non-crashing mechanisms above
+    test_block          using block.put
+    test_dag_string     uses dag.put to upload a string (not JSON)
+    test_dag_json       same but uploads an object (not really JSON since encode with CBOR)
+    test_httpapi_short  Accesses a file previously stored with the http api, short enough that it doesnt get sharded
+    test_httpapi_long   Accesses a file previously stored with the http api, long enough that it doesnt get sharded
+ */
+
+let tryexpectedfailures = false; // Set to false if want to check the things we expect to fail.
 let defaultipfsoptions = {
     repo: '/tmp/ipfs_testipfs', //TODO-IPFS think through where, esp for browser
     //init: true,
@@ -44,7 +65,7 @@ function p_streamToBuffer(stream, verbose) {
                 .once('end', () => { if (verbose) console.log('end chunks', chunks.length); resolve(Buffer.concat(chunks)); })
                 .on('error', (err) => { // Note error behavior untested currently
                     console.log("Error event in p_streamToBuffer",err);
-                    reject(new Dweb.errors.TransportError('Error in stream'))
+                    reject(new Error('Error in stream'))
                 });
             stream.resume();
         } catch (err) {
@@ -72,11 +93,11 @@ function p_ipfsstart(verbose) {
         })
 }
 
-function check_result(name, buff, expected) {
+function check_result(name, buff, expected, expectfailure) {
     if ( (typeof(expected) === "number") && (expected !== buff.length)) {
-        console.log(name, "Expected block length", expected, "but got", buff.length);
-        console.log(buff); // Normally leave commented out - will be long if looking at 250k file !
-    } else if ((typeof(expected) !== "number") && (expected !== buff)) {
+        console.log(name, "Expected block length", expected, "but got", buff.length, expectfailure ? "Note this was expected to fail." : "");
+        //console.log(buff); // Normally leave commented out - will be long if looking at 250k file !
+    } else if ((typeof(expected) !== "number") && (JSON.stringify(expected) !== JSON.stringify(buff))) {
         console.log(name, "Expected:", expected.constructor.name, expected, "got", buff.constructor.name, buff);
     } else {
         console.log(name, "Retrieved successfully");
@@ -84,139 +105,158 @@ function check_result(name, buff, expected) {
     return buff; // Simplify promise chain
 }
 
-function test_block_get(cid, expected) {
-    return promisified.ipfs.block.get(cid)
-        .then((block)=>block.data)
-        .then((buff) => check_result("block.get",buff, expected))
-        .then(() => delay(500))    // Allow error on other stream to appear
-        .catch((err) => console.log("Error thrown in block.cat", err))
+async function test_block_get(cid, expected, expectfailure) {
+    // Note we don't use block.get anymore , but its here for testing
+    if (expectfailure && !tryexpectedfailures) return;
+    try {
+        let block = await promisified.ipfs.block.get(cid);
+        let data = block.data;
+        check_result("block.get", data, expected, expectfailure);
+        await delay(500);    // Allow error on other stream to appear
+    } catch(err) {
+        console.log("Error thrown in block.cat", err);
+    }
 }
-function test_dag_get(cid, expected) {
+
+function test_dag_get(cid, expected, expectfailure) {
     //Try and retrieve with dag.get
+    if (expectfailure && !tryexpectedfailures) return;
     return ipfs.dag.get(cid)                // fails (never returns nor throws err) if cid came from block.put
         .then((res) => res.value)   // If we store with dag.put of a string or buffer the result is here
-        .then((buff) => check_result("dag.get",buff, expected))
+        .then((buff) => check_result("dag.get",buff, expected, expectfailure))
         .then(() => delay(500))    // Allow error on other stream to appear
         .catch((err) => console.log("Error thrown in dag.cat", err))
 }
-function test_files_cat(cid, expected) {
+function test_files_cat(cid, expected, expectfailure) {
+    if (expectfailure && !tryexpectedfailures) return;
     return ipfs.files.cat(cid) //Error: Groups are not supported in the blocks case - never returns from this call.
     // BUT Thows an error on the IPFS thread, not catchable
         .then((stream) => p_streamToBuffer(stream, true))
-        .then((buff) => check_result("files.cat",buff, expected))
+        .then((buff) => check_result("files.cat",buff, expected, expectfailure))
         .then(() => delay(500))    // Allow error on other stream to appear
         .catch((err) => console.log("Error thrown in files.cat", err)) // Note the HTTP test doesn't throw here, but in separate thread
 }
-function test_universal_get(cid, expected) {
+async function test_universal_get(cid, expected, expectfailure) {
+    if (expectfailure && !tryexpectedfailures) return;
     // This is an attempt at a retriever that works no matter what the type of multihash
-    //TODO check works with v0 CID or always with v1
-    return ipfs.dag.get(cid)
-        // Three possible cases -
-        // a) short file, get from _serialized as there's a Chrome bug in files.cat (it works in Node)
-        // b) long file use files.cat
-        // c) Not a file, value != DAGNode, return the value (works on strings or JSON)
-        .then((res) => { console.assert(!res.remainderPath.length); return res;} ) // Unsupported
-        .then((res) => {
-            if (res.value.constructor.name instanceof DAGNode) {
-                console.log("Case a or b");
-                if (res.value._links.length > 0) {
-                    console.log("Case b");
-                    return ipfs.files.cat(cid)
-                        .then((stream) => p_streamToBuffer(stream, true))
-                } else {
-                    console.log("Case a");
-                    return ipfs.files.cat(cid) // Works on Node, but fails on Chrome, cant figure out how to get data from the DAGNode otherwise (its the wrong size)
-                        .then((stream) => p_streamToBuffer(stream, true))
-                }
-            } else {
-                //Case c
-                return res.value;
+    // Three possible cases -
+    // a) short file, get from _serialized as there's a Chrome bug in files.cat (it works in Node)
+    // b) long file use files.cat
+    // c) Not a file, value != DAGNode, return the value (works on strings or JSON)
+    try {
+        let res = await ipfs.dag.get(cid);
+        console.assert(!res.remainderPath.length);  // Unsupported remainderPath - TODO throw error
+        let buff;
+        if (res.value instanceof DAGNode) {
+            //console.log("Case a or b");
+            //if (res.value._links.length > 0) { //b: Long file else short file but read stream anyway.
+            buff = await p_streamToBuffer(await ipfs.files.cat(cid), true);
+            // Previously was going back to read as a block if got 0 bytes
+            if (buff.length === 0) {    // Hit the Chrome bug
+                // This will get a file padded with ~14 bytes - 4 at front, 4 at end and cant find the other 6 !
+                // but it seems to work for PDFs which is what I'm testing on.
+                console.log("Kludge alert - files.cat fails in Chrome or Firefox, trying block.get");
+                let blk = await promisified.ipfs.block.get(cid);
+                buff = blk.data;
             }
-        })
-        .then((buff) => check_result("universal.get",buff, expected))
-        .then(() => delay(500))    // Allow error on other stream to appear
-        .catch((err) => console.log("Error thrown in files.cat", err)) // Note the HTTP test doesn't throw here, but in separate thread
+
+        } else { //c: not a file
+            buff = res.value;
+        }
+        check_result("universal.get",buff, expected, expectfailure);
+        await delay(500); // Allow error on other stream to appear
+    } catch(err) {
+        console.log("Error thrown in files.cat", err);
+    }
 }
 
-function test_block() {
-    let qbf = "The quick brown fox" // String for testing
-    let cid;   // Will hold CID of string stored with block.put
-    let len;    // Will hold length expected
+/* Each of this set of routines uploads with one method, and tries retrieving with multiple */
+
+async function test_block() {
+    let qbf = "The quick brown fox"; // String for testing
+    console.log("--------testing block.put:",qbf);
     // Store with block.put
-    return promisified.ipfs.block.put(new Buffer(qbf))
-    .then((block)=>block.cid)
-    .then((cid_stored) => { cid = cid_stored; len = qbf.length; })
-    .then(() => test_block_get(cid,len))        // Works
+    let block = await promisified.ipfs.block.put(new Buffer(qbf));
+    let cid = block.cid;       // Will hold CID of string stored with block.put
+    let len = qbf.length;      // Will hold length expected
+    await test_block_get(cid,len, false);                  // Works
     //NEXT TWO TESTS COMMENTED OUT AS FAIL *AND* HANG THE THREAD - NASTY IPFS BUG
-    .then(() => console.log("Commented out other ways to retrieve result of block.put as all crash with nasty IPFS bug "))
-    //.then(() => test_dag_get(cid, len))         // Fails - BUG throws "Groups are not supported in different thread, never returns or throws error
-    //.then(() => test_files_cat(cid, len))       // Fails - same as dag_get
-    //.then(() => test_universal_get(cid, len))     // Untested but dont expect to work as will fail in dag.get
-    //.then(() => console.log("test_block completed"))
+    console.log("Commented out other ways to retrieve result of block.put as all crash with nasty IPFS bug ");
+    //await test_dag_get(cid, len, true);                   // Fails - BUG throws "Groups are not supported in different thread, never returns or throws error
+    //await test_files_cat(cid, len, true);                 // Fails - same as dag_get
+    //await test_universal_get(cid, len, true);             // Untested but dont expect to work as will fail in dag.get
+    console.log("test_block completed");
 }
 
-function test_dag_string() {
-    let qbf = "the quick brown fox" // String for testing
-    let cid;   // Will hold CID of string stored with dag.put
-    let len;    // Will hold length expected
+async function test_dag_string() {
+    let qbf = "the quick brown fox"; // String for testing
     //https://github.com/ipfs/interface-ipfs-core/blob/master/SPEC/DAG.md#dagput
     //let qbf = new Buffer(qbf);    // Uncomment to test storing as buffer (behavior same as for string)
-    console.log("dag.put:",qbf);
-    return ipfs.dag.put(qbf,{ format: 'dag-cbor', hashAlg: 'sha3-512' }) //TODO try different hash
-        .then((cid_stored) => { cid = cid_stored; len = qbf.length; })
-        .then(() => test_block_get(cid,len))    // Gets 1 byte too long
-        .then(() => test_dag_get(cid, len))     // Works
-        .then(() => test_files_cat(cid, len))   // Throws  Error: invalid node type
-        .then(() => test_universal_get(cid, len))
+    console.log("--------testing dag.put:",qbf);
+    let cid = await ipfs.dag.put(qbf,{ format: 'dag-cbor', hashAlg: 'sha3-512' }); //TODO try different hash
+    let len = qbf.length;
+    await test_block_get(cid,len, true);    // Gets 1 byte too long - expected since encoded by dag
+    await test_dag_get(cid, len, false);     // Works
+    await test_files_cat(cid, len, true);   // Throws  Error: invalid node type as expected since its not a file
+    await test_universal_get(cid, len, false);
 }
 
-function test_dag_json() {
-    let j = { fox: "the quick brown"} // String for testing
-    let cid;   // Will hold CID of string stored with dag.put
+async function test_dag_json() {
+    let j = { fox: "the quick brown"}; // String for testing
     //https://github.com/ipfs/interface-ipfs-core/blob/master/SPEC/DAG.md#dagput
-    console.log("dag.put:",j);
-    return ipfs.dag.put(j,{ format: 'dag-cbor', hashAlg: 'sha2-256' })
-        .then((cid_stored) => { cid = cid_stored; })
-        .then(() => test_block_get(cid, j))    // Wrong - gets buffer
-        .then(() => test_dag_get(cid, j))     // Works
-        //.then(() => test_files_cat(cid, j))   // Throws  Error: invalid node type
-        .then(() => test_universal_get(cid, j))
+    console.log("--------Testing dag.put:",j);
+    let cid = await ipfs.dag.put(j,{ format: 'dag-cbor', hashAlg: 'sha2-256' }); // Will hold CID of string stored with dag.put
+    //console.log(cid);                                   // For debugging
+    //console.log(multihash.toB58String(cid.multihash));  // Debugging QmehRkRt4xipvY6sj5X79SMmsCfpryEsUWxYqwddFEjsDr
+    //console.log(cid.toBaseEncodedString());             // Debugging zdpuB2nDXFEoAMVCiKLLqrdHEqpdhvTD2qwtxymA3V9fAb68g
+    await test_block_get(cid, j, true);                       // Wrong - gets buffer as expected since encoded as a dag.
+    await test_dag_get(cid, j, false);                         // Works
+    await test_files_cat(cid, j, true);                     // Throws  Error: invalid node type - expected since its not a file
+    await test_universal_get(cid, j, false);
 }
 
-function test_httpapi_short() {
-    console.log("Testing short file sent to http API")
+async function test_httpapi_short() {
+    console.log("--------Testing short file sent to http API");
     let multihash="QmTds3bVoiM9pzfNJX6vT2ohxnezKPdaGHLd4Ptc4ACMLa"; //184324 bytes
-    let cid = new CID(multihash)
+    let cid = new CID(multihash);
     let len = 184324;
-    return test_block_get(cid,len)              // Seems to work as a PDF, but gets 184338 not 184324 bytes
-    //.then(() => test_dag_get(cid, len))     // As expected, Fails gets a data structure, not a buffer
-        .then(() => test_files_cat(cid, len))   // Works in node (correct size), fails in Chrome (immediate 'end' event) !! IPFS BUG !!
-        //.then(() => test_universal_get(cid, len))
+    await test_block_get(cid,len, true);        // Seems to work as a PDF, but gets 184338 not 184324 bytes
+    await test_dag_get(cid, len, true);         // As expected, Fails gets a data structure, not a buffer
+    await test_files_cat(cid, len, false);       // Works in node (correct size), fails in Chrome (immediate 'end' event) !! IPFS BUG !!
+    await test_universal_get(cid, len, false);
 }
-function test_httpapi_long() {
-    console.log("Testing long file sent to http API")
+async function test_httpapi_long() {
+    console.log("--------Testing long file sent to http API");
     let multihash="Qmbzs7jhkBZuVixhnM3J3QhMrL6bcAoSYiRPZrdoX3DhzB";
-    let cid = new CID(multihash)
+    let cid = new CID(multihash);
     let len = 262438;
-    return test_block_get(cid,len)              //  As expected, Doesnt work - just gets the IPLD as a buffer
-        //.then(() => test_dag_get(cid, len))     // As expected,  Fails gets a data structure, not a buffer
-        .then(() => test_files_cat(cid, len))   // Works in node and in Chrome
-        //.then(() => test_universal_get(cid, len))
+    await test_block_get(cid,len,true);              // As expected, Doesnt work - just gets the IPLD as a buffer
+    await test_dag_get(cid, len,true);               // As expected,  Fails gets a data structure, not a buffer
+    await test_files_cat(cid, len,false);             // Works in node and in Chrome
+    await test_universal_get(cid, len,false);
 }
 
-function test_ipfs() {
-    p_ipfsstart(true)
-    .then(() => test_httpapi_short())
-    .then(() => test_httpapi_long())
-    //.then(() => test_block()) // Run last because fails and never returns from files.cat
-    //.then(() => test_dag_string()) // Gets 1 byte extra with block.get (node type); fails on file - that is to be expected, note CIDs are dag-cbor, version 1
-    //.then(() => test_dag_json()) // Gets 1 byte extra with block.get (node type); fails on file - that is to be expected, note CIDs are dag-cbor, version 1
+async function sandbox() {
+    console.log("--------Sandbox");
+    // Just a place to try things - dont expect them to work or make sense !
+    let m = "zdpuB2nDXFEoAMVCiKLLqrdHEqpdhvTD2qwtxymA3V9fAb68g";
 }
 
-test_ipfs()
+async function test_ipfs() {
+    await p_ipfsstart(true);
+    //await sandbox();
+    await test_httpapi_short();     // No solution: *IPFS BUG* on files.cat; (work around also has bug of adding 14 bytes)
+    await test_httpapi_long();      // Works only on files.cat; Fails as expected on others
+    await test_block();             // Works on block.get; Fails *IPFS BUG REALLY BAD* on anything other than block.get
+    await test_dag_string();        // Works on dag.get; fails (as expected) on others
+    await test_dag_json();         // Works on dag.get; fails as expected on others
+    console.log('---- finished --- ')
+}
+
+test_ipfs();
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722,"cids":103,"ipfs":297,"ipld-dag-cbor":303,"ipld-dag-pb":315,"ipld-resolver":344,"multibase":516,"promisify-es6":562}],2:[function(require,module,exports){
+},{"buffer":715,"cids":103,"ipfs":313,"ipld-dag-cbor":319,"ipld-dag-pb":331,"multibase":520,"multihashes":527,"promisify-es6":554}],2:[function(require,module,exports){
 module.exports = after
 
 function after(count, callback, err_cb) {
@@ -351,7 +391,7 @@ Entity.prototype.encode = function encode(data, enc, /* internal */ reporter) {
   return this._getEncoder(enc).encode(data, reporter);
 };
 
-},{"../asn1":4,"inherits":203,"vm":760}],6:[function(require,module,exports){
+},{"../asn1":4,"inherits":193,"vm":753}],6:[function(require,module,exports){
 var inherits = require('inherits');
 var Reporter = require('../base').Reporter;
 var Buffer = require('buffer').Buffer;
@@ -469,7 +509,7 @@ EncoderBuffer.prototype.join = function join(out, offset) {
   return out;
 };
 
-},{"../base":7,"buffer":722,"inherits":203}],7:[function(require,module,exports){
+},{"../base":7,"buffer":715,"inherits":193}],7:[function(require,module,exports){
 var base = exports;
 
 base.Reporter = require('./reporter').Reporter;
@@ -1113,7 +1153,7 @@ Node.prototype._isPrintstr = function isPrintstr(str) {
   return /^[A-Za-z0-9 '\(\)\+,\-\.\/:=\?]*$/.test(str);
 };
 
-},{"../base":7,"minimalistic-assert":506}],9:[function(require,module,exports){
+},{"../base":7,"minimalistic-assert":510}],9:[function(require,module,exports){
 var inherits = require('inherits');
 
 function Reporter(options) {
@@ -1236,7 +1276,7 @@ ReporterError.prototype.rethrow = function rethrow(msg) {
   return this;
 };
 
-},{"inherits":203}],10:[function(require,module,exports){
+},{"inherits":193}],10:[function(require,module,exports){
 var constants = require('../constants');
 
 exports.tagClass = {
@@ -1627,7 +1667,7 @@ function derDecodeLen(buf, primitive, fail) {
   return len;
 }
 
-},{"../../asn1":4,"inherits":203}],13:[function(require,module,exports){
+},{"../../asn1":4,"inherits":193}],13:[function(require,module,exports){
 var decoders = exports;
 
 decoders.der = require('./der');
@@ -1684,7 +1724,7 @@ PEMDecoder.prototype.decode = function decode(data, options) {
   return DERDecoder.prototype.decode.call(this, input, options);
 };
 
-},{"./der":12,"buffer":722,"inherits":203}],15:[function(require,module,exports){
+},{"./der":12,"buffer":715,"inherits":193}],15:[function(require,module,exports){
 var inherits = require('inherits');
 var Buffer = require('buffer').Buffer;
 
@@ -1981,7 +2021,7 @@ function encodeTag(tag, primitive, cls, reporter) {
   return res;
 }
 
-},{"../../asn1":4,"buffer":722,"inherits":203}],16:[function(require,module,exports){
+},{"../../asn1":4,"buffer":715,"inherits":193}],16:[function(require,module,exports){
 var encoders = exports;
 
 encoders.der = require('./der');
@@ -2010,7 +2050,7 @@ PEMEncoder.prototype.encode = function encode(data, options) {
   return out.join('\n');
 };
 
-},{"./der":15,"inherits":203}],18:[function(require,module,exports){
+},{"./der":15,"inherits":193}],18:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -2121,7 +2161,7 @@ function rethrow(error) {
     throw error;
 }
 module.exports = exports['default'];
-},{"./internal/initialParams":36,"./internal/setImmediate":45,"lodash/isObject":494}],19:[function(require,module,exports){
+},{"./internal/initialParams":36,"./internal/setImmediate":45,"lodash/isObject":498}],19:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -2221,7 +2261,7 @@ function doWhilst(iteratee, test, callback) {
     _iteratee(next);
 }
 module.exports = exports['default'];
-},{"./internal/onlyOnce":41,"./internal/slice":46,"./internal/wrapAsync":48,"lodash/noop":498}],21:[function(require,module,exports){
+},{"./internal/onlyOnce":41,"./internal/slice":46,"./internal/wrapAsync":48,"lodash/noop":502}],21:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -2462,7 +2502,7 @@ var eachOfGeneric = (0, _doLimit2.default)(_eachOfLimit2.default, Infinity);
  * });
  */
 module.exports = exports['default'];
-},{"./eachOfLimit":24,"./internal/breakLoop":29,"./internal/doLimit":31,"./internal/once":40,"./internal/onlyOnce":41,"./internal/wrapAsync":48,"lodash/isArrayLike":490,"lodash/noop":498}],24:[function(require,module,exports){
+},{"./eachOfLimit":24,"./internal/breakLoop":29,"./internal/doLimit":31,"./internal/once":40,"./internal/onlyOnce":41,"./internal/wrapAsync":48,"lodash/isArrayLike":494,"lodash/noop":502}],24:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -2773,7 +2813,7 @@ function _createTester(check, getResult) {
     };
 }
 module.exports = exports['default'];
-},{"./breakLoop":29,"lodash/noop":498}],31:[function(require,module,exports){
+},{"./breakLoop":29,"lodash/noop":502}],31:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -2882,7 +2922,7 @@ function _eachOfLimit(limit) {
     };
 }
 module.exports = exports['default'];
-},{"./breakLoop":29,"./iterator":37,"./once":40,"./onlyOnce":41,"lodash/noop":498}],34:[function(require,module,exports){
+},{"./breakLoop":29,"./iterator":37,"./once":40,"./onlyOnce":41,"lodash/noop":502}],34:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -2958,7 +2998,7 @@ function _filter(eachfn, coll, iteratee, callback) {
     filter(eachfn, coll, (0, _wrapAsync2.default)(iteratee), callback || _noop2.default);
 }
 module.exports = exports['default'];
-},{"./wrapAsync":48,"lodash/_arrayMap":466,"lodash/_baseProperty":474,"lodash/isArrayLike":490,"lodash/noop":498}],35:[function(require,module,exports){
+},{"./wrapAsync":48,"lodash/_arrayMap":470,"lodash/_baseProperty":478,"lodash/isArrayLike":494,"lodash/noop":502}],35:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -3053,7 +3093,7 @@ function iterator(coll) {
     return iterator ? createES2015Iterator(iterator) : createObjectIterator(coll);
 }
 module.exports = exports['default'];
-},{"./getIterator":35,"lodash/isArrayLike":490,"lodash/keys":497}],38:[function(require,module,exports){
+},{"./getIterator":35,"lodash/isArrayLike":494,"lodash/keys":501}],38:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -3089,7 +3129,7 @@ function _asyncMap(eachfn, arr, iteratee, callback) {
     });
 }
 module.exports = exports['default'];
-},{"./wrapAsync":48,"lodash/noop":498}],39:[function(require,module,exports){
+},{"./wrapAsync":48,"lodash/noop":502}],39:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -3175,7 +3215,7 @@ function _parallel(eachfn, tasks, callback) {
     });
 }
 module.exports = exports['default'];
-},{"./slice":46,"./wrapAsync":48,"lodash/isArrayLike":490,"lodash/noop":498}],43:[function(require,module,exports){
+},{"./slice":46,"./wrapAsync":48,"lodash/isArrayLike":494,"lodash/noop":502}],43:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -3224,6 +3264,7 @@ function queue(worker, concurrency, payload) {
     var numRunning = 0;
     var workersList = [];
 
+    var processingScheduled = false;
     function _insert(data, insertAtFront, callback) {
         if (callback != null && typeof callback !== 'function') {
             throw new Error('task callback must be a function');
@@ -3251,7 +3292,14 @@ function queue(worker, concurrency, payload) {
                 q._tasks.push(item);
             }
         }
-        (0, _setImmediate2.default)(q.process);
+
+        if (!processingScheduled) {
+            processingScheduled = true;
+            (0, _setImmediate2.default)(function () {
+                processingScheduled = false;
+                q.process();
+            });
+        }
     }
 
     function _next(tasks) {
@@ -3262,7 +3310,9 @@ function queue(worker, concurrency, payload) {
                 var task = tasks[i];
 
                 var index = (0, _baseIndexOf2.default)(workersList, task, 0);
-                if (index >= 0) {
+                if (index === 0) {
+                    workersList.shift();
+                } else if (index > 0) {
                     workersList.splice(index, 1);
                 }
 
@@ -3370,7 +3420,7 @@ function queue(worker, concurrency, payload) {
     return q;
 }
 module.exports = exports['default'];
-},{"./DoublyLinkedList":28,"./onlyOnce":41,"./setImmediate":45,"./wrapAsync":48,"lodash/_baseIndexOf":469,"lodash/isArray":489,"lodash/noop":498}],44:[function(require,module,exports){
+},{"./DoublyLinkedList":28,"./onlyOnce":41,"./setImmediate":45,"./wrapAsync":48,"lodash/_baseIndexOf":473,"lodash/isArray":493,"lodash/noop":502}],44:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -3437,7 +3487,7 @@ if (hasSetImmediate) {
 
 exports.default = wrap(_defer);
 }).call(this,require('_process'))
-},{"./slice":46,"_process":733}],46:[function(require,module,exports){
+},{"./slice":46,"_process":726}],46:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -3927,7 +3977,7 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
  * @static
  * @memberOf module:Utils
  * @method
- * @alias nextTick
+ * @see [async.nextTick]{@link module:Utils.nextTick}
  * @category Util
  * @param {Function} callback - The function to call on a later loop around
  * the event loop. Invoked with (args...).
@@ -4001,7 +4051,7 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
  */
 exports.default = (0, _doParallel2.default)((0, _createTester2.default)(Boolean, _identity2.default));
 module.exports = exports['default'];
-},{"./internal/createTester":30,"./internal/doParallel":32,"lodash/identity":487}],56:[function(require,module,exports){
+},{"./internal/createTester":30,"./internal/doParallel":32,"lodash/identity":491}],56:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -4205,7 +4255,7 @@ module.exports = exports['default'];
  *     callback(null, 'done');
  * }
  */
-},{"./internal/once":40,"./internal/onlyOnce":41,"./internal/slice":46,"./internal/wrapAsync":48,"lodash/isArray":489,"lodash/noop":498}],58:[function(require,module,exports){
+},{"./internal/once":40,"./internal/onlyOnce":41,"./internal/slice":46,"./internal/wrapAsync":48,"lodash/isArray":493,"lodash/noop":502}],58:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -4278,7 +4328,7 @@ function whilst(test, iteratee, callback) {
     _iteratee(next);
 }
 module.exports = exports['default'];
-},{"./internal/onlyOnce":41,"./internal/slice":46,"./internal/wrapAsync":48,"lodash/noop":498}],59:[function(require,module,exports){
+},{"./internal/onlyOnce":41,"./internal/slice":46,"./internal/wrapAsync":48,"lodash/noop":502}],59:[function(require,module,exports){
 
 /**
  * Expose `Backoff`.
@@ -4458,7 +4508,7 @@ module.exports = function base (ALPHABET) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722}],61:[function(require,module,exports){
+},{"buffer":715}],61:[function(require,module,exports){
 "use strict";
 
 /**
@@ -7701,7 +7751,7 @@ module.exports = {
   encode: encode
 }
 
-},{"safe-buffer":654}],65:[function(require,module,exports){
+},{"safe-buffer":646}],65:[function(require,module,exports){
 // Blake2B in pure Javascript
 // Adapted from the reference implementation in RFC7693
 // Ported to Javascript by DC - https://github.com/dcposch
@@ -8270,7 +8320,7 @@ module.exports = {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722}],69:[function(require,module,exports){
+},{"buffer":715}],69:[function(require,module,exports){
 (function (global){
 /**
  * Create a blob builder even when vendor prefixes exist
@@ -11799,7 +11849,7 @@ module.exports = (function() {
   };
 })(typeof module === 'undefined' || module, this);
 
-},{"buffer":721}],71:[function(require,module,exports){
+},{"buffer":714}],71:[function(require,module,exports){
 'use strict'
 
 const Bignumber = require('bignumber.js')
@@ -13787,7 +13837,7 @@ Decoder.decodeFirst = Decoder.decode
 module.exports = Decoder
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
-},{"./constants":71,"./decoder.asm":72,"./simple":77,"./tagged":78,"./utils":79,"bignumber.js":63,"buffer":722,"ieee754":201,"url":754}],74:[function(require,module,exports){
+},{"./constants":71,"./decoder.asm":72,"./simple":77,"./tagged":78,"./utils":79,"bignumber.js":63,"buffer":715,"ieee754":191,"url":747}],74:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -13970,7 +14020,7 @@ function collectObject (val) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./decoder":73,"./utils":79,"buffer":722}],75:[function(require,module,exports){
+},{"./decoder":73,"./utils":79,"buffer":715}],75:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -14483,7 +14533,7 @@ class Encoder {
 module.exports = Encoder
 
 }).call(this,require("buffer").Buffer)
-},{"./constants":71,"./utils":79,"bignumber.js":63,"buffer":722,"url":754}],76:[function(require,module,exports){
+},{"./constants":71,"./utils":79,"bignumber.js":63,"buffer":715,"url":747}],76:[function(require,module,exports){
 'use strict'
 
 // exports.Commented = require('./commented')
@@ -14874,7 +14924,7 @@ exports.nextPowerOf2 = (n) => {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./constants":71,"bignumber.js":63,"buffer":722}],80:[function(require,module,exports){
+},{"./constants":71,"bignumber.js":63,"buffer":715}],80:[function(require,module,exports){
 var r;
 
 module.exports = function rand(len) {
@@ -14941,7 +14991,7 @@ if (typeof self === 'object') {
   }
 }
 
-},{"crypto":721}],81:[function(require,module,exports){
+},{"crypto":714}],81:[function(require,module,exports){
 // based on the aes implimentation in triple sec
 // https://github.com/keybase/triplesec
 // which is in turn based on the one from crypto-js
@@ -15171,7 +15221,7 @@ AES.prototype.scrub = function () {
 
 module.exports.AES = AES
 
-},{"safe-buffer":654}],82:[function(require,module,exports){
+},{"safe-buffer":646}],82:[function(require,module,exports){
 var aes = require('./aes')
 var Buffer = require('safe-buffer').Buffer
 var Transform = require('cipher-base')
@@ -15290,7 +15340,7 @@ StreamCipher.prototype.setAAD = function setAAD (buf) {
 
 module.exports = StreamCipher
 
-},{"./aes":81,"./ghash":86,"./incr32":87,"buffer-xor":102,"cipher-base":104,"inherits":203,"safe-buffer":654}],83:[function(require,module,exports){
+},{"./aes":81,"./ghash":86,"./incr32":87,"buffer-xor":102,"cipher-base":104,"inherits":193,"safe-buffer":646}],83:[function(require,module,exports){
 var ciphers = require('./encrypter')
 var deciphers = require('./decrypter')
 var modes = require('./modes/list.json')
@@ -15428,7 +15478,7 @@ function createDecipher (suite, password) {
 exports.createDecipher = createDecipher
 exports.createDecipheriv = createDecipheriv
 
-},{"./aes":81,"./authCipher":82,"./modes":94,"./streamCipher":97,"cipher-base":104,"evp_bytestokey":179,"inherits":203,"safe-buffer":654}],85:[function(require,module,exports){
+},{"./aes":81,"./authCipher":82,"./modes":94,"./streamCipher":97,"cipher-base":104,"evp_bytestokey":169,"inherits":193,"safe-buffer":646}],85:[function(require,module,exports){
 var MODES = require('./modes')
 var AuthCipher = require('./authCipher')
 var Buffer = require('safe-buffer').Buffer
@@ -15544,7 +15594,7 @@ function createCipher (suite, password) {
 exports.createCipheriv = createCipheriv
 exports.createCipher = createCipher
 
-},{"./aes":81,"./authCipher":82,"./modes":94,"./streamCipher":97,"cipher-base":104,"evp_bytestokey":179,"inherits":203,"safe-buffer":654}],86:[function(require,module,exports){
+},{"./aes":81,"./authCipher":82,"./modes":94,"./streamCipher":97,"cipher-base":104,"evp_bytestokey":169,"inherits":193,"safe-buffer":646}],86:[function(require,module,exports){
 var Buffer = require('safe-buffer').Buffer
 var ZEROES = Buffer.alloc(16, 0)
 
@@ -15635,7 +15685,7 @@ GHASH.prototype.final = function (abl, bl) {
 
 module.exports = GHASH
 
-},{"safe-buffer":654}],87:[function(require,module,exports){
+},{"safe-buffer":646}],87:[function(require,module,exports){
 function incr32 (iv) {
   var len = iv.length
   var item
@@ -15706,7 +15756,7 @@ exports.encrypt = function (self, data, decrypt) {
   return out
 }
 
-},{"buffer-xor":102,"safe-buffer":654}],90:[function(require,module,exports){
+},{"buffer-xor":102,"safe-buffer":646}],90:[function(require,module,exports){
 var Buffer = require('safe-buffer').Buffer
 
 function encryptByte (self, byteParam, decrypt) {
@@ -15750,7 +15800,7 @@ exports.encrypt = function (self, chunk, decrypt) {
   return out
 }
 
-},{"safe-buffer":654}],91:[function(require,module,exports){
+},{"safe-buffer":646}],91:[function(require,module,exports){
 var Buffer = require('safe-buffer').Buffer
 
 function encryptByte (self, byteParam, decrypt) {
@@ -15777,7 +15827,7 @@ exports.encrypt = function (self, chunk, decrypt) {
   return out
 }
 
-},{"safe-buffer":654}],92:[function(require,module,exports){
+},{"safe-buffer":646}],92:[function(require,module,exports){
 var xor = require('buffer-xor')
 var Buffer = require('safe-buffer').Buffer
 var incr32 = require('../incr32')
@@ -15809,7 +15859,7 @@ exports.encrypt = function (self, chunk) {
   return xor(chunk, pad)
 }
 
-},{"../incr32":87,"buffer-xor":102,"safe-buffer":654}],93:[function(require,module,exports){
+},{"../incr32":87,"buffer-xor":102,"safe-buffer":646}],93:[function(require,module,exports){
 exports.encrypt = function (self, block) {
   return self._cipher.encryptBlock(block)
 }
@@ -16051,7 +16101,7 @@ exports.encrypt = function (self, chunk) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722,"buffer-xor":102}],97:[function(require,module,exports){
+},{"buffer":715,"buffer-xor":102}],97:[function(require,module,exports){
 var aes = require('./aes')
 var Buffer = require('safe-buffer').Buffer
 var Transform = require('cipher-base')
@@ -16080,7 +16130,7 @@ StreamCipher.prototype._final = function () {
 
 module.exports = StreamCipher
 
-},{"./aes":81,"cipher-base":104,"inherits":203,"safe-buffer":654}],98:[function(require,module,exports){
+},{"./aes":81,"cipher-base":104,"inherits":193,"safe-buffer":646}],98:[function(require,module,exports){
 (function (Buffer){
 const Sha3 = require('js-sha3')
 
@@ -16118,7 +16168,7 @@ module.exports = {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722,"js-sha3":99}],99:[function(require,module,exports){
+},{"buffer":715,"js-sha3":99}],99:[function(require,module,exports){
 (function (global){
 /*
  * js-sha3 v0.3.1
@@ -16653,7 +16703,7 @@ module.exports = function base (ALPHABET) {
   }
 }
 
-},{"safe-buffer":654}],102:[function(require,module,exports){
+},{"safe-buffer":646}],102:[function(require,module,exports){
 (function (Buffer){
 module.exports = function xor (a, b) {
   var length = Math.min(a.length, b.length)
@@ -16667,7 +16717,7 @@ module.exports = function xor (a, b) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722}],103:[function(require,module,exports){
+},{"buffer":715}],103:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -16931,7 +16981,7 @@ CID.codecs = codecs
 module.exports = CID
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722,"multibase":516,"multicodec":518,"multicodec/src/base-table":517,"multicodec/src/varint-table":521,"multihashes":523}],104:[function(require,module,exports){
+},{"buffer":715,"multibase":520,"multicodec":522,"multicodec/src/base-table":521,"multicodec/src/varint-table":525,"multihashes":527}],104:[function(require,module,exports){
 var Buffer = require('safe-buffer').Buffer
 var Transform = require('stream').Transform
 var StringDecoder = require('string_decoder').StringDecoder
@@ -17032,7 +17082,7 @@ CipherBase.prototype._toString = function (value, enc, fin) {
 
 module.exports = CipherBase
 
-},{"inherits":203,"safe-buffer":654,"stream":752,"string_decoder":753}],105:[function(require,module,exports){
+},{"inherits":193,"safe-buffer":646,"stream":745,"string_decoder":746}],105:[function(require,module,exports){
 /**
  * Slice reference.
  */
@@ -17341,7 +17391,7 @@ function objectToString(o) {
 }
 
 }).call(this,{"isBuffer":require("../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728}],109:[function(require,module,exports){
+},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721}],109:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 var inherits = require('inherits')
@@ -17397,7 +17447,7 @@ module.exports = function createHash (alg) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./md5":111,"buffer":722,"cipher-base":104,"inherits":203,"ripemd160":652,"sha.js":670}],110:[function(require,module,exports){
+},{"./md5":111,"buffer":715,"cipher-base":104,"inherits":193,"ripemd160":644,"sha.js":662}],110:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 var intSize = 4
@@ -17431,7 +17481,7 @@ module.exports = function hash (buf, fn) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722}],111:[function(require,module,exports){
+},{"buffer":715}],111:[function(require,module,exports){
 'use strict'
 /*
  * A JavaScript implementation of the RSA Data Security, Inc. MD5 Message
@@ -17648,7 +17698,7 @@ module.exports = function createHmac (alg, key) {
   return new Hmac(alg, key)
 }
 
-},{"./legacy":113,"cipher-base":104,"create-hash/md5":111,"inherits":203,"ripemd160":652,"safe-buffer":654,"sha.js":670}],113:[function(require,module,exports){
+},{"./legacy":113,"cipher-base":104,"create-hash/md5":111,"inherits":193,"ripemd160":644,"safe-buffer":646,"sha.js":662}],113:[function(require,module,exports){
 'use strict'
 var inherits = require('inherits')
 var Buffer = require('safe-buffer').Buffer
@@ -17696,1008 +17746,7 @@ Hmac.prototype._final = function () {
 }
 module.exports = Hmac
 
-},{"cipher-base":104,"inherits":203,"safe-buffer":654}],114:[function(require,module,exports){
-/* @flow */
-'use strict'
-
-const KeytransformDatastore = require('./keytransform')
-const ShardingDatastore = require('./sharding')
-const MountDatastore = require('./mount')
-const TieredDatastore = require('./tiered')
-const NamespaceDatastore = require('./namespace')
-const shard = require('./shard')
-
-exports.KeytransformDatastore = KeytransformDatastore
-exports.ShardingDatastore = ShardingDatastore
-exports.MountDatastore = MountDatastore
-exports.TieredDatastore = TieredDatastore
-exports.NamespaceDatastore = NamespaceDatastore
-exports.shard = shard
-
-},{"./keytransform":115,"./mount":116,"./namespace":117,"./shard":119,"./sharding":120,"./tiered":121}],115:[function(require,module,exports){
-/* @flow */
-'use strict'
-
-const pull = require('pull-stream')
-
-/* ::
-import type {Key, Datastore, Batch, Query, QueryResult, Callback} from 'interface-datastore'
-*/
-
-/**
- * An object with a pair of functions for (invertibly) transforming keys
- */
-/* ::
-type KeyTransform = {
-  convert: KeyMapping,
-  invert: KeyMapping
-}
-*/
-
-/**
- * Map one key onto another key.
- */
-/* ::
-type KeyMapping = (Key) => Key
-*/
-
-/**
- * A datastore shim, that wraps around a given datastore, changing
- * the way keys look to the user, for example namespacing
- * keys, reversing them, etc.
- */
-class KeyTransformDatastore /* :: <Value> */ {
-  /* :: child: Datastore<Value> */
-  /* :: transform: KeyTransform */
-
-  constructor (child /* : Datastore<Value> */, transform /* : KeyTransform */) {
-    this.child = child
-    this.transform = transform
-  }
-
-  open (callback /* : Callback<void> */) /* : void */ {
-    this.child.open(callback)
-  }
-
-  put (key /* : Key */, val /* : Value */, callback /* : Callback<void> */) /* : void */ {
-    this.child.put(this.transform.convert(key), val, callback)
-  }
-
-  get (key /* : Key */, callback /* : Callback<Value> */) /* : void */ {
-    this.child.get(this.transform.convert(key), callback)
-  }
-
-  has (key /* : Key */, callback /* : Callback<bool> */) /* : void */ {
-    this.child.has(this.transform.convert(key), callback)
-  }
-
-  delete (key /* : Key */, callback /* : Callback<void> */) /* : void */ {
-    this.child.delete(this.transform.convert(key), callback)
-  }
-
-  batch () /* : Batch<Value> */ {
-    const b = this.child.batch()
-    return {
-      put: (key /* : Key */, value /* : Value */) /* : void */ => {
-        b.put(this.transform.convert(key), value)
-      },
-      delete: (key /* : Key */) /* : void */ => {
-        b.delete(this.transform.convert(key))
-      },
-      commit: (callback /* : Callback<void> */) /* : void */ => {
-        b.commit(callback)
-      }
-    }
-  }
-
-  query (q /* : Query<Value> */) /* : QueryResult<Value> */ {
-    return pull(
-      this.child.query(q),
-      pull.map(e => {
-        e.key = this.transform.invert(e.key)
-        return e
-      })
-    )
-  }
-
-  close (callback /* : Callback<void> */) /* : void */ {
-    this.child.close(callback)
-  }
-}
-
-module.exports = KeyTransformDatastore
-
-},{"pull-stream":598}],116:[function(require,module,exports){
-/* @flow */
-'use strict'
-
-const each = require('async/each')
-const many = require('pull-many')
-const pull = require('pull-stream')
-
-const Key = require('interface-datastore').Key
-const utils = require('interface-datastore').utils
-const asyncFilter = utils.asyncFilter
-const asyncSort = utils.asyncSort
-const replaceStartWith = utils.replaceStartWith
-
-const Keytransform = require('./keytransform')
-
-/* ::
-import type {Datastore, Callback, Batch, Query, QueryResult} from 'interface-datastore'
-
-type Mount<Value> = {
-  prefix: Key,
-  datastore: Datastore<Value>
-}
-*/
-
-/**
- * A datastore that can combine multiple stores inside various
- * key prefixs.
- */
-class MountDatastore /* :: <Value> */ {
-  /* :: mounts: Array<Mount<Value>> */
-
-  constructor (mounts /* : Array<Mount<Value>> */) {
-    this.mounts = mounts.slice()
-  }
-
-  open (callback /* : Callback<void> */) /* : void */ {
-    each(this.mounts, (m, cb) => {
-      m.datastore.open(cb)
-    }, callback)
-  }
-
-  /**
-   * Lookup the matching datastore for the given key.
-   *
-   * @private
-   * @param {Key} key
-   * @returns {{Datastore, Key, Key}}
-   */
-  _lookup (key /* : Key */) /* : ?{datastore: Datastore<Value>, mountpoint: Key, rest: Key} */ {
-    for (let mount of this.mounts) {
-      if (mount.prefix.toString() === key.toString() || mount.prefix.isAncestorOf(key)) {
-        const s = replaceStartWith(key.toString(), mount.prefix.toString())
-        return {
-          datastore: mount.datastore,
-          mountpoint: mount.prefix,
-          rest: new Key(s)
-        }
-      }
-    }
-  }
-
-  put (key /* : Key */, value /* : Value */, callback /* : Callback<void> */) /* : void */ {
-    const match = this._lookup(key)
-    if (match == null) {
-      callback(new Error('No datastore mounted for this key'))
-      return
-    }
-
-    match.datastore.put(match.rest, value, callback)
-  }
-
-  get (key /* : Key */, callback /* : Callback<Value> */) /* : void */ {
-    const match = this._lookup(key)
-    if (match == null) {
-      callback(new Error('No datastore mounted for this key'))
-      return
-    }
-
-    match.datastore.get(match.rest, callback)
-  }
-
-  has (key /* : Key */, callback /* : Callback<bool> */) /* : void */ {
-    const match = this._lookup(key)
-    if (match == null) {
-      callback(null, false)
-      return
-    }
-
-    match.datastore.has(match.rest, callback)
-  }
-
-  delete (key /* : Key */, callback /* : Callback<void> */) /* : void */ {
-    const match = this._lookup(key)
-    if (match == null) {
-      callback(new Error('No datastore mounted for this key'))
-      return
-    }
-
-    match.datastore.delete(match.rest, callback)
-  }
-
-  close (callback /* : Callback<void> */) /* : void */ {
-    each(this.mounts, (m, cb) => {
-      m.datastore.close(cb)
-    }, callback)
-  }
-
-  batch () /* : Batch<Value> */ {
-    const batchMounts = {}
-    const lookup = (key /* : Key */) /* : {batch: Batch<Value>, rest: Key} */ => {
-      const match = this._lookup(key)
-      if (match == null) {
-        throw new Error('No datastore mounted for this key')
-      }
-
-      const m = match.mountpoint.toString()
-      if (batchMounts[m] == null) {
-        batchMounts[m] = match.datastore.batch()
-      }
-
-      return {
-        batch: batchMounts[m],
-        rest: match.rest
-      }
-    }
-
-    return {
-      put: (key /* : Key */, value /* : Value */) /* : void */ => {
-        const match = lookup(key)
-        match.batch.put(match.rest, value)
-      },
-      delete: (key /* : Key */) /* : void */ => {
-        const match = lookup(key)
-        match.batch.delete(match.rest)
-      },
-      commit: (callback /* : Callback<void> */) /* : void */ => {
-        each(Object.keys(batchMounts), (p, cb) => {
-          batchMounts[p].commit(cb)
-        }, callback)
-      }
-    }
-  }
-
-  query (q /* : Query<Value> */) /* : QueryResult<Value> */ {
-    const qs = this.mounts.map(m => {
-      const ks = new Keytransform(m.datastore, {
-        convert: (key /* : Key */) /* : Key */ => {
-          throw new Error('should never be called')
-        },
-        invert: (key /* : Key */) /* : Key */ => {
-          return m.prefix.child(key)
-        }
-      })
-
-      let prefix
-      if (q.prefix != null) {
-        prefix = replaceStartWith(q.prefix, m.prefix.toString())
-      }
-
-      return ks.query({
-        prefix: prefix,
-        filters: q.filters,
-        keysOnly: q.keysOnly
-      })
-    })
-
-    let tasks = [many(qs)]
-
-    if (q.filters != null) {
-      tasks = tasks.concat(q.filters.map(f => asyncFilter(f)))
-    }
-
-    if (q.orders != null) {
-      tasks = tasks.concat(q.orders.map(o => asyncSort(o)))
-    }
-
-    if (q.offset != null) {
-      let i = 0
-      // $FlowFixMe
-      tasks.push(pull.filter(() => i++ >= q.offset))
-    }
-
-    if (q.limit != null) {
-      tasks.push(pull.take(q.limit))
-    }
-
-    return pull.apply(null, tasks)
-  }
-}
-
-module.exports = MountDatastore
-
-},{"./keytransform":115,"async/each":21,"interface-datastore":206,"pull-many":588,"pull-stream":598}],117:[function(require,module,exports){
-/* @flow */
-'use strict'
-
-const Key = require('interface-datastore').Key
-const KeytransformDatastore = require('./keytransform')
-
-/* ::
-import type {Callback, Datastore, Query, QueryResult} from 'interface-datastore'
-*/
-
-/**
- * Wraps a given datastore into a keytransform which
- * makes a given prefix transparent.
- *
- * For example, if the prefix is `new Key(/hello)` a call
- * to `store.put(new Key('/world'), mydata)` would store the data under
- * `/hello/world`.
- *
- */
-class NamespaceDatastore/* :: <Value> */ extends KeytransformDatastore /* :: <Value> */ {
-  /* :: prefix: Key */
-
-  constructor (child/* : Datastore<Value> */, prefix/* : Key */) {
-    super(child, {
-      convert (key/* : Key */)/* : Key */ {
-        return prefix.child(key)
-      },
-      invert (key/* : Key */)/* : Key */ {
-        if (prefix.toString() === '/') {
-          return key
-        }
-
-        if (!prefix.isAncestorOf(key)) {
-          throw new Error(`Expected prefix: (${prefix.toString()}) in key: ${key.toString()}`)
-        }
-
-        return new Key(key.toString().slice(prefix.toString().length), false)
-      }
-    })
-
-    this.prefix = prefix
-  }
-
-  query (q /* : Query<Value> */)/* : QueryResult<Value> */ {
-    if (q.prefix && this.prefix.toString() !== '/') {
-      return super.query(Object.assign({}, q, {
-        prefix: this.prefix.child(new Key(q.prefix)).toString()
-      }))
-    }
-    return super.query(q)
-  }
-}
-
-module.exports = NamespaceDatastore
-
-},{"./keytransform":115,"interface-datastore":206}],118:[function(require,module,exports){
-/* @flow */
-'use strict'
-
-module.exports = `This is a repository of IPLD objects. Each IPLD object is in a single file,
-named <base32 encoding of cid>.data. Where <base32 encoding of cid> is the
-"base32" encoding of the CID (as specified in
-https://github.com/multiformats/multibase) without the 'B' prefix.
-All the object files are placed in a tree of directories, based on a
-function of the CID. This is a form of sharding similar to
-the objects directory in git repositories. Previously, we used
-prefixes, we now use the next-to-last two charters.
-    func NextToLast(base32cid string) {
-      nextToLastLen := 2
-      offset := len(base32cid) - nextToLastLen - 1
-      return str[offset : offset+nextToLastLen]
-    }
-For example, an object with a base58 CIDv1 of
-    zb2rhYSxw4ZjuzgCnWSt19Q94ERaeFhu9uSqRgjSdx9bsgM6f
-has a base32 CIDv1 of
-    BAFKREIA22FLID5AJ2KU7URG47MDLROZIH6YF2KALU2PWEFPVI37YLKRSCA
-and will be placed at
-    SC/AFKREIA22FLID5AJ2KU7URG47MDLROZIH6YF2KALU2PWEFPVI37YLKRSCA.data
-with 'SC' being the last-to-next two characters and the 'B' at the
-beginning of the CIDv1 string is the multibase prefix that is not
-stored in the filename.
-`
-
-},{}],119:[function(require,module,exports){
-/* @flow */
-'use strict'
-
-const leftPad = require('left-pad')
-const Key = require('interface-datastore').Key
-
-const readme = require('./shard-readme')
-
-// eslint-disable-next-line
-/*:: import type {Datastore, Callback} from 'interface-datastore'
-
-export interface ShardV1 {
-  name: string;
-  param: number;
-  fun(string): string;
-  toString(): string;
-}
-*/
-
-const PREFIX = exports.PREFIX = '/repo/flatfs/shard/'
-const SHARDING_FN = exports.SHARDING_FN = 'SHARDING'
-exports.README_FN = '_README'
-
-class Shard {
-  /* :: name: string */
-  /* :: param: number */
-  /* :: _padding: string */
-
-  constructor (param /* : number */) {
-    this.param = param
-  }
-
-  fun (str /* : string */) /* : string */ {
-    throw new Error('implement me')
-  }
-
-  toString () /* : string */ {
-    return `${PREFIX}v1/${this.name}/${this.param}`
-  }
-}
-
-class Prefix extends Shard {
-  constructor (prefixLen /* : number */) {
-    super(prefixLen)
-    this._padding = leftPad('', prefixLen, '_')
-    this.name = 'prefix'
-  }
-
-  fun (noslash /* : string */) /* : string */ {
-    return (noslash + this._padding).slice(0, this.param)
-  }
-}
-
-class Suffix extends Shard {
-  constructor (suffixLen /* : number */) {
-    super(suffixLen)
-    this._padding = leftPad('', suffixLen, '_')
-    this.name = 'suffix'
-  }
-
-  fun (noslash /* : string */) /* : string */ {
-    const s = this._padding + noslash
-    return s.slice(s.length - this.param)
-  }
-}
-
-class NextToLast extends Shard {
-  constructor (suffixLen /* : number */) {
-    super(suffixLen)
-    this._padding = leftPad('', suffixLen + 1, '_')
-    this.name = 'next-to-last'
-  }
-
-  fun (noslash /* : string */) /* : string */ {
-    const s = this._padding + noslash
-    const offset = s.length - this.param - 1
-    return s.slice(offset, offset + this.param)
-  }
-}
-
-/**
- * Convert a given string to the matching sharding function.
- *
- * @param {string} str
- * @returns {ShardV1}
- */
-function parseShardFun (str /* : string */) /* : ShardV1 */ {
-  str = str.trim()
-
-  if (str.length === 0) {
-    throw new Error('empty shard string')
-  }
-
-  if (!str.startsWith(PREFIX)) {
-    throw new Error(`invalid or no path prefix: ${str}`)
-  }
-
-  const parts = str.slice(PREFIX.length).split('/')
-  const version = parts[0]
-
-  if (version !== 'v1') {
-    throw new Error(`expect 'v1' version, got '${version}'`)
-  }
-
-  const name = parts[1]
-
-  if (!parts[2]) {
-    throw new Error('missing param')
-  }
-
-  const param = parseInt(parts[2], 10)
-
-  switch (name) {
-    case 'prefix':
-      return new Prefix(param)
-    case 'suffix':
-      return new Suffix(param)
-    case 'next-to-last':
-      return new NextToLast(param)
-    default:
-      throw new Error(`unkown sharding function: ${name}`)
-  }
-}
-
-exports.readShardFun = (path /* : string */, store /* : Datastore<Buffer> */, callback /* : Callback<ShardV1> */) /* : void */ => {
-  const key = new Key(path).child(new Key(SHARDING_FN))
-  const get = typeof store.getRaw === 'function' ? store.getRaw.bind(store) : store.get.bind(store)
-
-  get(key, (err, res) => {
-    if (err) {
-      return callback(err)
-    }
-
-    let shard
-    try {
-      shard = parseShardFun((res || '').toString().trim())
-    } catch (err) {
-      return callback(err)
-    }
-
-    callback(null, shard)
-  })
-}
-
-exports.readme = readme
-exports.parseShardFun = parseShardFun
-exports.Prefix = Prefix
-exports.Suffix = Suffix
-exports.NextToLast = NextToLast
-
-},{"./shard-readme":118,"interface-datastore":206,"left-pad":358}],120:[function(require,module,exports){
-(function (Buffer){
-/* @flow */
-'use strict'
-
-const waterfall = require('async/waterfall')
-const parallel = require('async/parallel')
-const pull = require('pull-stream')
-const Key = require('interface-datastore').Key
-
-const sh = require('./shard')
-const KeytransformStore = require('./keytransform')
-
-const shardKey = new Key(sh.SHARDING_FN)
-const shardReadmeKey = new Key(sh.README_FN)
-
-/* ::
-import type {Datastore, Batch, Query, QueryResult, Callback} from 'interface-datastore'
-
-import type {ShardV1} from './shard'
-*/
-
-/**
- * Backend independent abstraction of go-ds-flatfs.
- *
- * Wraps another datastore such that all values are stored
- * sharded according to the given sharding function.
- */
-class ShardingDatastore {
-  /* :: shard: ShardV1 */
-  /* :: child: Datastore<Buffer> */
-
-  constructor (store /* : Datastore<Buffer> */, shard /* : ShardV1 */) {
-    this.child = new KeytransformStore(store, {
-      convert: this._convertKey.bind(this),
-      invert: this._invertKey.bind(this)
-    })
-    this.shard = shard
-  }
-
-  open (callback /* : Callback<void> */) /* : void */ {
-    this.child.open(callback)
-  }
-
-  _convertKey (key/* : Key */)/* : Key */ {
-    const s = key.toString()
-    if (s === shardKey.toString() || s === shardReadmeKey.toString()) {
-      return key
-    }
-
-    const parent = new Key(this.shard.fun(s))
-    return parent.child(key)
-  }
-
-  _invertKey (key/* : Key */)/* : Key */ {
-    const s = key.toString()
-    if (s === shardKey.toString() || s === shardReadmeKey.toString()) {
-      return key
-    }
-    return Key.withNamespaces(key.list().slice(1))
-  }
-
-  static createOrOpen (store /* : Datastore<Buffer> */, shard /* : ShardV1 */, callback /* : Callback<ShardingDatastore> */) /* : void */ {
-    ShardingDatastore.create(store, shard, err => {
-      if (err && err.message !== 'datastore exists') {
-        return callback(err)
-      }
-
-      ShardingDatastore.open(store, callback)
-    })
-  }
-
-  static open (store /* : Datastore<Buffer> */, callback /* : Callback<ShardingDatastore> */) /* : void */ {
-    waterfall([
-      (cb) => sh.readShardFun('/', store, cb),
-      (shard, cb) => {
-        cb(null, new ShardingDatastore(store, shard))
-      }
-    ], callback)
-  }
-
-  static create (store /* : Datastore<Buffer> */, shard /* : ShardV1 */, callback /* : Callback<void> */) /* : void */ {
-    store.has(shardKey, (err, exists) => {
-      if (err) {
-        return callback(err)
-      }
-
-      if (!exists) {
-        const put = typeof store.putRaw === 'function' ? store.putRaw.bind(store) : store.put.bind(store)
-        return parallel([
-          (cb) => put(shardKey, new Buffer(shard.toString() + '\n'), cb),
-          (cb) => put(shardReadmeKey, new Buffer(sh.readme), cb)
-        ], err => callback(err))
-      }
-
-      sh.readShardFun('/', store, (err, diskShard) => {
-        if (err) {
-          return callback(err)
-        }
-
-        const a = (diskShard || '').toString()
-        const b = shard.toString()
-        if (a !== b) {
-          return callback(new Error(`specified fun ${b} does not match repo shard fun ${a}`))
-        }
-
-        callback(new Error('datastore exists'))
-      })
-    })
-  }
-
-  put (key /* : Key */, val /* : Buffer */, callback /* : Callback<void> */) /* : void */ {
-    this.child.put(key, val, callback)
-  }
-
-  get (key /* : Key */, callback /* : Callback<Buffer> */) /* : void */ {
-    this.child.get(key, callback)
-  }
-
-  has (key /* : Key */, callback /* : Callback<bool> */) /* : void */ {
-    this.child.has(key, callback)
-  }
-
-  delete (key /* : Key */, callback /* : Callback<void> */) /* : void */ {
-    this.child.delete(key, callback)
-  }
-
-  batch () /* : Batch<Buffer> */ {
-    return this.child.batch()
-  }
-
-  query (q /* : Query<Buffer> */) /* : QueryResult<Buffer> */ {
-    const tq/* : Query<Buffer> */ = {
-      keysOnly: q.keysOnly
-    }
-
-    if (q.prefix != null) {
-      // TODO: transform
-      tq.prefix = q.prefix
-    }
-
-    if (q.filters != null) {
-      tq.filters = q.filters.map((f) => (e, cb) => {
-        f(Object.assign({}, e, {
-          key: this._invertKey(e.key)
-        }), cb)
-      })
-    }
-
-    if (q.orders != null) {
-      tq.orders = q.orders.map((o) => (res, cb) => {
-        const m = res.map((e) => {
-          return Object.assign({}, e, {
-            key: this._invertKey(e.key)
-          })
-        })
-        o(m, cb)
-      })
-    }
-
-    if (q.offset != null) {
-      tq.offset = q.offset + 2
-    }
-
-    if (q.limit != null) {
-      tq.limit = q.limit + 2
-    }
-
-    return pull(
-      this.child.query(tq),
-      pull.filter((e) => {
-        if (e.key.toString() === shardKey.toString() ||
-            e.key.toString() === shardReadmeKey.toString()) {
-          return false
-        }
-        return true
-      })
-    )
-  }
-
-  close (callback /* : Callback<void> */) /* : void */ {
-    this.child.close(callback)
-  }
-}
-
-module.exports = ShardingDatastore
-
-}).call(this,require("buffer").Buffer)
-},{"./keytransform":115,"./shard":119,"async/parallel":50,"async/waterfall":57,"buffer":722,"interface-datastore":206,"pull-stream":598}],121:[function(require,module,exports){
-/* @flow */
-'use strict'
-
-const each = require('async/each')
-const whilst = require('async/whilst')
-
-/* ::
-import type {Key, Datastore, Callback, Batch, Query, QueryResult} from 'interface-datastore'
-*/
-
-/**
- * A datastore that can combine multiple stores. Puts and deletes
- * will write through to all datastores. Has and get will
- * try each store sequentially. Query will always try the
- * last one first.
- *
- */
-class TieredDatastore /* :: <Value> */ {
-  /* :: stores: Array<Datastore<Value>> */
-
-  constructor (stores /* : Array<Datastore<Value>> */) {
-    this.stores = stores.slice()
-  }
-
-  open (callback /* : Callback<void> */) /* : void */ {
-    each(this.stores, (store, cb) => {
-      store.open(cb)
-    }, callback)
-  }
-
-  put (key /* : Key */, value /* : Value */, callback /* : Callback<void> */) /* : void */ {
-    each(this.stores, (store, cb) => {
-      store.put(key, value, cb)
-    }, callback)
-  }
-
-  get (key /* : Key */, callback /* : Callback<Value> */) /* : void */ {
-    const storeLength = this.stores.length
-    let done = false
-    let i = 0
-    whilst(() => !done && i < storeLength, cb => {
-      const store = this.stores[i++]
-      store.get(key, (err, res) => {
-        if (err == null) {
-          done = true
-          return cb(null, res)
-        }
-        cb()
-      })
-    }, callback)
-  }
-
-  has (key /* : Key */, callback /* : Callback<bool> */) /* : void */ {
-    const storeLength = this.stores.length
-    let done = false
-    let i = 0
-    whilst(() => !done && i < storeLength, cb => {
-      const store = this.stores[i++]
-      store.has(key, (err, exists) => {
-        if (err == null) {
-          done = true
-          return cb(null, exists)
-        }
-        cb()
-      })
-    }, callback)
-  }
-
-  delete (key /* : Key */, callback /* : Callback<void> */) /* : void */ {
-    each(this.stores, (store, cb) => {
-      store.delete(key, cb)
-    }, callback)
-  }
-
-  close (callback /* : Callback<void> */) /* : void */ {
-    each(this.stores, (store, cb) => {
-      store.close(cb)
-    }, callback)
-  }
-
-  batch () /* : Batch<Value> */ {
-    const batches = this.stores.map(store => store.batch())
-
-    return {
-      put: (key /* : Key */, value /* : Value */) /* : void */ => {
-        batches.forEach(b => b.put(key, value))
-      },
-      delete: (key /* : Key */) /* : void */ => {
-        batches.forEach(b => b.delete(key))
-      },
-      commit: (callback /* : Callback<void> */) /* : void */ => {
-        each(batches, (b, cb) => {
-          b.commit(cb)
-        }, callback)
-      }
-    }
-  }
-
-  query (q /* : Query<Value> */) /* : QueryResult<Value> */ {
-    return this.stores[this.stores.length - 1].query(q)
-  }
-}
-
-module.exports = TieredDatastore
-
-},{"async/each":21,"async/whilst":58}],122:[function(require,module,exports){
-(function (Buffer){
-/* @flow */
-'use strict'
-
-/* :: import type {Callback, Batch, Query, QueryResult, QueryEntry} from 'interface-datastore' */
-
-const pull = require('pull-stream')
-const levelup = require('levelup')
-
-const asyncFilter = require('interface-datastore').utils.asyncFilter
-const asyncSort = require('interface-datastore').utils.asyncSort
-const Key = require('interface-datastore').Key
-
-/**
- * A datastore backed by leveldb.
- */
-/* :: export type LevelOptions = {
-  createIfMissing?: bool,
-  errorIfExists?: bool,
-  compression?: bool,
-  cacheSize?: number,
-  db?: Object
-} */
-class LevelDatastore {
-  /* :: db: levelup */
-
-  constructor (path /* : string */, opts /* : ?LevelOptions */) {
-    this.db = levelup(path, Object.assign(opts || {}, {
-      compression: false, // same default as go
-      valueEncoding: 'binary'
-    }))
-  }
-
-  open (callback /* : Callback<void> */) /* : void */ {
-    this.db.open(callback)
-  }
-
-  put (key /* : Key */, value /* : Buffer */, callback /* : Callback<void> */) /* : void */ {
-    this.db.put(key.toString(), value, callback)
-  }
-
-  get (key /* : Key */, callback /* : Callback<Buffer> */) /* : void */ {
-    this.db.get(key.toString(), callback)
-  }
-
-  has (key /* : Key */, callback /* : Callback<bool> */) /* : void */ {
-    this.db.get(key.toString(), (err, res) => {
-      if (err) {
-        if (err.notFound) {
-          callback(null, false)
-          return
-        }
-        callback(err)
-        return
-      }
-
-      callback(null, true)
-    })
-  }
-
-  delete (key /* : Key */, callback /* : Callback<void> */) /* : void */ {
-    this.db.del(key.toString(), callback)
-  }
-
-  close (callback /* : Callback<void> */) /* : void */ {
-    this.db.close(callback)
-  }
-
-  batch () /* : Batch<Buffer> */ {
-    const ops = []
-    return {
-      put: (key /* : Key */, value /* : Buffer */) /* : void */ => {
-        ops.push({
-          type: 'put',
-          key: key.toString(),
-          value: value
-        })
-      },
-      delete: (key /* : Key */) /* : void */ => {
-        ops.push({
-          type: 'del',
-          key: key.toString()
-        })
-      },
-      commit: (callback /* : Callback<void> */) /* : void */ => {
-        this.db.batch(ops, callback)
-      }
-    }
-  }
-
-  query (q /* : Query<Buffer> */) /* : QueryResult<Buffer> */ {
-    let values = true
-    if (q.keysOnly != null) {
-      values = !q.keysOnly
-    }
-
-    const iter = this.db.db.iterator({
-      keys: true,
-      values: values,
-      keyAsBuffer: true
-    })
-
-    const rawStream = (end, cb) => {
-      if (end) {
-        return iter.end((err) => {
-          cb(err || end)
-        })
-      }
-
-      iter.next((err, key, value) => {
-        if (err) {
-          return cb(err)
-        }
-
-        if (err == null && key == null && value == null) {
-          return iter.end((err) => {
-            cb(err || true)
-          })
-        }
-
-        const res /* : QueryEntry<Buffer> */ = {
-          key: new Key(key, false)
-        }
-
-        if (values) {
-          res.value = new Buffer(value)
-        }
-
-        cb(null, res)
-      })
-    }
-
-    let tasks = [rawStream]
-    let filters = []
-
-    if (q.prefix != null) {
-      const prefix = q.prefix
-      filters.push((e, cb) => cb(null, e.key.toString().startsWith(prefix)))
-    }
-
-    if (q.filters != null) {
-      filters = filters.concat(q.filters)
-    }
-
-    tasks = tasks.concat(filters.map(f => asyncFilter(f)))
-
-    if (q.orders != null) {
-      tasks = tasks.concat(q.orders.map(o => asyncSort(o)))
-    }
-
-    if (q.offset != null) {
-      let i = 0
-      // $FlowFixMe
-      tasks.push(pull.filter(() => i++ >= q.offset))
-    }
-
-    if (q.limit != null) {
-      tasks.push(pull.take(q.limit))
-    }
-
-    return pull.apply(null, tasks)
-  }
-}
-
-module.exports = LevelDatastore
-
-}).call(this,require("buffer").Buffer)
-},{"buffer":722,"interface-datastore":206,"levelup":379,"pull-stream":598}],123:[function(require,module,exports){
+},{"cipher-base":104,"inherits":193,"safe-buffer":646}],114:[function(require,module,exports){
 (function (process){
 /**
  * This is the web browser implementation of `debug()`.
@@ -18896,7 +17945,7 @@ function localstorage() {
 }
 
 }).call(this,require('_process'))
-},{"./debug":124,"_process":733}],124:[function(require,module,exports){
+},{"./debug":115,"_process":726}],115:[function(require,module,exports){
 
 /**
  * This is the common logic for both the Node.js and web browser
@@ -19123,155 +18172,7 @@ function coerce(val) {
   return val;
 }
 
-},{"ms":508}],125:[function(require,module,exports){
-(function (Buffer){
-/*!
- * @description Recursive object extending
- * @author Viacheslav Lotsmanov <lotsmanov89@gmail.com>
- * @license MIT
- *
- * The MIT License (MIT)
- *
- * Copyright (c) 2013-2015 Viacheslav Lotsmanov
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
-
-'use strict';
-
-function isSpecificValue(val) {
-	return (
-		val instanceof Buffer
-		|| val instanceof Date
-		|| val instanceof RegExp
-	) ? true : false;
-}
-
-function cloneSpecificValue(val) {
-	if (val instanceof Buffer) {
-		var x = new Buffer(val.length);
-		val.copy(x);
-		return x;
-	} else if (val instanceof Date) {
-		return new Date(val.getTime());
-	} else if (val instanceof RegExp) {
-		return new RegExp(val);
-	} else {
-		throw new Error('Unexpected situation');
-	}
-}
-
-/**
- * Recursive cloning array.
- */
-function deepCloneArray(arr) {
-	var clone = [];
-	arr.forEach(function (item, index) {
-		if (typeof item === 'object' && item !== null) {
-			if (Array.isArray(item)) {
-				clone[index] = deepCloneArray(item);
-			} else if (isSpecificValue(item)) {
-				clone[index] = cloneSpecificValue(item);
-			} else {
-				clone[index] = deepExtend({}, item);
-			}
-		} else {
-			clone[index] = item;
-		}
-	});
-	return clone;
-}
-
-/**
- * Extening object that entered in first argument.
- *
- * Returns extended object or false if have no target object or incorrect type.
- *
- * If you wish to clone source object (without modify it), just use empty new
- * object as first argument, like this:
- *   deepExtend({}, yourObj_1, [yourObj_N]);
- */
-var deepExtend = module.exports = function (/*obj_1, [obj_2], [obj_N]*/) {
-	if (arguments.length < 1 || typeof arguments[0] !== 'object') {
-		return false;
-	}
-
-	if (arguments.length < 2) {
-		return arguments[0];
-	}
-
-	var target = arguments[0];
-
-	// convert arguments to array and cut off target object
-	var args = Array.prototype.slice.call(arguments, 1);
-
-	var val, src, clone;
-
-	args.forEach(function (obj) {
-		// skip argument if isn't an object, is null, or is an array
-		if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) {
-			return;
-		}
-
-		Object.keys(obj).forEach(function (key) {
-			src = target[key]; // source value
-			val = obj[key]; // new value
-
-			// recursion prevention
-			if (val === target) {
-				return;
-
-			/**
-			 * if new value isn't object then just overwrite by new value
-			 * instead of extending.
-			 */
-			} else if (typeof val !== 'object' || val === null) {
-				target[key] = val;
-				return;
-
-			// just clone arrays (and recursive clone objects inside)
-			} else if (Array.isArray(val)) {
-				target[key] = deepCloneArray(val);
-				return;
-
-			// custom cloning and overwrite for specific objects
-			} else if (isSpecificValue(val)) {
-				target[key] = cloneSpecificValue(val);
-				return;
-
-			// overwrite by new value if source isn't object or array
-			} else if (typeof src !== 'object' || src === null || Array.isArray(src)) {
-				target[key] = deepExtend({}, val);
-				return;
-
-			// source value and new value is objects both, extending...
-			} else {
-				target[key] = deepExtend(src, val);
-				return;
-			}
-		});
-	});
-
-	return target;
-}
-
-}).call(this,require("buffer").Buffer)
-},{"buffer":722}],126:[function(require,module,exports){
+},{"ms":512}],116:[function(require,module,exports){
 var util = require('util')
   , AbstractIterator = require('abstract-leveldown').AbstractIterator
 
@@ -19307,7 +18208,7 @@ DeferredIterator.prototype._operation = function (method, args) {
 
 module.exports = DeferredIterator;
 
-},{"abstract-leveldown":131,"util":759}],127:[function(require,module,exports){
+},{"abstract-leveldown":121,"util":752}],117:[function(require,module,exports){
 (function (Buffer,process){
 var util              = require('util')
   , AbstractLevelDOWN = require('abstract-leveldown').AbstractLevelDOWN
@@ -19367,7 +18268,7 @@ module.exports                  = DeferredLevelDOWN
 module.exports.DeferredIterator = DeferredIterator
 
 }).call(this,{"isBuffer":require("../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")},require('_process'))
-},{"../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728,"./deferred-iterator":126,"_process":733,"abstract-leveldown":131,"util":759}],128:[function(require,module,exports){
+},{"../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721,"./deferred-iterator":116,"_process":726,"abstract-leveldown":121,"util":752}],118:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2017 Rod Vagg, MIT License */
 
@@ -19459,7 +18360,7 @@ AbstractChainedBatch.prototype.write = function (options, callback) {
 module.exports = AbstractChainedBatch
 
 }).call(this,require('_process'))
-},{"_process":733}],129:[function(require,module,exports){
+},{"_process":726}],119:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2017 Rod Vagg, MIT License */
 
@@ -19512,7 +18413,7 @@ AbstractIterator.prototype.end = function (callback) {
 module.exports = AbstractIterator
 
 }).call(this,require('_process'))
-},{"_process":733}],130:[function(require,module,exports){
+},{"_process":726}],120:[function(require,module,exports){
 (function (Buffer,process){
 /* Copyright (c) 2017 Rod Vagg, MIT License */
 
@@ -19787,13 +18688,13 @@ AbstractLevelDOWN.prototype._checkKey = function (obj, type) {
 module.exports = AbstractLevelDOWN
 
 }).call(this,{"isBuffer":require("../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")},require('_process'))
-},{"../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728,"./abstract-chained-batch":128,"./abstract-iterator":129,"_process":733,"xtend":717}],131:[function(require,module,exports){
+},{"../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721,"./abstract-chained-batch":118,"./abstract-iterator":119,"_process":726,"xtend":710}],121:[function(require,module,exports){
 exports.AbstractLevelDOWN    = require('./abstract-leveldown')
 exports.AbstractIterator     = require('./abstract-iterator')
 exports.AbstractChainedBatch = require('./abstract-chained-batch')
 exports.isLevelDOWN          = require('./is-leveldown')
 
-},{"./abstract-chained-batch":128,"./abstract-iterator":129,"./abstract-leveldown":130,"./is-leveldown":132}],132:[function(require,module,exports){
+},{"./abstract-chained-batch":118,"./abstract-iterator":119,"./abstract-leveldown":120,"./is-leveldown":122}],122:[function(require,module,exports){
 var AbstractLevelDOWN = require('./abstract-leveldown')
 
 function isLevelDOWN (db) {
@@ -19809,7 +18710,7 @@ function isLevelDOWN (db) {
 
 module.exports = isLevelDOWN
 
-},{"./abstract-leveldown":130}],133:[function(require,module,exports){
+},{"./abstract-leveldown":120}],123:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 var createHmac = require('create-hmac')
@@ -19884,7 +18785,7 @@ HmacDRBG.prototype.generate = function (len, add) {
 module.exports = HmacDRBG
 
 }).call(this,require("buffer").Buffer)
-},{"./lib/hash-info.json":134,"buffer":722,"create-hmac":112}],134:[function(require,module,exports){
+},{"./lib/hash-info.json":124,"buffer":715,"create-hmac":112}],124:[function(require,module,exports){
 module.exports={
   "sha1": {
     "securityStrength": 128,
@@ -19913,7 +18814,7 @@ module.exports={
   }
 }
 
-},{}],135:[function(require,module,exports){
+},{}],125:[function(require,module,exports){
 (function (process,Buffer){
 var stream = require('readable-stream')
 var eos = require('end-of-stream')
@@ -20145,7 +19046,7 @@ Duplexify.prototype.end = function(data, enc, cb) {
 module.exports = Duplexify
 
 }).call(this,require('_process'),require("buffer").Buffer)
-},{"_process":733,"buffer":722,"end-of-stream":152,"inherits":203,"readable-stream":650,"stream-shift":697}],136:[function(require,module,exports){
+},{"_process":726,"buffer":715,"end-of-stream":142,"inherits":193,"readable-stream":642,"stream-shift":690}],126:[function(require,module,exports){
 'use strict';
 
 var elliptic = exports;
@@ -20160,7 +19061,7 @@ elliptic.curves = require('./elliptic/curves');
 elliptic.ec = require('./elliptic/ec');
 elliptic.eddsa = require('./elliptic/eddsa');
 
-},{"../package.json":151,"./elliptic/curve":139,"./elliptic/curves":142,"./elliptic/ec":143,"./elliptic/eddsa":146,"./elliptic/utils":150,"brorand":80}],137:[function(require,module,exports){
+},{"../package.json":141,"./elliptic/curve":129,"./elliptic/curves":132,"./elliptic/ec":133,"./elliptic/eddsa":136,"./elliptic/utils":140,"brorand":80}],127:[function(require,module,exports){
 'use strict';
 
 var BN = require('bn.js');
@@ -20537,7 +19438,7 @@ BasePoint.prototype.dblp = function dblp(k) {
   return r;
 };
 
-},{"../../elliptic":136,"bn.js":70}],138:[function(require,module,exports){
+},{"../../elliptic":126,"bn.js":70}],128:[function(require,module,exports){
 'use strict';
 
 var curve = require('../curve');
@@ -20972,7 +19873,7 @@ Point.prototype.eqXToP = function eqXToP(x) {
 Point.prototype.toP = Point.prototype.normalize;
 Point.prototype.mixedAdd = Point.prototype.add;
 
-},{"../../elliptic":136,"../curve":139,"bn.js":70,"inherits":203}],139:[function(require,module,exports){
+},{"../../elliptic":126,"../curve":129,"bn.js":70,"inherits":193}],129:[function(require,module,exports){
 'use strict';
 
 var curve = exports;
@@ -20982,7 +19883,7 @@ curve.short = require('./short');
 curve.mont = require('./mont');
 curve.edwards = require('./edwards');
 
-},{"./base":137,"./edwards":138,"./mont":140,"./short":141}],140:[function(require,module,exports){
+},{"./base":127,"./edwards":128,"./mont":130,"./short":131}],130:[function(require,module,exports){
 'use strict';
 
 var curve = require('../curve');
@@ -21164,7 +20065,7 @@ Point.prototype.getX = function getX() {
   return this.x.fromRed();
 };
 
-},{"../../elliptic":136,"../curve":139,"bn.js":70,"inherits":203}],141:[function(require,module,exports){
+},{"../../elliptic":126,"../curve":129,"bn.js":70,"inherits":193}],131:[function(require,module,exports){
 'use strict';
 
 var curve = require('../curve');
@@ -22104,7 +21005,7 @@ JPoint.prototype.isInfinity = function isInfinity() {
   return this.z.cmpn(0) === 0;
 };
 
-},{"../../elliptic":136,"../curve":139,"bn.js":70,"inherits":203}],142:[function(require,module,exports){
+},{"../../elliptic":126,"../curve":129,"bn.js":70,"inherits":193}],132:[function(require,module,exports){
 'use strict';
 
 var curves = exports;
@@ -22311,7 +21212,7 @@ defineCurve('secp256k1', {
   ]
 });
 
-},{"../elliptic":136,"./precomputed/secp256k1":149,"hash.js":187}],143:[function(require,module,exports){
+},{"../elliptic":126,"./precomputed/secp256k1":139,"hash.js":177}],133:[function(require,module,exports){
 'use strict';
 
 var BN = require('bn.js');
@@ -22553,7 +21454,7 @@ EC.prototype.getKeyRecoveryParam = function(e, signature, Q, enc) {
   throw new Error('Unable to find valid recovery factor');
 };
 
-},{"../../elliptic":136,"./key":144,"./signature":145,"bn.js":70,"hmac-drbg":199}],144:[function(require,module,exports){
+},{"../../elliptic":126,"./key":134,"./signature":135,"bn.js":70,"hmac-drbg":189}],134:[function(require,module,exports){
 'use strict';
 
 var BN = require('bn.js');
@@ -22674,7 +21575,7 @@ KeyPair.prototype.inspect = function inspect() {
          ' pub: ' + (this.pub && this.pub.inspect()) + ' >';
 };
 
-},{"../../elliptic":136,"bn.js":70}],145:[function(require,module,exports){
+},{"../../elliptic":126,"bn.js":70}],135:[function(require,module,exports){
 'use strict';
 
 var BN = require('bn.js');
@@ -22811,7 +21712,7 @@ Signature.prototype.toDER = function toDER(enc) {
   return utils.encode(res, enc);
 };
 
-},{"../../elliptic":136,"bn.js":70}],146:[function(require,module,exports){
+},{"../../elliptic":126,"bn.js":70}],136:[function(require,module,exports){
 'use strict';
 
 var hash = require('hash.js');
@@ -22931,7 +21832,7 @@ EDDSA.prototype.isPoint = function isPoint(val) {
   return val instanceof this.pointClass;
 };
 
-},{"../../elliptic":136,"./key":147,"./signature":148,"hash.js":187}],147:[function(require,module,exports){
+},{"../../elliptic":126,"./key":137,"./signature":138,"hash.js":177}],137:[function(require,module,exports){
 'use strict';
 
 var elliptic = require('../../elliptic');
@@ -23029,7 +21930,7 @@ KeyPair.prototype.getPublic = function getPublic(enc) {
 
 module.exports = KeyPair;
 
-},{"../../elliptic":136}],148:[function(require,module,exports){
+},{"../../elliptic":126}],138:[function(require,module,exports){
 'use strict';
 
 var BN = require('bn.js');
@@ -23097,7 +21998,7 @@ Signature.prototype.toHex = function toHex() {
 
 module.exports = Signature;
 
-},{"../../elliptic":136,"bn.js":70}],149:[function(require,module,exports){
+},{"../../elliptic":126,"bn.js":70}],139:[function(require,module,exports){
 module.exports = {
   doubles: {
     step: 4,
@@ -23879,7 +22780,7 @@ module.exports = {
   }
 };
 
-},{}],150:[function(require,module,exports){
+},{}],140:[function(require,module,exports){
 'use strict';
 
 var utils = exports;
@@ -24001,29 +22902,23 @@ function intFromLE(bytes) {
 utils.intFromLE = intFromLE;
 
 
-},{"bn.js":70,"minimalistic-assert":506,"minimalistic-crypto-utils":507}],151:[function(require,module,exports){
+},{"bn.js":70,"minimalistic-assert":510,"minimalistic-crypto-utils":511}],141:[function(require,module,exports){
 module.exports={
-  "_args": [
-    [
-      "elliptic@6.4.0",
-      "/Users/mitra/git/_github_internetarchive/dweb-transport"
-    ]
-  ],
-  "_from": "elliptic@6.4.0",
+  "_from": "elliptic@^6.2.3",
   "_id": "elliptic@6.4.0",
   "_inBundle": false,
   "_integrity": "sha1-ysmvh2LIWDYYcAPI3+GT5eLq5d8=",
   "_location": "/elliptic",
   "_phantomChildren": {},
   "_requested": {
-    "type": "version",
+    "type": "range",
     "registry": true,
-    "raw": "elliptic@6.4.0",
+    "raw": "elliptic@^6.2.3",
     "name": "elliptic",
     "escapedName": "elliptic",
-    "rawSpec": "6.4.0",
+    "rawSpec": "^6.2.3",
     "saveSpec": null,
-    "fetchSpec": "6.4.0"
+    "fetchSpec": "^6.2.3"
   },
   "_requiredBy": [
     "/browserify-sign",
@@ -24031,8 +22926,9 @@ module.exports={
     "/secp256k1"
   ],
   "_resolved": "https://registry.npmjs.org/elliptic/-/elliptic-6.4.0.tgz",
-  "_spec": "6.4.0",
-  "_where": "/Users/mitra/git/_github_internetarchive/dweb-transport",
+  "_shasum": "cac9af8762c85836187003c8dfe193e5e2eae5df",
+  "_spec": "elliptic@^6.2.3",
+  "_where": "/Users/mitra/git/_github_internetarchive/dweb-transport/node_modules/secp256k1",
   "author": {
     "name": "Fedor Indutny",
     "email": "fedor@indutny.com"
@@ -24040,6 +22936,7 @@ module.exports={
   "bugs": {
     "url": "https://github.com/indutny/elliptic/issues"
   },
+  "bundleDependencies": false,
   "dependencies": {
     "bn.js": "^4.4.0",
     "brorand": "^1.0.1",
@@ -24049,6 +22946,7 @@ module.exports={
     "minimalistic-assert": "^1.0.0",
     "minimalistic-crypto-utils": "^1.0.0"
   },
+  "deprecated": false,
   "description": "EC cryptography",
   "devDependencies": {
     "brfs": "^1.4.3",
@@ -24094,7 +22992,7 @@ module.exports={
   "version": "6.4.0"
 }
 
-},{}],152:[function(require,module,exports){
+},{}],142:[function(require,module,exports){
 var once = require('once');
 
 var noop = function() {};
@@ -24179,7 +23077,7 @@ var eos = function(stream, opts, callback) {
 
 module.exports = eos;
 
-},{"once":552}],153:[function(require,module,exports){
+},{"once":544}],143:[function(require,module,exports){
 
 module.exports = require('./socket');
 
@@ -24191,7 +23089,7 @@ module.exports = require('./socket');
  */
 module.exports.parser = require('engine.io-parser');
 
-},{"./socket":154,"engine.io-parser":164}],154:[function(require,module,exports){
+},{"./socket":144,"engine.io-parser":154}],144:[function(require,module,exports){
 (function (global){
 /**
  * Module dependencies.
@@ -24938,7 +23836,7 @@ Socket.prototype.filterUpgrades = function (upgrades) {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./transport":155,"./transports/index":156,"component-emitter":106,"debug":162,"engine.io-parser":164,"indexof":202,"parseqs":553,"parseuri":554}],155:[function(require,module,exports){
+},{"./transport":145,"./transports/index":146,"component-emitter":106,"debug":152,"engine.io-parser":154,"indexof":192,"parseqs":545,"parseuri":546}],145:[function(require,module,exports){
 /**
  * Module dependencies.
  */
@@ -25097,7 +23995,7 @@ Transport.prototype.onClose = function () {
   this.emit('close');
 };
 
-},{"component-emitter":106,"engine.io-parser":164}],156:[function(require,module,exports){
+},{"component-emitter":106,"engine.io-parser":154}],146:[function(require,module,exports){
 (function (global){
 /**
  * Module dependencies
@@ -25154,7 +24052,7 @@ function polling (opts) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./polling-jsonp":157,"./polling-xhr":158,"./websocket":160,"xmlhttprequest-ssl":161}],157:[function(require,module,exports){
+},{"./polling-jsonp":147,"./polling-xhr":148,"./websocket":150,"xmlhttprequest-ssl":151}],147:[function(require,module,exports){
 (function (global){
 
 /**
@@ -25389,7 +24287,7 @@ JSONPPolling.prototype.doWrite = function (data, fn) {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./polling":159,"component-inherit":107}],158:[function(require,module,exports){
+},{"./polling":149,"component-inherit":107}],148:[function(require,module,exports){
 (function (global){
 /**
  * Module requirements.
@@ -25806,7 +24704,7 @@ function unloadHandler () {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./polling":159,"component-emitter":106,"component-inherit":107,"debug":162,"xmlhttprequest-ssl":161}],159:[function(require,module,exports){
+},{"./polling":149,"component-emitter":106,"component-inherit":107,"debug":152,"xmlhttprequest-ssl":151}],149:[function(require,module,exports){
 /**
  * Module dependencies.
  */
@@ -26053,7 +24951,7 @@ Polling.prototype.uri = function () {
   return schema + '://' + (ipv6 ? '[' + this.hostname + ']' : this.hostname) + port + this.path + query;
 };
 
-},{"../transport":155,"component-inherit":107,"debug":162,"engine.io-parser":164,"parseqs":553,"xmlhttprequest-ssl":161,"yeast":718}],160:[function(require,module,exports){
+},{"../transport":145,"component-inherit":107,"debug":152,"engine.io-parser":154,"parseqs":545,"xmlhttprequest-ssl":151,"yeast":711}],150:[function(require,module,exports){
 (function (global){
 /**
  * Module dependencies.
@@ -26343,7 +25241,7 @@ WS.prototype.check = function () {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../transport":155,"component-inherit":107,"debug":162,"engine.io-parser":164,"parseqs":553,"ws":721,"yeast":718}],161:[function(require,module,exports){
+},{"../transport":145,"component-inherit":107,"debug":152,"engine.io-parser":154,"parseqs":545,"ws":714,"yeast":711}],151:[function(require,module,exports){
 (function (global){
 // browser shim for xmlhttprequest module
 
@@ -26384,7 +25282,7 @@ module.exports = function (opts) {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"has-cors":185}],162:[function(require,module,exports){
+},{"has-cors":175}],152:[function(require,module,exports){
 (function (process){
 /**
  * This is the web browser implementation of `debug()`.
@@ -26573,7 +25471,7 @@ function localstorage() {
 }
 
 }).call(this,require('_process'))
-},{"./debug":163,"_process":733}],163:[function(require,module,exports){
+},{"./debug":153,"_process":726}],153:[function(require,module,exports){
 
 /**
  * This is the common logic for both the Node.js and web browser
@@ -26777,7 +25675,7 @@ function coerce(val) {
   return val;
 }
 
-},{"ms":508}],164:[function(require,module,exports){
+},{"ms":512}],154:[function(require,module,exports){
 (function (global){
 /**
  * Module dependencies.
@@ -27387,7 +26285,7 @@ exports.decodePayloadAsBinary = function (data, binaryType, callback) {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./keys":165,"./utf8":166,"after":2,"arraybuffer.slice":3,"base64-arraybuffer":62,"blob":69,"has-binary2":183}],165:[function(require,module,exports){
+},{"./keys":155,"./utf8":156,"after":2,"arraybuffer.slice":3,"base64-arraybuffer":62,"blob":69,"has-binary2":173}],155:[function(require,module,exports){
 
 /**
  * Gets the keys for an object.
@@ -27408,7 +26306,7 @@ module.exports = Object.keys || function keys (obj){
   return arr;
 };
 
-},{}],166:[function(require,module,exports){
+},{}],156:[function(require,module,exports){
 (function (global){
 /*! https://mths.be/utf8js v2.1.2 by @mathias */
 ;(function(root) {
@@ -27667,7 +26565,7 @@ module.exports = Object.keys || function keys (obj){
 }(this));
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],167:[function(require,module,exports){
+},{}],157:[function(require,module,exports){
 var prr = require('prr')
 
 function init (type, message, cause) {
@@ -27724,7 +26622,7 @@ module.exports = function (errno) {
   }
 }
 
-},{"prr":169}],168:[function(require,module,exports){
+},{"prr":159}],158:[function(require,module,exports){
 var all = module.exports.all = [
   {
     errno: -2,
@@ -28039,7 +26937,7 @@ all.forEach(function (error) {
 module.exports.custom = require('./custom')(module.exports)
 module.exports.create = module.exports.custom.createError
 
-},{"./custom":167}],169:[function(require,module,exports){
+},{"./custom":157}],159:[function(require,module,exports){
 /*!
   * prr
   * (c) 2013 Rod Vagg <rod@vagg.org>
@@ -28103,7 +27001,7 @@ module.exports.create = module.exports.custom.createError
 
   return prr
 })
-},{}],170:[function(require,module,exports){
+},{}],160:[function(require,module,exports){
 module.exports={
   "genesisGasLimit": {
     "v": 5000,
@@ -28352,7 +27250,7 @@ module.exports={
   }
 }
 
-},{}],171:[function(require,module,exports){
+},{}],161:[function(require,module,exports){
 (function (Buffer){
 const ethUtil = require('ethereumjs-util')
 const rlp = require('rlp')
@@ -28435,7 +27333,7 @@ Account.prototype.isEmpty = function () {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722,"ethereumjs-util":177,"rlp":653}],172:[function(require,module,exports){
+},{"buffer":715,"ethereumjs-util":167,"rlp":645}],162:[function(require,module,exports){
 (function (Buffer){
 'use strict';
 
@@ -28671,7 +27569,7 @@ BlockHeader.prototype.isGenesis = function () {
 };
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722,"ethereum-common/params.json":170,"ethereumjs-util":173}],173:[function(require,module,exports){
+},{"buffer":715,"ethereum-common/params.json":160,"ethereumjs-util":163}],163:[function(require,module,exports){
 (function (Buffer){
 'use strict';
 
@@ -29342,7 +28240,7 @@ exports.defineProperties = function (self, fields, data) {
 };
 
 }).call(this,require("buffer").Buffer)
-},{"assert":719,"bn.js":70,"buffer":722,"create-hash":109,"ethjs-util":178,"keccak":351,"rlp":653,"secp256k1":655}],174:[function(require,module,exports){
+},{"assert":712,"bn.js":70,"buffer":715,"create-hash":109,"ethjs-util":168,"keccak":365,"rlp":645,"secp256k1":647}],164:[function(require,module,exports){
 (function (Buffer){
 'use strict';
 
@@ -29670,7 +28568,7 @@ var Transaction = function () {
 
 module.exports = Transaction;
 }).call(this,require("buffer").Buffer)
-},{"buffer":722,"ethereum-common/params.json":175,"ethereumjs-util":176}],175:[function(require,module,exports){
+},{"buffer":715,"ethereum-common/params.json":165,"ethereumjs-util":166}],165:[function(require,module,exports){
 module.exports={
   "genesisGasLimit": {
     "v": 5000,
@@ -29907,9 +28805,9 @@ module.exports={
   }
 }
 
-},{}],176:[function(require,module,exports){
-arguments[4][173][0].apply(exports,arguments)
-},{"assert":719,"bn.js":70,"buffer":722,"create-hash":109,"dup":173,"ethjs-util":178,"keccak":351,"rlp":653,"secp256k1":655}],177:[function(require,module,exports){
+},{}],166:[function(require,module,exports){
+arguments[4][163][0].apply(exports,arguments)
+},{"assert":712,"bn.js":70,"buffer":715,"create-hash":109,"dup":163,"ethjs-util":168,"keccak":365,"rlp":645,"secp256k1":647}],167:[function(require,module,exports){
 (function (Buffer){
 const SHA3 = require('keccakjs')
 const secp256k1 = require('secp256k1')
@@ -30614,7 +29512,7 @@ exports.defineProperties = function (self, fields, data) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"assert":719,"bn.js":70,"buffer":722,"create-hash":109,"keccakjs":357,"rlp":653,"secp256k1":655}],178:[function(require,module,exports){
+},{"assert":712,"bn.js":70,"buffer":715,"create-hash":109,"keccakjs":371,"rlp":645,"secp256k1":647}],168:[function(require,module,exports){
 (function (Buffer){
 'use strict';
 
@@ -30837,7 +29735,7 @@ module.exports = {
   isHexString: isHexString
 };
 }).call(this,require("buffer").Buffer)
-},{"buffer":722,"is-hex-prefixed":346,"strip-hex-prefix":700}],179:[function(require,module,exports){
+},{"buffer":715,"is-hex-prefixed":360,"strip-hex-prefix":693}],169:[function(require,module,exports){
 var Buffer = require('safe-buffer').Buffer
 var MD5 = require('md5.js')
 
@@ -30884,7 +29782,7 @@ function EVP_BytesToKey (password, salt, keyBits, ivLen) {
 
 module.exports = EVP_BytesToKey
 
-},{"md5.js":503,"safe-buffer":654}],180:[function(require,module,exports){
+},{"md5.js":507,"safe-buffer":646}],170:[function(require,module,exports){
 const EventEmitter = require('events').EventEmitter
 const assert = require('assert')
 const fsm = require('fsm')
@@ -30963,7 +29861,7 @@ function reach (curr, next, reachable) {
   return here[next].length === 1
 }
 
-},{"assert":719,"events":724,"fsm":181}],181:[function(require,module,exports){
+},{"assert":712,"events":717,"fsm":171}],171:[function(require,module,exports){
 function each(obj, iter) {
   for(var key in obj) {
     var value = obj[key]
@@ -31137,7 +30035,7 @@ var combine = exports.combine = function (fsm1, fsm2, start1, start2) {
 }
 
 
-},{}],182:[function(require,module,exports){
+},{}],172:[function(require,module,exports){
 // originally pulled out of simple-peer
 
 module.exports = function getBrowserRTC () {
@@ -31154,7 +30052,7 @@ module.exports = function getBrowserRTC () {
   return wrtc
 }
 
-},{}],183:[function(require,module,exports){
+},{}],173:[function(require,module,exports){
 (function (global){
 /* global Blob File */
 
@@ -31220,14 +30118,14 @@ function hasBinary (obj) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"isarray":184}],184:[function(require,module,exports){
+},{"isarray":174}],174:[function(require,module,exports){
 var toString = {}.toString;
 
 module.exports = Array.isArray || function (arr) {
   return toString.call(arr) == '[object Array]';
 };
 
-},{}],185:[function(require,module,exports){
+},{}],175:[function(require,module,exports){
 
 /**
  * Module exports.
@@ -31246,7 +30144,7 @@ try {
   module.exports = false;
 }
 
-},{}],186:[function(require,module,exports){
+},{}],176:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 var Transform = require('stream').Transform
@@ -31333,7 +30231,7 @@ HashBase.prototype._digest = function () {
 module.exports = HashBase
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722,"inherits":203,"stream":752}],187:[function(require,module,exports){
+},{"buffer":715,"inherits":193,"stream":745}],177:[function(require,module,exports){
 var hash = exports;
 
 hash.utils = require('./hash/utils');
@@ -31350,7 +30248,7 @@ hash.sha384 = hash.sha.sha384;
 hash.sha512 = hash.sha.sha512;
 hash.ripemd160 = hash.ripemd.ripemd160;
 
-},{"./hash/common":188,"./hash/hmac":189,"./hash/ripemd":190,"./hash/sha":191,"./hash/utils":198}],188:[function(require,module,exports){
+},{"./hash/common":178,"./hash/hmac":179,"./hash/ripemd":180,"./hash/sha":181,"./hash/utils":188}],178:[function(require,module,exports){
 'use strict';
 
 var utils = require('./utils');
@@ -31444,7 +30342,7 @@ BlockHash.prototype._pad = function pad() {
   return res;
 };
 
-},{"./utils":198,"minimalistic-assert":506}],189:[function(require,module,exports){
+},{"./utils":188,"minimalistic-assert":510}],179:[function(require,module,exports){
 'use strict';
 
 var utils = require('./utils');
@@ -31493,7 +30391,7 @@ Hmac.prototype.digest = function digest(enc) {
   return this.outer.digest(enc);
 };
 
-},{"./utils":198,"minimalistic-assert":506}],190:[function(require,module,exports){
+},{"./utils":188,"minimalistic-assert":510}],180:[function(require,module,exports){
 'use strict';
 
 var utils = require('./utils');
@@ -31641,7 +30539,7 @@ var sh = [
   8, 5, 12, 9, 12, 5, 14, 6, 8, 13, 6, 5, 15, 13, 11, 11
 ];
 
-},{"./common":188,"./utils":198}],191:[function(require,module,exports){
+},{"./common":178,"./utils":188}],181:[function(require,module,exports){
 'use strict';
 
 exports.sha1 = require('./sha/1');
@@ -31650,7 +30548,7 @@ exports.sha256 = require('./sha/256');
 exports.sha384 = require('./sha/384');
 exports.sha512 = require('./sha/512');
 
-},{"./sha/1":192,"./sha/224":193,"./sha/256":194,"./sha/384":195,"./sha/512":196}],192:[function(require,module,exports){
+},{"./sha/1":182,"./sha/224":183,"./sha/256":184,"./sha/384":185,"./sha/512":186}],182:[function(require,module,exports){
 'use strict';
 
 var utils = require('../utils');
@@ -31726,7 +30624,7 @@ SHA1.prototype._digest = function digest(enc) {
     return utils.split32(this.h, 'big');
 };
 
-},{"../common":188,"../utils":198,"./common":197}],193:[function(require,module,exports){
+},{"../common":178,"../utils":188,"./common":187}],183:[function(require,module,exports){
 'use strict';
 
 var utils = require('../utils');
@@ -31758,7 +30656,7 @@ SHA224.prototype._digest = function digest(enc) {
 };
 
 
-},{"../utils":198,"./256":194}],194:[function(require,module,exports){
+},{"../utils":188,"./256":184}],184:[function(require,module,exports){
 'use strict';
 
 var utils = require('../utils');
@@ -31865,7 +30763,7 @@ SHA256.prototype._digest = function digest(enc) {
     return utils.split32(this.h, 'big');
 };
 
-},{"../common":188,"../utils":198,"./common":197,"minimalistic-assert":506}],195:[function(require,module,exports){
+},{"../common":178,"../utils":188,"./common":187,"minimalistic-assert":510}],185:[function(require,module,exports){
 'use strict';
 
 var utils = require('../utils');
@@ -31902,7 +30800,7 @@ SHA384.prototype._digest = function digest(enc) {
     return utils.split32(this.h.slice(0, 12), 'big');
 };
 
-},{"../utils":198,"./512":196}],196:[function(require,module,exports){
+},{"../utils":188,"./512":186}],186:[function(require,module,exports){
 'use strict';
 
 var utils = require('../utils');
@@ -32234,7 +31132,7 @@ function g1_512_lo(xh, xl) {
   return r;
 }
 
-},{"../common":188,"../utils":198,"minimalistic-assert":506}],197:[function(require,module,exports){
+},{"../common":178,"../utils":188,"minimalistic-assert":510}],187:[function(require,module,exports){
 'use strict';
 
 var utils = require('../utils');
@@ -32285,7 +31183,7 @@ function g1_256(x) {
 }
 exports.g1_256 = g1_256;
 
-},{"../utils":198}],198:[function(require,module,exports){
+},{"../utils":188}],188:[function(require,module,exports){
 'use strict';
 
 var assert = require('minimalistic-assert');
@@ -32540,7 +31438,7 @@ function shr64_lo(ah, al, num) {
 }
 exports.shr64_lo = shr64_lo;
 
-},{"inherits":203,"minimalistic-assert":506}],199:[function(require,module,exports){
+},{"inherits":193,"minimalistic-assert":510}],189:[function(require,module,exports){
 'use strict';
 
 var hash = require('hash.js');
@@ -32655,7 +31553,7 @@ HmacDRBG.prototype.generate = function generate(len, enc, add, addEnc) {
   return utils.encode(res, enc);
 };
 
-},{"hash.js":187,"minimalistic-assert":506,"minimalistic-crypto-utils":507}],200:[function(require,module,exports){
+},{"hash.js":177,"minimalistic-assert":510,"minimalistic-crypto-utils":511}],190:[function(require,module,exports){
 /**
  * Copyright (c) 2016 Tim Kuijsten
  *
@@ -32793,7 +31691,7 @@ function idbReadableStream(db, storeName, opts) {
 
 module.exports = idbReadableStream
 
-},{"stream":752,"xtend":717}],201:[function(require,module,exports){
+},{"stream":745,"xtend":710}],191:[function(require,module,exports){
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m
   var eLen = nBytes * 8 - mLen - 1
@@ -32879,7 +31777,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],202:[function(require,module,exports){
+},{}],192:[function(require,module,exports){
 
 var indexOf = [].indexOf;
 
@@ -32890,7 +31788,7 @@ module.exports = function(arr, obj){
   }
   return -1;
 };
-},{}],203:[function(require,module,exports){
+},{}],193:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -32915,7 +31813,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],204:[function(require,module,exports){
+},{}],194:[function(require,module,exports){
 'use strict'
 
 const defer = require('pull-defer/duplex')
@@ -32977,669 +31875,12 @@ module.exports = class Connection {
   }
 }
 
-},{"pull-defer/duplex":579}],205:[function(require,module,exports){
+},{"pull-defer/duplex":571}],195:[function(require,module,exports){
 'use strict'
 
 exports.Connection = require('./connection')
 
-},{"./connection":204}],206:[function(require,module,exports){
-/* @flow */
-'use strict'
-
-const Key = require('./key')
-const MemoryDatastore = require('./memory')
-const utils = require('./utils')
-
-exports.Key = Key
-exports.MemoryDatastore = MemoryDatastore
-exports.utils = utils
-
-/* ::
-// -- Basics
-
-export type Callback<Value> = (err: ?Error, ?Value) => void
-
-// eslint-disable-next-line
-export interface Datastore<Value> {
-  // eslint-disable-next-line
-  put(Key, Value, Callback<void>): void;
-  // eslint-disable-next-line
-  get(Key, Callback<Value>): void;
-  has(Key, Callback<bool>): void;
-  delete(Key, Callback<void>): void;
-  // eslint-disable-next-line
-  query(Query<Value>): QueryResult<Value>;
-
-  // eslint-disable-next-line
-  batch(): Batch<Value>;
-  close(Callback<void>): void;
-  open(Callback<void>): void;
-}
-
-// -- Batch
-export type Batch<Value> = {
-  put(Key, Value): void,
-  delete(Key): void,
-  commit(Callback<void>): void
-}
-
-// -- Query
-
-export type Query<Value> = {
-  prefix?: string,
-  filters?: Array<Filter<Value>>,
-  orders?: Array<Order<Value>>,
-  limit?: number,
-  offset?: number,
-  keysOnly?: bool
-}
-
-export type PullEnd = bool | Error
-export type PullSource<Val> = (end: ?PullEnd, (end: ?PullEnd, Val) => void) => void
-
-export type QueryResult<Value> = PullSource<QueryEntry<Value>>
-
-export type QueryEntry<Value> = {
-  key: Key,
-  value?: Value
-}
-
-export type Filter<Value> = (QueryEntry<Value>, Callback<bool>) => void
-
-export type Order<Value> = (QueryResult<Value>, Callback<QueryResult<Value>>) => void
-
-*/
-
-},{"./key":207,"./memory":208,"./utils":209}],207:[function(require,module,exports){
-(function (Buffer){
-/* @flow */
-'use strict'
-
-const path = require('path')
-const uuid = require('uuid/v4')
-
-const pathSepS = path.sep
-const pathSep = new Buffer(pathSepS, 'utf8')[0]
-
-/**
- * A Key represents the unique identifier of an object.
- * Our Key scheme is inspired by file systems and Google App Engine key model.
- * Keys are meant to be unique across a system. Keys are hierarchical,
- * incorporating more and more specific namespaces. Thus keys can be deemed
- * 'children' or 'ancestors' of other keys:
- * - `new Key('/Comedy')`
- * - `new Key('/Comedy/MontyPython')`
- * Also, every namespace can be parametrized to embed relevant object
- * information. For example, the Key `name` (most specific namespace) could
- * include the object type:
- * - `new Key('/Comedy/MontyPython/Actor:JohnCleese')`
- * - `new Key('/Comedy/MontyPython/Sketch:CheeseShop')`
- * - `new Key('/Comedy/MontyPython/Sketch:CheeseShop/Character:Mousebender')`
- *
- */
-class Key {
-  /* :: _buf: Buffer */
-
-  constructor (s /* : string|Buffer */, clean /* : ?bool */) {
-    if (typeof s === 'string') {
-      this._buf = new Buffer(s)
-    } else if (Buffer.isBuffer(s)) {
-      this._buf = s
-    }
-
-    if (clean == null) {
-      clean = true
-    }
-
-    if (clean) {
-      this.clean()
-    }
-
-    if (this._buf.length === 0 || this._buf[0] !== pathSep) {
-      throw new Error(`Invalid key: ${this.toString()}`)
-    }
-  }
-
-  /**
-   * Convert to the string representation
-   *
-   * @param {string} [encoding='utf8']
-   * @returns {string}
-   */
-  toString (encoding/* : ?buffer$Encoding */)/* : string */ {
-    return this._buf.toString(encoding || 'utf8')
-  }
-
-  /**
-   * Return the buffer representation of the key
-   *
-   * @returns {Buffer}
-   */
-  toBuffer () /* : Buffer */ {
-    return this._buf
-  }
-
-  // waiting on https://github.com/facebook/flow/issues/2286
-  // $FlowFixMe
-  get [Symbol.toStringTag] () /* : string */ {
-    return `[Key ${this.toString()}]`
-  }
-
-  /**
-   * Constructs a key out of a namespace array.
-   *
-   * @param {Array<string>} list
-   * @returns {Key}
-   *
-   * @example
-   * Key.withNamespaces(['one', 'two'])
-   * // => Key('/one/two')
-   *
-   */
-  static withNamespaces (list /* : Array<string> */) /* : Key */ {
-    return new Key(list.join(pathSepS))
-  }
-
-  /**
-   * Returns a randomly (uuid) generated key.
-   *
-   * @returns {Key}
-   *
-   * @example
-   * Key.random()
-   * // => Key('/f98719ea086343f7b71f32ea9d9d521d')
-   *
-   */
-  static random () /* : Key */ {
-    return new Key(uuid().replace(/-/g, ''))
-  }
-
-  /**
-   * Cleanup the current key
-   *
-   * @returns {void}
-   */
-  clean () {
-    if (!this._buf || this._buf.length === 0) {
-      this._buf = new Buffer(pathSepS, 'utf8')
-    }
-
-    this._buf = new Buffer(path.normalize(this.toString()))
-
-    if (this._buf[0] !== pathSep) {
-      this._buf = Buffer.concat([new Buffer(pathSepS, 'utf8'), this._buf])
-    }
-
-    // normalize does not remove trailing slashes
-    if (this.toString().length > 1 && this._buf[this._buf.length - 1] === pathSep) {
-      this._buf = this._buf.slice(0, -1)
-    }
-  }
-
-  /**
-   * Check if the given key is sorted lower than ourself.
-   *
-   * @param {Key} key
-   * @returns {bool}
-   */
-  less (key /* : Key */) /* : bool */ {
-    const list1 = this.list()
-    const list2 = key.list()
-
-    for (let i = 0; i < list1.length; i++) {
-      if (list2.length < i + 1) {
-        return false
-      }
-
-      const c1 = list1[i]
-      const c2 = list2[i]
-
-      if (c1 < c2) {
-        return true
-      } else if (c1 > c2) {
-        return false
-      }
-    }
-
-    return list1.length < list2.length
-  }
-
-  /**
-   * Returns the key with all parts in reversed order.
-   *
-   * @returns {Key}
-   *
-   * @example
-   * new Key('/Comedy/MontyPython/Actor:JohnCleese').reverse()
-   * // => Key('/Actor:JohnCleese/MontyPython/Comedy')
-   */
-  reverse () /* : Key */ {
-    return Key.withNamespaces(this.list().slice().reverse())
-  }
-
-  /**
-   * Returns the `namespaces` making up this Key.
-   *
-   * @returns {Array<string>}
-   */
-  namespaces () /* : Array<string> */ {
-    return this.list()
-  }
-
-  /** Returns the "base" namespace of this key.
-   *
-   * @returns {string}
-   *
-   * @example
-   * new Key('/Comedy/MontyPython/Actor:JohnCleese').baseNamespace()
-   * // => 'Actor:JohnCleese'
-   *
-   */
-  baseNamespace () /* : string */ {
-    const ns = this.namespaces()
-    return ns[ns.length - 1]
-  }
-
-  /**
-   * Returns the `list` representation of this key.
-   *
-   * @returns {Array<string>}
-   *
-   * @example
-   * new Key('/Comedy/MontyPython/Actor:JohnCleese').list()
-   * // => ['Comedy', 'MontyPythong', 'Actor:JohnCleese']
-   *
-   */
-  list () /* : Array<string> */ {
-    return this.toString().split(pathSepS).slice(1)
-  }
-
-  /**
-   * Returns the "type" of this key (value of last namespace).
-   *
-   * @returns {string}
-   *
-   * @example
-   * new Key('/Comedy/MontyPython/Actor:JohnCleese').type()
-   * // => 'Actor'
-   *
-   */
-  type () /* : string */ {
-    return namespaceType(this.baseNamespace())
-  }
-
-  /**
-   * Returns the "name" of this key (field of last namespace).
-   *
-   * @returns {string}
-   *
-   * @example
-   * new Key('/Comedy/MontyPython/Actor:JohnCleese').name()
-   * // => 'JohnCleese'
-   */
-  name () /* : string */ {
-    return namespaceValue(this.baseNamespace())
-  }
-
-  /**
-   * Returns an "instance" of this type key (appends value to namespace).
-   *
-   * @param {string} s
-   * @returns {Key}
-   *
-   * @example
-   * new Key('/Comedy/MontyPython/Actor').instance('JohnClesse')
-   * // => Key('/Comedy/MontyPython/Actor:JohnCleese')
-   */
-  instance (s /* : string */) /* : Key */ {
-    return new Key(this.toString() + ':' + s)
-  }
-
-  /**
-   * Returns the "path" of this key (parent + type).
-   *
-   * @returns {Key}
-   *
-   * @example
-   * new Key('/Comedy/MontyPython/Actor:JohnCleese').path()
-   * // => Key('/Comedy/MontyPython/Actor')
-   *
-   */
-  path () /* : Key */ {
-    return new Key(this.parent().toString() + pathSepS + this.type())
-  }
-
-  /**
-   * Returns the `parent` Key of this Key.
-   *
-   * @returns {Key}
-   *
-   * @example
-   * new Key("/Comedy/MontyPython/Actor:JohnCleese").parent()
-   * // => Key("/Comedy/MontyPython")
-   *
-   */
-  parent () /* : Key */ {
-    const list = this.list()
-    if (list.length === 1) {
-      return new Key(pathSepS, false)
-    }
-
-    return new Key(list.slice(0, -1).join(pathSepS))
-  }
-
-  /**
-   * Returns the `child` Key of this Key.
-   *
-   * @param {Key} key
-   * @returns {Key}
-   *
-   * @example
-   * new Key('/Comedy/MontyPython').child(new Key('Actor:JohnCleese'))
-   * // => Key('/Comedy/MontyPython/Actor:JohnCleese')
-   *
-   */
-  child (key /* : Key */) /* : Key */ {
-    if (this.toString() === pathSepS) {
-      return key
-    } else if (key.toString() === pathSepS) {
-      return this
-    }
-
-    return new Key(this.toString() + key.toString(), false)
-  }
-
-  /**
-   * Returns whether this key is a prefix of `other`
-   *
-   * @param {Key} other
-   * @returns {bool}
-   *
-   * @example
-   * new Key('/Comedy').isAncestorOf('/Comedy/MontyPython')
-   * // => true
-   *
-   */
-  isAncestorOf (other /* : Key */) /* : bool */ {
-    if (other.toString() === this.toString()) {
-      return false
-    }
-
-    return other.toString().startsWith(this.toString())
-  }
-
-  /**
-   * Returns whether this key is a contains another as prefix.
-   *
-   * @param {Key} other
-   * @returns {bool}
-   *
-   * @example
-   * new Key('/Comedy/MontyPython').isDecendantOf('/Comedy')
-   * // => true
-   *
-   */
-  isDecendantOf (other /* : Key */) /* : bool */ {
-    if (other.toString() === this.toString()) {
-      return false
-    }
-
-    return this.toString().startsWith(other.toString())
-  }
-
-  /**
-   * Returns wether this key has only one namespace.
-   *
-   * @returns {bool}
-   *
-   */
-  isTopLevel () /* : bool */ {
-    return this.list().length === 1
-  }
-}
-
-/**
- * The first component of a namespace. `foo` in `foo:bar`
- *
- * @param {string} ns
- * @returns {string}
- */
-function namespaceType (ns /* : string */) /* : string */ {
-  const parts = ns.split(':')
-  if (parts.length < 2) {
-    return ''
-  }
-  return parts.slice(0, -1).join(':')
-}
-
-/**
- * The last component of a namespace, `baz` in `foo:bar:baz`.
- *
- * @param {string} ns
- * @returns {string}
- */
-function namespaceValue (ns /* : string */) /* : string */ {
-  const parts = ns.split(':')
-  return parts[parts.length - 1]
-}
-
-module.exports = Key
-
-}).call(this,require("buffer").Buffer)
-},{"buffer":722,"path":731,"uuid/v4":708}],208:[function(require,module,exports){
-/* @flow */
-'use strict'
-
-/* :: import type {Batch, Query, QueryResult, Callback} from './' */
-
-const pull = require('pull-stream')
-const setImmediate = require('async/setImmediate')
-
-const asyncFilter = require('./utils').asyncFilter
-const asyncSort = require('./utils').asyncSort
-const Key = require('./key')
-
-class MemoryDatastore {
-  /* :: data: {[key: string]: Buffer} */
-
-  constructor () {
-    this.data = {}
-  }
-
-  open (callback /* : Callback<void> */) /* : void */ {
-    setImmediate(callback)
-  }
-
-  put (key /* : Key */, val /* : Buffer */, callback /* : Callback<void> */) /* : void */ {
-    this.data[key.toString()] = val
-
-    setImmediate(callback)
-  }
-
-  get (key /* : Key */, callback /* : Callback<Buffer> */) /* : void */ {
-    this.has(key, (err, exists) => {
-      if (err) {
-        return callback(err)
-      }
-
-      if (!exists) {
-        return callback(new Error('No value'))
-      }
-
-      callback(null, this.data[key.toString()])
-    })
-  }
-
-  has (key /* : Key */, callback /* : Callback<bool> */) /* : void */ {
-    setImmediate(() => {
-      callback(null, this.data[key.toString()] !== undefined)
-    })
-  }
-
-  delete (key /* : Key */, callback /* : Callback<void> */) /* : void */ {
-    delete this.data[key.toString()]
-
-    setImmediate(() => {
-      callback()
-    })
-  }
-
-  batch () /* : Batch<Buffer> */ {
-    let puts = []
-    let dels = []
-
-    return {
-      put (key /* : Key */, value /* : Buffer */) /* : void */ {
-        puts.push([key, value])
-      },
-      delete (key /* : Key */) /* : void */ {
-        dels.push(key)
-      },
-      commit: (callback /* : Callback<void> */) /* : void */ => {
-        puts.forEach(v => {
-          this.data[v[0].toString()] = v[1]
-        })
-
-        puts = []
-        dels.forEach(key => {
-          delete this.data[key.toString()]
-        })
-        dels = []
-
-        setImmediate(callback)
-      }
-    }
-  }
-
-  query (q /* : Query<Buffer> */) /* : QueryResult<Buffer> */ {
-    let tasks = [pull.keys(this.data), pull.map(k => ({
-      key: new Key(k),
-      value: this.data[k]
-    }))]
-
-    let filters = []
-
-    if (q.prefix != null) {
-      const prefix = q.prefix
-      filters.push((e, cb) => cb(null, e.key.toString().startsWith(prefix)))
-    }
-
-    if (q.filters != null) {
-      filters = filters.concat(q.filters)
-    }
-
-    tasks = tasks.concat(filters.map(f => asyncFilter(f)))
-
-    if (q.orders != null) {
-      tasks = tasks.concat(q.orders.map(o => asyncSort(o)))
-    }
-
-    if (q.offset != null) {
-      let i = 0
-      // $FlowFixMe
-      tasks.push(pull.filter(() => i++ >= q.offset))
-    }
-
-    if (q.limit != null) {
-      tasks.push(pull.take(q.limit))
-    }
-
-    if (q.keysOnly === true) {
-      tasks.push(pull.map(e => ({ key: e.key })))
-    }
-
-    return pull.apply(null, tasks)
-  }
-
-  close (callback /* : Callback<void> */) /* : void */ {
-    setImmediate(callback)
-  }
-}
-
-module.exports = MemoryDatastore
-
-},{"./key":207,"./utils":209,"async/setImmediate":54,"pull-stream":598}],209:[function(require,module,exports){
-'use strict'
-
-const pull = require('pull-stream')
-const Source = require('pull-defer/source')
-const path = require('path')
-const os = require('os')
-const uuid = require('uuid/v4')
-
-exports.asyncFilter = function (test) {
-  let busy = false
-  let abortCb
-  let aborted
-
-  return function (read) {
-    return function next (abort, cb) {
-      if (aborted) return cb(aborted)
-      if (abort) {
-        aborted = abort
-        if (!busy) {
-          read(abort, cb)
-        } else {
-          read(abort, () => {
-            // if we are still busy, wait for the test to complete.
-            if (busy) abortCb = cb; else cb(abort)
-          })
-        }
-      } else {
-        read(null, (end, data) => {
-          if (end) cb(end); else if (aborted) cb(aborted); else {
-            busy = true
-            test(data, (err, valid) => {
-              busy = false
-              if (aborted) {
-                cb(aborted)
-                abortCb(aborted)
-              } else if (err) {
-                next(err, cb)
-              } else if (valid) {
-                cb(null, data)
-              } else {
-                next(null, cb)
-              }
-            })
-          }
-        })
-      }
-    }
-  }
-}
-
-exports.asyncSort = function (sorter) {
-  const source = Source()
-
-  const sink = pull.collect((err, ary) => {
-    if (err) {
-      return source.abort(err)
-    }
-    sorter(ary, (err, res) => {
-      if (err) {
-        return source.abort(err)
-      }
-      source.resolve(pull.values(ary))
-    })
-  })
-
-  return function (read) {
-    sink(read)
-    return source
-  }
-}
-
-exports.replaceStartWith = function (s, r) {
-  const matcher = new RegExp('^' + r)
-  return s.replace(matcher, '')
-}
-
-exports.tmpdir = () => {
-  return path.join(os.tmpdir(), uuid())
-}
-
-},{"os":730,"path":731,"pull-defer/source":582,"pull-stream":598,"uuid/v4":708}],210:[function(require,module,exports){
+},{"./connection":194}],196:[function(require,module,exports){
 'use strict';
 
 var ip = exports;
@@ -34057,7 +32298,7 @@ ip.fromLong = function(ipl) {
       (ipl & 255) );
 };
 
-},{"buffer":722,"os":730}],211:[function(require,module,exports){
+},{"buffer":715,"os":723}],197:[function(require,module,exports){
 'use strict'
 
 const SECOND = 1000
@@ -34072,7 +32313,7 @@ module.exports = {
   maxListeners: 1000
 }
 
-},{}],212:[function(require,module,exports){
+},{}],198:[function(require,module,exports){
 'use strict'
 
 const each = require('async/each')
@@ -34359,7 +32600,7 @@ class DecisionEngine {
 
 module.exports = DecisionEngine
 
-},{"../types/message":218,"../types/wantlist":221,"../utils":222,"./ledger":213,"async/each":21,"async/eachSeries":26,"async/map":49,"async/setImmediate":54,"async/waterfall":57,"lodash.debounce":447,"lodash.find":449,"lodash.groupby":451,"lodash.pullallwith":457,"lodash.uniqwith":462,"lodash.values":463}],213:[function(require,module,exports){
+},{"../types/message":204,"../types/wantlist":207,"../utils":208,"./ledger":199,"async/each":21,"async/eachSeries":26,"async/map":49,"async/setImmediate":54,"async/waterfall":57,"lodash.debounce":451,"lodash.find":453,"lodash.groupby":455,"lodash.pullallwith":461,"lodash.uniqwith":466,"lodash.values":467}],199:[function(require,module,exports){
 'use strict'
 
 const Wantlist = require('../types/wantlist')
@@ -34405,7 +32646,7 @@ class Ledger {
 
 module.exports = Ledger
 
-},{"../types/wantlist":221}],214:[function(require,module,exports){
+},{"../types/wantlist":207}],200:[function(require,module,exports){
 'use strict'
 
 const waterfall = require('async/waterfall')
@@ -34791,7 +33032,7 @@ class Bitswap {
 
 module.exports = Bitswap
 
-},{"./decision-engine":212,"./network":215,"./notifications":216,"./utils":222,"./want-manager":223,"async/each":21,"async/map":49,"async/reject":52,"async/series":53,"async/waterfall":57,"once":552}],215:[function(require,module,exports){
+},{"./decision-engine":198,"./network":201,"./notifications":202,"./utils":208,"./want-manager":209,"async/each":21,"async/map":49,"async/reject":52,"async/series":53,"async/waterfall":57,"once":544}],201:[function(require,module,exports){
 'use strict'
 
 const lp = require('pull-length-prefixed')
@@ -34983,7 +33224,7 @@ function writeMessage (conn, msg, callback) {
 
 module.exports = Network
 
-},{"./constants":211,"./types/message":218,"./utils":222,"async/each":21,"async/setImmediate":54,"async/waterfall":57,"pull-length-prefixed":587,"pull-stream":598}],216:[function(require,module,exports){
+},{"./constants":197,"./types/message":204,"./utils":208,"async/each":21,"async/setImmediate":54,"async/waterfall":57,"pull-length-prefixed":579,"pull-stream":590}],202:[function(require,module,exports){
 'use strict'
 
 const EventEmitter = require('events').EventEmitter
@@ -35099,7 +33340,7 @@ class Notifications extends EventEmitter {
 
 module.exports = Notifications
 
-},{"./constants":211,"./utils":222,"events":724}],217:[function(require,module,exports){
+},{"./constants":197,"./utils":208,"events":717}],203:[function(require,module,exports){
 'use strict'
 
 const WantlistEntry = require('../wantlist').Entry
@@ -35141,7 +33382,7 @@ module.exports = class BitswapMessageEntry {
   }
 }
 
-},{"../wantlist":221,"assert":719,"cids":103}],218:[function(require,module,exports){
+},{"../wantlist":207,"assert":712,"cids":103}],204:[function(require,module,exports){
 'use strict'
 
 const protons = require('protons')
@@ -35352,7 +33593,7 @@ BitswapMessage.deserialize = (raw, callback) => {
 BitswapMessage.Entry = Entry
 module.exports = BitswapMessage
 
-},{"./entry":217,"./message.proto":219,"assert":719,"async/each":21,"cids":103,"ipfs-block":232,"lodash.isequalwith":454,"multicodec/src/name-table":519,"multihashing-async":527,"protons":573,"varint-decoder":709}],219:[function(require,module,exports){
+},{"./entry":203,"./message.proto":205,"assert":712,"async/each":21,"cids":103,"ipfs-block":211,"lodash.isequalwith":458,"multicodec/src/name-table":523,"multihashing-async":531,"protons":565,"varint-decoder":702}],205:[function(require,module,exports){
 'use strict'
 
 // from: https://github.com/ipfs/go-ipfs/blob/master/exchange/bitswap/message/pb/message.proto
@@ -35382,7 +33623,7 @@ module.exports = `
   }
 `
 
-},{}],220:[function(require,module,exports){
+},{}],206:[function(require,module,exports){
 'use strict'
 
 const assert = require('assert')
@@ -35426,7 +33667,7 @@ class WantListEntry {
 
 module.exports = WantListEntry
 
-},{"assert":719,"cids":103}],221:[function(require,module,exports){
+},{"assert":712,"cids":103}],207:[function(require,module,exports){
 'use strict'
 
 const sort = require('lodash.sortby')
@@ -35502,7 +33743,7 @@ class Wantlist {
 Wantlist.Entry = Entry
 module.exports = Wantlist
 
-},{"./entry":220,"lodash.sortby":459}],222:[function(require,module,exports){
+},{"./entry":206,"lodash.sortby":463}],208:[function(require,module,exports){
 'use strict'
 
 const debug = require('debug')
@@ -35530,7 +33771,7 @@ exports.logger = (id, subsystem) => {
   return logger
 }
 
-},{"debug":123}],223:[function(require,module,exports){
+},{"debug":114}],209:[function(require,module,exports){
 'use strict'
 
 const setImmediate = require('async/setImmediate')
@@ -35668,7 +33909,7 @@ module.exports = class WantManager {
   }
 }
 
-},{"../constants":211,"../types/message":218,"../types/wantlist":221,"../utils":222,"./msg-queue":224,"async/setImmediate":54}],224:[function(require,module,exports){
+},{"../constants":197,"../types/message":204,"../types/wantlist":207,"../utils":208,"./msg-queue":210,"async/setImmediate":54}],210:[function(require,module,exports){
 'use strict'
 
 const debounce = require('lodash.debounce')
@@ -35734,7 +33975,2013 @@ module.exports = class MsgQueue {
   }
 }
 
-},{"../types/message":218,"../utils":222,"lodash.debounce":447}],225:[function(require,module,exports){
+},{"../types/message":204,"../utils":208,"lodash.debounce":451}],211:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const CID = require('cids')
+
+/**
+ * Represents an immutable block of data that is uniquely referenced with a cid.
+ *
+ * @constructor
+ * @param {Buffer} data - The data to be stored in the block as a buffer.
+ * @param {CID} cid - The cid of the data
+ *
+ * @example
+ * const block = new Block(new Buffer('a012d83b20f9371...'))
+ */
+class Block {
+  constructor (data, cid) {
+    if (!data || !Buffer.isBuffer(data)) {
+      throw new Error('first argument  must be a buffer')
+    }
+
+    if (!cid || !CID.isCID(cid)) {
+      throw new Error('second argument must be a CID')
+    }
+
+    this._data = data
+    this._cid = cid
+  }
+
+  /**
+   * The data of this block.
+   *
+   * @type {Buffer}
+   */
+  get data () {
+    return this._data
+  }
+
+  set data (val) {
+    throw new Error('Tried to change an immutable block')
+  }
+
+  /**
+   * The cid of the data this block represents.
+   *
+   * @type {CID}
+   */
+  get cid () {
+    return this._cid
+  }
+
+  set cid (val) {
+    throw new Error('Tried to change an immutable block')
+  }
+
+  /**
+   * Check if the given value is a Block.
+   *
+   * @param {any} other
+   * @returns {bool}
+   */
+  static isBlock (other) {
+    return other && other.constructor.name === 'Block'
+  }
+}
+
+module.exports = Block
+
+}).call(this,{"isBuffer":require("../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
+},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721,"cids":103}],212:[function(require,module,exports){
+'use strict'
+
+const protons = require('protons')
+const pb = protons(require('./unixfs.proto'))
+// encode/decode
+const unixfsData = pb.Data
+// const unixfsMetadata = pb.MetaData // encode/decode
+
+const types = [
+  'raw',
+  'directory',
+  'file',
+  'metadata',
+  'symlink',
+  'hamt-sharded-directory'
+]
+
+const dirTypes = [
+  'directory',
+  'hamt-sharded-directory'
+]
+
+function Data (type, data) {
+  if (!(this instanceof Data)) {
+    return new Data(type, data)
+  }
+  if (types.indexOf(type) === -1) {
+    throw new Error('Type: ' + type + ' is not valid')
+  }
+
+  this.type = type
+  this.data = data
+  this.blockSizes = []
+
+  this.addBlockSize = (size) => {
+    this.blockSizes.push(size)
+  }
+
+  this.removeBlockSize = (index) => {
+    this.blockSizes.splice(index, 1)
+  }
+
+  // data.length + blockSizes
+  this.fileSize = () => {
+    if (dirTypes.indexOf(this.type) >= 0) {
+      // dirs don't have file size
+      return undefined
+    }
+
+    let sum = 0
+    this.blockSizes.forEach((size) => {
+      sum += size
+    })
+    if (data) {
+      sum += data.length
+    }
+    return sum
+  }
+
+  // encode to protobuf
+  this.marshal = () => {
+    let type
+
+    switch (this.type) {
+      case 'raw': type = unixfsData.DataType.Raw; break
+      case 'directory': type = unixfsData.DataType.Directory; break
+      case 'file': type = unixfsData.DataType.File; break
+      case 'metadata': type = unixfsData.DataType.Metadata; break
+      case 'symlink': type = unixfsData.DataType.Symlink; break
+      case 'hamt-sharded-directory': type = unixfsData.DataType.HAMTShard; break
+      default:
+        throw new Error(`Unkown type: "${this.type}"`)
+    }
+    let fileSize = this.fileSize()
+
+    if (!fileSize) {
+      fileSize = undefined
+    }
+
+    return unixfsData.encode({
+      Type: type,
+      Data: this.data,
+      filesize: fileSize,
+      blocksizes: this.blockSizes.length > 0 ? this.blockSizes : undefined,
+      hashType: this.hashType,
+      fanout: this.fanout
+    })
+  }
+}
+
+// decode from protobuf https://github.com/ipfs/go-ipfs/blob/master/unixfs/format.go#L24
+Data.unmarshal = (marsheled) => {
+  const decoded = unixfsData.decode(marsheled)
+  if (!decoded.Data) {
+    decoded.Data = undefined
+  }
+  const obj = new Data(types[decoded.Type], decoded.Data)
+  obj.blockSizes = decoded.blocksizes
+  return obj
+}
+
+exports = module.exports = Data
+
+},{"./unixfs.proto":213,"protons":565}],213:[function(require,module,exports){
+'use strict'
+
+module.exports = `message Data {
+  enum DataType {
+    Raw = 0;
+    Directory = 1;
+    File = 2;
+    Metadata = 3;
+    Symlink = 4;
+    HAMTShard = 5;
+  }
+
+  required DataType Type = 1;
+  optional bytes Data = 2;
+  optional uint64 filesize = 3;
+  repeated uint64 blocksizes = 4;
+
+  optional uint64 hashType = 5;
+  optional uint64 fanout = 6;
+}
+
+message Metadata {
+  required string MimeType = 1;
+}`
+
+},{}],214:[function(require,module,exports){
+/* @flow */
+'use strict'
+
+const KeytransformDatastore = require('./keytransform')
+const ShardingDatastore = require('./sharding')
+const MountDatastore = require('./mount')
+const TieredDatastore = require('./tiered')
+const NamespaceDatastore = require('./namespace')
+const shard = require('./shard')
+
+exports.KeytransformDatastore = KeytransformDatastore
+exports.ShardingDatastore = ShardingDatastore
+exports.MountDatastore = MountDatastore
+exports.TieredDatastore = TieredDatastore
+exports.NamespaceDatastore = NamespaceDatastore
+exports.shard = shard
+
+},{"./keytransform":215,"./mount":216,"./namespace":217,"./shard":219,"./sharding":220,"./tiered":221}],215:[function(require,module,exports){
+/* @flow */
+'use strict'
+
+const pull = require('pull-stream')
+
+/* ::
+import type {Key, Datastore, Batch, Query, QueryResult, Callback} from 'interface-datastore'
+*/
+
+/**
+ * An object with a pair of functions for (invertibly) transforming keys
+ */
+/* ::
+type KeyTransform = {
+  convert: KeyMapping,
+  invert: KeyMapping
+}
+*/
+
+/**
+ * Map one key onto another key.
+ */
+/* ::
+type KeyMapping = (Key) => Key
+*/
+
+/**
+ * A datastore shim, that wraps around a given datastore, changing
+ * the way keys look to the user, for example namespacing
+ * keys, reversing them, etc.
+ */
+class KeyTransformDatastore /* :: <Value> */ {
+  /* :: child: Datastore<Value> */
+  /* :: transform: KeyTransform */
+
+  constructor (child /* : Datastore<Value> */, transform /* : KeyTransform */) {
+    this.child = child
+    this.transform = transform
+  }
+
+  open (callback /* : Callback<void> */) /* : void */ {
+    this.child.open(callback)
+  }
+
+  put (key /* : Key */, val /* : Value */, callback /* : Callback<void> */) /* : void */ {
+    this.child.put(this.transform.convert(key), val, callback)
+  }
+
+  get (key /* : Key */, callback /* : Callback<Value> */) /* : void */ {
+    this.child.get(this.transform.convert(key), callback)
+  }
+
+  has (key /* : Key */, callback /* : Callback<bool> */) /* : void */ {
+    this.child.has(this.transform.convert(key), callback)
+  }
+
+  delete (key /* : Key */, callback /* : Callback<void> */) /* : void */ {
+    this.child.delete(this.transform.convert(key), callback)
+  }
+
+  batch () /* : Batch<Value> */ {
+    const b = this.child.batch()
+    return {
+      put: (key /* : Key */, value /* : Value */) /* : void */ => {
+        b.put(this.transform.convert(key), value)
+      },
+      delete: (key /* : Key */) /* : void */ => {
+        b.delete(this.transform.convert(key))
+      },
+      commit: (callback /* : Callback<void> */) /* : void */ => {
+        b.commit(callback)
+      }
+    }
+  }
+
+  query (q /* : Query<Value> */) /* : QueryResult<Value> */ {
+    return pull(
+      this.child.query(q),
+      pull.map(e => {
+        e.key = this.transform.invert(e.key)
+        return e
+      })
+    )
+  }
+
+  close (callback /* : Callback<void> */) /* : void */ {
+    this.child.close(callback)
+  }
+}
+
+module.exports = KeyTransformDatastore
+
+},{"pull-stream":590}],216:[function(require,module,exports){
+/* @flow */
+'use strict'
+
+const each = require('async/each')
+const many = require('pull-many')
+const pull = require('pull-stream')
+
+const Key = require('interface-datastore').Key
+const utils = require('interface-datastore').utils
+const asyncFilter = utils.asyncFilter
+const asyncSort = utils.asyncSort
+const replaceStartWith = utils.replaceStartWith
+
+const Keytransform = require('./keytransform')
+
+/* ::
+import type {Datastore, Callback, Batch, Query, QueryResult} from 'interface-datastore'
+
+type Mount<Value> = {
+  prefix: Key,
+  datastore: Datastore<Value>
+}
+*/
+
+/**
+ * A datastore that can combine multiple stores inside various
+ * key prefixs.
+ */
+class MountDatastore /* :: <Value> */ {
+  /* :: mounts: Array<Mount<Value>> */
+
+  constructor (mounts /* : Array<Mount<Value>> */) {
+    this.mounts = mounts.slice()
+  }
+
+  open (callback /* : Callback<void> */) /* : void */ {
+    each(this.mounts, (m, cb) => {
+      m.datastore.open(cb)
+    }, callback)
+  }
+
+  /**
+   * Lookup the matching datastore for the given key.
+   *
+   * @private
+   * @param {Key} key
+   * @returns {{Datastore, Key, Key}}
+   */
+  _lookup (key /* : Key */) /* : ?{datastore: Datastore<Value>, mountpoint: Key, rest: Key} */ {
+    for (let mount of this.mounts) {
+      if (mount.prefix.toString() === key.toString() || mount.prefix.isAncestorOf(key)) {
+        const s = replaceStartWith(key.toString(), mount.prefix.toString())
+        return {
+          datastore: mount.datastore,
+          mountpoint: mount.prefix,
+          rest: new Key(s)
+        }
+      }
+    }
+  }
+
+  put (key /* : Key */, value /* : Value */, callback /* : Callback<void> */) /* : void */ {
+    const match = this._lookup(key)
+    if (match == null) {
+      callback(new Error('No datastore mounted for this key'))
+      return
+    }
+
+    match.datastore.put(match.rest, value, callback)
+  }
+
+  get (key /* : Key */, callback /* : Callback<Value> */) /* : void */ {
+    const match = this._lookup(key)
+    if (match == null) {
+      callback(new Error('No datastore mounted for this key'))
+      return
+    }
+
+    match.datastore.get(match.rest, callback)
+  }
+
+  has (key /* : Key */, callback /* : Callback<bool> */) /* : void */ {
+    const match = this._lookup(key)
+    if (match == null) {
+      callback(null, false)
+      return
+    }
+
+    match.datastore.has(match.rest, callback)
+  }
+
+  delete (key /* : Key */, callback /* : Callback<void> */) /* : void */ {
+    const match = this._lookup(key)
+    if (match == null) {
+      callback(new Error('No datastore mounted for this key'))
+      return
+    }
+
+    match.datastore.delete(match.rest, callback)
+  }
+
+  close (callback /* : Callback<void> */) /* : void */ {
+    each(this.mounts, (m, cb) => {
+      m.datastore.close(cb)
+    }, callback)
+  }
+
+  batch () /* : Batch<Value> */ {
+    const batchMounts = {}
+    const lookup = (key /* : Key */) /* : {batch: Batch<Value>, rest: Key} */ => {
+      const match = this._lookup(key)
+      if (match == null) {
+        throw new Error('No datastore mounted for this key')
+      }
+
+      const m = match.mountpoint.toString()
+      if (batchMounts[m] == null) {
+        batchMounts[m] = match.datastore.batch()
+      }
+
+      return {
+        batch: batchMounts[m],
+        rest: match.rest
+      }
+    }
+
+    return {
+      put: (key /* : Key */, value /* : Value */) /* : void */ => {
+        const match = lookup(key)
+        match.batch.put(match.rest, value)
+      },
+      delete: (key /* : Key */) /* : void */ => {
+        const match = lookup(key)
+        match.batch.delete(match.rest)
+      },
+      commit: (callback /* : Callback<void> */) /* : void */ => {
+        each(Object.keys(batchMounts), (p, cb) => {
+          batchMounts[p].commit(cb)
+        }, callback)
+      }
+    }
+  }
+
+  query (q /* : Query<Value> */) /* : QueryResult<Value> */ {
+    const qs = this.mounts.map(m => {
+      const ks = new Keytransform(m.datastore, {
+        convert: (key /* : Key */) /* : Key */ => {
+          throw new Error('should never be called')
+        },
+        invert: (key /* : Key */) /* : Key */ => {
+          return m.prefix.child(key)
+        }
+      })
+
+      let prefix
+      if (q.prefix != null) {
+        prefix = replaceStartWith(q.prefix, m.prefix.toString())
+      }
+
+      return ks.query({
+        prefix: prefix,
+        filters: q.filters,
+        keysOnly: q.keysOnly
+      })
+    })
+
+    let tasks = [many(qs)]
+
+    if (q.filters != null) {
+      tasks = tasks.concat(q.filters.map(f => asyncFilter(f)))
+    }
+
+    if (q.orders != null) {
+      tasks = tasks.concat(q.orders.map(o => asyncSort(o)))
+    }
+
+    if (q.offset != null) {
+      let i = 0
+      // $FlowFixMe
+      tasks.push(pull.filter(() => i++ >= q.offset))
+    }
+
+    if (q.limit != null) {
+      tasks.push(pull.take(q.limit))
+    }
+
+    return pull.apply(null, tasks)
+  }
+}
+
+module.exports = MountDatastore
+
+},{"./keytransform":215,"async/each":21,"interface-datastore":224,"pull-many":580,"pull-stream":590}],217:[function(require,module,exports){
+/* @flow */
+'use strict'
+
+const Key = require('interface-datastore').Key
+const KeytransformDatastore = require('./keytransform')
+
+/* ::
+import type {Callback, Datastore, Query, QueryResult} from 'interface-datastore'
+*/
+
+/**
+ * Wraps a given datastore into a keytransform which
+ * makes a given prefix transparent.
+ *
+ * For example, if the prefix is `new Key(/hello)` a call
+ * to `store.put(new Key('/world'), mydata)` would store the data under
+ * `/hello/world`.
+ *
+ */
+class NamespaceDatastore/* :: <Value> */ extends KeytransformDatastore /* :: <Value> */ {
+  /* :: prefix: Key */
+
+  constructor (child/* : Datastore<Value> */, prefix/* : Key */) {
+    super(child, {
+      convert (key/* : Key */)/* : Key */ {
+        return prefix.child(key)
+      },
+      invert (key/* : Key */)/* : Key */ {
+        if (prefix.toString() === '/') {
+          return key
+        }
+
+        if (!prefix.isAncestorOf(key)) {
+          throw new Error(`Expected prefix: (${prefix.toString()}) in key: ${key.toString()}`)
+        }
+
+        return new Key(key.toString().slice(prefix.toString().length), false)
+      }
+    })
+
+    this.prefix = prefix
+  }
+
+  query (q /* : Query<Value> */)/* : QueryResult<Value> */ {
+    if (q.prefix && this.prefix.toString() !== '/') {
+      return super.query(Object.assign({}, q, {
+        prefix: this.prefix.child(new Key(q.prefix)).toString()
+      }))
+    }
+    return super.query(q)
+  }
+}
+
+module.exports = NamespaceDatastore
+
+},{"./keytransform":215,"interface-datastore":224}],218:[function(require,module,exports){
+/* @flow */
+'use strict'
+
+module.exports = `This is a repository of IPLD objects. Each IPLD object is in a single file,
+named <base32 encoding of cid>.data. Where <base32 encoding of cid> is the
+"base32" encoding of the CID (as specified in
+https://github.com/multiformats/multibase) without the 'B' prefix.
+All the object files are placed in a tree of directories, based on a
+function of the CID. This is a form of sharding similar to
+the objects directory in git repositories. Previously, we used
+prefixes, we now use the next-to-last two charters.
+    func NextToLast(base32cid string) {
+      nextToLastLen := 2
+      offset := len(base32cid) - nextToLastLen - 1
+      return str[offset : offset+nextToLastLen]
+    }
+For example, an object with a base58 CIDv1 of
+    zb2rhYSxw4ZjuzgCnWSt19Q94ERaeFhu9uSqRgjSdx9bsgM6f
+has a base32 CIDv1 of
+    BAFKREIA22FLID5AJ2KU7URG47MDLROZIH6YF2KALU2PWEFPVI37YLKRSCA
+and will be placed at
+    SC/AFKREIA22FLID5AJ2KU7URG47MDLROZIH6YF2KALU2PWEFPVI37YLKRSCA.data
+with 'SC' being the last-to-next two characters and the 'B' at the
+beginning of the CIDv1 string is the multibase prefix that is not
+stored in the filename.
+`
+
+},{}],219:[function(require,module,exports){
+/* @flow */
+'use strict'
+
+const leftPad = require('left-pad')
+const Key = require('interface-datastore').Key
+
+const readme = require('./shard-readme')
+
+// eslint-disable-next-line
+/*:: import type {Datastore, Callback} from 'interface-datastore'
+
+export interface ShardV1 {
+  name: string;
+  param: number;
+  fun(string): string;
+  toString(): string;
+}
+*/
+
+const PREFIX = exports.PREFIX = '/repo/flatfs/shard/'
+const SHARDING_FN = exports.SHARDING_FN = 'SHARDING'
+exports.README_FN = '_README'
+
+class Shard {
+  /* :: name: string */
+  /* :: param: number */
+  /* :: _padding: string */
+
+  constructor (param /* : number */) {
+    this.param = param
+  }
+
+  fun (str /* : string */) /* : string */ {
+    throw new Error('implement me')
+  }
+
+  toString () /* : string */ {
+    return `${PREFIX}v1/${this.name}/${this.param}`
+  }
+}
+
+class Prefix extends Shard {
+  constructor (prefixLen /* : number */) {
+    super(prefixLen)
+    this._padding = leftPad('', prefixLen, '_')
+    this.name = 'prefix'
+  }
+
+  fun (noslash /* : string */) /* : string */ {
+    return (noslash + this._padding).slice(0, this.param)
+  }
+}
+
+class Suffix extends Shard {
+  constructor (suffixLen /* : number */) {
+    super(suffixLen)
+    this._padding = leftPad('', suffixLen, '_')
+    this.name = 'suffix'
+  }
+
+  fun (noslash /* : string */) /* : string */ {
+    const s = this._padding + noslash
+    return s.slice(s.length - this.param)
+  }
+}
+
+class NextToLast extends Shard {
+  constructor (suffixLen /* : number */) {
+    super(suffixLen)
+    this._padding = leftPad('', suffixLen + 1, '_')
+    this.name = 'next-to-last'
+  }
+
+  fun (noslash /* : string */) /* : string */ {
+    const s = this._padding + noslash
+    const offset = s.length - this.param - 1
+    return s.slice(offset, offset + this.param)
+  }
+}
+
+/**
+ * Convert a given string to the matching sharding function.
+ *
+ * @param {string} str
+ * @returns {ShardV1}
+ */
+function parseShardFun (str /* : string */) /* : ShardV1 */ {
+  str = str.trim()
+
+  if (str.length === 0) {
+    throw new Error('empty shard string')
+  }
+
+  if (!str.startsWith(PREFIX)) {
+    throw new Error(`invalid or no path prefix: ${str}`)
+  }
+
+  const parts = str.slice(PREFIX.length).split('/')
+  const version = parts[0]
+
+  if (version !== 'v1') {
+    throw new Error(`expect 'v1' version, got '${version}'`)
+  }
+
+  const name = parts[1]
+
+  if (!parts[2]) {
+    throw new Error('missing param')
+  }
+
+  const param = parseInt(parts[2], 10)
+
+  switch (name) {
+    case 'prefix':
+      return new Prefix(param)
+    case 'suffix':
+      return new Suffix(param)
+    case 'next-to-last':
+      return new NextToLast(param)
+    default:
+      throw new Error(`unkown sharding function: ${name}`)
+  }
+}
+
+exports.readShardFun = (path /* : string */, store /* : Datastore<Buffer> */, callback /* : Callback<ShardV1> */) /* : void */ => {
+  const key = new Key(path).child(new Key(SHARDING_FN))
+  const get = typeof store.getRaw === 'function' ? store.getRaw.bind(store) : store.get.bind(store)
+
+  get(key, (err, res) => {
+    if (err) {
+      return callback(err)
+    }
+
+    let shard
+    try {
+      shard = parseShardFun((res || '').toString().trim())
+    } catch (err) {
+      return callback(err)
+    }
+
+    callback(null, shard)
+  })
+}
+
+exports.readme = readme
+exports.parseShardFun = parseShardFun
+exports.Prefix = Prefix
+exports.Suffix = Suffix
+exports.NextToLast = NextToLast
+
+},{"./shard-readme":218,"interface-datastore":224,"left-pad":372}],220:[function(require,module,exports){
+(function (Buffer){
+/* @flow */
+'use strict'
+
+const waterfall = require('async/waterfall')
+const parallel = require('async/parallel')
+const pull = require('pull-stream')
+const Key = require('interface-datastore').Key
+
+const sh = require('./shard')
+const KeytransformStore = require('./keytransform')
+
+const shardKey = new Key(sh.SHARDING_FN)
+const shardReadmeKey = new Key(sh.README_FN)
+
+/* ::
+import type {Datastore, Batch, Query, QueryResult, Callback} from 'interface-datastore'
+
+import type {ShardV1} from './shard'
+*/
+
+/**
+ * Backend independent abstraction of go-ds-flatfs.
+ *
+ * Wraps another datastore such that all values are stored
+ * sharded according to the given sharding function.
+ */
+class ShardingDatastore {
+  /* :: shard: ShardV1 */
+  /* :: child: Datastore<Buffer> */
+
+  constructor (store /* : Datastore<Buffer> */, shard /* : ShardV1 */) {
+    this.child = new KeytransformStore(store, {
+      convert: this._convertKey.bind(this),
+      invert: this._invertKey.bind(this)
+    })
+    this.shard = shard
+  }
+
+  open (callback /* : Callback<void> */) /* : void */ {
+    this.child.open(callback)
+  }
+
+  _convertKey (key/* : Key */)/* : Key */ {
+    const s = key.toString()
+    if (s === shardKey.toString() || s === shardReadmeKey.toString()) {
+      return key
+    }
+
+    const parent = new Key(this.shard.fun(s))
+    return parent.child(key)
+  }
+
+  _invertKey (key/* : Key */)/* : Key */ {
+    const s = key.toString()
+    if (s === shardKey.toString() || s === shardReadmeKey.toString()) {
+      return key
+    }
+    return Key.withNamespaces(key.list().slice(1))
+  }
+
+  static createOrOpen (store /* : Datastore<Buffer> */, shard /* : ShardV1 */, callback /* : Callback<ShardingDatastore> */) /* : void */ {
+    ShardingDatastore.create(store, shard, err => {
+      if (err && err.message !== 'datastore exists') {
+        return callback(err)
+      }
+
+      ShardingDatastore.open(store, callback)
+    })
+  }
+
+  static open (store /* : Datastore<Buffer> */, callback /* : Callback<ShardingDatastore> */) /* : void */ {
+    waterfall([
+      (cb) => sh.readShardFun('/', store, cb),
+      (shard, cb) => {
+        cb(null, new ShardingDatastore(store, shard))
+      }
+    ], callback)
+  }
+
+  static create (store /* : Datastore<Buffer> */, shard /* : ShardV1 */, callback /* : Callback<void> */) /* : void */ {
+    store.has(shardKey, (err, exists) => {
+      if (err) {
+        return callback(err)
+      }
+
+      if (!exists) {
+        const put = typeof store.putRaw === 'function' ? store.putRaw.bind(store) : store.put.bind(store)
+        return parallel([
+          (cb) => put(shardKey, new Buffer(shard.toString() + '\n'), cb),
+          (cb) => put(shardReadmeKey, new Buffer(sh.readme), cb)
+        ], err => callback(err))
+      }
+
+      sh.readShardFun('/', store, (err, diskShard) => {
+        if (err) {
+          return callback(err)
+        }
+
+        const a = (diskShard || '').toString()
+        const b = shard.toString()
+        if (a !== b) {
+          return callback(new Error(`specified fun ${b} does not match repo shard fun ${a}`))
+        }
+
+        callback(new Error('datastore exists'))
+      })
+    })
+  }
+
+  put (key /* : Key */, val /* : Buffer */, callback /* : Callback<void> */) /* : void */ {
+    this.child.put(key, val, callback)
+  }
+
+  get (key /* : Key */, callback /* : Callback<Buffer> */) /* : void */ {
+    this.child.get(key, callback)
+  }
+
+  has (key /* : Key */, callback /* : Callback<bool> */) /* : void */ {
+    this.child.has(key, callback)
+  }
+
+  delete (key /* : Key */, callback /* : Callback<void> */) /* : void */ {
+    this.child.delete(key, callback)
+  }
+
+  batch () /* : Batch<Buffer> */ {
+    return this.child.batch()
+  }
+
+  query (q /* : Query<Buffer> */) /* : QueryResult<Buffer> */ {
+    const tq/* : Query<Buffer> */ = {
+      keysOnly: q.keysOnly
+    }
+
+    if (q.prefix != null) {
+      // TODO: transform
+      tq.prefix = q.prefix
+    }
+
+    if (q.filters != null) {
+      tq.filters = q.filters.map((f) => (e, cb) => {
+        f(Object.assign({}, e, {
+          key: this._invertKey(e.key)
+        }), cb)
+      })
+    }
+
+    if (q.orders != null) {
+      tq.orders = q.orders.map((o) => (res, cb) => {
+        const m = res.map((e) => {
+          return Object.assign({}, e, {
+            key: this._invertKey(e.key)
+          })
+        })
+        o(m, cb)
+      })
+    }
+
+    if (q.offset != null) {
+      tq.offset = q.offset + 2
+    }
+
+    if (q.limit != null) {
+      tq.limit = q.limit + 2
+    }
+
+    return pull(
+      this.child.query(tq),
+      pull.filter((e) => {
+        if (e.key.toString() === shardKey.toString() ||
+            e.key.toString() === shardReadmeKey.toString()) {
+          return false
+        }
+        return true
+      })
+    )
+  }
+
+  close (callback /* : Callback<void> */) /* : void */ {
+    this.child.close(callback)
+  }
+}
+
+module.exports = ShardingDatastore
+
+}).call(this,require("buffer").Buffer)
+},{"./keytransform":215,"./shard":219,"async/parallel":50,"async/waterfall":57,"buffer":715,"interface-datastore":224,"pull-stream":590}],221:[function(require,module,exports){
+/* @flow */
+'use strict'
+
+const each = require('async/each')
+const whilst = require('async/whilst')
+
+/* ::
+import type {Key, Datastore, Callback, Batch, Query, QueryResult} from 'interface-datastore'
+*/
+
+/**
+ * A datastore that can combine multiple stores. Puts and deletes
+ * will write through to all datastores. Has and get will
+ * try each store sequentially. Query will always try the
+ * last one first.
+ *
+ */
+class TieredDatastore /* :: <Value> */ {
+  /* :: stores: Array<Datastore<Value>> */
+
+  constructor (stores /* : Array<Datastore<Value>> */) {
+    this.stores = stores.slice()
+  }
+
+  open (callback /* : Callback<void> */) /* : void */ {
+    each(this.stores, (store, cb) => {
+      store.open(cb)
+    }, callback)
+  }
+
+  put (key /* : Key */, value /* : Value */, callback /* : Callback<void> */) /* : void */ {
+    each(this.stores, (store, cb) => {
+      store.put(key, value, cb)
+    }, callback)
+  }
+
+  get (key /* : Key */, callback /* : Callback<Value> */) /* : void */ {
+    const storeLength = this.stores.length
+    let done = false
+    let i = 0
+    whilst(() => !done && i < storeLength, cb => {
+      const store = this.stores[i++]
+      store.get(key, (err, res) => {
+        if (err == null) {
+          done = true
+          return cb(null, res)
+        }
+        cb()
+      })
+    }, callback)
+  }
+
+  has (key /* : Key */, callback /* : Callback<bool> */) /* : void */ {
+    const storeLength = this.stores.length
+    let done = false
+    let i = 0
+    whilst(() => !done && i < storeLength, cb => {
+      const store = this.stores[i++]
+      store.has(key, (err, exists) => {
+        if (err == null) {
+          done = true
+          return cb(null, exists)
+        }
+        cb()
+      })
+    }, callback)
+  }
+
+  delete (key /* : Key */, callback /* : Callback<void> */) /* : void */ {
+    each(this.stores, (store, cb) => {
+      store.delete(key, cb)
+    }, callback)
+  }
+
+  close (callback /* : Callback<void> */) /* : void */ {
+    each(this.stores, (store, cb) => {
+      store.close(cb)
+    }, callback)
+  }
+
+  batch () /* : Batch<Value> */ {
+    const batches = this.stores.map(store => store.batch())
+
+    return {
+      put: (key /* : Key */, value /* : Value */) /* : void */ => {
+        batches.forEach(b => b.put(key, value))
+      },
+      delete: (key /* : Key */) /* : void */ => {
+        batches.forEach(b => b.delete(key))
+      },
+      commit: (callback /* : Callback<void> */) /* : void */ => {
+        each(batches, (b, cb) => {
+          b.commit(cb)
+        }, callback)
+      }
+    }
+  }
+
+  query (q /* : Query<Value> */) /* : QueryResult<Value> */ {
+    return this.stores[this.stores.length - 1].query(q)
+  }
+}
+
+module.exports = TieredDatastore
+
+},{"async/each":21,"async/whilst":58}],222:[function(require,module,exports){
+(function (Buffer){
+/* @flow */
+'use strict'
+
+/* :: import type {Callback, Batch, Query, QueryResult, QueryEntry} from 'interface-datastore' */
+
+const pull = require('pull-stream')
+const levelup = require('levelup')
+
+const asyncFilter = require('interface-datastore').utils.asyncFilter
+const asyncSort = require('interface-datastore').utils.asyncSort
+const Key = require('interface-datastore').Key
+
+/**
+ * A datastore backed by leveldb.
+ */
+/* :: export type LevelOptions = {
+  createIfMissing?: bool,
+  errorIfExists?: bool,
+  compression?: bool,
+  cacheSize?: number,
+  db?: Object
+} */
+class LevelDatastore {
+  /* :: db: levelup */
+
+  constructor (path /* : string */, opts /* : ?LevelOptions */) {
+    this.db = levelup(path, Object.assign(opts || {}, {
+      compression: false, // same default as go
+      valueEncoding: 'binary'
+    }))
+  }
+
+  open (callback /* : Callback<void> */) /* : void */ {
+    this.db.open(callback)
+  }
+
+  put (key /* : Key */, value /* : Buffer */, callback /* : Callback<void> */) /* : void */ {
+    this.db.put(key.toString(), value, callback)
+  }
+
+  get (key /* : Key */, callback /* : Callback<Buffer> */) /* : void */ {
+    this.db.get(key.toString(), callback)
+  }
+
+  has (key /* : Key */, callback /* : Callback<bool> */) /* : void */ {
+    this.db.get(key.toString(), (err, res) => {
+      if (err) {
+        if (err.notFound) {
+          callback(null, false)
+          return
+        }
+        callback(err)
+        return
+      }
+
+      callback(null, true)
+    })
+  }
+
+  delete (key /* : Key */, callback /* : Callback<void> */) /* : void */ {
+    this.db.del(key.toString(), callback)
+  }
+
+  close (callback /* : Callback<void> */) /* : void */ {
+    this.db.close(callback)
+  }
+
+  batch () /* : Batch<Buffer> */ {
+    const ops = []
+    return {
+      put: (key /* : Key */, value /* : Buffer */) /* : void */ => {
+        ops.push({
+          type: 'put',
+          key: key.toString(),
+          value: value
+        })
+      },
+      delete: (key /* : Key */) /* : void */ => {
+        ops.push({
+          type: 'del',
+          key: key.toString()
+        })
+      },
+      commit: (callback /* : Callback<void> */) /* : void */ => {
+        this.db.batch(ops, callback)
+      }
+    }
+  }
+
+  query (q /* : Query<Buffer> */) /* : QueryResult<Buffer> */ {
+    let values = true
+    if (q.keysOnly != null) {
+      values = !q.keysOnly
+    }
+
+    const iter = this.db.db.iterator({
+      keys: true,
+      values: values,
+      keyAsBuffer: true
+    })
+
+    const rawStream = (end, cb) => {
+      if (end) {
+        return iter.end((err) => {
+          cb(err || end)
+        })
+      }
+
+      iter.next((err, key, value) => {
+        if (err) {
+          return cb(err)
+        }
+
+        if (err == null && key == null && value == null) {
+          return iter.end((err) => {
+            cb(err || true)
+          })
+        }
+
+        const res /* : QueryEntry<Buffer> */ = {
+          key: new Key(key, false)
+        }
+
+        if (values) {
+          res.value = new Buffer(value)
+        }
+
+        cb(null, res)
+      })
+    }
+
+    let tasks = [rawStream]
+    let filters = []
+
+    if (q.prefix != null) {
+      const prefix = q.prefix
+      filters.push((e, cb) => cb(null, e.key.toString().startsWith(prefix)))
+    }
+
+    if (q.filters != null) {
+      filters = filters.concat(q.filters)
+    }
+
+    tasks = tasks.concat(filters.map(f => asyncFilter(f)))
+
+    if (q.orders != null) {
+      tasks = tasks.concat(q.orders.map(o => asyncSort(o)))
+    }
+
+    if (q.offset != null) {
+      let i = 0
+      // $FlowFixMe
+      tasks.push(pull.filter(() => i++ >= q.offset))
+    }
+
+    if (q.limit != null) {
+      tasks.push(pull.take(q.limit))
+    }
+
+    return pull.apply(null, tasks)
+  }
+}
+
+module.exports = LevelDatastore
+
+}).call(this,require("buffer").Buffer)
+},{"buffer":715,"interface-datastore":224,"levelup":393,"pull-stream":590}],223:[function(require,module,exports){
+(function (Buffer){
+/*!
+ * @description Recursive object extending
+ * @author Viacheslav Lotsmanov <lotsmanov89@gmail.com>
+ * @license MIT
+ *
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2013-2015 Viacheslav Lotsmanov
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of
+ * this software and associated documentation files (the "Software"), to deal in
+ * the Software without restriction, including without limitation the rights to
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+ * the Software, and to permit persons to whom the Software is furnished to do so,
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+ * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+ * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+ * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+'use strict';
+
+function isSpecificValue(val) {
+	return (
+		val instanceof Buffer
+		|| val instanceof Date
+		|| val instanceof RegExp
+	) ? true : false;
+}
+
+function cloneSpecificValue(val) {
+	if (val instanceof Buffer) {
+		var x = new Buffer(val.length);
+		val.copy(x);
+		return x;
+	} else if (val instanceof Date) {
+		return new Date(val.getTime());
+	} else if (val instanceof RegExp) {
+		return new RegExp(val);
+	} else {
+		throw new Error('Unexpected situation');
+	}
+}
+
+/**
+ * Recursive cloning array.
+ */
+function deepCloneArray(arr) {
+	var clone = [];
+	arr.forEach(function (item, index) {
+		if (typeof item === 'object' && item !== null) {
+			if (Array.isArray(item)) {
+				clone[index] = deepCloneArray(item);
+			} else if (isSpecificValue(item)) {
+				clone[index] = cloneSpecificValue(item);
+			} else {
+				clone[index] = deepExtend({}, item);
+			}
+		} else {
+			clone[index] = item;
+		}
+	});
+	return clone;
+}
+
+/**
+ * Extening object that entered in first argument.
+ *
+ * Returns extended object or false if have no target object or incorrect type.
+ *
+ * If you wish to clone source object (without modify it), just use empty new
+ * object as first argument, like this:
+ *   deepExtend({}, yourObj_1, [yourObj_N]);
+ */
+var deepExtend = module.exports = function (/*obj_1, [obj_2], [obj_N]*/) {
+	if (arguments.length < 1 || typeof arguments[0] !== 'object') {
+		return false;
+	}
+
+	if (arguments.length < 2) {
+		return arguments[0];
+	}
+
+	var target = arguments[0];
+
+	// convert arguments to array and cut off target object
+	var args = Array.prototype.slice.call(arguments, 1);
+
+	var val, src, clone;
+
+	args.forEach(function (obj) {
+		// skip argument if isn't an object, is null, or is an array
+		if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) {
+			return;
+		}
+
+		Object.keys(obj).forEach(function (key) {
+			src = target[key]; // source value
+			val = obj[key]; // new value
+
+			// recursion prevention
+			if (val === target) {
+				return;
+
+			/**
+			 * if new value isn't object then just overwrite by new value
+			 * instead of extending.
+			 */
+			} else if (typeof val !== 'object' || val === null) {
+				target[key] = val;
+				return;
+
+			// just clone arrays (and recursive clone objects inside)
+			} else if (Array.isArray(val)) {
+				target[key] = deepCloneArray(val);
+				return;
+
+			// custom cloning and overwrite for specific objects
+			} else if (isSpecificValue(val)) {
+				target[key] = cloneSpecificValue(val);
+				return;
+
+			// overwrite by new value if source isn't object or array
+			} else if (typeof src !== 'object' || src === null || Array.isArray(src)) {
+				target[key] = deepExtend({}, val);
+				return;
+
+			// source value and new value is objects both, extending...
+			} else {
+				target[key] = deepExtend(src, val);
+				return;
+			}
+		});
+	});
+
+	return target;
+}
+
+}).call(this,require("buffer").Buffer)
+},{"buffer":715}],224:[function(require,module,exports){
+/* @flow */
+'use strict'
+
+const Key = require('./key')
+const MemoryDatastore = require('./memory')
+const utils = require('./utils')
+
+exports.Key = Key
+exports.MemoryDatastore = MemoryDatastore
+exports.utils = utils
+
+/* ::
+// -- Basics
+
+export type Callback<Value> = (err: ?Error, ?Value) => void
+
+// eslint-disable-next-line
+export interface Datastore<Value> {
+  // eslint-disable-next-line
+  put(Key, Value, Callback<void>): void;
+  // eslint-disable-next-line
+  get(Key, Callback<Value>): void;
+  has(Key, Callback<bool>): void;
+  delete(Key, Callback<void>): void;
+  // eslint-disable-next-line
+  query(Query<Value>): QueryResult<Value>;
+
+  // eslint-disable-next-line
+  batch(): Batch<Value>;
+  close(Callback<void>): void;
+  open(Callback<void>): void;
+}
+
+// -- Batch
+export type Batch<Value> = {
+  put(Key, Value): void,
+  delete(Key): void,
+  commit(Callback<void>): void
+}
+
+// -- Query
+
+export type Query<Value> = {
+  prefix?: string,
+  filters?: Array<Filter<Value>>,
+  orders?: Array<Order<Value>>,
+  limit?: number,
+  offset?: number,
+  keysOnly?: bool
+}
+
+export type PullEnd = bool | Error
+export type PullSource<Val> = (end: ?PullEnd, (end: ?PullEnd, Val) => void) => void
+
+export type QueryResult<Value> = PullSource<QueryEntry<Value>>
+
+export type QueryEntry<Value> = {
+  key: Key,
+  value?: Value
+}
+
+export type Filter<Value> = (QueryEntry<Value>, Callback<bool>) => void
+
+export type Order<Value> = (QueryResult<Value>, Callback<QueryResult<Value>>) => void
+
+*/
+
+},{"./key":225,"./memory":226,"./utils":227}],225:[function(require,module,exports){
+(function (Buffer){
+/* @flow */
+'use strict'
+
+const path = require('path')
+const uuid = require('uuid/v4')
+
+const pathSepS = path.sep
+const pathSep = new Buffer(pathSepS, 'utf8')[0]
+
+/**
+ * A Key represents the unique identifier of an object.
+ * Our Key scheme is inspired by file systems and Google App Engine key model.
+ * Keys are meant to be unique across a system. Keys are hierarchical,
+ * incorporating more and more specific namespaces. Thus keys can be deemed
+ * 'children' or 'ancestors' of other keys:
+ * - `new Key('/Comedy')`
+ * - `new Key('/Comedy/MontyPython')`
+ * Also, every namespace can be parametrized to embed relevant object
+ * information. For example, the Key `name` (most specific namespace) could
+ * include the object type:
+ * - `new Key('/Comedy/MontyPython/Actor:JohnCleese')`
+ * - `new Key('/Comedy/MontyPython/Sketch:CheeseShop')`
+ * - `new Key('/Comedy/MontyPython/Sketch:CheeseShop/Character:Mousebender')`
+ *
+ */
+class Key {
+  /* :: _buf: Buffer */
+
+  constructor (s /* : string|Buffer */, clean /* : ?bool */) {
+    if (typeof s === 'string') {
+      this._buf = new Buffer(s)
+    } else if (Buffer.isBuffer(s)) {
+      this._buf = s
+    }
+
+    if (clean == null) {
+      clean = true
+    }
+
+    if (clean) {
+      this.clean()
+    }
+
+    if (this._buf.length === 0 || this._buf[0] !== pathSep) {
+      throw new Error(`Invalid key: ${this.toString()}`)
+    }
+  }
+
+  /**
+   * Convert to the string representation
+   *
+   * @param {string} [encoding='utf8']
+   * @returns {string}
+   */
+  toString (encoding/* : ?buffer$Encoding */)/* : string */ {
+    return this._buf.toString(encoding || 'utf8')
+  }
+
+  /**
+   * Return the buffer representation of the key
+   *
+   * @returns {Buffer}
+   */
+  toBuffer () /* : Buffer */ {
+    return this._buf
+  }
+
+  // waiting on https://github.com/facebook/flow/issues/2286
+  // $FlowFixMe
+  get [Symbol.toStringTag] () /* : string */ {
+    return `[Key ${this.toString()}]`
+  }
+
+  /**
+   * Constructs a key out of a namespace array.
+   *
+   * @param {Array<string>} list
+   * @returns {Key}
+   *
+   * @example
+   * Key.withNamespaces(['one', 'two'])
+   * // => Key('/one/two')
+   *
+   */
+  static withNamespaces (list /* : Array<string> */) /* : Key */ {
+    return new Key(list.join(pathSepS))
+  }
+
+  /**
+   * Returns a randomly (uuid) generated key.
+   *
+   * @returns {Key}
+   *
+   * @example
+   * Key.random()
+   * // => Key('/f98719ea086343f7b71f32ea9d9d521d')
+   *
+   */
+  static random () /* : Key */ {
+    return new Key(uuid().replace(/-/g, ''))
+  }
+
+  /**
+   * Cleanup the current key
+   *
+   * @returns {void}
+   */
+  clean () {
+    if (!this._buf || this._buf.length === 0) {
+      this._buf = new Buffer(pathSepS, 'utf8')
+    }
+
+    this._buf = new Buffer(path.normalize(this.toString()))
+
+    if (this._buf[0] !== pathSep) {
+      this._buf = Buffer.concat([new Buffer(pathSepS, 'utf8'), this._buf])
+    }
+
+    // normalize does not remove trailing slashes
+    if (this.toString().length > 1 && this._buf[this._buf.length - 1] === pathSep) {
+      this._buf = this._buf.slice(0, -1)
+    }
+  }
+
+  /**
+   * Check if the given key is sorted lower than ourself.
+   *
+   * @param {Key} key
+   * @returns {bool}
+   */
+  less (key /* : Key */) /* : bool */ {
+    const list1 = this.list()
+    const list2 = key.list()
+
+    for (let i = 0; i < list1.length; i++) {
+      if (list2.length < i + 1) {
+        return false
+      }
+
+      const c1 = list1[i]
+      const c2 = list2[i]
+
+      if (c1 < c2) {
+        return true
+      } else if (c1 > c2) {
+        return false
+      }
+    }
+
+    return list1.length < list2.length
+  }
+
+  /**
+   * Returns the key with all parts in reversed order.
+   *
+   * @returns {Key}
+   *
+   * @example
+   * new Key('/Comedy/MontyPython/Actor:JohnCleese').reverse()
+   * // => Key('/Actor:JohnCleese/MontyPython/Comedy')
+   */
+  reverse () /* : Key */ {
+    return Key.withNamespaces(this.list().slice().reverse())
+  }
+
+  /**
+   * Returns the `namespaces` making up this Key.
+   *
+   * @returns {Array<string>}
+   */
+  namespaces () /* : Array<string> */ {
+    return this.list()
+  }
+
+  /** Returns the "base" namespace of this key.
+   *
+   * @returns {string}
+   *
+   * @example
+   * new Key('/Comedy/MontyPython/Actor:JohnCleese').baseNamespace()
+   * // => 'Actor:JohnCleese'
+   *
+   */
+  baseNamespace () /* : string */ {
+    const ns = this.namespaces()
+    return ns[ns.length - 1]
+  }
+
+  /**
+   * Returns the `list` representation of this key.
+   *
+   * @returns {Array<string>}
+   *
+   * @example
+   * new Key('/Comedy/MontyPython/Actor:JohnCleese').list()
+   * // => ['Comedy', 'MontyPythong', 'Actor:JohnCleese']
+   *
+   */
+  list () /* : Array<string> */ {
+    return this.toString().split(pathSepS).slice(1)
+  }
+
+  /**
+   * Returns the "type" of this key (value of last namespace).
+   *
+   * @returns {string}
+   *
+   * @example
+   * new Key('/Comedy/MontyPython/Actor:JohnCleese').type()
+   * // => 'Actor'
+   *
+   */
+  type () /* : string */ {
+    return namespaceType(this.baseNamespace())
+  }
+
+  /**
+   * Returns the "name" of this key (field of last namespace).
+   *
+   * @returns {string}
+   *
+   * @example
+   * new Key('/Comedy/MontyPython/Actor:JohnCleese').name()
+   * // => 'JohnCleese'
+   */
+  name () /* : string */ {
+    return namespaceValue(this.baseNamespace())
+  }
+
+  /**
+   * Returns an "instance" of this type key (appends value to namespace).
+   *
+   * @param {string} s
+   * @returns {Key}
+   *
+   * @example
+   * new Key('/Comedy/MontyPython/Actor').instance('JohnClesse')
+   * // => Key('/Comedy/MontyPython/Actor:JohnCleese')
+   */
+  instance (s /* : string */) /* : Key */ {
+    return new Key(this.toString() + ':' + s)
+  }
+
+  /**
+   * Returns the "path" of this key (parent + type).
+   *
+   * @returns {Key}
+   *
+   * @example
+   * new Key('/Comedy/MontyPython/Actor:JohnCleese').path()
+   * // => Key('/Comedy/MontyPython/Actor')
+   *
+   */
+  path () /* : Key */ {
+    return new Key(this.parent().toString() + pathSepS + this.type())
+  }
+
+  /**
+   * Returns the `parent` Key of this Key.
+   *
+   * @returns {Key}
+   *
+   * @example
+   * new Key("/Comedy/MontyPython/Actor:JohnCleese").parent()
+   * // => Key("/Comedy/MontyPython")
+   *
+   */
+  parent () /* : Key */ {
+    const list = this.list()
+    if (list.length === 1) {
+      return new Key(pathSepS, false)
+    }
+
+    return new Key(list.slice(0, -1).join(pathSepS))
+  }
+
+  /**
+   * Returns the `child` Key of this Key.
+   *
+   * @param {Key} key
+   * @returns {Key}
+   *
+   * @example
+   * new Key('/Comedy/MontyPython').child(new Key('Actor:JohnCleese'))
+   * // => Key('/Comedy/MontyPython/Actor:JohnCleese')
+   *
+   */
+  child (key /* : Key */) /* : Key */ {
+    if (this.toString() === pathSepS) {
+      return key
+    } else if (key.toString() === pathSepS) {
+      return this
+    }
+
+    return new Key(this.toString() + key.toString(), false)
+  }
+
+  /**
+   * Returns whether this key is a prefix of `other`
+   *
+   * @param {Key} other
+   * @returns {bool}
+   *
+   * @example
+   * new Key('/Comedy').isAncestorOf('/Comedy/MontyPython')
+   * // => true
+   *
+   */
+  isAncestorOf (other /* : Key */) /* : bool */ {
+    if (other.toString() === this.toString()) {
+      return false
+    }
+
+    return other.toString().startsWith(this.toString())
+  }
+
+  /**
+   * Returns whether this key is a contains another as prefix.
+   *
+   * @param {Key} other
+   * @returns {bool}
+   *
+   * @example
+   * new Key('/Comedy/MontyPython').isDecendantOf('/Comedy')
+   * // => true
+   *
+   */
+  isDecendantOf (other /* : Key */) /* : bool */ {
+    if (other.toString() === this.toString()) {
+      return false
+    }
+
+    return this.toString().startsWith(other.toString())
+  }
+
+  /**
+   * Returns wether this key has only one namespace.
+   *
+   * @returns {bool}
+   *
+   */
+  isTopLevel () /* : bool */ {
+    return this.list().length === 1
+  }
+}
+
+/**
+ * The first component of a namespace. `foo` in `foo:bar`
+ *
+ * @param {string} ns
+ * @returns {string}
+ */
+function namespaceType (ns /* : string */) /* : string */ {
+  const parts = ns.split(':')
+  if (parts.length < 2) {
+    return ''
+  }
+  return parts.slice(0, -1).join(':')
+}
+
+/**
+ * The last component of a namespace, `baz` in `foo:bar:baz`.
+ *
+ * @param {string} ns
+ * @returns {string}
+ */
+function namespaceValue (ns /* : string */) /* : string */ {
+  const parts = ns.split(':')
+  return parts[parts.length - 1]
+}
+
+module.exports = Key
+
+}).call(this,require("buffer").Buffer)
+},{"buffer":715,"path":724,"uuid/v4":701}],226:[function(require,module,exports){
+/* @flow */
+'use strict'
+
+/* :: import type {Batch, Query, QueryResult, Callback} from './' */
+
+const pull = require('pull-stream')
+const setImmediate = require('async/setImmediate')
+
+const asyncFilter = require('./utils').asyncFilter
+const asyncSort = require('./utils').asyncSort
+const Key = require('./key')
+
+class MemoryDatastore {
+  /* :: data: {[key: string]: Buffer} */
+
+  constructor () {
+    this.data = {}
+  }
+
+  open (callback /* : Callback<void> */) /* : void */ {
+    setImmediate(callback)
+  }
+
+  put (key /* : Key */, val /* : Buffer */, callback /* : Callback<void> */) /* : void */ {
+    this.data[key.toString()] = val
+
+    setImmediate(callback)
+  }
+
+  get (key /* : Key */, callback /* : Callback<Buffer> */) /* : void */ {
+    this.has(key, (err, exists) => {
+      if (err) {
+        return callback(err)
+      }
+
+      if (!exists) {
+        return callback(new Error('No value'))
+      }
+
+      callback(null, this.data[key.toString()])
+    })
+  }
+
+  has (key /* : Key */, callback /* : Callback<bool> */) /* : void */ {
+    setImmediate(() => {
+      callback(null, this.data[key.toString()] !== undefined)
+    })
+  }
+
+  delete (key /* : Key */, callback /* : Callback<void> */) /* : void */ {
+    delete this.data[key.toString()]
+
+    setImmediate(() => {
+      callback()
+    })
+  }
+
+  batch () /* : Batch<Buffer> */ {
+    let puts = []
+    let dels = []
+
+    return {
+      put (key /* : Key */, value /* : Buffer */) /* : void */ {
+        puts.push([key, value])
+      },
+      delete (key /* : Key */) /* : void */ {
+        dels.push(key)
+      },
+      commit: (callback /* : Callback<void> */) /* : void */ => {
+        puts.forEach(v => {
+          this.data[v[0].toString()] = v[1]
+        })
+
+        puts = []
+        dels.forEach(key => {
+          delete this.data[key.toString()]
+        })
+        dels = []
+
+        setImmediate(callback)
+      }
+    }
+  }
+
+  query (q /* : Query<Buffer> */) /* : QueryResult<Buffer> */ {
+    let tasks = [pull.keys(this.data), pull.map(k => ({
+      key: new Key(k),
+      value: this.data[k]
+    }))]
+
+    let filters = []
+
+    if (q.prefix != null) {
+      const prefix = q.prefix
+      filters.push((e, cb) => cb(null, e.key.toString().startsWith(prefix)))
+    }
+
+    if (q.filters != null) {
+      filters = filters.concat(q.filters)
+    }
+
+    tasks = tasks.concat(filters.map(f => asyncFilter(f)))
+
+    if (q.orders != null) {
+      tasks = tasks.concat(q.orders.map(o => asyncSort(o)))
+    }
+
+    if (q.offset != null) {
+      let i = 0
+      // $FlowFixMe
+      tasks.push(pull.filter(() => i++ >= q.offset))
+    }
+
+    if (q.limit != null) {
+      tasks.push(pull.take(q.limit))
+    }
+
+    if (q.keysOnly === true) {
+      tasks.push(pull.map(e => ({ key: e.key })))
+    }
+
+    return pull.apply(null, tasks)
+  }
+
+  close (callback /* : Callback<void> */) /* : void */ {
+    setImmediate(callback)
+  }
+}
+
+module.exports = MemoryDatastore
+
+},{"./key":225,"./utils":227,"async/setImmediate":54,"pull-stream":590}],227:[function(require,module,exports){
+'use strict'
+
+const pull = require('pull-stream')
+const Source = require('pull-defer/source')
+const path = require('path')
+const os = require('os')
+const uuid = require('uuid/v4')
+
+exports.asyncFilter = function (test) {
+  let busy = false
+  let abortCb
+  let aborted
+
+  return function (read) {
+    return function next (abort, cb) {
+      if (aborted) return cb(aborted)
+      if (abort) {
+        aborted = abort
+        if (!busy) {
+          read(abort, cb)
+        } else {
+          read(abort, () => {
+            // if we are still busy, wait for the test to complete.
+            if (busy) abortCb = cb; else cb(abort)
+          })
+        }
+      } else {
+        read(null, (end, data) => {
+          if (end) cb(end); else if (aborted) cb(aborted); else {
+            busy = true
+            test(data, (err, valid) => {
+              busy = false
+              if (aborted) {
+                cb(aborted)
+                abortCb(aborted)
+              } else if (err) {
+                next(err, cb)
+              } else if (valid) {
+                cb(null, data)
+              } else {
+                next(null, cb)
+              }
+            })
+          }
+        })
+      }
+    }
+  }
+}
+
+exports.asyncSort = function (sorter) {
+  const source = Source()
+
+  const sink = pull.collect((err, ary) => {
+    if (err) {
+      return source.abort(err)
+    }
+    sorter(ary, (err, res) => {
+      if (err) {
+        return source.abort(err)
+      }
+      source.resolve(pull.values(ary))
+    })
+  })
+
+  return function (read) {
+    sink(read)
+    return source
+  }
+}
+
+exports.replaceStartWith = function (s, r) {
+  const matcher = new RegExp('^' + r)
+  return s.replace(matcher, '')
+}
+
+exports.tmpdir = () => {
+  return path.join(os.tmpdir(), uuid())
+}
+
+},{"os":723,"path":724,"pull-defer/source":574,"pull-stream":590,"uuid/v4":701}],228:[function(require,module,exports){
 'use strict'
 
 /**
@@ -35845,445 +36092,11 @@ class BlockService {
 
 module.exports = BlockService
 
-},{}],226:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const mh = require('multihashes')
-const multibase = require('multibase')
-const multicodec = require('multicodec')
-const codecs = require('multicodec/src/base-table')
-const codecVarints = require('multicodec/src/varint-table')
-const multihash = require('multihashes')
-
-// CID: <mbase><version><mcodec><mhash>
-
-class CID {
-  /*
-   * if (str)
-   *   if (1st char is on multibase table) -> CID String
-   *   else -> bs58 encoded multihash
-   * else if (Buffer)
-   *   if (0 or 1) -> CID
-   *   else -> multihash
-   * else if (Number)
-   *   -> construct CID by parts
-   *
-   * ..if only JS had traits..
-   */
-  constructor (version, codec, multihash) {
-    if (typeof version === 'string') {
-      if (multibase.isEncoded(version)) { // CID String (encoded with multibase)
-        const cid = multibase.decode(version)
-        this.version = parseInt(cid.slice(0, 1).toString('hex'), 16)
-        this.codec = multicodec.getCodec(cid.slice(1))
-        this.multihash = multicodec.rmPrefix(cid.slice(1))
-      } else { // bs58 string encoded multihash
-        this.codec = 'dag-pb'
-        this.multihash = mh.fromB58String(version)
-        this.version = 0
-      }
-    } else if (Buffer.isBuffer(version)) {
-      const firstByte = version.slice(0, 1)
-      const v = parseInt(firstByte.toString('hex'), 16)
-      if (v === 0 || v === 1) { // CID
-        const cid = version
-        this.version = v
-        this.codec = multicodec.getCodec(cid.slice(1))
-        this.multihash = multicodec.rmPrefix(cid.slice(1))
-      } else { // multihash
-        this.codec = 'dag-pb'
-        this.multihash = version
-        this.version = 0
-      }
-    } else if (typeof version === 'number') {
-      if (typeof codec !== 'string') {
-        throw new Error('codec must be string')
-      }
-      if (!(version === 0 || version === 1)) {
-        throw new Error('version must be a number equal to 0 or 1')
-      }
-      mh.validate(multihash)
-      this.codec = codec
-      this.version = version
-      this.multihash = multihash
-    }
-  }
-
-  get buffer () {
-    switch (this.version) {
-      case 0:
-        return this.multihash
-      case 1:
-        return Buffer.concat([
-          Buffer('01', 'hex'),
-          Buffer(codecVarints[this.codec]),
-          this.multihash
-        ])
-      default:
-        throw new Error('unsupported version')
-    }
-  }
-
-  get prefix () {
-    return Buffer.concat([
-      new Buffer(`0${this.version}`, 'hex'),
-      codecVarints[this.codec],
-      multihash.prefix(this.multihash)
-    ])
-  }
-
-  toV0 () {
-    if (this.codec !== 'dag-pb') {
-      throw new Error('Cannot convert a non dag-pb CID to CIDv0')
-    }
-
-    return new CID(0, this.codec, this.multihash)
-  }
-
-  toV1 () {
-    return new CID(1, this.codec, this.multihash)
-  }
-
-  /* defaults to base58btc */
-  toBaseEncodedString (base) {
-    base = base || 'base58btc'
-
-    switch (this.version) {
-      case 0: {
-        if (base !== 'base58btc') {
-          throw new Error('not supported with CIDv0, to support different bases, please migrate the instance do CIDv1, you can do that through cid.toV1()')
-        }
-        return mh.toB58String(this.multihash)
-      }
-      case 1:
-        return multibase.encode(base, this.buffer).toString()
-      default:
-        throw new Error('Unsupported version')
-    }
-  }
-
-  toJSON () {
-    return {
-      codec: this.codec,
-      version: this.version,
-      hash: this.multihash
-    }
-  }
-
-  equals (other) {
-    return this.codec === other.codec &&
-      this.version === other.version &&
-      this.multihash.equals(other.multihash)
-  }
-}
-
-CID.codecs = codecs
-CID.isCID = (other) => {
-  return other.constructor.name === 'CID'
-}
-
-module.exports = CID
-
-}).call(this,require("buffer").Buffer)
-},{"buffer":722,"multibase":516,"multicodec":228,"multicodec/src/base-table":227,"multicodec/src/varint-table":231,"multihashes":523}],227:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-// spec and table at: https://github.com/multiformats/multicodec
-
-exports = module.exports
-
-// Miscellaneous
-exports['raw'] = new Buffer('55', 'hex')
-
-// bases encodings
-exports['base1'] = new Buffer('01', 'hex')
-exports['base2'] = new Buffer('55', 'hex')
-exports['base8'] = new Buffer('07', 'hex')
-exports['base10'] = new Buffer('09', 'hex')
-
-// Serialization formats
-exports['protobuf'] = new Buffer('50', 'hex')
-exports['cbor'] = new Buffer('51', 'hex')
-exports['rlp'] = new Buffer('60', 'hex')
-exports['bencode'] = new Buffer('63', 'hex')
-
-// Multiformats
-exports['multicodec'] = new Buffer('30', 'hex')
-exports['multihash'] = new Buffer('31', 'hex')
-exports['multiaddr'] = new Buffer('32', 'hex')
-exports['multibase'] = new Buffer('33', 'hex')
-
-// multihashes
-exports['sha1'] = new Buffer('11', 'hex')
-exports['sha2-256'] = new Buffer('12', 'hex')
-exports['sha2-512'] = new Buffer('13', 'hex')
-exports['sha3-224'] = new Buffer('17', 'hex')
-exports['sha3-256'] = new Buffer('16', 'hex')
-exports['sha3-384'] = new Buffer('15', 'hex')
-exports['sha3-512'] = new Buffer('14', 'hex')
-exports['shake-128'] = new Buffer('18', 'hex')
-exports['shake-256'] = new Buffer('19', 'hex')
-exports['keccak-224'] = new Buffer('1a', 'hex')
-exports['keccak-256'] = new Buffer('1b', 'hex')
-exports['keccak-384'] = new Buffer('1c', 'hex')
-exports['keccak-512'] = new Buffer('1d', 'hex')
-exports['blake2b'] = new Buffer('40', 'hex')
-exports['blake2s'] = new Buffer('41', 'hex')
-
-// multiaddrs
-exports['ip4'] = new Buffer('04', 'hex')
-exports['ip6'] = new Buffer('29', 'hex')
-exports['tcp'] = new Buffer('06', 'hex')
-exports['udp'] = new Buffer('0111', 'hex')
-exports['dccp'] = new Buffer('21', 'hex')
-exports['sctp'] = new Buffer('84', 'hex')
-exports['udt'] = new Buffer('012d', 'hex')
-exports['utp'] = new Buffer('012e', 'hex')
-exports['ipfs'] = new Buffer('2a', 'hex')
-exports['http'] = new Buffer('01e0', 'hex')
-exports['https'] = new Buffer('01bb', 'hex')
-exports['ws'] = new Buffer('01dd', 'hex')
-exports['onion'] = new Buffer('01bc', 'hex')
-
-// archiving formats
-
-// image formats
-
-// video formats
-
-// VCS formats
-exports['git-raw'] = new Buffer('78', 'hex')
-
-// IPLD formats
-exports['dag-pb'] = new Buffer('70', 'hex')
-exports['dag-cbor'] = new Buffer('71', 'hex')
-
-exports['eth-block'] = new Buffer('90', 'hex')
-exports['eth-block-list'] = new Buffer('91', 'hex')
-exports['eth-tx-trie'] = new Buffer('92', 'hex')
-exports['eth-tx'] = new Buffer('93', 'hex')
-exports['eth-tx-receipt-trie'] = new Buffer('94', 'hex')
-exports['eth-tx-receipt'] = new Buffer('95', 'hex')
-exports['eth-state-trie'] = new Buffer('96', 'hex')
-exports['eth-account-snapshot'] = new Buffer('97', 'hex')
-exports['eth-storage-trie'] = new Buffer('98', 'hex')
-
-exports['bitcoin-block'] = new Buffer('b0', 'hex')
-exports['bitcoin-tx'] = new Buffer('b1', 'hex')
-
-exports['stellar-block'] = new Buffer('d0', 'hex')
-exports['stellar-tx'] = new Buffer('d1', 'hex')
-
-exports['torrent-info'] = new Buffer('7b', 'hex')
-exports['torrent-file'] = new Buffer('7c', 'hex')
-
-}).call(this,require("buffer").Buffer)
-},{"buffer":722}],228:[function(require,module,exports){
-(function (Buffer){
-/**
- * Implementation of the multicodec specification.
- *
- * @module multicodec
- * @example
- * const multicodec = require('multicodec')
- *
- * const prefixedProtobuf = multicodec.addPrefix('protobuf', protobufBuffer)
- * // prefixedProtobuf 0x50...
- *
- */
-'use strict'
-
-const varint = require('varint')
-const codecNameToCodeVarint = require('./varint-table')
-const codeToCodecName = require('./name-table')
-const util = require('./util')
-
-exports = module.exports
-
-/**
- * Prefix a buffer with a multicodec-packed.
- *
- * @param {string|number} multicodecStrOrCode
- * @param {Buffer} data
- * @returns {Buffer}
- */
-exports.addPrefix = (multicodecStrOrCode, data) => {
-  let prefix
-
-  if (Buffer.isBuffer(multicodecStrOrCode)) {
-    prefix = util.varintBufferEncode(multicodecStrOrCode)
-  } else {
-    if (codecNameToCodeVarint[multicodecStrOrCode]) {
-      prefix = codecNameToCodeVarint[multicodecStrOrCode]
-    } else {
-      throw new Error('multicodec not recognized')
-    }
-  }
-  return Buffer.concat([prefix, data])
-}
-
-/**
- * Decapsulate the multicodec-packed prefix from the data.
- *
- * @param {Buffer} data
- * @returns {Buffer}
- */
-exports.rmPrefix = (data) => {
-  varint.decode(data)
-  return data.slice(varint.decode.bytes)
-}
-
-/**
- * Get the codec of the prefixed data.
- * @param {Buffer} prefixedData
- * @returns {string}
- */
-exports.getCodec = (prefixedData) => {
-  const code = util.varintBufferDecode(prefixedData)
-  const codecName = codeToCodecName[code.toString('hex')]
-  return codecName
-}
-
-}).call(this,require("buffer").Buffer)
-},{"./name-table":229,"./util":230,"./varint-table":231,"buffer":722,"varint":712}],229:[function(require,module,exports){
-'use strict'
-const baseTable = require('./base-table')
-
-// this creates a map for code as hexString -> codecName
-
-const nameTable = {}
-module.exports = nameTable
-
-for (let encodingName in baseTable) {
-  let code = baseTable[encodingName]
-  nameTable[code.toString('hex')] = encodingName
-}
-
-},{"./base-table":227}],230:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-const varint = require('varint')
-
-module.exports = {
-  numberToBuffer,
-  bufferToNumber,
-  varintBufferEncode,
-  varintBufferDecode
-}
-
-function bufferToNumber (buf) {
-  return parseInt(buf.toString('hex'), 16)
-}
-
-function numberToBuffer (num) {
-  let hexString = num.toString(16)
-  if (hexString.length % 2 === 1) {
-    hexString = '0' + hexString
-  }
-  return new Buffer(hexString, 'hex')
-}
-
-function varintBufferEncode (input) {
-  return new Buffer(varint.encode(bufferToNumber(input)))
-}
-
-function varintBufferDecode (input) {
-  return numberToBuffer(varint.decode(input))
-}
-
-}).call(this,require("buffer").Buffer)
-},{"buffer":722,"varint":712}],231:[function(require,module,exports){
-'use strict'
-const baseTable = require('./base-table')
-const varintBufferEncode = require('./util').varintBufferEncode
-
-// this creates a map for codecName -> codeVarintBuffer
-
-const varintTable = {}
-module.exports = varintTable
-
-for (let encodingName in baseTable) {
-  let code = baseTable[encodingName]
-  varintTable[encodingName] = varintBufferEncode(code)
-}
-
-},{"./base-table":227,"./util":230}],232:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const CID = require('cids')
-
-/**
- * Represents an immutable block of data that is uniquely referenced with a cid.
- *
- * @constructor
- * @param {Buffer} data - The data to be stored in the block as a buffer.
- * @param {CID} cid - The cid of the data
- *
- * @example
- * const block = new Block(new Buffer('a012d83b20f9371...'))
- */
-class Block {
-  constructor (data, cid) {
-    if (!data || !Buffer.isBuffer(data)) {
-      throw new Error('first argument  must be a buffer')
-    }
-
-    if (!cid || !CID.isCID(cid)) {
-      throw new Error('second argument must be a CID')
-    }
-
-    this._data = data
-    this._cid = cid
-  }
-
-  /**
-   * The data of this block.
-   *
-   * @type {Buffer}
-   */
-  get data () {
-    return this._data
-  }
-
-  set data (val) {
-    throw new Error('Tried to change an immutable block')
-  }
-
-  /**
-   * The cid of the data this block represents.
-   *
-   * @type {CID}
-   */
-  get cid () {
-    return this._cid
-  }
-
-  set cid (val) {
-    throw new Error('Tried to change an immutable block')
-  }
-
-  /**
-   * Check if the given value is a Block.
-   *
-   * @param {any} other
-   * @returns {bool}
-   */
-  static isBlock (other) {
-    return other && other.constructor.name === 'Block'
-  }
-}
-
-module.exports = Block
-
-}).call(this,{"isBuffer":require("../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728,"cids":226}],233:[function(require,module,exports){
-arguments[4][162][0].apply(exports,arguments)
-},{"./debug":234,"_process":733,"dup":162}],234:[function(require,module,exports){
-arguments[4][163][0].apply(exports,arguments)
-},{"dup":163,"ms":508}],235:[function(require,module,exports){
+},{}],229:[function(require,module,exports){
+arguments[4][152][0].apply(exports,arguments)
+},{"./debug":230,"_process":726,"dup":152}],230:[function(require,module,exports){
+arguments[4][153][0].apply(exports,arguments)
+},{"dup":153,"ms":512}],231:[function(require,module,exports){
 'use strict'
 
 const Key = require('interface-datastore').Key
@@ -36324,7 +36137,7 @@ module.exports = (store) => {
   }
 }
 
-},{"interface-datastore":206,"safe-buffer":654}],236:[function(require,module,exports){
+},{"interface-datastore":224,"safe-buffer":646}],232:[function(require,module,exports){
 'use strict'
 
 exports.create = function createBackend (name, path, options) {
@@ -36333,7 +36146,7 @@ exports.create = function createBackend (name, path, options) {
   return new Ctor(path, backendOptions)
 }
 
-},{}],237:[function(require,module,exports){
+},{}],233:[function(require,module,exports){
 'use strict'
 
 const core = require('datastore-core')
@@ -36487,7 +36300,7 @@ function createBaseStore (store) {
   }
 }
 
-},{"async/reject":52,"async/setImmediate":54,"base32.js":61,"cids":103,"datastore-core":114,"interface-datastore":206,"ipfs-block":232}],238:[function(require,module,exports){
+},{"async/reject":52,"async/setImmediate":54,"base32.js":61,"cids":103,"datastore-core":214,"interface-datastore":224,"ipfs-block":211}],234:[function(require,module,exports){
 'use strict'
 
 const Key = require('interface-datastore').Key
@@ -36597,7 +36410,7 @@ module.exports = (store) => {
   }
 }
 
-},{"async/queue":51,"async/waterfall":57,"interface-datastore":206,"lodash.get":450,"lodash.has":452,"lodash.set":458,"safe-buffer":654}],239:[function(require,module,exports){
+},{"async/queue":51,"async/waterfall":57,"interface-datastore":224,"lodash.get":454,"lodash.has":456,"lodash.set":462,"safe-buffer":646}],235:[function(require,module,exports){
 'use strict'
 
 // Default configuration for a repo in the browser
@@ -36623,7 +36436,7 @@ module.exports = {
   }
 }
 
-},{"datastore-level":122,"level-js":371}],240:[function(require,module,exports){
+},{"datastore-level":222,"level-js":385}],236:[function(require,module,exports){
 'use strict'
 
 const waterfall = require('async/waterfall')
@@ -36853,7 +36666,7 @@ function buildOptions (_options) {
   return options
 }
 
-},{"./api-addr":235,"./backends":236,"./blockstore":237,"./config":238,"./default-options":239,"./lock":241,"./lock-memory":241,"./version":242,"assert":719,"async/each":21,"async/parallel":50,"async/series":53,"async/waterfall":57,"debug":233,"path":731}],241:[function(require,module,exports){
+},{"./api-addr":231,"./backends":232,"./blockstore":233,"./config":234,"./default-options":235,"./lock":237,"./lock-memory":237,"./version":238,"assert":712,"async/each":21,"async/parallel":50,"async/series":53,"async/waterfall":57,"debug":229,"path":724}],237:[function(require,module,exports){
 'use strict'
 
 const debug = require('debug')
@@ -36906,7 +36719,7 @@ exports.locked = (dir, callback) => {
   })
 }
 
-},{"async/setImmediate":54,"debug":233}],242:[function(require,module,exports){
+},{"async/setImmediate":54,"debug":229}],238:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -36973,9 +36786,7 @@ module.exports = (store) => {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722,"debug":233,"interface-datastore":206}],243:[function(require,module,exports){
-arguments[4][125][0].apply(exports,arguments)
-},{"buffer":722,"dup":125}],244:[function(require,module,exports){
+},{"buffer":715,"debug":229,"interface-datastore":224}],239:[function(require,module,exports){
 'use strict'
 
 const pull = require('pull-stream')
@@ -37034,7 +36845,7 @@ module.exports = function balancedReduceToRoot (reduce, options) {
   }
 }
 
-},{"pull-batch":575,"pull-pair":589,"pull-pushable":593,"pull-stream":598}],245:[function(require,module,exports){
+},{"pull-batch":567,"pull-pair":581,"pull-pushable":585,"pull-stream":590}],240:[function(require,module,exports){
 'use strict'
 
 const balancedReducer = require('./balanced-reducer')
@@ -37048,7 +36859,7 @@ module.exports = function (reduce, _options) {
   return balancedReducer(reduce, options)
 }
 
-},{"./balanced-reducer":244}],246:[function(require,module,exports){
+},{"./balanced-reducer":239}],241:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -37215,7 +37026,7 @@ module.exports = function (createChunker, ipldResolver, createReducer, _options)
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./reduce":250,"async/parallel":50,"async/waterfall":57,"buffer":722,"cids":103,"deep-extend":243,"ipfs-unixfs":272,"ipld-dag-pb":315,"pull-stream":598,"pull-through":629}],247:[function(require,module,exports){
+},{"./reduce":245,"async/parallel":50,"async/waterfall":57,"buffer":715,"cids":103,"deep-extend":223,"ipfs-unixfs":212,"ipld-dag-pb":331,"pull-stream":590,"pull-through":621}],242:[function(require,module,exports){
 'use strict'
 
 const pullPushable = require('pull-pushable')
@@ -37237,7 +37048,7 @@ module.exports = function createBuildStream (createStrategy, ipldResolver, optio
   }
 }
 
-},{"pull-pushable":593,"pull-write":631}],248:[function(require,module,exports){
+},{"pull-pushable":585,"pull-write":623}],243:[function(require,module,exports){
 'use strict'
 
 const pull = require('pull-stream')
@@ -37276,7 +37087,7 @@ module.exports = function (reduce, options) {
   }
 }
 
-},{"pull-batch":575,"pull-pair":589,"pull-pushable":593,"pull-stream":598}],249:[function(require,module,exports){
+},{"pull-batch":567,"pull-pair":581,"pull-pushable":585,"pull-stream":590}],244:[function(require,module,exports){
 'use strict'
 
 const assert = require('assert')
@@ -37310,7 +37121,7 @@ module.exports = function (Chunker, ipldResolver, _options) {
   return createBuildStream(createStrategy, ipldResolver, options)
 }
 
-},{"./balanced":245,"./builder":246,"./create-build-stream":247,"./flat":248,"./trickle":251,"assert":719}],250:[function(require,module,exports){
+},{"./balanced":240,"./builder":241,"./create-build-stream":242,"./flat":243,"./trickle":246,"assert":712}],245:[function(require,module,exports){
 'use strict'
 
 const waterfall = require('async/waterfall')
@@ -37376,7 +37187,7 @@ module.exports = function (file, ipldResolver, options) {
   }
 }
 
-},{"async/waterfall":57,"cids":103,"ipfs-unixfs":272,"ipld-dag-pb":315}],251:[function(require,module,exports){
+},{"async/waterfall":57,"cids":103,"ipfs-unixfs":212,"ipld-dag-pb":331}],246:[function(require,module,exports){
 'use strict'
 
 const trickleReducer = require('./trickle-reducer')
@@ -37391,7 +37202,7 @@ module.exports = function (reduce, _options) {
   return trickleReducer(reduce, options)
 }
 
-},{"./trickle-reducer":252}],252:[function(require,module,exports){
+},{"./trickle-reducer":247}],247:[function(require,module,exports){
 'use strict'
 
 const pull = require('pull-stream')
@@ -37538,7 +37349,7 @@ module.exports = function trickleReduceToRoot (reduce, options) {
   }
 }
 
-},{"pull-batch":575,"pull-pair":589,"pull-pause":592,"pull-pushable":593,"pull-stream":598,"pull-through":629,"pull-write":631}],253:[function(require,module,exports){
+},{"pull-batch":567,"pull-pair":581,"pull-pause":584,"pull-pushable":585,"pull-stream":590,"pull-through":621,"pull-write":623}],248:[function(require,module,exports){
 'use strict'
 
 const pullBlock = require('pull-block')
@@ -37548,7 +37359,7 @@ module.exports = (options) => {
   return pullBlock(maxSize, { zeroPadding: false, emitEmpty: true })
 }
 
-},{"pull-block":576}],254:[function(require,module,exports){
+},{"pull-block":568}],249:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -37562,8 +37373,8 @@ module.exports = (multihash) => {
   return multihash
 }
 
-}).call(this,{"isBuffer":require("../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728,"multihashes":523}],255:[function(require,module,exports){
+}).call(this,{"isBuffer":require("../../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
+},{"../../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721,"multihashes":527}],250:[function(require,module,exports){
 'use strict'
 
 const path = require('path')
@@ -37613,7 +37424,7 @@ function dirExporter (node, name, pathRest, ipldResolver, resolve, parent) {
   return cat(streams)
 }
 
-},{"cids":103,"path":731,"pull-cat":577,"pull-paramap":590,"pull-stream":598}],256:[function(require,module,exports){
+},{"cids":103,"path":724,"pull-cat":569,"pull-paramap":582,"pull-stream":590}],251:[function(require,module,exports){
 'use strict'
 
 const path = require('path')
@@ -37687,7 +37498,7 @@ function shardedDirExporter (node, name, pathRest, ipldResolver, resolve, parent
   return cat(streams)
 }
 
-},{"./clean-multihash":254,"cids":103,"path":731,"pull-cat":577,"pull-paramap":590,"pull-stream":598}],257:[function(require,module,exports){
+},{"./clean-multihash":249,"cids":103,"path":724,"pull-cat":569,"pull-paramap":582,"pull-stream":590}],252:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -37736,7 +37547,7 @@ module.exports = (node, name, pathRest, ipldResolver) => {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722,"cids":103,"ipfs-unixfs":272,"pull-paramap":590,"pull-stream":598,"pull-traverse":630}],258:[function(require,module,exports){
+},{"buffer":715,"cids":103,"ipfs-unixfs":212,"pull-paramap":582,"pull-stream":590,"pull-traverse":622}],253:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -37802,8 +37613,8 @@ module.exports = (path, dag) => {
   )
 }
 
-}).call(this,{"isBuffer":require("../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728,"./resolve":260,"cids":103,"pull-defer":580,"pull-stream":598}],259:[function(require,module,exports){
+}).call(this,{"isBuffer":require("../../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
+},{"../../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721,"./resolve":255,"cids":103,"pull-defer":572,"pull-stream":590}],254:[function(require,module,exports){
 'use strict'
 
 const path = require('path')
@@ -37841,7 +37652,7 @@ function sanitizeCID (cid) {
   return new CID(cid.version, cid.codec, cid.multihash)
 }
 
-},{"cids":103,"path":731,"pull-defer":580,"pull-stream":598}],260:[function(require,module,exports){
+},{"cids":103,"path":724,"pull-defer":572,"pull-stream":590}],255:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -37877,8 +37688,8 @@ function typeOf (node) {
   }
 }
 
-}).call(this,{"isBuffer":require("../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728,"./dir-flat":255,"./dir-hamt-sharded":256,"./file":257,"./object":259,"ipfs-unixfs":272,"pull-stream":598}],261:[function(require,module,exports){
+}).call(this,{"isBuffer":require("../../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
+},{"../../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721,"./dir-flat":250,"./dir-hamt-sharded":251,"./file":252,"./object":254,"ipfs-unixfs":212,"pull-stream":590}],256:[function(require,module,exports){
 (function (process){
 'use strict'
 
@@ -38171,7 +37982,7 @@ function asyncTransformBucket (bucket, asyncMap, asyncReduce, callback) {
 module.exports = Bucket
 
 }).call(this,require('_process'))
-},{"./consumable-hash":263,"_process":733,"async/eachSeries":26,"async/map":49,"sparse-array":695}],262:[function(require,module,exports){
+},{"./consumable-hash":258,"_process":726,"async/eachSeries":26,"async/map":49,"sparse-array":688}],257:[function(require,module,exports){
 'use strict'
 
 const START_MASKS = [
@@ -38255,7 +38066,7 @@ function maskFor (start, length) {
   return START_MASKS[start] & STOP_MASKS[Math.min(length + start - 1, 7)]
 }
 
-},{}],263:[function(require,module,exports){
+},{}],258:[function(require,module,exports){
 (function (Buffer,process){
 'use strict'
 
@@ -38361,8 +38172,8 @@ class InfiniteHash {
   }
 }
 
-}).call(this,{"isBuffer":require("../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")},require('_process'))
-},{"../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728,"./consumable-buffer":262,"_process":733,"async/whilst":58}],264:[function(require,module,exports){
+}).call(this,{"isBuffer":require("../../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")},require('_process'))
+},{"../../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721,"./consumable-buffer":257,"_process":726,"async/whilst":58}],259:[function(require,module,exports){
 'use strict'
 
 const Bucket = require('./bucket')
@@ -38373,7 +38184,7 @@ module.exports = function createHAMT (options) {
 
 module.exports.isBucket = Bucket.isBucket
 
-},{"./bucket":261}],265:[function(require,module,exports){
+},{"./bucket":256}],260:[function(require,module,exports){
 (function (process){
 'use strict'
 
@@ -38472,7 +38283,7 @@ function createDirFlat (props, _options) {
 }
 
 }).call(this,require('_process'))
-},{"./dir":267,"_process":733,"async/eachSeries":26,"async/waterfall":57,"cids":103,"ipfs-unixfs":272,"ipld-dag-pb":315}],266:[function(require,module,exports){
+},{"./dir":262,"_process":726,"async/eachSeries":26,"async/waterfall":57,"cids":103,"ipfs-unixfs":212,"ipld-dag-pb":331}],261:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -38649,7 +38460,7 @@ function flush (options, bucket, path, ipldResolver, source, callback) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"../hamt":264,"./dir":267,"async/waterfall":57,"async/whilst":58,"buffer":722,"cids":103,"ipfs-unixfs":272,"ipld-dag-pb":315,"left-pad":358,"multihashing-async":527}],267:[function(require,module,exports){
+},{"../hamt":259,"./dir":262,"async/waterfall":57,"async/whilst":58,"buffer":715,"cids":103,"ipfs-unixfs":212,"ipld-dag-pb":331,"left-pad":372,"multihashing-async":531}],262:[function(require,module,exports){
 'use strict'
 
 module.exports = class Dir {
@@ -38659,7 +38470,7 @@ module.exports = class Dir {
   }
 }
 
-},{}],268:[function(require,module,exports){
+},{}],263:[function(require,module,exports){
 'use strict'
 
 const waterfall = require('async/waterfall')
@@ -38735,7 +38546,7 @@ function definitelyShardOne (oldDir, options, callback) {
   )
 }
 
-},{"./dir-sharded":266,"async/waterfall":57}],269:[function(require,module,exports){
+},{"./dir-sharded":261,"async/waterfall":57}],264:[function(require,module,exports){
 (function (process){
 'use strict'
 
@@ -38837,7 +38648,7 @@ module.exports = function (ipldResolver, _options) {
 }
 
 }).call(this,require('_process'))
-},{"../builder":249,"../chunker/fixed-size":253,"./tree-builder":270,"_process":733,"assert":719,"async/setImmediate":54,"pull-pause":592,"pull-pushable":593,"pull-stream":598,"pull-write":631}],270:[function(require,module,exports){
+},{"../builder":244,"../chunker/fixed-size":248,"./tree-builder":265,"_process":726,"assert":712,"async/setImmediate":54,"pull-pause":584,"pull-pushable":585,"pull-stream":590,"pull-write":623}],265:[function(require,module,exports){
 (function (process){
 'use strict'
 
@@ -39058,4647 +38869,13 @@ function notEmpty (str) {
 }
 
 }).call(this,require('_process'))
-},{"./dir":267,"./dir-flat":265,"./flat-to-shard":268,"_process":733,"async/eachOfSeries":25,"async/eachSeries":26,"async/queue":51,"async/waterfall":57,"pull-pushable":593,"pull-write":631}],271:[function(require,module,exports){
+},{"./dir":262,"./dir-flat":260,"./flat-to-shard":263,"_process":726,"async/eachOfSeries":25,"async/eachSeries":26,"async/queue":51,"async/waterfall":57,"pull-pushable":585,"pull-write":623}],266:[function(require,module,exports){
 'use strict'
 
 exports.importer = exports.Importer = require('./importer')
 exports.exporter = exports.Exporter = require('./exporter')
 
-},{"./exporter":258,"./importer":269}],272:[function(require,module,exports){
-'use strict'
-
-const protons = require('protons')
-const pb = protons(require('./unixfs.proto'))
-// encode/decode
-const unixfsData = pb.Data
-// const unixfsMetadata = pb.MetaData // encode/decode
-
-const types = [
-  'raw',
-  'directory',
-  'file',
-  'metadata',
-  'symlink',
-  'hamt-sharded-directory'
-]
-
-const dirTypes = [
-  'directory',
-  'hamt-sharded-directory'
-]
-
-function Data (type, data) {
-  if (!(this instanceof Data)) {
-    return new Data(type, data)
-  }
-  if (types.indexOf(type) === -1) {
-    throw new Error('Type: ' + type + ' is not valid')
-  }
-
-  this.type = type
-  this.data = data
-  this.blockSizes = []
-
-  this.addBlockSize = (size) => {
-    this.blockSizes.push(size)
-  }
-
-  this.removeBlockSize = (index) => {
-    this.blockSizes.splice(index, 1)
-  }
-
-  // data.length + blockSizes
-  this.fileSize = () => {
-    if (dirTypes.indexOf(this.type) >= 0) {
-      // dirs don't have file size
-      return undefined
-    }
-
-    let sum = 0
-    this.blockSizes.forEach((size) => {
-      sum += size
-    })
-    if (data) {
-      sum += data.length
-    }
-    return sum
-  }
-
-  // encode to protobuf
-  this.marshal = () => {
-    let type
-
-    switch (this.type) {
-      case 'raw': type = unixfsData.DataType.Raw; break
-      case 'directory': type = unixfsData.DataType.Directory; break
-      case 'file': type = unixfsData.DataType.File; break
-      case 'metadata': type = unixfsData.DataType.Metadata; break
-      case 'symlink': type = unixfsData.DataType.Symlink; break
-      case 'hamt-sharded-directory': type = unixfsData.DataType.HAMTShard; break
-      default:
-        throw new Error(`Unkown type: "${this.type}"`)
-    }
-    let fileSize = this.fileSize()
-
-    if (!fileSize) {
-      fileSize = undefined
-    }
-
-    return unixfsData.encode({
-      Type: type,
-      Data: this.data,
-      filesize: fileSize,
-      blocksizes: this.blockSizes.length > 0 ? this.blockSizes : undefined,
-      hashType: this.hashType,
-      fanout: this.fanout
-    })
-  }
-}
-
-// decode from protobuf https://github.com/ipfs/go-ipfs/blob/master/unixfs/format.go#L24
-Data.unmarshal = (marsheled) => {
-  const decoded = unixfsData.decode(marsheled)
-  if (!decoded.Data) {
-    decoded.Data = undefined
-  }
-  const obj = new Data(types[decoded.Type], decoded.Data)
-  obj.blockSizes = decoded.blocksizes
-  return obj
-}
-
-exports = module.exports = Data
-
-},{"./unixfs.proto":273,"protons":573}],273:[function(require,module,exports){
-'use strict'
-
-module.exports = `message Data {
-  enum DataType {
-    Raw = 0;
-    Directory = 1;
-    File = 2;
-    Metadata = 3;
-    Symlink = 4;
-    HAMTShard = 5;
-  }
-
-  required DataType Type = 1;
-  optional bytes Data = 2;
-  optional uint64 filesize = 3;
-  repeated uint64 blocksizes = 4;
-
-  optional uint64 hashType = 5;
-  optional uint64 fanout = 6;
-}
-
-message Metadata {
-  required string MimeType = 1;
-}`
-
-},{}],274:[function(require,module,exports){
-module.exports={
-  "_from": "git+https://git@github.com/ipfs/js-ipfs.git",
-  "_id": "ipfs@0.26.0",
-  "_inBundle": false,
-  "_integrity": "sha1-gklKTz4fahp0L8MGEJ9dM+qweR4=",
-  "_location": "/ipfs",
-  "_phantomChildren": {},
-  "_requested": {
-    "type": "git",
-    "raw": "git+https://git@github.com/ipfs/js-ipfs.git",
-    "rawSpec": "git+https://git@github.com/ipfs/js-ipfs.git",
-    "saveSpec": "git+https://git@github.com/ipfs/js-ipfs.git",
-    "fetchSpec": "https://git@github.com/ipfs/js-ipfs.git",
-    "gitCommittish": "master"
-  },
-  "_requiredBy": [
-    "#USER",
-    "/"
-  ],
-  "_resolved": "git+https://git@github.com/ipfs/js-ipfs.git#319c1c9830262ab5c05bf99fc525d8883d3178cb",
-  "_spec": "git+https://git@github.com/ipfs/js-ipfs.git",
-  "_where": "/Users/mitra/git/_github_internetarchive/dweb-transport",
-  "author": {
-    "name": "David Dias",
-    "email": "daviddias@ipfs.io"
-  },
-  "bin": {
-    "jsipfs": "src/cli/bin.js"
-  },
-  "browser": {
-    "./src/core/components/init-assets.js": false,
-    "./src/core/runtime/config-nodejs.json": "./src/core/runtime/config-browser.json",
-    "./src/core/runtime/libp2p-nodejs.js": "./src/core/runtime/libp2p-browser.js",
-    "./src/core/runtime/repo-nodejs.js": "./src/core/runtime/repo-browser.js",
-    "./test/utils/create-repo-nodejs.js": "./test/utils/create-repo-browser.js",
-    "stream": "readable-stream"
-  },
-  "bugs": {
-    "url": "https://github.com/ipfs/js-ipfs/issues"
-  },
-  "bundleDependencies": false,
-  "contributors": [
-    {
-      "name": "Andrew de Andrade",
-      "email": "andrew@deandrade.com.br"
-    },
-    {
-      "name": "Bernard Mordan",
-      "email": "bernard@tableflip.io"
-    },
-    {
-      "name": "CHEVALAY JOSSELIN",
-      "email": "josselin54.chevalay@gmail.com"
-    },
-    {
-      "name": "Caio Gondim",
-      "email": "me@caiogondim.com"
-    },
-    {
-      "name": "Christian Couder",
-      "email": "chriscool@tuxfamily.org"
-    },
-    {
-      "name": "Daniel J. O'Quinn",
-      "email": "danieljoquinn@gmail.com"
-    },
-    {
-      "name": "Daniela Borges Matos de Carvalho",
-      "email": "alunassertiva@gmail.com"
-    },
-    {
-      "name": "David Dias",
-      "email": "daviddias.p@gmail.com"
-    },
-    {
-      "name": "Dmitriy Ryajov",
-      "email": "dryajov@gmail.com"
-    },
-    {
-      "name": "Dzmitry Das",
-      "email": "dbachko@gmail.com"
-    },
-    {
-      "name": "Enrico Marino",
-      "email": "enrico.marino@email.com"
-    },
-    {
-      "name": "Felix Yan",
-      "email": "felixonmars@archlinux.org"
-    },
-    {
-      "name": "Francisco Baio Dias",
-      "email": "xicombd@gmail.com"
-    },
-    {
-      "name": "Francisco Baio Dias",
-      "email": "francisco@typeform.com"
-    },
-    {
-      "name": "Friedel Ziegelmayer",
-      "email": "dignifiedquire@gmail.com"
-    },
-    {
-      "name": "Georgios Rassias",
-      "email": "georassias@gmail.com"
-    },
-    {
-      "name": "Greenkeeper",
-      "email": "support@greenkeeper.io"
-    },
-    {
-      "name": "Haad",
-      "email": "haadcode@users.noreply.github.com"
-    },
-    {
-      "name": "Harsh Vakharia",
-      "email": "harshjv@users.noreply.github.com"
-    },
-    {
-      "name": "Henry Rodrick",
-      "email": "moshisushi@gmail.com"
-    },
-    {
-      "name": "Johannes Wikner",
-      "email": "johannes.wikner@gmail.com"
-    },
-    {
-      "name": "Jon Schlinkert",
-      "email": "dev@sellside.com"
-    },
-    {
-      "name": "João Antunes",
-      "email": "j.goncalo.antunes@gmail.com"
-    },
-    {
-      "name": "Kevin Wang",
-      "email": "kevin@fossa.io"
-    },
-    {
-      "name": "Lars Gierth",
-      "email": "larsg@systemli.org"
-    },
-    {
-      "name": "Maciej Krüger",
-      "email": "mkg20001@gmail.com"
-    },
-    {
-      "name": "Marius Darila",
-      "email": "marius.darila@gmail.com"
-    },
-    {
-      "name": "Michelle Lee",
-      "email": "michelle@protocol.ai"
-    },
-    {
-      "name": "Mikeal Rogers",
-      "email": "mikeal.rogers@gmail.com"
-    },
-    {
-      "name": "Mithgol",
-      "email": "getgit@mithgol.ru"
-    },
-    {
-      "name": "Nuno Nogueira",
-      "email": "nunofmn@gmail.com"
-    },
-    {
-      "name": "Oskar Nyberg",
-      "email": "oskar@oskarnyberg.com"
-    },
-    {
-      "name": "Pau Ramon Revilla",
-      "email": "masylum@gmail.com"
-    },
-    {
-      "name": "Pedro Teixeira",
-      "email": "i@pgte.me"
-    },
-    {
-      "name": "RasmusErik Voel Jensen",
-      "email": "github@solsort.com"
-    },
-    {
-      "name": "Richard Littauer",
-      "email": "richard.littauer@gmail.com"
-    },
-    {
-      "name": "Rod Keys",
-      "email": "rod@zokos.com"
-    },
-    {
-      "name": "Sid Harder",
-      "email": "sideharder@gmail.com"
-    },
-    {
-      "name": "SidHarder",
-      "email": "softwarenavigator@gmail.com"
-    },
-    {
-      "name": "Stephen Whitmore",
-      "email": "stephen.whitmore@gmail.com"
-    },
-    {
-      "name": "Stephen Whitmore",
-      "email": "noffle@users.noreply.github.com"
-    },
-    {
-      "name": "Terence Pae",
-      "email": "terencepae@gmail.com"
-    },
-    {
-      "name": "Uroš Jurglič",
-      "email": "jurglic@gmail.com"
-    },
-    {
-      "name": "Xiao Liang",
-      "email": "yxliang01@users.noreply.github.com"
-    },
-    {
-      "name": "Yahya",
-      "email": "ya7yaz@gmail.com"
-    },
-    {
-      "name": "bitspill",
-      "email": "bitspill+github@bitspill.net"
-    },
-    {
-      "name": "haad",
-      "email": "haad@headbanggames.com"
-    },
-    {
-      "name": "jbenet",
-      "email": "juan@benet.ai"
-    },
-    {
-      "name": "kumavis",
-      "email": "kumavis@users.noreply.github.com"
-    },
-    {
-      "name": "nginnever",
-      "email": "ginneversource@gmail.com"
-    },
-    {
-      "name": "npmcdn-to-unpkg-bot",
-      "email": "npmcdn-to-unpkg-bot@users.noreply.github.com"
-    },
-    {
-      "name": "tcme",
-      "email": "hi@this-connect.me"
-    },
-    {
-      "name": "Łukasz Magiera",
-      "email": "magik6k@users.noreply.github.com"
-    },
-    {
-      "name": "ᴠɪᴄᴛᴏʀ ʙᴊᴇʟᴋʜᴏʟᴍ",
-      "email": "victorbjelkholm@gmail.com"
-    }
-  ],
-  "dependencies": {
-    "async": "^2.5.0",
-    "bl": "^1.2.1",
-    "boom": "^6.0.0",
-    "byteman": "^1.3.5",
-    "cids": "^0.5.2",
-    "debug": "^3.1.0",
-    "file-type": "^7.2.0",
-    "filesize": "^3.5.11",
-    "fsm-event": "^2.1.0",
-    "get-folder-size": "^1.0.0",
-    "glob": "^7.1.2",
-    "hapi": "^16.6.2",
-    "hapi-set-header": "^1.0.2",
-    "hoek": "^5.0.0",
-    "ipfs-api": "^14.3.7",
-    "ipfs-bitswap": "~0.17.2",
-    "ipfs-block": "~0.6.0",
-    "ipfs-block-service": "~0.12.0",
-    "ipfs-multipart": "~0.1.0",
-    "ipfs-repo": "~0.17.0",
-    "ipfs-unixfs": "~0.1.13",
-    "ipfs-unixfs-engine": "~0.22.5",
-    "ipld-resolver": "~0.13.4",
-    "is-ipfs": "^0.3.2",
-    "is-stream": "^1.1.0",
-    "joi": "^13.0.1",
-    "libp2p": "~0.12.4",
-    "libp2p-floodsub": "~0.11.1",
-    "libp2p-kad-dht": "~0.5.1",
-    "libp2p-mdns": "~0.9.1",
-    "libp2p-multiplex": "~0.5.0",
-    "libp2p-railing": "~0.7.1",
-    "libp2p-secio": "~0.8.1",
-    "libp2p-tcp": "~0.11.1",
-    "libp2p-webrtc-star": "~0.13.2",
-    "libp2p-websockets": "~0.10.2",
-    "lodash.flatmap": "^4.5.0",
-    "lodash.get": "^4.4.2",
-    "lodash.sortby": "^4.7.0",
-    "lodash.values": "^4.3.0",
-    "mafmt": "^3.0.1",
-    "mime-types": "^2.1.17",
-    "mkdirp": "~0.5.1",
-    "multiaddr": "^3.0.1",
-    "multihashes": "~0.4.12",
-    "once": "^1.4.0",
-    "path-exists": "^3.0.0",
-    "peer-book": "~0.5.1",
-    "peer-id": "~0.10.2",
-    "peer-info": "~0.11.0",
-    "progress": "^2.0.0",
-    "prom-client": "^10.2.0",
-    "prometheus-gc-stats": "^0.5.0",
-    "promisify-es6": "^1.0.3",
-    "pull-abortable": "^4.1.1",
-    "pull-file": "^1.0.0",
-    "pull-ndjson": "^0.1.1",
-    "pull-paramap": "^1.2.2",
-    "pull-pushable": "^2.1.1",
-    "pull-sort": "^1.0.1",
-    "pull-stream": "^3.6.1",
-    "pull-stream-to-stream": "^1.3.4",
-    "pull-zip": "^2.0.1",
-    "read-pkg-up": "^2.0.0",
-    "readable-stream": "2.3.3",
-    "safe-buffer": "^5.1.1",
-    "stream-to-pull-stream": "^1.7.2",
-    "tar-stream": "^1.5.4",
-    "temp": "~0.8.3",
-    "through2": "^2.0.3",
-    "update-notifier": "^2.3.0",
-    "yargs": "9.0.1"
-  },
-  "deprecated": false,
-  "description": "JavaScript implementation of the IPFS specification",
-  "devDependencies": {
-    "aegir": "^11.0.2",
-    "buffer-loader": "0.0.1",
-    "chai": "^4.1.2",
-    "delay": "^2.0.0",
-    "detect-node": "^2.0.3",
-    "dir-compare": "^1.4.0",
-    "dirty-chai": "^2.0.1",
-    "eslint-plugin-react": "^7.4.0",
-    "execa": "^0.8.0",
-    "expose-loader": "^0.7.3",
-    "form-data": "^2.3.1",
-    "gulp": "^3.9.1",
-    "interface-ipfs-core": "~0.32.1",
-    "ipfsd-ctl": "~0.24.0",
-    "left-pad": "^1.1.3",
-    "lodash": "^4.17.4",
-    "mocha": "^4.0.1",
-    "ncp": "^2.0.0",
-    "nexpect": "^0.5.0",
-    "pre-commit": "^1.2.2",
-    "pretty-bytes": "^4.0.2",
-    "qs": "^6.5.1",
-    "random-fs": "^1.0.3",
-    "rimraf": "^2.6.2",
-    "stream-to-promise": "^2.2.0",
-    "transform-loader": "^0.2.4"
-  },
-  "engines": {
-    "node": ">=6.0.0",
-    "npm": ">=3.0.0"
-  },
-  "homepage": "https://github.com/ipfs/js-ipfs#readme",
-  "keywords": [
-    "IPFS"
-  ],
-  "license": "MIT",
-  "main": "src/core/index.js",
-  "name": "ipfs",
-  "optionalDependencies": {
-    "prom-client": "^10.2.0",
-    "prometheus-gc-stats": "^0.5.0"
-  },
-  "pre-commit": [
-    "lint",
-    "test"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/ipfs/js-ipfs.git"
-  },
-  "scripts": {
-    "build": "gulp build",
-    "coverage": "gulp coverage",
-    "coverage-publish": "aegir-coverage publish",
-    "lint": "aegir-lint",
-    "release": "gulp release",
-    "release-major": "gulp release --type major",
-    "release-minor": "gulp release --type minor",
-    "test": "gulp test --dom",
-    "test:benchmark": "echo \"Error: no benchmarks yet\" && exit 1",
-    "test:benchmark:browser": "echo \"Error: no benchmarks yet\" && exit 1",
-    "test:benchmark:node": "echo \"Error: no benchmarks yet\" && exit 1",
-    "test:benchmark:node:core": "echo \"Error: no benchmarks yet\" && exit 1",
-    "test:benchmark:node:http": "echo \"Error: no benchmarks yet\" && exit 1",
-    "test:browser": "npm run test:unit:browser",
-    "test:interop": "npm run test:interop:node",
-    "test:interop:browser": "mocha -t 60000 test/interop/browser.js",
-    "test:interop:node": "mocha -t 60000 test/interop/node.js",
-    "test:node": "npm run test:unit:node",
-    "test:unit:browser": "gulp test:browser",
-    "test:unit:node": "gulp test:node",
-    "test:unit:node:cli": "TEST=cli npm run test:unit:node",
-    "test:unit:node:core": "TEST=core npm run test:unit:node",
-    "test:unit:node:gateway": "TEST=gateway npm run test:unit:node",
-    "test:unit:node:http": "TEST=http npm run test:unit:node"
-  },
-  "version": "0.26.0"
-}
-
-},{}],275:[function(require,module,exports){
-'use strict'
-
-const waterfall = require('async/waterfall')
-const series = require('async/series')
-const extend = require('deep-extend')
-
-// Boot an IPFS node depending on the options set
-module.exports = (self) => {
-  self.log('booting')
-  const options = self._options
-  const doInit = options.init
-  const doStart = options.start
-  const config = options.config
-  const setConfig = config && typeof config === 'object'
-  const repoOpen = !self._repo.closed
-
-  const customInitOptions = typeof options.init === 'object' ? options.init : {}
-  const initOptions = Object.assign({ bits: 2048 }, customInitOptions)
-
-  // Checks if a repo exists, and if so opens it
-  // Will return callback with a bool indicating the existence
-  // of the repo
-  const maybeOpenRepo = (cb) => {
-    // nothing to do
-    if (repoOpen) {
-      return cb(null, true)
-    }
-
-    series([
-      (cb) => self._repo.open(cb),
-      (cb) => self.preStart(cb),
-      (cb) => {
-        self.state.initialized()
-        cb(null, true)
-      }
-    ], (err, res) => {
-      if (err) {
-        // If the error is that no repo exists,
-        // which happens when the version file is not found
-        // we just want to signal that no repo exist, not
-        // fail the whole process.
-        // TODO: improve datastore and ipfs-repo implemenations so this error is a bit more unified
-        if (err.message.match(/not found/) || // indexeddb
-            err.message.match(/ENOENT/) || // fs
-            err.message.match(/No value/) // memory
-           ) {
-          return cb(null, false)
-        }
-        return cb(err)
-      }
-      cb(null, res)
-    })
-  }
-
-  const done = (err) => {
-    if (err) {
-      return self.emit('error', err)
-    }
-    self.emit('ready')
-    self.log('boot:done', err)
-  }
-
-  const tasks = []
-
-  // check if there as a repo and if so open it
-  maybeOpenRepo((err, hasRepo) => {
-    if (err) {
-      return done(err)
-    }
-
-    // No repo, but need should init one
-    if (doInit && !hasRepo) {
-      tasks.push((cb) => self.init(initOptions, cb))
-      // we know we will have a repo for all follwing tasks
-      // if the above succeeds
-      hasRepo = true
-    }
-
-    // Need to set config
-    if (setConfig) {
-      if (!hasRepo) {
-        console.log('WARNING, trying to set config on uninitialized repo, maybe forgot to set "init: true"')
-      } else {
-        tasks.push((cb) => {
-          waterfall([
-            (cb) => self.config.get(cb),
-            (config, cb) => {
-              extend(config, options.config)
-
-              self.config.replace(config, cb)
-            }
-          ], cb)
-        })
-      }
-    }
-
-    // Need to start up the node
-    if (doStart) {
-      if (!hasRepo) {
-        console.log('WARNING, trying to start ipfs node on uninitialized repo, maybe forgot to set "init: true"')
-        return done(new Error('Uninitalized repo'))
-      } else {
-        tasks.push((cb) => self.start(cb))
-      }
-    }
-
-    // Do the actual boot sequence
-    series(tasks, done)
-  })
-}
-
-},{"async/series":53,"async/waterfall":57,"deep-extend":125}],276:[function(require,module,exports){
-'use strict'
-
-const OFFLINE_ERROR = require('../utils').OFFLINE_ERROR
-
-function formatWantlist (list) {
-  return Array.from(list).map((e) => e[1])
-}
-
-module.exports = function bitswap (self) {
-  return {
-    wantlist: () => {
-      if (!self.isOnline()) {
-        throw OFFLINE_ERROR
-      }
-
-      const list = self._bitswap.getWantlist()
-      return formatWantlist(list)
-    },
-    stat: () => {
-      if (!self.isOnline()) {
-        throw OFFLINE_ERROR
-      }
-
-      const stats = self._bitswap.stat()
-      stats.wantlist = formatWantlist(stats.wantlist)
-      stats.peers = stats.peers.map((id) => id.toB58String())
-
-      return stats
-    },
-    unwant: (key) => {
-      if (!self.isOnline()) {
-        throw OFFLINE_ERROR
-      }
-
-      // TODO: implement when https://github.com/ipfs/js-ipfs-bitswap/pull/10 is merged
-    }
-  }
-}
-
-},{"../utils":302}],277:[function(require,module,exports){
-'use strict'
-
-const Block = require('ipfs-block')
-const multihash = require('multihashes')
-const multihashing = require('multihashing-async')
-const CID = require('cids')
-const waterfall = require('async/waterfall')
-
-module.exports = function block (self) {
-  return {
-    get: (cid, callback) => {
-      cid = cleanCid(cid)
-      self._blockService.get(cid, callback)
-    },
-    put: (block, options, callback) => {
-      if (typeof options === 'function') {
-        callback = options
-        options = {}
-      }
-
-      if (Array.isArray(block)) {
-        return callback(new Error('Array is not supported'))
-      }
-
-      waterfall([
-        (cb) => {
-          if (Block.isBlock(block)) {
-            return cb(null, block)
-          }
-
-          if (options.cid && CID.isCID(options.cid)) {
-            return cb(null, new Block(block, options.cid))
-          }
-
-          const mhtype = options.mhtype || 'sha2-256'
-          const format = options.format || 'dag-pb'
-          const cidVersion = options.version || 0
-          // const mhlen = options.mhlen || 0
-
-          multihashing(block, mhtype, (err, multihash) => {
-            if (err) {
-              return cb(err)
-            }
-
-            cb(null, new Block(block, new CID(cidVersion, format, multihash)))
-          })
-        },
-        (block, cb) => self._blockService.put(block, (err) => {
-          if (err) {
-            return cb(err)
-          }
-          cb(null, block)
-        })
-      ], callback)
-    },
-    rm: (cid, callback) => {
-      cid = cleanCid(cid)
-      self._blockService.delete(cid, callback)
-    },
-    stat: (cid, callback) => {
-      cid = cleanCid(cid)
-
-      self._blockService.get(cid, (err, block) => {
-        if (err) {
-          return callback(err)
-        }
-        callback(null, {
-          key: multihash.toB58String(cid.multihash),
-          size: block.data.length
-        })
-      })
-    }
-  }
-}
-
-function cleanCid (cid) {
-  if (CID.isCID(cid)) {
-    return cid
-  }
-
-  // CID constructor knows how to do the cleaning :)
-  return new CID(cid)
-}
-
-},{"async/waterfall":57,"cids":103,"ipfs-block":232,"multihashes":523,"multihashing-async":527}],278:[function(require,module,exports){
-'use strict'
-
-const defaultNodes = require('../runtime/config-nodejs.json').Bootstrap
-
-module.exports = function bootstrap (self) {
-  return {
-    list: (callback) => {
-      self._repo.config.get((err, config) => {
-        if (err) {
-          return callback(err)
-        }
-        callback(null, {Peers: config.Bootstrap})
-      })
-    },
-    add: (multiaddr, args, callback) => {
-      if (typeof args === 'function') {
-        callback = args
-        args = {default: false}
-      }
-      self._repo.config.get((err, config) => {
-        if (err) {
-          return callback(err)
-        }
-        if (args.default) {
-          config.Bootstrap = defaultNodes
-        } else if (multiaddr && config.Bootstrap.indexOf(multiaddr) === -1) {
-          config.Bootstrap.push(multiaddr)
-        }
-        self._repo.config.set(config, (err) => {
-          if (err) {
-            return callback(err)
-          }
-
-          callback(null, {
-            Peers: args.default ? defaultNodes : [multiaddr]
-          })
-        })
-      })
-    },
-    rm: (multiaddr, args, callback) => {
-      if (typeof args === 'function') {
-        callback = args
-        args = {all: false}
-      }
-      self._repo.config.get((err, config) => {
-        if (err) {
-          return callback(err)
-        }
-        if (args.all) {
-          config.Bootstrap = []
-        } else {
-          config.Bootstrap = config.Bootstrap.filter((mh) => mh !== multiaddr)
-        }
-
-        self._repo.config.set(config, (err) => {
-          if (err) {
-            return callback(err)
-          }
-
-          const res = []
-          if (!args.all && multiaddr) {
-            res.push(multiaddr)
-          }
-
-          callback(null, {Peers: res})
-        })
-      })
-    }
-  }
-}
-
-},{"../runtime/config-nodejs.json":298}],279:[function(require,module,exports){
-'use strict'
-
-const promisify = require('promisify-es6')
-
-module.exports = function config (self) {
-  return {
-    get: promisify((key, callback) => {
-      if (typeof key === 'function') {
-        callback = key
-        key = undefined
-      }
-
-      return self._repo.config.get(key, callback)
-    }),
-    set: promisify((key, value, callback) => {
-      self._repo.config.set(key, value, callback)
-    }),
-    replace: promisify((config, callback) => {
-      self._repo.config.set(config, callback)
-    })
-  }
-}
-
-},{"promisify-es6":562}],280:[function(require,module,exports){
-'use strict'
-
-const promisify = require('promisify-es6')
-const CID = require('cids')
-const pull = require('pull-stream')
-
-module.exports = function dag (self) {
-  return {
-    put: promisify((dagNode, options, callback) => {
-      self._ipldResolver.put(dagNode, options, callback)
-    }),
-
-    get: promisify((cid, path, options, callback) => {
-      if (typeof path === 'function') {
-        callback = path
-        path = undefined
-      }
-
-      if (typeof options === 'function') {
-        callback = options
-        options = {}
-      }
-
-      options = options || {}
-
-      if (typeof cid === 'string') {
-        const split = cid.split('/')
-        cid = new CID(split[0])
-        split.shift()
-
-        if (split.length > 0) {
-          path = split.join('/')
-        } else {
-          path = '/'
-        }
-      }
-
-      self._ipldResolver.get(cid, path, options, callback)
-    }),
-
-    tree: promisify((cid, path, options, callback) => {
-      if (typeof path === 'object') {
-        callback = options
-        options = path
-        path = undefined
-      }
-
-      if (typeof path === 'function') {
-        callback = path
-        path = undefined
-      }
-
-      if (typeof options === 'function') {
-        callback = options
-        options = {}
-      }
-
-      options = options || {}
-
-      if (typeof cid === 'string') {
-        const split = cid.split('/')
-        cid = new CID(split[0])
-        split.shift()
-
-        if (split.length > 0) {
-          path = split.join('/')
-        } else {
-          path = undefined
-        }
-      }
-
-      pull(
-        self._ipldResolver.treeStream(cid, path, options),
-        pull.collect(callback)
-      )
-    })
-  }
-}
-
-},{"cids":103,"promisify-es6":562,"pull-stream":598}],281:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const promisify = require('promisify-es6')
-const every = require('async/every')
-const PeerId = require('peer-id')
-const CID = require('cids')
-const each = require('async/each')
-// const bsplit = require('buffer-split')
-
-module.exports = (self) => {
-  return {
-    /**
-     * Given a key, query the DHT for its best value.
-     *
-     * @param {Buffer} key
-     * @param {function(Error)} [callback]
-     * @returns {Promise|void}
-     */
-    get: promisify((key, options, callback) => {
-      if (!Buffer.isBuffer(key)) {
-        return callback(new Error('Not valid key'))
-      }
-
-      if (typeof options === 'function') {
-        callback = options
-        options = {}
-      }
-
-      self._libp2pNode.dht.get(key, options.timeout, callback)
-    }),
-
-    /**
-     * Write a key/value pair to the DHT.
-     *
-     * Given a key of the form /foo/bar and a value of any
-     * form, this will write that value to the DHT with
-     * that key.
-     *
-     * @param {Buffer} key
-     * @param {Buffer} value
-     * @param {function(Error)} [callback]
-     * @returns {Promise|void}
-     */
-    put: promisify((key, value, callback) => {
-      if (!Buffer.isBuffer(key)) {
-        return callback(new Error('Not valid key'))
-      }
-
-      self._libp2pNode.dht.put(key, value, callback)
-    }),
-
-    /**
-     * Find peers in the DHT that can provide a specific value, given a key.
-     *
-     * @param {CID} key - They key to find providers for.
-     * @param {function(Error, Array<PeerInfo>)} [callback]
-     * @returns {Promise<PeerInfo>|void}
-     */
-    findprovs: promisify((key, callback) => {
-      if (typeof key === 'string') {
-        key = new CID(key)
-      }
-
-      self._libp2pNode.contentRouting.findProviders(key, callback)
-    }),
-
-    /**
-     * Query the DHT for all multiaddresses associated with a `PeerId`.
-     *
-     * @param {PeerId} peer - The id of the peer to search for.
-     * @param {function(Error, Array<Multiaddr>)} [callback]
-     * @returns {Promise<Array<Multiaddr>>|void}
-     */
-    findpeer: promisify((peer, callback) => {
-      if (typeof peer === 'string') {
-        peer = PeerId.createFromB58String(peer)
-      }
-
-      self._libp2pNode.peerRouting.findPeer(peer, (err, info) => {
-        if (err) {
-          return callback(err)
-        }
-
-        // convert to go-ipfs return value, we need to revisit
-        // this. For now will just conform.
-        const goResult = [
-          {
-            Responses: [{
-              ID: info.id.toB58String(),
-              Addresses: info.multiaddrs.toArray().map((a) => a.toString())
-            }]
-          }
-        ]
-
-        callback(null, goResult)
-      })
-    }),
-
-    /**
-     * Announce to the network that we are providing given values.
-     *
-     * @param {CID|Array<CID>} keys - The keys that should be announced.
-     * @param {Object} [options={}]
-     * @param {bool} [options.recursive=false] - Provide not only the given object but also all objects linked from it.
-     * @param {function(Error)} [callback]
-     * @returns {Promise|void}
-     */
-    provide: promisify((keys, options, callback) => {
-      if (!Array.isArray(keys)) {
-        keys = [keys]
-      }
-      if (typeof options === 'function') {
-        callback = options
-        options = {}
-      }
-
-      // ensure blocks are actually local
-      every(keys, (key, cb) => {
-        self._repo.blocks.has(key, cb)
-      }, (err, has) => {
-        if (err) {
-          return callback(err)
-        }
-        /* TODO reconsider this. go-ipfs provides anyway
-        if (!has) {
-          return callback(new Error('Not all blocks exist locally, can not provide'))
-        }
-        */
-
-        if (options.recursive) {
-          // TODO: Implement recursive providing
-        } else {
-          each(keys, (cid, cb) => {
-            self._libp2pNode.contentRouting.provide(cid, cb)
-          }, callback)
-        }
-      })
-    }),
-
-    /**
-     * Find the closest peers to a given `PeerId`, by querying the DHT.
-     *
-     * @param {PeerId} peer - The `PeerId` to run the query agains.
-     * @param {function(Error, Array<PeerId>)} [callback]
-     * @returns {Promise<Array<PeerId>>|void}
-     */
-    query: promisify((peerId, callback) => {
-      if (typeof peerId === 'string') {
-        peerId = PeerId.createFromB58String(peerId)
-      }
-
-      // TODO expose this method in peerRouting
-      self._libp2pNode._dht.getClosestPeers(peerId.toBytes(), (err, peerIds) => {
-        if (err) {
-          return callback(err)
-        }
-        callback(null, peerIds.map((id) => {
-          return { ID: id.toB58String() }
-        }))
-      })
-    })
-  }
-}
-
-}).call(this,{"isBuffer":require("../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728,"async/each":21,"async/every":27,"cids":103,"peer-id":556,"promisify-es6":562}],282:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const unixfsEngine = require('ipfs-unixfs-engine')
-const importer = unixfsEngine.importer
-const exporter = unixfsEngine.exporter
-const promisify = require('promisify-es6')
-const pull = require('pull-stream')
-const sort = require('pull-sort')
-const pushable = require('pull-pushable')
-const toStream = require('pull-stream-to-stream')
-const toPull = require('stream-to-pull-stream')
-const waterfall = require('async/waterfall')
-const isStream = require('is-stream')
-const Duplex = require('stream').Duplex
-const CID = require('cids')
-
-module.exports = function files (self) {
-  const createAddPullStream = (options) => {
-    const opts = Object.assign({}, {
-      shardSplitThreshold: self._options.EXPERIMENTAL.sharding ? 1000 : Infinity
-    }, options)
-
-    let total = 0
-    let prog = opts.progress || (() => {})
-    const progress = (bytes) => {
-      total += bytes
-      prog(total)
-    }
-
-    opts.progress = progress
-    return pull(
-      pull.map(normalizeContent),
-      pull.flatten(),
-      importer(self._ipldResolver, opts),
-      pull.asyncMap(prepareFile.bind(null, self, opts))
-    )
-  }
-
-  return {
-    createAddStream: (options, callback) => {
-      if (typeof options === 'function') {
-        callback = options
-        options = undefined
-      }
-
-      const addPullStream = createAddPullStream(options)
-      const p = pushable()
-      const s = pull(
-        p,
-        addPullStream
-      )
-
-      const retStream = new AddStreamDuplex(s, p)
-
-      retStream.once('finish', () => p.end())
-
-      callback(null, retStream)
-    },
-
-    createAddPullStream: createAddPullStream,
-
-    add: promisify((data, options, callback) => {
-      if (typeof options === 'function') {
-        callback = options
-        options = {}
-      } else if (!callback || typeof callback !== 'function') {
-        callback = noop
-      }
-
-      if (typeof data !== 'object' &&
-          !Buffer.isBuffer(data) &&
-          !isStream(data)) {
-        return callback(new Error('Invalid arguments, data must be an object, Buffer or readable stream'))
-      }
-
-      pull(
-        pull.values([data]),
-        createAddPullStream(options),
-        sort((a, b) => {
-          if (a.path < b.path) return 1
-          if (a.path > b.path) return -1
-          return 0
-        }),
-        pull.collect(callback)
-      )
-    }),
-
-    cat: promisify((ipfsPath, callback) => {
-      if (typeof ipfsPath === 'function') {
-        return callback(new Error('You must supply an ipfsPath'))
-      }
-
-      pull(
-        exporter(ipfsPath, self._ipldResolver),
-        pull.collect((err, files) => {
-          if (err) {
-            return callback(err)
-          }
-          if (!files || !files.length) return callback(new Error('No such file'))
-          callback(null, toStream.source(files[files.length - 1].content))
-        })
-      )
-    }),
-
-    get: promisify((ipfsPath, callback) => {
-      callback(null, toStream.source(pull(
-        exporter(ipfsPath, self._ipldResolver),
-        pull.map((file) => {
-          if (file.content) {
-            file.content = toStream.source(file.content)
-            file.content.pause()
-          }
-
-          return file
-        })
-      )))
-    }),
-
-    getPull: promisify((ipfsPath, callback) => {
-      callback(null, exporter(ipfsPath, self._ipldResolver))
-    })
-  }
-}
-
-function prepareFile (self, opts, file, callback) {
-  opts = opts || {}
-
-  waterfall([
-    (cb) => self.object.get(file.multihash, cb),
-    (node, cb) => {
-      let cid = new CID(node.multihash)
-
-      if (opts['cid-version'] === 1) {
-        cid = cid.toV1()
-      }
-
-      const b58Hash = cid.toBaseEncodedString()
-
-      cb(null, {
-        path: file.path || b58Hash,
-        hash: b58Hash,
-        size: node.size
-      })
-    }
-  ], callback)
-}
-
-function normalizeContent (content) {
-  if (!Array.isArray(content)) {
-    content = [content]
-  }
-
-  return content.map((data) => {
-    // Buffer input
-    if (Buffer.isBuffer(data)) {
-      data = {
-        path: '',
-        content: pull.values([data])
-      }
-    }
-
-    // Readable stream input
-    if (isStream.readable(data)) {
-      data = {
-        path: '',
-        content: toPull.source(data)
-      }
-    }
-
-    if (data && data.content && typeof data.content !== 'function') {
-      if (Buffer.isBuffer(data.content)) {
-        data.content = pull.values([data.content])
-      }
-
-      if (isStream.readable(data.content)) {
-        data.content = toPull.source(data.content)
-      }
-    }
-
-    return data
-  })
-}
-
-function noop () {}
-
-class AddStreamDuplex extends Duplex {
-  constructor (pullStream, push, options) {
-    super(Object.assign({ objectMode: true }, options))
-    this._pullStream = pullStream
-    this._pushable = push
-    this._waitingPullFlush = []
-  }
-
-  _read () {
-    this._pullStream(null, (end, data) => {
-      while (this._waitingPullFlush.length) {
-        const cb = this._waitingPullFlush.shift()
-        cb()
-      }
-      if (end) {
-        if (end instanceof Error) {
-          this.emit('error', end)
-        }
-      } else {
-        this.push(data)
-      }
-    })
-  }
-
-  _write (chunk, encoding, callback) {
-    this._waitingPullFlush.push(callback)
-    this._pushable.push(chunk)
-  }
-}
-
-}).call(this,{"isBuffer":require("../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728,"async/waterfall":57,"cids":103,"ipfs-unixfs-engine":271,"is-stream":348,"promisify-es6":562,"pull-pushable":593,"pull-sort":596,"pull-stream":598,"pull-stream-to-stream":597,"stream":650,"stream-to-pull-stream":698}],283:[function(require,module,exports){
-'use strict'
-
-const promisify = require('promisify-es6')
-const setImmediate = require('async/setImmediate')
-
-module.exports = function id (self) {
-  return promisify((opts, callback) => {
-    if (typeof opts === 'function') {
-      callback = opts
-      opts = {}
-    }
-
-    setImmediate(() => callback(null, {
-      id: self._peerInfo.id.toB58String(),
-      publicKey: self._peerInfo.id.pubKey.bytes.toString('base64'),
-      addresses: self._peerInfo.multiaddrs
-                               .toArray()
-                               .map((ma) => ma.toString())
-                               .filter((ma) => ma.indexOf('ipfs') >= 0)
-                               .sort(),
-      agentVersion: 'js-ipfs',
-      protocolVersion: '9000'
-    }))
-  })
-}
-
-},{"async/setImmediate":54,"promisify-es6":562}],284:[function(require,module,exports){
-'use strict'
-
-exports.preStart = require('./pre-start')
-exports.start = require('./start')
-exports.stop = require('./stop')
-exports.isOnline = require('./is-online')
-exports.version = require('./version')
-exports.id = require('./id')
-exports.repo = require('./repo')
-exports.init = require('./init')
-exports.bootstrap = require('./bootstrap')
-exports.config = require('./config')
-exports.block = require('./block')
-exports.object = require('./object')
-exports.dag = require('./dag')
-exports.libp2p = require('./libp2p')
-exports.swarm = require('./swarm')
-exports.ping = require('./ping')
-exports.files = require('./files')
-exports.bitswap = require('./bitswap')
-exports.pubsub = require('./pubsub')
-exports.dht = require('./dht')
-
-},{"./bitswap":276,"./block":277,"./bootstrap":278,"./config":279,"./dag":280,"./dht":281,"./files":282,"./id":283,"./init":285,"./is-online":286,"./libp2p":287,"./object":288,"./ping":289,"./pre-start":290,"./pubsub":291,"./repo":292,"./start":293,"./stop":294,"./swarm":295,"./version":296}],285:[function(require,module,exports){
-'use strict'
-
-const peerId = require('peer-id')
-const waterfall = require('async/waterfall')
-const parallel = require('async/parallel')
-const promisify = require('promisify-es6')
-const config = require('../runtime/config-nodejs.json')
-
-const addDefaultAssets = require('./init-assets')
-
-module.exports = function init (self) {
-  return promisify((opts, callback) => {
-    if (typeof opts === 'function') {
-      callback = opts
-      opts = {}
-    }
-
-    const done = (err, res) => {
-      if (err) {
-        self.emit('error', err)
-        return callback(err)
-      }
-
-      self.state.initialized()
-      self.emit('init')
-      callback(null, res)
-    }
-
-    if (self.state.state() !== 'uninitalized') {
-      return done(new Error('Not able to init from state: ' + self.state.state()))
-    }
-
-    self.state.init()
-    self.log('init')
-
-    opts.emptyRepo = opts.emptyRepo || false
-    opts.bits = Number(opts.bits) || 2048
-    opts.log = opts.log || function () {}
-
-    waterfall([
-      // Verify repo does not yet exist.
-      (cb) => self._repo.exists(cb),
-      (exists, cb) => {
-        self.log('repo exists?', exists)
-        if (exists === true) {
-          return cb(new Error('repo already exists'))
-        }
-
-        // Generate peer identity keypair + transform to desired format + add to config.
-        opts.log(`generating ${opts.bits}-bit RSA keypair...`, false)
-        self.log('generating peer id: %s bits', opts.bits)
-        peerId.create({bits: opts.bits}, cb)
-      },
-      (keys, cb) => {
-        self.log('identity generated')
-        config.Identity = {
-          PeerID: keys.toB58String(),
-          PrivKey: keys.privKey.bytes.toString('base64')
-        }
-        opts.log('done')
-        opts.log('peer identity: ' + config.Identity.PeerID)
-
-        self._repo.init(config, cb)
-      },
-      (_, cb) => self._repo.open(cb),
-      (cb) => {
-        self.log('repo opened')
-        if (opts.emptyRepo) {
-          return cb(null, true)
-        }
-
-        const tasks = [
-          // add empty unixfs dir object (go-ipfs assumes this exists)
-          (cb) => self.object.new('unixfs-dir', cb)
-        ]
-
-        if (typeof addDefaultAssets === 'function') {
-          tasks.push((cb) => addDefaultAssets(self, opts.log, cb))
-        }
-
-        parallel(tasks, (err) => {
-          if (err) {
-            cb(err)
-          } else {
-            cb(null, true)
-          }
-        })
-      }
-    ], done)
-  })
-}
-
-},{"../runtime/config-nodejs.json":298,"./init-assets":721,"async/parallel":50,"async/waterfall":57,"peer-id":556,"promisify-es6":562}],286:[function(require,module,exports){
-'use strict'
-
-module.exports = function isOnline (self) {
-  return () => {
-    return Boolean(self._bitswap && self._libp2pNode && self._libp2pNode.isStarted())
-  }
-}
-
-},{}],287:[function(require,module,exports){
-'use strict'
-
-// libp2p-nodejs gets replaced by libp2p-browser when webpacked/browserified
-const Node = require('../runtime/libp2p-nodejs')
-const promisify = require('promisify-es6')
-const get = require('lodash.get')
-
-module.exports = function libp2p (self) {
-  return {
-    start: promisify((callback) => {
-      self.config.get(gotConfig)
-
-      function gotConfig (err, config) {
-        if (err) {
-          return callback(err)
-        }
-
-        const options = {
-          mdns: get(config, 'Discovery.MDNS.Enabled'),
-          webRTCStar: get(config, 'Discovery.webRTCStar.Enabled'),
-          bootstrap: get(config, 'Bootstrap'),
-          dht: get(self._options, 'EXPERIMENTAL.dht'),
-          modules: self._libp2pModules
-        }
-
-        self._libp2pNode = new Node(self._peerInfo, self._peerInfoBook, options)
-
-        self._libp2pNode.on('peer:discovery', (peerInfo) => {
-          const dial = () => {
-            self._peerInfoBook.put(peerInfo)
-            self._libp2pNode.dial(peerInfo, () => {})
-          }
-          if (self.isOnline()) {
-            dial()
-          } else {
-            self._libp2pNode.once('start', dial)
-          }
-        })
-
-        self._libp2pNode.on('peer:connect', (peerInfo) => {
-          self._peerInfoBook.put(peerInfo)
-        })
-
-        self._libp2pNode.start((err) => {
-          if (err) {
-            return callback(err)
-          }
-
-          self._libp2pNode.peerInfo.multiaddrs.forEach((ma) => {
-            console.log('Swarm listening on', ma.toString())
-          })
-
-          callback()
-        })
-      }
-    }),
-    stop: promisify((callback) => {
-      self._libp2pNode.stop(callback)
-    })
-  }
-}
-
-},{"../runtime/libp2p-nodejs":299,"lodash.get":450,"promisify-es6":562}],288:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const waterfall = require('async/waterfall')
-const promisify = require('promisify-es6')
-const dagPB = require('ipld-dag-pb')
-const DAGNode = dagPB.DAGNode
-const DAGLink = dagPB.DAGLink
-const CID = require('cids')
-const mh = require('multihashes')
-const Unixfs = require('ipfs-unixfs')
-const assert = require('assert')
-
-function normalizeMultihash (multihash, enc) {
-  if (typeof multihash === 'string') {
-    if (enc === 'base58' || !enc) {
-      return multihash
-    }
-
-    return new Buffer(multihash, enc)
-  } else if (Buffer.isBuffer(multihash)) {
-    return multihash
-  } else {
-    throw new Error('unsupported multihash')
-  }
-}
-
-function parseBuffer (buf, encoding, callback) {
-  switch (encoding) {
-    case 'json':
-      return parseJSONBuffer(buf, callback)
-    case 'protobuf':
-      return parseProtoBuffer(buf, callback)
-    default:
-      callback(new Error(`unkown encoding: ${encoding}`))
-  }
-}
-
-function parseJSONBuffer (buf, callback) {
-  let data
-  let links
-
-  try {
-    const parsed = JSON.parse(buf.toString())
-
-    links = (parsed.Links || []).map((link) => {
-      return new DAGLink(
-        link.Name || link.name,
-        link.Size || link.size,
-        mh.fromB58String(link.Hash || link.hash || link.multihash)
-      )
-    })
-    data = new Buffer(parsed.Data)
-  } catch (err) {
-    return callback(new Error('failed to parse JSON: ' + err))
-  }
-
-  DAGNode.create(data, links, callback)
-}
-
-function parseProtoBuffer (buf, callback) {
-  dagPB.util.deserialize(buf, callback)
-}
-
-module.exports = function object (self) {
-  function editAndSave (edit) {
-    return (multihash, options, callback) => {
-      if (typeof options === 'function') {
-        callback = options
-        options = {}
-      }
-
-      waterfall([
-        (cb) => {
-          self.object.get(multihash, options, cb)
-        },
-        (node, cb) => {
-          // edit applies the edit func passed to
-          // editAndSave
-          edit(node, (err, node) => {
-            if (err) {
-              return cb(err)
-            }
-            self._ipldResolver.put(node, {
-              cid: new CID(node.multihash)
-            }, (err) => {
-              cb(err, node)
-            })
-          })
-        }
-      ], callback)
-    }
-  }
-
-  return {
-    new: promisify((template, callback) => {
-      if (typeof template === 'function') {
-        callback = template
-        template = undefined
-      }
-
-      let data
-
-      if (template) {
-        assert(template === 'unixfs-dir', 'unkown template')
-        data = (new Unixfs('directory')).marshal()
-      } else {
-        data = new Buffer(0)
-      }
-
-      DAGNode.create(data, (err, node) => {
-        if (err) {
-          return callback(err)
-        }
-        self._ipldResolver.put(node, {
-          cid: new CID(node.multihash)
-        }, (err) => {
-          if (err) {
-            return callback(err)
-          }
-
-          callback(null, node)
-        })
-      })
-    }),
-    put: promisify((obj, options, callback) => {
-      if (typeof options === 'function') {
-        callback = options
-        options = {}
-      }
-
-      const encoding = options.enc
-      let node
-
-      if (Buffer.isBuffer(obj)) {
-        if (encoding) {
-          parseBuffer(obj, encoding, (err, _node) => {
-            if (err) {
-              return callback(err)
-            }
-            node = _node
-            next()
-          })
-        } else {
-          DAGNode.create(obj, (err, _node) => {
-            if (err) {
-              return callback(err)
-            }
-            node = _node
-            next()
-          })
-        }
-      } else if (obj.multihash) {
-        // already a dag node
-        node = obj
-        next()
-      } else if (typeof obj === 'object') {
-        DAGNode.create(obj.Data, obj.Links, (err, _node) => {
-          if (err) {
-            return callback(err)
-          }
-          node = _node
-          next()
-        })
-      } else {
-        return callback(new Error('obj not recognized'))
-      }
-
-      function next () {
-        self._ipldResolver.put(node, {
-          cid: new CID(node.multihash)
-        }, (err) => {
-          if (err) {
-            return callback(err)
-          }
-
-          self.object.get(node.multihash, callback)
-        })
-      }
-    }),
-
-    get: promisify((multihash, options, callback) => {
-      if (typeof options === 'function') {
-        callback = options
-        options = {}
-      }
-
-      let mh
-
-      try {
-        mh = normalizeMultihash(multihash, options.enc)
-      } catch (err) {
-        return callback(err)
-      }
-      const cid = new CID(mh)
-
-      self._ipldResolver.get(cid, (err, result) => {
-        if (err) {
-          return callback(err)
-        }
-
-        const node = result.value
-
-        callback(null, node)
-      })
-    }),
-
-    data: promisify((multihash, options, callback) => {
-      if (typeof options === 'function') {
-        callback = options
-        options = {}
-      }
-
-      self.object.get(multihash, options, (err, node) => {
-        if (err) {
-          return callback(err)
-        }
-        callback(null, node.data)
-      })
-    }),
-
-    links: promisify((multihash, options, callback) => {
-      if (typeof options === 'function') {
-        callback = options
-        options = {}
-      }
-
-      self.object.get(multihash, options, (err, node) => {
-        if (err) {
-          return callback(err)
-        }
-
-        callback(null, node.links)
-      })
-    }),
-
-    stat: promisify((multihash, options, callback) => {
-      if (typeof options === 'function') {
-        callback = options
-        options = {}
-      }
-
-      self.object.get(multihash, options, (err, node) => {
-        if (err) {
-          return callback(err)
-        }
-
-        dagPB.util.serialize(node, (err, serialized) => {
-          if (err) {
-            return callback(err)
-          }
-
-          const blockSize = serialized.length
-          const linkLength = node.links.reduce((a, l) => a + l.size, 0)
-
-          const nodeJSON = node.toJSON()
-
-          callback(null, {
-            Hash: nodeJSON.multihash,
-            NumLinks: node.links.length,
-            BlockSize: blockSize,
-            LinksSize: blockSize - node.data.length,
-            DataSize: node.data.length,
-            CumulativeSize: blockSize + linkLength
-          })
-        })
-      })
-    }),
-
-    patch: promisify({
-      addLink (multihash, link, options, callback) {
-        editAndSave((node, cb) => {
-          DAGNode.addLink(node, link, cb)
-        })(multihash, options, callback)
-      },
-
-      rmLink (multihash, linkRef, options, callback) {
-        editAndSave((node, cb) => {
-          if (linkRef.constructor &&
-              linkRef.constructor.name === 'DAGLink') {
-            linkRef = linkRef._name
-          }
-          DAGNode.rmLink(node, linkRef, cb)
-        })(multihash, options, callback)
-      },
-
-      appendData (multihash, data, options, callback) {
-        editAndSave((node, cb) => {
-          const newData = Buffer.concat([node.data, data])
-          DAGNode.create(newData, node.links, cb)
-        })(multihash, options, callback)
-      },
-
-      setData (multihash, data, options, callback) {
-        editAndSave((node, cb) => {
-          DAGNode.create(data, node.links, cb)
-        })(multihash, options, callback)
-      }
-    })
-  }
-}
-
-}).call(this,require("buffer").Buffer)
-},{"assert":719,"async/waterfall":57,"buffer":722,"cids":103,"ipfs-unixfs":272,"ipld-dag-pb":315,"multihashes":523,"promisify-es6":562}],289:[function(require,module,exports){
-'use strict'
-
-const promisify = require('promisify-es6')
-
-module.exports = function ping (self) {
-  return promisify((callback) => {
-    callback(new Error('Not implemented'))
-  })
-}
-
-},{"promisify-es6":562}],290:[function(require,module,exports){
-'use strict'
-
-const peerId = require('peer-id')
-const PeerInfo = require('peer-info')
-const multiaddr = require('multiaddr')
-const waterfall = require('async/waterfall')
-const mafmt = require('mafmt')
-
-/*
- * Load stuff from Repo into memory
- */
-module.exports = function preStart (self) {
-  return (callback) => {
-    self.log('pre-start')
-
-    waterfall([
-      (cb) => self._repo.config.get(cb),
-      (config, cb) => {
-        const privKey = config.Identity.PrivKey
-
-        peerId.createFromPrivKey(privKey, (err, id) => cb(err, config, id))
-      },
-      (config, id, cb) => {
-        self._peerInfo = new PeerInfo(id)
-
-        config.Addresses.Swarm.forEach((addr) => {
-          let ma = multiaddr(addr)
-
-          if (!mafmt.IPFS.matches(ma)) {
-            ma = ma.encapsulate('/ipfs/' + self._peerInfo.id.toB58String())
-          }
-
-          self._peerInfo.multiaddrs.add(ma)
-        })
-
-        cb()
-      }
-    ], callback)
-  }
-}
-
-},{"async/waterfall":57,"mafmt":502,"multiaddr":511,"peer-id":556,"peer-info":557}],291:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const promisify = require('promisify-es6')
-const setImmediate = require('async/setImmediate')
-
-const OFFLINE_ERROR = require('../utils').OFFLINE_ERROR
-
-module.exports = function pubsub (self) {
-  return {
-    subscribe: (topic, options, handler, callback) => {
-      if (!self.isOnline()) {
-        throw OFFLINE_ERROR
-      }
-
-      if (typeof options === 'function') {
-        callback = handler
-        handler = options
-        options = {}
-      }
-
-      if (!callback) {
-        return new Promise((resolve, reject) => {
-          subscribe(topic, options, handler, (err) => {
-            if (err) {
-              return reject(err)
-            }
-            resolve()
-          })
-        })
-      }
-
-      subscribe(topic, options, handler, callback)
-    },
-
-    unsubscribe: (topic, handler) => {
-      const ps = self._pubsub
-
-      ps.removeListener(topic, handler)
-
-      if (ps.listenerCount(topic) === 0) {
-        ps.unsubscribe(topic)
-      }
-    },
-
-    publish: promisify((topic, data, callback) => {
-      if (!self.isOnline()) {
-        return setImmediate(() => callback(OFFLINE_ERROR))
-      }
-
-      if (!Buffer.isBuffer(data)) {
-        return setImmediate(() => callback(new Error('data must be a Buffer')))
-      }
-
-      self._pubsub.publish(topic, data)
-      setImmediate(() => callback())
-    }),
-
-    ls: promisify((callback) => {
-      if (!self.isOnline()) {
-        return setImmediate(() => callback(OFFLINE_ERROR))
-      }
-
-      const subscriptions = Array.from(
-        self._pubsub.subscriptions
-      )
-
-      setImmediate(() => callback(null, subscriptions))
-    }),
-
-    peers: promisify((topic, callback) => {
-      if (!self.isOnline()) {
-        return setImmediate(() => callback(OFFLINE_ERROR))
-      }
-
-      const peers = Array.from(self._pubsub.peers.values())
-          .filter((peer) => peer.topics.has(topic))
-          .map((peer) => peer.info.id.toB58String())
-
-      setImmediate(() => callback(null, peers))
-    }),
-
-    setMaxListeners (n) {
-      return self._pubsub.setMaxListeners(n)
-    }
-  }
-
-  function subscribe (topic, options, handler, callback) {
-    const ps = self._pubsub
-
-    if (ps.listenerCount(topic) === 0) {
-      ps.subscribe(topic)
-    }
-
-    ps.on(topic, handler)
-    setImmediate(() => callback())
-  }
-}
-
-}).call(this,{"isBuffer":require("../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728,"../utils":302,"async/setImmediate":54,"promisify-es6":562}],292:[function(require,module,exports){
-'use strict'
-
-module.exports = function repo (self) {
-  return {
-    init: (bits, empty, callback) => {
-      // 1. check if repo already exists
-    },
-
-    version: (callback) => {
-      self._repo.version.get(callback)
-    },
-
-    gc: function () {},
-
-    path: () => self._repo.path
-  }
-}
-
-},{}],293:[function(require,module,exports){
-'use strict'
-
-const series = require('async/series')
-const Bitswap = require('ipfs-bitswap')
-const FloodSub = require('libp2p-floodsub')
-const setImmediate = require('async/setImmediate')
-const promisify = require('promisify-es6')
-
-module.exports = (self) => {
-  return promisify((callback) => {
-    callback = callback || function noop () {}
-
-    const done = (err) => {
-      if (err) {
-        setImmediate(() => self.emit('error', err))
-        return callback(err)
-      }
-
-      self.state.started()
-      setImmediate(() => self.emit('start'))
-      callback()
-    }
-
-    if (self.state.state() !== 'stopped') {
-      return done(new Error('Not able to start from state: ' + self.state.state()))
-    }
-
-    self.log('starting')
-    self.state.start()
-
-    series([
-      (cb) => {
-        self._repo.closed
-          ? self._repo.open(cb)
-          : cb()
-      },
-      (cb) => self.preStart(cb),
-      (cb) => self.libp2p.start(cb)
-    ], (err) => {
-      if (err) {
-        return done(err)
-      }
-
-      self._bitswap = new Bitswap(
-        self._libp2pNode,
-        self._repo.blocks,
-        self._peerInfoBook
-      )
-
-      self._bitswap.start()
-      self._blockService.setExchange(self._bitswap)
-
-      if (self._options.EXPERIMENTAL.pubsub) {
-        self._pubsub = new FloodSub(self._libp2pNode)
-        self._pubsub.start(done)
-      } else {
-        done()
-      }
-    })
-  })
-}
-
-},{"async/series":53,"async/setImmediate":54,"ipfs-bitswap":214,"libp2p-floodsub":403,"promisify-es6":562}],294:[function(require,module,exports){
-'use strict'
-
-const series = require('async/series')
-
-module.exports = (self) => {
-  return (callback) => {
-    callback = callback || function noop () {}
-    self.log('stop')
-
-    if (self.state.state() === 'stopped') {
-      return callback()
-    }
-
-    const done = (err) => {
-      if (err) {
-        self.emit('error', err)
-        return callback(err)
-      }
-      self.state.stopped()
-      self.emit('stop')
-      callback()
-    }
-
-    if (self.state.state() !== 'running') {
-      return done(new Error('Not able to stop from state: ' + self.state.state()))
-    }
-
-    self.state.stop()
-    self._blockService.unsetExchange()
-    self._bitswap.stop()
-
-    series([
-      (cb) => {
-        if (self._options.EXPERIMENTAL.pubsub) {
-          self._pubsub.stop(cb)
-        } else {
-          cb()
-        }
-      },
-      (cb) => self.libp2p.stop(cb),
-      (cb) => self._repo.close(cb)
-    ], done)
-  }
-}
-
-},{"async/series":53}],295:[function(require,module,exports){
-'use strict'
-
-const multiaddr = require('multiaddr')
-const promisify = require('promisify-es6')
-const values = require('lodash.values')
-
-const OFFLINE_ERROR = require('../utils').OFFLINE_ERROR
-
-module.exports = function swarm (self) {
-  return {
-    peers: promisify((opts, callback) => {
-      if (typeof opts === 'function') {
-        callback = opts
-        opts = {}
-      }
-
-      if (!self.isOnline()) {
-        return callback(OFFLINE_ERROR)
-      }
-
-      const verbose = opts.v || opts.verbose
-      // TODO: return latency and streams when verbose is set
-      // we currently don't have this information
-
-      const peers = []
-
-      values(self._peerInfoBook.getAll()).forEach((peer) => {
-        const connectedAddr = peer.isConnected()
-
-        if (!connectedAddr) { return }
-
-        const tupple = {
-          addr: connectedAddr,
-          peer: peer
-        }
-        if (verbose) {
-          tupple.latency = 'unknown'
-        }
-
-        peers.push(tupple)
-      })
-
-      callback(null, peers)
-    }),
-
-    // all the addrs we know
-    addrs: promisify((callback) => {
-      if (!self.isOnline()) {
-        return callback(OFFLINE_ERROR)
-      }
-
-      const peers = values(self._peerInfoBook.getAll())
-
-      callback(null, peers)
-    }),
-
-    localAddrs: promisify((callback) => {
-      if (!self.isOnline()) {
-        return callback(OFFLINE_ERROR)
-      }
-
-      callback(null, self._libp2pNode.peerInfo.multiaddrs.toArray())
-    }),
-
-    connect: promisify((maddr, callback) => {
-      if (!self.isOnline()) {
-        return callback(OFFLINE_ERROR)
-      }
-
-      if (typeof maddr === 'string') {
-        maddr = multiaddr(maddr)
-      }
-
-      self._libp2pNode.dial(maddr, callback)
-    }),
-
-    disconnect: promisify((maddr, callback) => {
-      if (!self.isOnline()) {
-        return callback(OFFLINE_ERROR)
-      }
-
-      if (typeof maddr === 'string') {
-        maddr = multiaddr(maddr)
-      }
-
-      self._libp2pNode.hangUp(maddr, callback)
-    }),
-
-    filters: promisify((callback) => callback(new Error('Not implemented')))
-  }
-}
-
-},{"../utils":302,"lodash.values":463,"multiaddr":511,"promisify-es6":562}],296:[function(require,module,exports){
-'use strict'
-
-const pkg = require('../../../package.json')
-const promisify = require('promisify-es6')
-
-module.exports = function version (self) {
-  return promisify((opts, callback) => {
-    if (typeof opts === 'function') {
-      callback = opts
-      opts = {}
-    }
-
-    callback(null, {
-      version: pkg.version,
-      repo: '',
-      commit: ''
-    })
-  })
-}
-
-},{"../../../package.json":274,"promisify-es6":562}],297:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const BlockService = require('ipfs-block-service')
-const IPLDResolver = require('ipld-resolver')
-const PeerId = require('peer-id')
-const PeerInfo = require('peer-info')
-const multiaddr = require('multiaddr')
-const multihash = require('multihashes')
-const PeerBook = require('peer-book')
-const CID = require('cids')
-const debug = require('debug')
-const extend = require('deep-extend')
-const EventEmitter = require('events')
-
-const boot = require('./boot')
-const components = require('./components')
-// replaced by repo-browser when running in the browser
-const defaultRepo = require('./runtime/repo-nodejs')
-
-class IPFS extends EventEmitter {
-  constructor (options) {
-    super()
-
-    this._options = {
-      init: true,
-      start: true,
-      EXPERIMENTAL: {}
-    }
-
-    options = options || {}
-    this._libp2pModules = options.libp2p && options.libp2p.modules
-
-    extend(this._options, options)
-
-    if (options.init === false) {
-      this._options.init = false
-    }
-
-    if (!(options.start === false)) {
-      this._options.start = true
-    }
-
-    if (typeof options.repo === 'string' ||
-        options.repo === undefined) {
-      this._repo = defaultRepo(options.repo)
-    } else {
-      this._repo = options.repo
-    }
-
-    // IPFS utils
-    this.log = debug('jsipfs')
-    this.log.err = debug('jsipfs:err')
-
-    this.on('error', (err) => this.log(err))
-
-    // IPFS types
-    this.types = {
-      Buffer: Buffer,
-      PeerId: PeerId,
-      PeerInfo: PeerInfo,
-      multiaddr: multiaddr,
-      multihash: multihash,
-      CID: CID
-    }
-
-    // IPFS Core Internals
-    // this._repo - assigned above
-    this._peerInfoBook = new PeerBook()
-    this._peerInfo = undefined
-    this._libp2pNode = undefined
-    this._bitswap = undefined
-    this._blockService = new BlockService(this._repo)
-    this._ipldResolver = new IPLDResolver(this._blockService)
-    this._pubsub = undefined
-
-    // IPFS Core exposed components
-    //   - for booting up a node
-    this.init = components.init(this)
-    this.preStart = components.preStart(this)
-    this.start = components.start(this)
-    this.stop = components.stop(this)
-    this.isOnline = components.isOnline(this)
-    //   - interface-ipfs-core defined API
-    this.version = components.version(this)
-    this.id = components.id(this)
-    this.repo = components.repo(this)
-    this.bootstrap = components.bootstrap(this)
-    this.config = components.config(this)
-    this.block = components.block(this)
-    this.object = components.object(this)
-    this.dag = components.dag(this)
-    this.libp2p = components.libp2p(this)
-    this.swarm = components.swarm(this)
-    this.files = components.files(this)
-    this.bitswap = components.bitswap(this)
-    this.ping = components.ping(this)
-    this.pubsub = components.pubsub(this)
-    this.dht = components.dht(this)
-
-    if (this._options.EXPERIMENTAL.pubsub) {
-      this.log('EXPERIMENTAL pubsub is enabled')
-    }
-    if (this._options.EXPERIMENTAL.sharding) {
-      this.log('EXPERIMENTAL sharding is enabled')
-    }
-    if (this._options.EXPERIMENTAL.dht) {
-      this.log('EXPERIMENTAL Kademlia DHT is enabled')
-    }
-
-    this.state = require('./state')(this)
-
-    boot(this)
-  }
-}
-
-exports = module.exports = IPFS
-
-exports.createNode = (options) => {
-  return new IPFS(options)
-}
-
-}).call(this,require("buffer").Buffer)
-},{"./boot":275,"./components":284,"./runtime/repo-nodejs":300,"./state":301,"buffer":722,"cids":103,"debug":123,"deep-extend":125,"events":724,"ipfs-block-service":225,"ipld-resolver":344,"multiaddr":511,"multihashes":523,"peer-book":555,"peer-id":556,"peer-info":557}],298:[function(require,module,exports){
-module.exports={
-  "Addresses": {
-    "Swarm": [
-      "/dns4/star-signal.cloud.ipfs.team/wss/p2p-webrtc-star"
-    ],
-    "API": "",
-    "Gateway": ""
-  },
-  "Discovery": {
-    "MDNS": {
-      "Enabled": false,
-      "Interval": 10
-    },
-    "webRTCStar": {
-      "Enabled": true
-    }
-  },
-  "Bootstrap": [
-    "/dns4/ams-1.bootstrap.libp2p.io/tcp/443/wss/ipfs/QmSoLer265NRgSp2LA3dPaeykiS1J6DifTC88f5uVQKNAd",
-    "/dns4/lon-1.bootstrap.libp2p.io/tcp/443/wss/ipfs/QmSoLMeWqB7YGVLJN3pNLQpmmEk35v6wYtsMGLzSr5QBU3",
-    "/dns4/sfo-3.bootstrap.libp2p.io/tcp/443/wss/ipfs/QmSoLPppuBtQSGwKDZT2M73ULpjvfd3aZ6ha4oFGL1KrGM",
-    "/dns4/sgp-1.bootstrap.libp2p.io/tcp/443/wss/ipfs/QmSoLSafTMBsPKadTEgaXctDQVcqN88CNLHXMkTNwMKPnu",
-    "/dns4/nyc-1.bootstrap.libp2p.io/tcp/443/wss/ipfs/QmSoLueR4xBeUbY9WZ9xGUUxunbKWcrNFTDAadQJmocnWm",
-    "/dns4/nyc-2.bootstrap.libp2p.io/tcp/443/wss/ipfs/QmSoLV4Bbm51jM9C4gDYZQ9Cy3U6aXMJDAbzgu2fzaDs64",
-    "/dns4/wss0.bootstrap.libp2p.io/tcp/443/wss/ipfs/QmZMxNdpMkewiVZLMRxaNxUeZpDUb34pWjZ1kZvsd16Zic",
-    "/dns4/wss1.bootstrap.libp2p.io/tcp/443/wss/ipfs/Qmbut9Ywz9YEDrz8ySBSgWyJk41Uvm2QJPhwDJzJyGFsD6"
-  ]
-}
-
-},{}],299:[function(require,module,exports){
-'use strict'
-
-const WS = require('libp2p-websockets')
-const WebRTCStar = require('libp2p-webrtc-star')
-const Multiplex = require('libp2p-multiplex')
-const SECIO = require('libp2p-secio')
-const Railing = require('libp2p-railing')
-const libp2p = require('libp2p')
-
-class Node extends libp2p {
-  constructor (peerInfo, peerBook, options) {
-    options = options || {}
-    const wstar = new WebRTCStar()
-
-    const modules = {
-      transport: [new WS(), wstar],
-      connection: {
-        muxer: [Multiplex],
-        crypto: [SECIO]
-      },
-      discovery: [wstar.discovery]
-    }
-
-    if (options.bootstrap) {
-      const r = new Railing(options.bootstrap)
-      modules.discovery.push(r)
-    }
-
-    if (options.modules && options.modules.transport) {
-      options.modules.transport.forEach((t) => modules.transport.push(t))
-    }
-
-    if (options.modules && options.modules.discovery) {
-      options.modules.discovery.forEach((d) => modules.discovery.push(d))
-    }
-
-    super(modules, peerInfo, peerBook, options)
-  }
-}
-
-module.exports = Node
-
-},{"libp2p":446,"libp2p-multiplex":413,"libp2p-railing":421,"libp2p-secio":429,"libp2p-webrtc-star":441,"libp2p-websockets":443}],300:[function(require,module,exports){
-'use strict'
-
-const IPFSRepo = require('ipfs-repo')
-
-module.exports = (dir) => {
-  const repoPath = dir || 'ipfs'
-  return new IPFSRepo(repoPath)
-}
-
-},{"ipfs-repo":240}],301:[function(require,module,exports){
-'use strict'
-
-const debug = require('debug')
-const log = debug('jsipfs:state')
-log.error = debug('jsipfs:state:error')
-
-const fsm = require('fsm-event')
-
-module.exports = (self) => {
-  const s = fsm('uninitalized', {
-    uninitalized: {
-      init: 'initializing',
-      initialized: 'stopped'
-    },
-    initializing: {
-      initialized: 'stopped'
-    },
-    stopped: {
-      start: 'starting'
-    },
-    starting: {
-      started: 'running'
-    },
-    running: {
-      stop: 'stopping'
-    },
-    stopping: {
-      stopped: 'stopped'
-    }
-  })
-
-  // log events
-  s.on('error', (err) => log.error(err))
-  s.on('done', () => log('-> ' + s._state))
-
-  // -- Actions
-
-  s.init = () => {
-    s('init')
-  }
-
-  s.initialized = () => {
-    s('initialized')
-  }
-
-  s.stop = () => {
-    s('stop')
-  }
-
-  s.stopped = () => {
-    s('stopped')
-  }
-
-  s.start = () => {
-    s('start')
-  }
-
-  s.started = () => {
-    s('started')
-  }
-
-  s.state = () => s._state
-
-  return s
-}
-
-},{"debug":123,"fsm-event":180}],302:[function(require,module,exports){
-'use strict'
-
-exports.OFFLINE_ERROR = new Error('This command must be run in online mode. Try running \'ipfs daemon\' first.')
-
-},{}],303:[function(require,module,exports){
-'use strict'
-
-exports.util = require('./util.js')
-exports.resolver = require('./resolver.js')
-
-},{"./resolver.js":304,"./util.js":305}],304:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const util = require('./util')
-const traverse = require('traverse')
-
-exports = module.exports
-
-exports.multicodec = 'dag-cbor'
-
-/*
- * resolve: receives a path and a block and returns the value on path,
- * throw if not possible. `block` is an IPFS Block instance (contains data + cid)
- */
-exports.resolve = (block, path, callback) => {
-  if (typeof path === 'function') {
-    callback = path
-    path = undefined
-  }
-
-  util.deserialize(block.data, (err, node) => {
-    if (err) {
-      return callback(err)
-    }
-
-    // root
-
-    if (!path || path === '/') {
-      return callback(null, {
-        value: node,
-        remainderPath: ''
-      })
-    }
-
-    // within scope
-
-    // const tree = exports.tree(block)
-    const parts = path.split('/')
-    const val = traverse(node).get(parts)
-
-    if (val) {
-      return callback(null, {
-        value: val,
-        remainderPath: ''
-      })
-    }
-
-    // out of scope
-    let value
-    let len = parts.length
-
-    for (let i = 0; i < len; i++) {
-      const partialPath = parts.shift()
-
-      if (Array.isArray(node) && !Buffer.isBuffer(node)) {
-        value = node[Number(partialPath)]
-      } if (node[partialPath]) {
-        value = node[partialPath]
-      } else {
-        // can't traverse more
-        if (!value) {
-          return callback(new Error('path not available at root'))
-        } else {
-          parts.unshift(partialPath)
-          return callback(null, {
-            value: value,
-            remainderPath: parts.join('/')
-          })
-        }
-      }
-      node = value
-    }
-  })
-}
-
-function flattenObject (obj, delimiter) {
-  delimiter = delimiter || '/'
-
-  if (Object.keys(obj).length === 0) {
-    return []
-  }
-
-  return traverse(obj).reduce(function (acc, x) {
-    if (typeof x === 'object' && x['/']) {
-      this.update(undefined)
-    }
-    const path = this.path.join(delimiter)
-
-    if (path !== '') {
-      acc.push({ path: path, value: x })
-    }
-    return acc
-  }, [])
-}
-
-/*
- * tree: returns a flattened array with paths: values of the project. options
- * are option (i.e. nestness)
- */
-exports.tree = (block, options, callback) => {
-  if (typeof options === 'function') {
-    callback = options
-    options = undefined
-  }
-
-  options = options || {}
-
-  util.deserialize(block.data, (err, node) => {
-    if (err) {
-      return callback(err)
-    }
-    const flat = flattenObject(node)
-    const paths = flat.map((el) => el.path)
-
-    callback(null, paths)
-  })
-}
-
-exports.isLink = (block, path, callback) => {
-  exports.resolve(block, path, (err, result) => {
-    if (err) {
-      return callback(err)
-    }
-
-    if (result.remainderPath.length > 0) {
-      return callback(new Error('path out of scope'))
-    }
-
-    if (typeof result.value === 'object' && result.value['/']) {
-      callback(null, result.value)
-    } else {
-      callback(null, false)
-    }
-  })
-}
-
-}).call(this,{"isBuffer":require("../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728,"./util":305,"traverse":703}],305:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const cbor = require('borc')
-const multihashing = require('multihashing-async')
-const CID = require('cids')
-const waterfall = require('async/waterfall')
-const setImmediate = require('async/setImmediate')
-const isCircular = require('is-circular')
-
-const resolver = require('./resolver')
-
-// https://github.com/ipfs/go-ipfs/issues/3570#issuecomment-273931692
-const CID_CBOR_TAG = 42
-
-function tagCID (cid) {
-  if (typeof cid === 'string') {
-    cid = new CID(cid).buffer
-  }
-
-  return new cbor.Tagged(CID_CBOR_TAG, Buffer.concat([
-    new Buffer('00', 'hex'), // thanks jdag
-    cid
-  ]))
-}
-
-const decoder = new cbor.Decoder({
-  tags: {
-    [CID_CBOR_TAG]: (val) => {
-      // remove that 0
-      val = val.slice(1)
-      return {'/': val}
-    }
-  }
-})
-
-function replaceCIDbyTAG (dagNode) {
-  let circular
-  try {
-    circular = isCircular(dagNode)
-  } catch (e) {
-    circular = false
-  }
-  if (circular) {
-    throw new Error('The object passed has circular references')
-  }
-
-  function transform (obj) {
-    if (!obj || Buffer.isBuffer(obj) || typeof obj === 'string') {
-      return obj
-    }
-
-    if (Array.isArray(obj)) {
-      return obj.map(transform)
-    }
-
-    const keys = Object.keys(obj)
-
-    // only `{'/': 'link'}` are valid
-    if (keys.length === 1 && keys[0] === '/') {
-      // Multiaddr encoding
-      // if (typeof link === 'string' && isMultiaddr(link)) {
-      //  link = new Multiaddr(link).buffer
-      // }
-
-      return tagCID(obj['/'])
-    } else if (keys.length > 0) {
-      // Recursive transform
-      let out = {}
-      keys.forEach((key) => {
-        if (typeof obj[key] === 'object') {
-          out[key] = transform(obj[key])
-        } else {
-          out[key] = obj[key]
-        }
-      })
-      return out
-    } else {
-      return obj
-    }
-  }
-
-  return transform(dagNode)
-}
-
-exports = module.exports
-
-exports.serialize = (dagNode, callback) => {
-  let serialized
-
-  try {
-    const dagNodeTagged = replaceCIDbyTAG(dagNode)
-    serialized = cbor.encode(dagNodeTagged)
-  } catch (err) {
-    return setImmediate(() => callback(err))
-  }
-  setImmediate(() => callback(null, serialized))
-}
-
-exports.deserialize = (data, callback) => {
-  let deserialized
-
-  try {
-    deserialized = decoder.decodeFirst(data)
-  } catch (err) {
-    return setImmediate(() => callback(err))
-  }
-
-  setImmediate(() => callback(null, deserialized))
-}
-
-exports.cid = (dagNode, callback) => {
-  waterfall([
-    (cb) => exports.serialize(dagNode, cb),
-    (serialized, cb) => multihashing(serialized, 'sha2-256', cb),
-    (mh, cb) => cb(null, new CID(1, resolver.multicodec, mh))
-  ], callback)
-}
-
-}).call(this,require("buffer").Buffer)
-},{"./resolver":304,"async/setImmediate":54,"async/waterfall":57,"borc":76,"buffer":722,"cids":103,"is-circular":345,"multihashing-async":527}],306:[function(require,module,exports){
-'use strict'
-
-const DAGLink = require('./index.js')
-
-function create (name, size, multihash, callback) {
-  const link = new DAGLink(name, size, multihash)
-  callback(null, link)
-}
-
-module.exports = create
-
-},{"./index.js":307}],307:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const mh = require('multihashes')
-const assert = require('assert')
-
-// Link represents an IPFS Merkle DAG Link between Nodes.
-class DAGLink {
-  constructor (name, size, multihash) {
-    assert(multihash, 'A link requires a multihash to point to')
-    assert(size, 'A link requires a size')
-
-    this._name = name
-    this._size = size
-
-    if (typeof multihash === 'string') {
-      this._multihash = mh.fromB58String(multihash)
-    } else if (Buffer.isBuffer(multihash)) {
-      this._multihash = multihash
-    }
-  }
-
-  toString () {
-    const mhStr = mh.toB58String(this.multihash)
-    return `DAGLink <${mhStr} - name: "${this.name}", size: ${this.size}>`
-  }
-
-  toJSON () {
-    return {
-      name: this.name,
-      size: this.size,
-      multihash: mh.toB58String(this._multihash)
-    }
-  }
-
-  get name () {
-    return this._name
-  }
-
-  set name (name) {
-    throw new Error("Can't set property: 'name' is immutable")
-  }
-
-  get size () {
-    return this._size
-  }
-
-  set size (size) {
-    throw new Error("Can't set property: 'size' is immutable")
-  }
-
-  get multihash () {
-    return this._multihash
-  }
-
-  set multihash (multihash) {
-    throw new Error("Can't set property: 'multihash' is immutable")
-  }
-}
-
-exports = module.exports = DAGLink
-exports.create = require('./create')
-
-}).call(this,{"isBuffer":require("../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728,"./create":306,"assert":719,"multihashes":523}],308:[function(require,module,exports){
-'use strict'
-
-const dagNodeUtil = require('./util')
-const cloneLinks = dagNodeUtil.cloneLinks
-const cloneData = dagNodeUtil.cloneData
-const toDAGLink = dagNodeUtil.toDAGLink
-const DAGLink = require('./../dag-link')
-const create = require('./create')
-
-function addLink (node, link, callback) {
-  const links = cloneLinks(node)
-  const data = cloneData(node)
-
-  if ((link.constructor && link.constructor.name === 'DAGLink')) {
-    // It's a DAGLink instance
-    // no need to do anything
-  } else if (link.constructor && link.constructor.name === 'DAGNode') {
-    // It's a DAGNode instance
-    // convert to link
-    link = toDAGLink(link)
-  } else {
-    // It's a Object with name, multihash/link and size
-    link.multihash = link.multihash || link.hash
-    try {
-      link = new DAGLink(link.name, link.size, link.multihash)
-    } catch (err) {
-      return callback(err)
-    }
-  }
-
-  links.push(link)
-  create(data, links, callback)
-}
-
-module.exports = addLink
-
-},{"./../dag-link":307,"./create":310,"./util":313}],309:[function(require,module,exports){
-'use strict'
-
-const dagNodeUtil = require('./util')
-const cloneLinks = dagNodeUtil.cloneLinks
-const cloneData = dagNodeUtil.cloneData
-const create = require('./create')
-
-function clone (dagNode, callback) {
-  const data = cloneData(dagNode)
-  const links = cloneLinks(dagNode)
-  create(data, links, callback)
-}
-
-module.exports = clone
-
-},{"./create":310,"./util":313}],310:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const multihashing = require('multihashing-async')
-const sort = require('stable')
-const dagPBUtil = require('../util.js')
-const serialize = dagPBUtil.serialize
-const dagNodeUtil = require('./util.js')
-const linkSort = dagNodeUtil.linkSort
-const DAGNode = require('./index.js')
-const DAGLink = require('./../dag-link')
-
-function create (data, dagLinks, hashAlg, callback) {
-  if (typeof data === 'function') {
-    callback = data
-    data = undefined
-  } else if (typeof data === 'string') {
-    data = Buffer.from(data)
-  }
-  if (typeof dagLinks === 'function') {
-    callback = dagLinks
-    dagLinks = []
-  }
-  if (typeof hashAlg === 'function') {
-    callback = hashAlg
-    hashAlg = undefined
-  }
-
-  if (!Buffer.isBuffer(data)) {
-    return callback(new Error('Passed \'data\' is not a buffer or a string!'))
-  }
-
-  if (!hashAlg) {
-    hashAlg = 'sha2-256'
-  }
-
-  const links = dagLinks.map((l) => {
-    if (l.constructor && l.constructor.name === 'DAGLink') {
-      return l
-    }
-
-    return new DAGLink(
-      l.name ? l.name : l.Name,
-      l.size ? l.size : l.Size,
-      l.hash || l.Hash || l.multihash
-    )
-  })
-  const sortedLinks = sort(links, linkSort)
-
-  serialize({
-    data: data,
-    links: sortedLinks
-  }, (err, serialized) => {
-    if (err) {
-      return callback(err)
-    }
-    multihashing(serialized, hashAlg, (err, multihash) => {
-      if (err) {
-        return callback(err)
-      }
-      const dagNode = new DAGNode(data, sortedLinks, serialized, multihash)
-      callback(null, dagNode)
-    })
-  })
-}
-
-module.exports = create
-
-}).call(this,require("buffer").Buffer)
-},{"../util.js":317,"./../dag-link":307,"./index.js":311,"./util.js":313,"buffer":722,"multihashing-async":527,"stable":696}],311:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const mh = require('multihashes')
-const assert = require('assert')
-
-class DAGNode {
-  constructor (data, links, serialized, multihash) {
-    assert(serialized, 'DAGNode needs its serialized format')
-    assert(multihash, 'DAGNode needs its multihash')
-
-    if (typeof multihash === 'string') {
-      multihash = mh.fromB58String(multihash)
-    }
-
-    this._data = data || Buffer.alloc(0)
-    this._links = links || []
-    this._serialized = serialized
-    this._multihash = multihash
-
-    this._size = this.links.reduce((sum, l) => sum + l.size, this.serialized.length)
-
-    this._json = {
-      data: this.data,
-      links: this.links.map((l) => l.toJSON()),
-      multihash: mh.toB58String(this.multihash),
-      size: this.size
-    }
-  }
-
-  toJSON () {
-    return this._json
-  }
-
-  toString () {
-    const mhStr = mh.toB58String(this.multihash)
-    return `DAGNode <${mhStr} - data: "${this.data.toString()}", links: ${this.links.length}, size: ${this.size}>`
-  }
-
-  get data () {
-    return this._data
-  }
-
-  set data (data) {
-    throw new Error("Can't set property: 'data' is immutable")
-  }
-
-  get links () {
-    return this._links
-  }
-
-  set links (links) {
-    throw new Error("Can't set property: 'links' is immutable")
-  }
-
-  get serialized () {
-    return this._serialized
-  }
-
-  set serialized (serialized) {
-    throw new Error("Can't set property: 'serialized' is immutable")
-  }
-
-  get size () {
-    return this._size
-  }
-
-  set size (size) {
-    throw new Error("Can't set property: 'size' is immutable")
-  }
-
-  get multihash () {
-    return this._multihash
-  }
-
-  set multihash (multihash) {
-    throw new Error("Can't set property: 'multihash' is immutable")
-  }
-}
-
-exports = module.exports = DAGNode
-exports.create = require('./create')
-exports.clone = require('./clone')
-exports.addLink = require('./addLink')
-exports.rmLink = require('./rmLink')
-
-}).call(this,require("buffer").Buffer)
-},{"./addLink":308,"./clone":309,"./create":310,"./rmLink":312,"assert":719,"buffer":722,"multihashes":523}],312:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const dagNodeUtil = require('./util')
-const cloneLinks = dagNodeUtil.cloneLinks
-const cloneData = dagNodeUtil.cloneData
-const create = require('./create')
-
-function rmLink (dagNode, nameOrMultihash, callback) {
-  const data = cloneData(dagNode)
-  let links = cloneLinks(dagNode)
-
-  if (typeof nameOrMultihash === 'string') {
-    links = links.filter((link) => link.name !== nameOrMultihash)
-  } else if (Buffer.isBuffer(nameOrMultihash)) {
-    links = links.filter((link) => !link.multihash.equals(nameOrMultihash))
-  } else {
-    return callback(new Error('second arg needs to be a name or multihash'), null)
-  }
-
-  create(data, links, callback)
-}
-
-module.exports = rmLink
-
-}).call(this,{"isBuffer":require("../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728,"./create":310,"./util":313}],313:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const DAGLink = require('./../dag-link')
-
-exports = module.exports
-
-function cloneData (dagNode) {
-  let data
-
-  if (dagNode.data && dagNode.data.length > 0) {
-    data = new Buffer(dagNode.data.length)
-    dagNode.data.copy(data)
-  } else {
-    data = new Buffer(0)
-  }
-
-  return data
-}
-
-function cloneLinks (dagNode) {
-  return dagNode.links.slice()
-}
-
-function linkSort (a, b) {
-  const aBuf = new Buffer(a.name || '', 'ascii')
-  const bBuf = new Buffer(b.name || '', 'ascii')
-
-  return aBuf.compare(bBuf)
-}
-
-/*
- * toDAGLink converts a DAGNode to a DAGLink
- */
-function toDAGLink (node) {
-  return new DAGLink('', node.size, node.multihash)
-}
-
-exports.cloneData = cloneData
-exports.cloneLinks = cloneLinks
-exports.linkSort = linkSort
-exports.toDAGLink = toDAGLink
-
-}).call(this,require("buffer").Buffer)
-},{"./../dag-link":307,"buffer":722}],314:[function(require,module,exports){
-'use strict'
-
-module.exports = `// An IPFS MerkleDAG Link
-message PBLink {
-
-  // multihash of the target object
-  optional bytes Hash = 1;
-
-  // utf string name. should be unique per object
-  optional string Name = 2;
-
-  // cumulative size of target object
-  optional uint64 Tsize = 3;
-}
-
-// An IPFS MerkleDAG Node
-message PBNode {
-
-  // refs to other objects
-  repeated PBLink Links = 2;
-
-  // opaque user data
-  optional bytes Data = 1;
-}`
-
-},{}],315:[function(require,module,exports){
-'use strict'
-
-exports.DAGNode = require('./dag-node')
-exports.DAGLink = require('./dag-link')
-
-/*
- * Functions to fulfil IPLD Format interface
- * https://github.com/ipld/interface-ipld-format
- */
-exports.resolver = require('./resolver')
-exports.util = require('./util')
-
-},{"./dag-link":307,"./dag-node":311,"./resolver":316,"./util":317}],316:[function(require,module,exports){
-'use strict'
-
-const waterfall = require('async/waterfall')
-
-const util = require('./util')
-
-exports = module.exports
-exports.multicodec = 'dag-pb'
-
-/*
- * resolve: receives a path and a block and returns the value on path,
- * throw if not possible. `block` is an IPFS Block instance (contains data+key)
- */
-exports.resolve = (block, path, callback) => {
-  waterfall([
-    (cb) => util.deserialize(block.data, cb),
-    (node, cb) => {
-      const split = path.split('/')
-
-      if (split[0] === 'Links') {
-        let remainderPath = ''
-
-        // all links
-        if (!split[1]) {
-          return cb(null, {
-            value: node.links.map((l) => l.toJSON()),
-            remainderPath: ''
-          })
-        }
-
-        // select one link
-
-        const values = {}
-
-        // populate both index number and name to enable both cases
-        // for the resolver
-        node.links.forEach((l, i) => {
-          const link = l.toJSON()
-          values[i] = {
-            hash: link.multihash,
-            name: link.name,
-            size: link.size
-          }
-          // TODO by enabling something to resolve through link name, we are
-          // applying a transformation (a view) to the data, confirm if this
-          // is exactly what we want
-          values[link.name] = link.multihash
-        })
-
-        let value = values[split[1]]
-
-        // if remainderPath exists, value needs to be CID
-        if (split[2] === 'Hash') {
-          value = { '/': value.hash }
-        } else if (split[2] === 'Tsize') {
-          value = { '/': value.size }
-        } else if (split[2] === 'Name') {
-          value = { '/': value.name }
-        }
-
-        remainderPath = split.slice(3).join('/')
-
-        cb(null, { value: value, remainderPath: remainderPath })
-      } else if (split[0] === 'Data') {
-        cb(null, { value: node.data, remainderPath: '' })
-      } else {
-        cb(new Error('path not available'))
-      }
-    }
-  ], callback)
-}
-
-/*
- * tree: returns a flattened array with paths: values of the project. options
- * is an object that can carry several options (i.e. nestness)
- */
-exports.tree = (block, options, callback) => {
-  if (typeof options === 'function') {
-    callback = options
-    options = {}
-  }
-
-  options = options || {}
-
-  util.deserialize(block.data, (err, node) => {
-    if (err) {
-      return callback(err)
-    }
-
-    const paths = []
-
-    paths.push('Links')
-
-    node.links.forEach((link, i) => {
-      paths.push(`Links/${i}/Name`)
-      paths.push(`Links/${i}/Tsize`)
-      paths.push(`Links/${i}/Hash`)
-    })
-
-    paths.push('Data')
-
-    callback(null, paths)
-  })
-}
-
-/*
- * isLink: returns the Link if a given path in a block is a Link, false otherwise
- */
-exports.isLink = (block, path, callback) => {
-  exports.resolve(block, path, (err, result) => {
-    if (err) {
-      return callback(err)
-    }
-
-    if (result.remainderPath.length > 0) {
-      return callback(new Error('path out of scope'))
-    }
-
-    if (typeof result.value === 'object' && result.value['/']) {
-      callback(null, result.value)
-    } else {
-      callback(null, false)
-    }
-  })
-}
-
-},{"./util":317,"async/waterfall":57}],317:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const CID = require('cids')
-const protons = require('protons')
-const proto = protons(require('./dag.proto.js'))
-const DAGLink = require('./dag-link')
-const DAGNode = require('./dag-node')
-
-exports = module.exports
-
-function cid (node, callback) {
-  if (node.multihash) {
-    return callback(null, new CID(node.multihash))
-  }
-  callback(new Error('not valid dagPB node'))
-}
-
-function serialize (node, callback) {
-  let serialized
-
-  try {
-    serialized = proto.PBNode.encode(toProtoBuf(node))
-  } catch (err) {
-    return callback(err)
-  }
-
-  callback(null, serialized)
-}
-
-function deserialize (data, callback) {
-  const pbn = proto.PBNode.decode(data)
-
-  const links = pbn.Links.map((link) => {
-    return new DAGLink(link.Name, link.Tsize, link.Hash)
-  })
-
-  const buf = pbn.Data == null ? Buffer.alloc(0) : Buffer.from(pbn.Data)
-
-  DAGNode.create(buf, links, callback)
-}
-
-function toProtoBuf (node) {
-  const pbn = {}
-
-  if (node.data && node.data.length > 0) {
-    pbn.Data = node.data
-  } else {
-    // NOTE: this has to be null in order to match go-ipfs serialization `null !== new Buffer(0)`
-    pbn.Data = null
-  }
-
-  if (node.links && node.links.length > 0) {
-    pbn.Links = node.links.map((link) => {
-      return {
-        Hash: link.multihash,
-        Name: link.name,
-        Tsize: link.size
-      }
-    })
-  } else {
-    pbn.Links = null
-  }
-
-  return pbn
-}
-
-exports.serialize = serialize
-exports.deserialize = deserialize
-exports.cid = cid
-
-}).call(this,require("buffer").Buffer)
-},{"./dag-link":307,"./dag-node":311,"./dag.proto.js":314,"buffer":722,"cids":103,"protons":573}],318:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-const EthAccount = require('ethereumjs-account')
-const createResolver = require('../util/createResolver')
-const cidFromHash = require('../util/cidFromHash')
-const emptyCodeHash = require('../util/emptyCodeHash')
-
-module.exports = createResolver('eth-account-snapshot', EthAccount, mapFromEthObj)
-
-
-function mapFromEthObj (account, options, callback) {
-  const paths = []
-
-  // external links
-
-  paths.push({
-    path: 'storage',
-    value: { '/': cidFromHash('eth-storage-trie', account.stateRoot).toBaseEncodedString() }
-  })
-
-  // resolve immediately if empty, otherwise link to code
-  if (emptyCodeHash.equals(account.codeHash)) {
-    paths.push({
-      path: 'code',
-      value: Buffer.from(''),
-    })
-  } else {
-    paths.push({
-      path: 'code',
-      value: { '/': cidFromHash('raw', account.codeHash).toBaseEncodedString() }
-    })
-  }
-
-  // external links as data
-
-  paths.push({
-    path: 'stateRoot',
-    value: account.stateRoot
-  })
-
-  paths.push({
-    path: 'codeHash',
-    value: account.codeHash
-  })
-
-  // internal data
-
-  paths.push({
-    path: 'nonce',
-    value: account.nonce
-  })
-
-  paths.push({
-    path: 'balance',
-    value: account.balance
-  })
-
-  // helpers
-
-  paths.push({
-    path: 'isEmpty',
-    value: account.isEmpty()
-  })
-
-  paths.push({
-    path: 'isContract',
-    value: account.isContract()
-  })
-
-  callback(null, paths)
-}
-
-}).call(this,require("buffer").Buffer)
-},{"../util/cidFromHash":327,"../util/createResolver":329,"../util/emptyCodeHash":332,"buffer":722,"ethereumjs-account":171}],319:[function(require,module,exports){
-'use strict'
-const waterfall = require('async/waterfall')
-const each = require('async/each')
-const asyncify = require('async/asyncify')
-const RLP = require('rlp')
-const EthBlockHead = require('ethereumjs-block/header')
-const multihash = require('multihashing-async')
-const ethBlockResolver = require('../eth-block').resolver
-const createResolver = require('../util/createResolver')
-const cidFromHash = require('../util/cidFromHash')
-
-const ethBlockListResolver = createResolver('eth-block-list', undefined, mapFromEthObj)
-const util = ethBlockListResolver.util
-util.serialize = asyncify((ethBlockList) => {
-  const rawOmmers = ethBlockList.map((ethBlock) => ethBlock.raw)
-  return RLP.encode(rawOmmers)
-})
-util.deserialize = asyncify((serialized) => {
-  const rawOmmers = RLP.decode(serialized)
-  return rawOmmers.map((rawBlock) => new EthBlockHead(rawBlock))
-})
-util.cid = (blockList, callback) => {
-  waterfall([
-    (cb) => util.serialize(blockList, cb),
-    (data, cb) => multihash.digest(data, 'keccak-256', cb),
-    asyncify((mhash) => cidFromHash('eth-block-list', mhash))
-  ], callback)
-}
-
-module.exports = ethBlockListResolver
-
-
-function mapFromEthObj (ethBlockList, options, callback) {
-  let paths = []
-
-  // external links (none)
-
-  // external links as data (none)
-
-  // helpers
-
-  paths.push({
-    path: 'count',
-    value: ethBlockList.length
-  })
-
-  // internal data
-
-  // add paths for each block
-  each(ethBlockList, (ethBlock, next) => {
-    const index = ethBlockList.indexOf(ethBlock)
-    const blockPath = index.toString()
-    // block root
-    paths.push({
-      path: blockPath,
-      value: ethBlock
-    })
-    // block children
-    ethBlockResolver._mapFromEthObject(ethBlock, {}, (err, subpaths) => {
-      if (err) return next(err)
-      // append blockPath to each subpath
-      subpaths.forEach((path) => path.path = blockPath + '/' + path.path)
-      paths = paths.concat(subpaths)
-      next()
-    })
-  }, (err) => {
-    if (err) return callback(err)
-    callback(null, paths)
-  })
-}
-
-},{"../eth-block":320,"../util/cidFromHash":327,"../util/createResolver":329,"async/asyncify":18,"async/each":21,"async/waterfall":57,"ethereumjs-block/header":172,"multihashing-async":527,"rlp":653}],320:[function(require,module,exports){
-'use strict'
-const EthBlockHeader = require('ethereumjs-block/header')
-const createResolver = require('../util/createResolver')
-const cidFromHash = require('../util/cidFromHash')
-
-module.exports = createResolver('eth-block', EthBlockHeader, mapFromEthObj)
-
-
-function mapFromEthObj (ethObj, options, callback) {
-  const paths = []
-
-  // external links
-  paths.push({
-    path: 'parent',
-    value: { '/': cidFromHash('eth-block', ethObj.parentHash).toBaseEncodedString() }
-  })
-  paths.push({
-    path: 'ommers',
-    value: { '/': cidFromHash('eth-block-list', ethObj.uncleHash).toBaseEncodedString() }
-  })
-  paths.push({
-    path: 'transactions',
-    value: { '/': cidFromHash('eth-tx-trie', ethObj.transactionsTrie).toBaseEncodedString() }
-  })
-  paths.push({
-    path: 'transactionReceipts',
-    value: { '/': cidFromHash('eth-tx-receipt-trie', ethObj.receiptTrie).toBaseEncodedString() }
-  })
-  paths.push({
-    path: 'state',
-    value: { '/': cidFromHash('eth-state-trie', ethObj.stateRoot).toBaseEncodedString() }
-  })
-
-  // external links as data
-  paths.push({
-    path: 'parentHash',
-    value: ethObj.parentHash
-  })
-  paths.push({
-    path: 'ommerHash',
-    value: ethObj.uncleHash
-  })
-  paths.push({
-    path: 'transactionTrieRoot',
-    value: ethObj.transactionsTrie
-  })
-  paths.push({
-    path: 'transactionReceiptTrieRoot',
-    value: ethObj.receiptTrie
-  })
-  paths.push({
-    path: 'stateRoot',
-    value: ethObj.stateRoot
-  })
-
-  // internal data
-  paths.push({
-    path: 'authorAddress',
-    value: ethObj.coinbase
-  })
-  paths.push({
-    path: 'bloom',
-    value: ethObj.bloom
-  })
-  paths.push({
-    path: 'difficulty',
-    value: ethObj.difficulty
-  })
-  paths.push({
-    path: 'number',
-    value: ethObj.number
-  })
-  paths.push({
-    path: 'gasLimit',
-    value: ethObj.gasLimit
-  })
-  paths.push({
-    path: 'gasUsed',
-    value: ethObj.gasUsed
-  })
-  paths.push({
-    path: 'timestamp',
-    value: ethObj.timestamp
-  })
-  paths.push({
-    path: 'extraData',
-    value: ethObj.extraData
-  })
-  paths.push({
-    path: 'mixHash',
-    value: ethObj.mixHash
-  })
-  paths.push({
-    path: 'nonce',
-    value: ethObj.nonce
-  })
-
-  callback(null, paths)
-}
-
-},{"../util/cidFromHash":327,"../util/createResolver":329,"ethereumjs-block/header":172}],321:[function(require,module,exports){
-'use strict'
-/* eslint max-nested-callbacks: ["error", 5] */
-
-const ethAccountSnapshotResolver = require('../eth-account-snapshot')
-const createTrieResolver = require('../util/createTrieResolver')
-
-const ethStateTrieResolver = createTrieResolver('eth-state-trie', ethAccountSnapshotResolver)
-
-module.exports = ethStateTrieResolver
-
-},{"../eth-account-snapshot":318,"../util/createTrieResolver":330}],322:[function(require,module,exports){
-'use strict'
-/* eslint max-nested-callbacks: ["error", 5] */
-
-const createTrieResolver = require('../util/createTrieResolver')
-
-const ethStorageTrieResolver = createTrieResolver('eth-storage-trie')
-
-module.exports = ethStorageTrieResolver
-
-},{"../util/createTrieResolver":330}],323:[function(require,module,exports){
-'use strict'
-/* eslint max-nested-callbacks: ["error", 5] */
-
-const ethTxResolver = require('../eth-tx')
-const createTrieResolver = require('../util/createTrieResolver')
-
-const ethTxTrieResolver = createTrieResolver('eth-tx-trie', ethTxResolver)
-
-module.exports = ethTxTrieResolver
-
-},{"../eth-tx":324,"../util/createTrieResolver":330}],324:[function(require,module,exports){
-'use strict'
-const EthTx = require('ethereumjs-tx')
-const createResolver = require('../util/createResolver')
-const cidFromHash = require('../util/cidFromHash')
-
-module.exports = createResolver('eth-tx', EthTx, mapFromEthObj)
-
-
-function mapFromEthObj (tx, options, callback) {
-  const paths = []
-
-  // external links (none)
-
-  // external links as data (none)
-
-  // internal data
-
-  paths.push({
-    path: 'nonce',
-    value: tx.nonce
-  })
-  paths.push({
-    path: 'gasPrice',
-    value: tx.gasPrice
-  })
-  paths.push({
-    path: 'gasLimit',
-    value: tx.gasLimit
-  })
-  paths.push({
-    path: 'toAddress',
-    value: tx.to
-  })
-  paths.push({
-    path: 'value',
-    value: tx.value
-  })
-  paths.push({
-    path: 'data',
-    value: tx.data
-  })
-  paths.push({
-    path: 'v',
-    value: tx.v
-  })
-  paths.push({
-    path: 'r',
-    value: tx.r
-  })
-  paths.push({
-    path: 's',
-    value: tx.s
-  })
-
-  // helpers
-
-  paths.push({
-    path: 'fromAddress',
-    value: tx.from
-  })
-
-  paths.push({
-    path: 'signature',
-    value: [tx.v, tx.r, tx.s]
-  })
-
-  paths.push({
-    path: 'isContractPublish',
-    value: tx.toCreationAddress()
-  })
-
-  callback(null, paths)
-}
-
-},{"../util/cidFromHash":327,"../util/createResolver":329,"ethereumjs-tx":174}],325:[function(require,module,exports){
-'use strict'
-
-exports.ethAccountSnapshot = require('../eth-account-snapshot')
-exports.ethBlock = require('../eth-block')
-exports.ethBlockList = require('../eth-block-list')
-exports.ethStateTrie = require('../eth-state-trie')
-exports.ethStorageTrie = require('../eth-storage-trie')
-exports.ethTx = require('../eth-tx')
-exports.ethTxTrie = require('../eth-tx-trie')
-
-},{"../eth-account-snapshot":318,"../eth-block":320,"../eth-block-list":319,"../eth-state-trie":321,"../eth-storage-trie":322,"../eth-tx":324,"../eth-tx-trie":323}],326:[function(require,module,exports){
-'use strict'
-const cidFromHash = require('./cidFromHash')
-
-module.exports = cidFromEthObj
-
-function cidFromEthObj (multicodec, ethObj) {
-  const hashBuffer = ethObj.hash()
-  const cid = cidFromHash(multicodec, hashBuffer)
-  return cid
-}
-
-},{"./cidFromHash":327}],327:[function(require,module,exports){
-'use strict'
-const CID = require('cids')
-const multihashes = require('multihashes')
-
-module.exports = cidFromHash
-
-function cidFromHash (codec, hashBuffer) {
-  const multihash = multihashes.encode(hashBuffer, 'keccak-256')
-  const cid = new CID(1, codec, multihash)
-  return cid
-}
-
-},{"cids":103,"multihashes":523}],328:[function(require,module,exports){
-module.exports = createIsLink
-
-function createIsLink (resolve) {
-  return function isLink (block, path, callback) {
-    resolve(block, path, (err, result) => {
-      if (err) {
-        return callback(err)
-      }
-
-      if (result.remainderPath.length > 0) {
-        return callback(new Error('path out of scope'))
-      }
-
-      if (typeof result.value === 'object' && result.value['/']) {
-        callback(null, result.value)
-      } else {
-        callback(null, false)
-      }
-    })
-  }
-}
-
-},{}],329:[function(require,module,exports){
-'use strict'
-const waterfall = require('async/waterfall')
-const createIsLink = require('../util/createIsLink')
-const createUtil = require('../util/createUtil')
-
-module.exports = createResolver
-
-function createResolver (multicodec, EthObjClass, mapFromEthObject) {
-  const util = createUtil(multicodec, EthObjClass)
-  const resolver = {
-    multicodec: multicodec,
-    resolve: resolve,
-    tree: tree,
-    isLink: createIsLink(resolve),
-    _resolveFromEthObject: resolveFromEthObject,
-    _treeFromEthObject: treeFromEthObject,
-    _mapFromEthObject: mapFromEthObject
-  }
-
-  return {
-    resolver: resolver,
-    util: util,
-  }
-
-  /*
-   * tree: returns a flattened array with paths: values of the project. options
-   * are option (i.e. nestness)
-   */
-
-  function tree (ipfsBlock, options, callback) {
-    // parse arguments
-    if (typeof options === 'function') {
-      callback = options
-      options = undefined
-    }
-    if (!options) {
-      options = {}
-    }
-
-    waterfall([
-      (cb) => util.deserialize(ipfsBlock.data, cb),
-      (ethObj, cb) => treeFromEthObject(ethObj, options, cb)
-    ], callback)
-  }
-
-  function treeFromEthObject (ethObj, options, callback) {
-    waterfall([
-      (cb) => mapFromEthObject(ethObj, options, cb),
-      (tuples, cb) => cb(null, tuples.map((tuple) => tuple.path))
-    ], callback)
-  }
-
-  /*
-   * resolve: receives a path and a ipfsBlock and returns the value on path,
-   * throw if not possible. `ipfsBlock` is an IPFS Block instance (contains data + key)
-   */
-
-  function resolve (ipfsBlock, path, callback) {
-    waterfall([
-      (cb) => util.deserialize(ipfsBlock.data, cb),
-      (ethObj, cb) => resolveFromEthObject(ethObj, path, cb)
-    ], callback)
-  }
-
-  function resolveFromEthObject (ethObj, path, callback) {
-    // root
-    if (!path || path === '/') {
-      const result = { value: ethObj, remainderPath: '' }
-      return callback(null, result)
-    }
-
-    // check tree results
-    mapFromEthObject(ethObj, {}, (err, paths) => {
-      if (err) return callback(err)
-
-      // parse path
-      const pathParts = path.split('/')
-      // find potential matches
-      let matches = paths.filter((child) => child.path === path.slice(0, child.path.length))
-      // only match whole path chunks
-      matches = matches.filter((child) => child.path.split('/').every((part, index) => part === pathParts[index]))
-      // take longest match
-      const sortedMatches = matches.sort((a, b) => a.path.length < b.path.length)
-      const treeResult = sortedMatches[0]
-
-      if (!treeResult) {
-        let err = new Error('Path not found ("' + path + '").')
-        return callback(err)
-      }
-
-      // slice off remaining path (after match and following slash)
-      const remainderPath = path.slice(treeResult.path.length + 1)
-
-      const result = {
-        value: treeResult.value,
-        remainderPath: remainderPath
-      }
-
-      return callback(null, result)
-    })
-  }
-}
-},{"../util/createIsLink":328,"../util/createUtil":331,"async/waterfall":57}],330:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-const each = require('async/each')
-const waterfall = require('async/waterfall')
-const asyncify = require('async/asyncify')
-const rlp = require('rlp')
-const EthTrieNode = require('merkle-patricia-tree/trieNode')
-// const createBaseTrieResolver = require('./createBaseTrieResolver.js')
-const createResolver = require('./createResolver')
-const isExternalLink = require('./isExternalLink')
-const toIpfsBlock = require('./toIpfsBlock')
-const createUtil = require('./createUtil')
-const createIsLink = require('./createIsLink')
-const cidFromEthObj = require('./cidFromEthObj')
-const cidFromHash = require('./cidFromHash')
-
-
-module.exports = createTrieResolver
-
-function createTrieResolver(multicodec, leafResolver){
-  const baseTrie = createResolver(multicodec, EthTrieNode, mapFromEthObj)
-  baseTrie.util.deserialize = asyncify((serialized) => {
-    const rawNode = rlp.decode(serialized)
-    const trieNode = new EthTrieNode(rawNode)
-    return trieNode
-  })
-
-  return baseTrie
-
-  // create map using both baseTrie and leafResolver
-  function mapFromEthObj (trieNode, options, callback) {
-    // expand from merkle-patricia-tree using leafResolver
-    mapFromBaseTrie(trieNode, options, (err, basePaths) => {
-      if (err) return callback(err)
-      if (!leafResolver) return callback(null, basePaths)
-      // expand children
-      let paths = basePaths.slice()
-      const leafTerminatingPaths = basePaths.filter(child => Buffer.isBuffer(child.value))
-      each(leafTerminatingPaths, (child, cb) => {
-        return waterfall([
-          (cb) => leafResolver.util.deserialize(child.value, cb),
-          (ethObj, cb) => leafResolver.resolver._mapFromEthObject(ethObj, options, cb)
-        ], (err, grandChildren) => {
-          if (err) return cb(err)
-          // add prefix to grandchildren
-          grandChildren.forEach((grandChild) => {
-            paths.push({
-              path: child.path + '/' + grandChild.path,
-              value: grandChild.value,
-            })
-          })
-          cb()
-        })
-      }, (err) => {
-        if (err) return callback(err)
-        callback(null, paths)
-      })
-    })
-  }
-
-  // create map from merkle-patricia-tree nodes
-  function mapFromBaseTrie (trieNode, options, callback) {
-    let paths = []
-
-    if (trieNode.type === 'leaf') {
-      // leaf nodes resolve to their actual value
-      paths.push({
-        path: nibbleToPath(trieNode.getKey()),
-        value: trieNode.getValue()
-      })
-    }
-
-    each(trieNode.getChildren(), (childData, next) => {
-      const key = nibbleToPath(childData[0])
-      const value = childData[1]
-      if (EthTrieNode.isRawNode(value)) {
-        // inline child root
-        const childNode = new EthTrieNode(value)
-        paths.push({
-          path: key,
-          value: childNode
-        })
-        // inline child non-leaf subpaths
-        mapFromBaseTrie(childNode, options, (err, subtree) => {
-          if (err) return next(err)
-          subtree.forEach((path) => {
-            path.path = key + '/' + path.path
-          })
-          paths = paths.concat(subtree)
-          next()
-        })
-      } else {
-        // other nodes link by hash
-        let link = { '/': cidFromHash(multicodec, value).toBaseEncodedString() }
-        paths.push({
-          path: key,
-          value: link
-        })
-        next()
-      }
-    }, (err) => {
-      if (err) return callback(err)
-      callback(null, paths)
-    })
-  }
-}
-
-function nibbleToPath (data) {
-  return data.map((num) => num.toString(16)).join('/')
-}
-}).call(this,{"isBuffer":require("../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728,"./cidFromEthObj":326,"./cidFromHash":327,"./createIsLink":328,"./createResolver":329,"./createUtil":331,"./isExternalLink":333,"./toIpfsBlock":334,"async/asyncify":18,"async/each":21,"async/waterfall":57,"merkle-patricia-tree/trieNode":505,"rlp":653}],331:[function(require,module,exports){
-const cidFromEthObj = require('./cidFromEthObj')
-const asyncify = require('async/asyncify')
-
-module.exports = createUtil
-
-function createUtil (multicodec, EthObjClass) {
-  return {
-    deserialize: asyncify((serialized) => new EthObjClass(serialized)),
-    serialize: asyncify((ethObj) => ethObj.serialize()),
-    cid: asyncify((ethObj) => cidFromEthObj(multicodec, ethObj))
-  }
-}
-
-},{"./cidFromEthObj":326,"async/asyncify":18}],332:[function(require,module,exports){
-(function (Buffer){
-// this is the hash of the empty code (SHA3_NULL)
-module.exports = new Buffer('c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470', 'hex')
-
-}).call(this,require("buffer").Buffer)
-},{"buffer":722}],333:[function(require,module,exports){
-module.exports = isExternalLink
-
-function isExternalLink (obj) {
-  return Boolean(obj['/'])
-}
-},{}],334:[function(require,module,exports){
-const IpfsBlock = require('ipfs-block')
-const CID = require('cids')
-const multihashing = require('multihashing-async')
-
-module.exports = toIpfsBlock
-
-function toIpfsBlock (multicodec, value, callback) {
-  multihashing(value, 'keccak-256', (err, hash) => {
-    if (err) {
-      return callback(err)
-    }
-    const cid = new CID(1, multicodec, hash)
-    callback(null, new IpfsBlock(value, cid))
-  })
-}
-
-},{"cids":103,"ipfs-block":232,"multihashing-async":527}],335:[function(require,module,exports){
-arguments[4][227][0].apply(exports,arguments)
-},{"buffer":722,"dup":227}],336:[function(require,module,exports){
-arguments[4][303][0].apply(exports,arguments)
-},{"./resolver.js":337,"./util.js":338,"dup":303}],337:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const util = require('./util')
-const traverse = require('traverse')
-
-exports = module.exports
-
-exports.multicodec = 'git-raw'
-
-const personInfoPaths = [
-  'original',
-  'name',
-  'email',
-  'date'
-]
-
-exports.resolve = (block, path, callback) => {
-  if (typeof path === 'function') {
-    callback = path
-    path = undefined
-  }
-
-  util.deserialize(block.data, (err, node) => {
-    if (err) {
-      return callback(err)
-    }
-
-    if (!path || path === '/') {
-      return callback(null, {
-        value: node,
-        remainderPath: ''
-      })
-    }
-
-    if (Buffer.isBuffer(node)) { // git blob
-      return callback(null, {
-        value: node,
-        remainderPath: path
-      })
-    }
-
-    const parts = path.split('/')
-    const val = traverse(node).get(parts)
-
-    if (val) {
-      return callback(null, {
-        value: val,
-        remainderPath: ''
-      })
-    }
-
-    let value
-    let len = parts.length
-
-    for (let i = 0; i < len; i++) {
-      const partialPath = parts.shift()
-
-      if (Array.isArray(node)) {
-        value = node[Number(partialPath)]
-      } if (node[partialPath]) {
-        value = node[partialPath]
-      } else {
-        // can't traverse more
-        if (!value) {
-          return callback(new Error('path not available at root'))
-        } else {
-          parts.unshift(partialPath)
-          return callback(null, {
-            value: value,
-            remainderPath: parts.join('/')
-          })
-        }
-      }
-      node = value
-    }
-  })
-}
-
-exports.tree = (block, options, callback) => {
-  if (typeof options === 'function') {
-    callback = options
-    options = undefined
-  }
-
-  options = options || {}
-
-  util.deserialize(block.data, (err, node) => {
-    if (err) {
-      return callback(err)
-    }
-
-    if (Buffer.isBuffer(node)) { // git blob
-      return callback(null, [])
-    }
-
-    let paths = []
-    switch (node.gitType) {
-      case 'commit':
-        paths = [
-          'message',
-          'tree'
-        ]
-
-        paths = paths.concat(personInfoPaths.map(e => 'author/' + e))
-        paths = paths.concat(personInfoPaths.map(e => 'committer/' + e))
-        paths = paths.concat([...node.parents.keys()].map(e => 'parents/' + e))
-
-        if (node.encoding) {
-          paths.push('encoding')
-        }
-        break
-      case 'tag':
-        paths = [
-          'object',
-          'type',
-          'tag',
-          'message'
-        ]
-
-        if (node.tagger) {
-          paths = paths.concat(personInfoPaths.map((e) => 'tagger/' + e))
-        }
-
-        break
-      default: // tree
-        Object.keys(node).forEach(dir => {
-          paths.push(dir)
-          paths.push(dir + '/hash')
-          paths.push(dir + '/mode')
-        })
-    }
-    callback(null, paths)
-  })
-}
-
-exports.isLink = (block, path, callback) => {
-  exports.resolve(block, path, (err, result) => {
-    if (err) {
-      return callback(err)
-    }
-
-    if (result.remainderPath.length > 0) {
-      return callback(new Error('path out of scope'))
-    }
-
-    if (typeof result.value === 'object' && result.value['/']) {
-      callback(null, result.value)
-    } else {
-      callback(null, false)
-    }
-  })
-}
-
-}).call(this,{"isBuffer":require("../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728,"./util":338,"traverse":703}],338:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const setImmediate = require('async/setImmediate')
-const waterfall = require('async/waterfall')
-const multihashing = require('multihashing-async')
-const CID = require('cids')
-
-const resolver = require('./resolver')
-const gitUtil = require('./util/util')
-
-const commit = require('./util/commit')
-const tag = require('./util/tag')
-const tree = require('./util/tree')
-
-exports = module.exports
-
-exports.serialize = (dagNode, callback) => {
-  if (dagNode === null) {
-    setImmediate(() => callback(new Error('dagNode passed to serialize was null'), null))
-    return
-  }
-
-  if (Buffer.isBuffer(dagNode)) {
-    if (dagNode.slice(0, 4).toString() === 'blob') {
-      setImmediate(() => callback(null, dagNode))
-    } else {
-      setImmediate(() => callback(new Error('unexpected dagNode passed to serialize'), null))
-    }
-    return
-  }
-
-  switch (dagNode.gitType) {
-    case 'commit':
-      commit.serialize(dagNode, callback)
-      break
-    case 'tag':
-      tag.serialize(dagNode, callback)
-      break
-    default:
-      // assume tree as a file named 'type' is legal
-      tree.serialize(dagNode, callback)
-  }
-}
-
-exports.deserialize = (data, callback) => {
-  let headLen = gitUtil.find(data, 0)
-  let head = data.slice(0, headLen).toString()
-  let typeLen = head.match(/([^ ]+) (\d+)/)
-  if (!typeLen) {
-    setImmediate(() => callback(new Error('invalid object header'), null))
-    return
-  }
-
-  switch (typeLen[1]) {
-    case 'blob':
-      callback(null, data)
-      break
-    case 'commit':
-      commit.deserialize(data.slice(headLen + 1), callback)
-      break
-    case 'tag':
-      tag.deserialize(data.slice(headLen + 1), callback)
-      break
-    case 'tree':
-      tree.deserialize(data.slice(headLen + 1), callback)
-      break
-    default:
-      setImmediate(() => callback(new Error('unknown object type ' + typeLen[1]), null))
-  }
-}
-
-exports.cid = (dagNode, callback) => {
-  waterfall([
-    (cb) => exports.serialize(dagNode, cb),
-    (serialized, cb) => multihashing(serialized, 'sha1', cb),
-    (mh, cb) => cb(null, new CID(1, resolver.multicodec, mh))
-  ], callback)
-}
-
-}).call(this,{"isBuffer":require("../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728,"./resolver":337,"./util/commit":339,"./util/tag":340,"./util/tree":341,"./util/util":342,"async/setImmediate":54,"async/waterfall":57,"cids":103,"multihashing-async":527}],339:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const setImmediate = require('async/setImmediate')
-const SmartBuffer = require('smart-buffer').SmartBuffer
-const gitUtil = require('./util')
-
-exports = module.exports
-
-exports.serialize = (dagNode, callback) => {
-  let lines = []
-  lines.push('tree ' + gitUtil.cidToSha(dagNode.tree['/']).toString('hex'))
-  dagNode.parents.forEach((parent) => {
-    lines.push('parent ' + gitUtil.cidToSha(parent['/']).toString('hex'))
-  })
-  lines.push('author ' + gitUtil.serializePersonLine(dagNode.author))
-  lines.push('committer ' + gitUtil.serializePersonLine(dagNode.committer))
-  if (dagNode.encoding) {
-    lines.push('encoding ' + dagNode.encoding)
-  }
-  if (dagNode.signature) {
-    lines.push('gpgsig -----BEGIN PGP SIGNATURE-----')
-    lines.push(dagNode.signature.text)
-    lines.push(' -----END PGP SIGNATURE-----')
-  }
-  lines.push('')
-  lines.push(dagNode.message)
-
-  let data = lines.join('\n')
-
-  let outBuf = new SmartBuffer()
-  outBuf.writeString('commit ')
-  outBuf.writeString(data.length.toString())
-  outBuf.writeUInt8(0)
-  outBuf.writeString(data)
-  setImmediate(() => callback(null, outBuf.toBuffer()))
-}
-
-exports.deserialize = (data, callback) => {
-  let lines = data.toString().split('\n')
-  let res = {gitType: 'commit', parents: []}
-
-  for (let line = 0; line < lines.length; line++) {
-    let m = lines[line].match(/^([^ ]+) (.+)$/)
-    if (!m) {
-      if (lines[line] !== '') {
-        setImmediate(() => callback(new Error('Invalid commit line ' + line)))
-      }
-      res.message = lines.slice(line + 1).join('\n')
-      break
-    }
-
-    let key = m[1]
-    let value = m[2]
-    switch (key) {
-      case 'tree':
-        res.tree = {'/': gitUtil.shaToCid(new Buffer(value, 'hex'))}
-        break
-      case 'committer':
-        res.committer = gitUtil.parsePersonLine(value)
-        break
-      case 'author':
-        res.author = gitUtil.parsePersonLine(value)
-        break
-      case 'parent':
-        res.parents.push({'/': gitUtil.shaToCid(new Buffer(value, 'hex'))})
-        break
-      case 'gpgsig': {
-        if (value !== '-----BEGIN PGP SIGNATURE-----') {
-          setImmediate(() => callback(new Error('Invalid commit line ' + line)))
-        }
-        res.signature = {}
-
-        let startLine = line
-        for (; line < lines.length - 1; line++) {
-          if (lines[line + 1] === ' -----END PGP SIGNATURE-----') {
-            res.signature.text = lines.slice(startLine + 1, line + 1).join('\n')
-            break
-          }
-        }
-        line++
-        break
-      }
-      default:
-        res[key] = value
-    }
-  }
-
-  setImmediate(() => callback(null, res))
-}
-
-}).call(this,require("buffer").Buffer)
-},{"./util":342,"async/setImmediate":54,"buffer":722,"smart-buffer":681}],340:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const setImmediate = require('async/setImmediate')
-const SmartBuffer = require('smart-buffer').SmartBuffer
-const gitUtil = require('./util')
-
-exports = module.exports
-
-exports.serialize = (dagNode, callback) => {
-  let lines = []
-  lines.push('object ' + gitUtil.cidToSha(dagNode.object['/']).toString('hex'))
-  lines.push('type ' + dagNode.type)
-  lines.push('tag ' + dagNode.tag)
-  if (dagNode.tagger !== null) {
-    lines.push('tagger ' + gitUtil.serializePersonLine(dagNode.tagger))
-  }
-  lines.push('')
-  lines.push(dagNode.message)
-
-  let data = lines.join('\n')
-
-  let outBuf = new SmartBuffer()
-  outBuf.writeString('tag ')
-  outBuf.writeString(data.length.toString())
-  outBuf.writeUInt8(0)
-  outBuf.writeString(data)
-  setImmediate(() => callback(null, outBuf.toBuffer()))
-}
-
-exports.deserialize = (data, callback) => {
-  let lines = data.toString().split('\n')
-  let res = {gitType: 'tag'}
-
-  for (let line = 0; line < lines.length; line++) {
-    let m = lines[line].match(/^([^ ]+) (.+)$/)
-    if (m === null) {
-      if (lines[line] !== '') {
-        setImmediate(() => callback(new Error('Invalid tag line ' + line)))
-      }
-      res.message = lines.slice(line + 1).join('\n')
-      break
-    }
-
-    let key = m[1]
-    let value = m[2]
-    switch (key) {
-      case 'object':
-        res.object = {'/': gitUtil.shaToCid(new Buffer(value, 'hex'))}
-        break
-      case 'tagger':
-        res.tagger = gitUtil.parsePersonLine(value)
-        break
-      case 'tag':
-        res.tag = value
-        break
-      case 'type':
-        res.type = value
-        break
-      default:
-        res[key] = value
-    }
-  }
-
-  setImmediate(() => callback(null, res))
-}
-
-}).call(this,require("buffer").Buffer)
-},{"./util":342,"async/setImmediate":54,"buffer":722,"smart-buffer":681}],341:[function(require,module,exports){
-'use strict'
-
-const setImmediate = require('async/setImmediate')
-const SmartBuffer = require('smart-buffer').SmartBuffer
-const gitUtil = require('./util')
-
-exports = module.exports
-
-exports.serialize = (dagNode, callback) => {
-  let entries = []
-  Object.keys(dagNode).forEach((name) => {
-    entries.push([name, dagNode[name]])
-  })
-  entries.sort((a, b) => a[0] > b[0] ? 1 : -1)
-  let buf = new SmartBuffer()
-  entries.forEach((entry) => {
-    buf.writeStringNT(entry[1].mode + ' ' + entry[0])
-    buf.writeBuffer(gitUtil.cidToSha(entry[1].hash['/']))
-  })
-
-  let outBuf = new SmartBuffer()
-  outBuf.writeString('tree ')
-  outBuf.writeString(buf.length.toString())
-  outBuf.writeUInt8(0)
-  outBuf.writeBuffer(buf.toBuffer())
-  setImmediate(() => callback(null, outBuf.toBuffer()))
-}
-
-exports.deserialize = (data, callback) => {
-  let res = {}
-  let buf = SmartBuffer.fromBuffer(data, 'utf8')
-
-  for (;;) {
-    let modeName = buf.readStringNT()
-    if (modeName === '') {
-      break
-    }
-
-    let hash = buf.readBuffer(gitUtil.SHA1_LENGTH)
-    let modNameMatched = modeName.match(/^(\d+) (.+)$/)
-    if (!modNameMatched) {
-      setImmediate(() => callback(new Error('invalid file mode/name')))
-    }
-
-    if (res[modNameMatched[2]]) {
-      setImmediate(() => callback(new Error('duplicate file in tree')))
-    }
-
-    res[modNameMatched[2]] = {
-      mode: modNameMatched[1],
-      hash: {'/': gitUtil.shaToCid(hash)}
-    }
-  }
-
-  setImmediate(() => callback(null, res))
-}
-
-},{"./util":342,"async/setImmediate":54,"smart-buffer":681}],342:[function(require,module,exports){
-'use strict'
-
-const SmartBuffer = require('smart-buffer').SmartBuffer
-const multihashes = require('multihashes/src/constants')
-const multicodecs = require('multicodec/src/base-table')
-const multihash = require('multihashes')
-const CID = require('cids')
-
-exports = module.exports
-
-exports.SHA1_LENGTH = multihashes.defaultLengths[multihashes.names.sha1]
-
-exports.find = (buf, byte) => {
-  for (let i = 0; i < buf.length; i++) {
-    if (buf[i] === byte) {
-      return i
-    }
-  }
-  return -1
-}
-
-exports.parsePersonLine = (line) => {
-  let matched = line.match(/^(([^<]+)\s)?\s?<([^>]+)>\s?(\d+\s[+\-\d]+)?$/)
-  if (matched === null) {
-    return null
-  }
-
-  return {
-    name: matched[2],
-    email: matched[3],
-    date: matched[4]
-  }
-}
-
-exports.serializePersonLine = (node) => {
-  let parts = []
-  if (node.name) {
-    parts.push(node.name)
-  }
-  parts.push('<' + node.email + '>')
-  if (node.date) {
-    parts.push(node.date)
-  }
-
-  return parts.join(' ')
-}
-
-exports.shaToCid = (buf) => {
-  let mhashBuf = new SmartBuffer()
-  mhashBuf.writeUInt8(1)
-  mhashBuf.writeBuffer(multicodecs['git-raw'])
-  mhashBuf.writeUInt8(multihashes.names.sha1)
-  mhashBuf.writeUInt8(exports.SHA1_LENGTH)
-  mhashBuf.writeBuffer(buf)
-  return mhashBuf.toBuffer()
-}
-
-exports.cidToSha = (cidBuf) => {
-  let mh = multihash.decode(new CID(cidBuf).multihash)
-  if (mh.name !== 'sha1') {
-    return null
-  }
-
-  return mh.digest
-}
-
-},{"cids":103,"multicodec/src/base-table":335,"multihashes":523,"multihashes/src/constants":522,"smart-buffer":681}],343:[function(require,module,exports){
-'use strict'
-const CID = require('cids')
-
-// binary resolver
-module.exports = {
-  resolver: {
-    multicodec: 'raw',
-    resolve: (ipfsBlock, path, callback) => {
-      callback(null, {
-        value: ipfsBlock.data,
-        remainderPath: ''
-      })
-    },
-    tree: (ipfsBlock, options, callback) => {
-      callback(null, [])
-    }
-  },
-  util: {
-    deserialize: (data, cb) => {
-      cb(null, data)
-    },
-    serialize: (data, cb) => {
-      cb(null, data)
-    },
-    cid: (data, cb) => {
-      cb(null, new CID(1, 'raw', data))
-    }
-  }
-}
-
-},{"cids":103}],344:[function(require,module,exports){
+},{"./exporter":253,"./importer":264}],267:[function(require,module,exports){
 'use strict'
 
 const Block = require('ipfs-block')
@@ -44124,7 +39301,6372 @@ IPLDResolver.inMemory = function (callback) {
 
 module.exports = IPLDResolver
 
-},{"async/doUntil":19,"async/map":49,"async/series":53,"async/waterfall":57,"cids":103,"interface-datastore":206,"ipfs-block":232,"ipfs-block-service":225,"ipfs-repo":240,"ipld-dag-cbor":303,"ipld-dag-pb":315,"ipld-ethereum":325,"ipld-git":336,"ipld-raw":343,"path":731,"pull-defer":580,"pull-stream":598,"pull-traverse":630}],345:[function(require,module,exports){
+},{"async/doUntil":19,"async/map":49,"async/series":53,"async/waterfall":57,"cids":103,"interface-datastore":224,"ipfs-block":211,"ipfs-block-service":228,"ipfs-repo":236,"ipld-dag-cbor":319,"ipld-dag-pb":331,"ipld-ethereum":341,"ipld-git":351,"ipld-raw":358,"path":724,"pull-defer":572,"pull-stream":590,"pull-traverse":622}],268:[function(require,module,exports){
+'use strict'
+
+const identify = require('libp2p-identify')
+const multistream = require('multistream-select')
+const waterfall = require('async/waterfall')
+const debug = require('debug')
+const log = debug('libp2p:swarm:connection')
+const setImmediate = require('async/setImmediate')
+
+const protocolMuxer = require('./protocol-muxer')
+const plaintext = require('./plaintext')
+
+module.exports = function connection (swarm) {
+  return {
+    addUpgrade () {},
+
+    addStreamMuxer (muxer) {
+      // for dialing
+      swarm.muxers[muxer.multicodec] = muxer
+
+      // for listening
+      swarm.handle(muxer.multicodec, (protocol, conn) => {
+        const muxedConn = muxer.listener(conn)
+
+        muxedConn.on('stream', (conn) => {
+          protocolMuxer(swarm.protocols, conn)
+        })
+
+        // If identify is enabled
+        //   1. overload getPeerInfo
+        //   2. call getPeerInfo
+        //   3. add this conn to the pool
+        if (swarm.identify) {
+          // overload peerInfo to use Identify instead
+          conn.getPeerInfo = (cb) => {
+            const conn = muxedConn.newStream()
+            const ms = new multistream.Dialer()
+
+            waterfall([
+              (cb) => ms.handle(conn, cb),
+              (cb) => ms.select(identify.multicodec, cb),
+              (conn, cb) => identify.dialer(conn, cb),
+              (peerInfo, observedAddrs, cb) => {
+                observedAddrs.forEach((oa) => {
+                  swarm._peerInfo.multiaddrs.addSafe(oa)
+                })
+                cb(null, peerInfo)
+              }
+            ], cb)
+          }
+
+          conn.getPeerInfo((err, peerInfo) => {
+            if (err) {
+              return log('Identify not successful')
+            }
+            const b58Str = peerInfo.id.toB58String()
+
+            swarm.muxedConns[b58Str] = { muxer: muxedConn }
+
+            if (peerInfo.multiaddrs.size > 0) {
+              // with incomming conn and through identify, going to pick one
+              // of the available multiaddrs from the other peer as the one
+              // I'm connected to as we really can't be sure at the moment
+              // TODO add this consideration to the connection abstraction!
+              peerInfo.connect(peerInfo.multiaddrs.toArray()[0])
+            } else {
+              // for the case of websockets in the browser, where peers have
+              // no addr, use just their IPFS id
+              peerInfo.connect(`/ipfs/${b58Str}`)
+            }
+            peerInfo = swarm._peerBook.put(peerInfo)
+
+            muxedConn.on('close', () => {
+              delete swarm.muxedConns[b58Str]
+              peerInfo.disconnect()
+              peerInfo = swarm._peerBook.put(peerInfo)
+              setImmediate(() => swarm.emit('peer-mux-closed', peerInfo))
+            })
+
+            setImmediate(() => swarm.emit('peer-mux-established', peerInfo))
+          })
+        }
+
+        return conn
+      })
+    },
+
+    reuse () {
+      swarm.identify = true
+      swarm.handle(identify.multicodec, (protocol, conn) => {
+        identify.listener(conn, swarm._peerInfo)
+      })
+    },
+
+    crypto (tag, encrypt) {
+      if (!tag && !encrypt) {
+        tag = plaintext.tag
+        encrypt = plaintext.encrypt
+      }
+
+      swarm.unhandle(swarm.crypto.tag)
+      swarm.handle(tag, (protocol, conn) => {
+        const id = swarm._peerInfo.id
+        const secure = encrypt(id, id.privKey, conn)
+
+        protocolMuxer(swarm.protocols, secure)
+      })
+
+      swarm.crypto = {tag, encrypt}
+    }
+  }
+}
+
+},{"./plaintext":274,"./protocol-muxer":275,"async/setImmediate":54,"async/waterfall":57,"debug":114,"libp2p-identify":424,"multistream-select":282}],269:[function(require,module,exports){
+'use strict'
+
+const multistream = require('multistream-select')
+const Connection = require('interface-connection').Connection
+const setImmediate = require('async/setImmediate')
+const getPeerInfo = require('./get-peer-info')
+const debug = require('debug')
+const log = debug('libp2p:swarm:dial')
+
+const protocolMuxer = require('./protocol-muxer')
+
+function dial (swarm) {
+  return (peer, protocol, callback) => {
+    if (typeof protocol === 'function') {
+      callback = protocol
+      protocol = null
+    }
+
+    callback = callback || function noop () {}
+    const pi = getPeerInfo(peer, swarm._peerBook)
+
+    const proxyConn = new Connection()
+
+    const b58Id = pi.id.toB58String()
+    log('dialing %s', b58Id)
+
+    if (!swarm.muxedConns[b58Id]) {
+      if (!swarm.conns[b58Id]) {
+        attemptDial(pi, (err, conn) => {
+          if (err) {
+            return callback(err)
+          }
+          gotWarmedUpConn(conn)
+        })
+      } else {
+        const conn = swarm.conns[b58Id]
+        swarm.conns[b58Id] = undefined
+        gotWarmedUpConn(conn)
+      }
+    } else {
+      if (!protocol) {
+        return callback()
+      }
+      gotMuxer(swarm.muxedConns[b58Id].muxer)
+    }
+
+    return proxyConn
+
+    function gotWarmedUpConn (conn) {
+      conn.setPeerInfo(pi)
+      attemptMuxerUpgrade(conn, (err, muxer) => {
+        if (!protocol) {
+          if (err) {
+            swarm.conns[b58Id] = conn
+          }
+          return callback()
+        }
+
+        if (err) {
+          // couldn't upgrade to Muxer, it is ok
+          protocolHandshake(conn, protocol, callback)
+        } else {
+          gotMuxer(muxer)
+        }
+      })
+    }
+
+    function gotMuxer (muxer) {
+      if (swarm.identify) {
+        // TODO: Consider:
+        // 1. overload getPeerInfo
+        // 2. exec identify (through getPeerInfo)
+        // 3. update the peerInfo that is already stored in the conn
+      }
+
+      openConnInMuxedConn(muxer, (conn) => {
+        protocolHandshake(conn, protocol, callback)
+      })
+    }
+
+    function attemptDial (pi, cb) {
+      const tKeys = swarm.availableTransports(pi)
+
+      if (tKeys.length === 0) {
+        return cb(new Error('No available transport to dial to'))
+      }
+
+      nextTransport(tKeys.shift())
+
+      function nextTransport (key) {
+        swarm.transport.dial(key, pi, (err, conn) => {
+          if (err) {
+            if (tKeys.length === 0) {
+              return cb(new Error('Could not dial in any of the transports'))
+            }
+            return nextTransport(tKeys.shift())
+          }
+
+          cryptoDial()
+
+          function cryptoDial () {
+            const ms = new multistream.Dialer()
+            ms.handle(conn, (err) => {
+              if (err) {
+                return cb(err)
+              }
+
+              const id = swarm._peerInfo.id
+              log('selecting crypto: %s', swarm.crypto.tag)
+              ms.select(swarm.crypto.tag, (err, conn) => {
+                if (err) {
+                  return cb(err)
+                }
+
+                const wrapped = swarm.crypto.encrypt(id, id.privKey, conn)
+                cb(null, wrapped)
+              })
+            })
+          }
+        })
+      }
+    }
+
+    function attemptMuxerUpgrade (conn, cb) {
+      const muxers = Object.keys(swarm.muxers)
+      if (muxers.length === 0) {
+        return cb(new Error('no muxers available'))
+      }
+
+      // 1. try to handshake in one of the muxers available
+      // 2. if succeeds
+      //  - add the muxedConn to the list of muxedConns
+      //  - add incomming new streams to connHandler
+
+      const ms = new multistream.Dialer()
+      ms.handle(conn, (err) => {
+        if (err) {
+          return callback(new Error('multistream not supported'))
+        }
+
+        nextMuxer(muxers.shift())
+      })
+
+      function nextMuxer (key) {
+        log('selecting %s', key)
+        ms.select(key, (err, conn) => {
+          if (err) {
+            if (muxers.length === 0) {
+              cb(new Error('could not upgrade to stream muxing'))
+            } else {
+              nextMuxer(muxers.shift())
+            }
+            return
+          }
+
+          const muxedConn = swarm.muxers[key].dialer(conn)
+          swarm.muxedConns[b58Id] = {}
+          swarm.muxedConns[b58Id].muxer = muxedConn
+          // should not be needed anymore - swarm.muxedConns[b58Id].conn = conn
+
+          muxedConn.once('close', () => {
+            const b58Str = pi.id.toB58String()
+            delete swarm.muxedConns[b58Str]
+            pi.disconnect()
+            swarm._peerBook.get(b58Str).disconnect()
+            setImmediate(() => swarm.emit('peer-mux-closed', pi))
+          })
+
+          // For incoming streams, in case identify is on
+          muxedConn.on('stream', (conn) => {
+            protocolMuxer(swarm.protocols, conn)
+          })
+
+          setImmediate(() => swarm.emit('peer-mux-established', pi))
+
+          cb(null, muxedConn)
+        })
+      }
+    }
+
+    function openConnInMuxedConn (muxer, cb) {
+      cb(muxer.newStream())
+    }
+
+    function protocolHandshake (conn, protocol, cb) {
+      const ms = new multistream.Dialer()
+      ms.handle(conn, (err) => {
+        if (err) {
+          return cb(err)
+        }
+        ms.select(protocol, (err, conn) => {
+          if (err) {
+            return cb(err)
+          }
+          proxyConn.setInnerConn(conn)
+          cb(null, proxyConn)
+        })
+      })
+    }
+  }
+}
+
+module.exports = dial
+
+},{"./get-peer-info":270,"./protocol-muxer":275,"async/setImmediate":54,"debug":114,"interface-connection":195,"multistream-select":282}],270:[function(require,module,exports){
+'use strict'
+
+const PeerId = require('peer-id')
+const PeerInfo = require('peer-info')
+const multiaddr = require('multiaddr')
+
+/*
+ * Helper method to check the data type of peer and convert it to PeerInfo
+ */
+function getPeerInfo (peer, peerBook) {
+  let p
+
+  // PeerInfo
+  if (PeerInfo.isPeerInfo(peer)) {
+    p = peer
+  // Multiaddr instance (not string)
+  } else if (multiaddr.isMultiaddr(peer)) {
+    const peerIdB58Str = peer.getPeerId()
+    try {
+      p = peerBook.get(peerIdB58Str)
+    } catch (err) {
+      p = new PeerInfo(PeerId.createFromB58String(peerIdB58Str))
+    }
+    p.multiaddrs.add(peer)
+
+  // PeerId
+  } else if (PeerId.isPeerId(peer)) {
+    const peerIdB58Str = peer.toB58String()
+    try {
+      p = peerBook.get(peerIdB58Str)
+    } catch (err) {
+      throw new Error('Couldnt get PeerInfo')
+    }
+  } else {
+    throw new Error('peer type not recognized')
+  }
+
+  return p
+}
+
+module.exports = getPeerInfo
+
+},{"multiaddr":515,"peer-id":548,"peer-info":549}],271:[function(require,module,exports){
+'use strict'
+
+const util = require('util')
+const EE = require('events').EventEmitter
+const each = require('async/each')
+const series = require('async/series')
+const transport = require('./transport')
+const connection = require('./connection')
+const getPeerInfo = require('./get-peer-info')
+const dial = require('./dial')
+const protocolMuxer = require('./protocol-muxer')
+const plaintext = require('./plaintext')
+const assert = require('assert')
+
+exports = module.exports = Swarm
+
+util.inherits(Swarm, EE)
+
+function Swarm (peerInfo, peerBook) {
+  if (!(this instanceof Swarm)) {
+    return new Swarm(peerInfo)
+  }
+
+  assert(peerInfo, 'You must provide a `peerInfo`')
+  assert(peerBook, 'You must provide a `peerBook`')
+
+  this._peerInfo = peerInfo
+  this._peerBook = peerBook
+
+  this.setMaxListeners(Infinity)
+  // transports --
+  // { key: transport }; e.g { tcp: <tcp> }
+  this.transports = {}
+
+  // connections --
+  // { peerIdB58: { conn: <conn> }}
+  this.conns = {}
+
+  // {
+  //   peerIdB58: {
+  //     muxer: <muxer>
+  //     conn: <transport socket> // to extract info required for the Identify Protocol
+  //   }
+  // }
+  this.muxedConns = {}
+
+  // { protocol: handler }
+  this.protocols = {}
+
+  // { muxerCodec: <muxer> } e.g { '/spdy/0.3.1': spdy }
+  this.muxers = {}
+
+  // is the Identify protocol enabled?
+  this.identify = false
+
+  // Crypto details
+  this.crypto = plaintext
+
+  this.transport = transport(this)
+  this.connection = connection(this)
+
+  this.availableTransports = (pi) => {
+    const myAddrs = pi.multiaddrs.toArray()
+    const myTransports = Object.keys(this.transports)
+
+    // Only listen on transports we actually have addresses for
+    return myTransports.filter((ts) => this.transports[ts].filter(myAddrs).length > 0)
+  }
+
+  // higher level (public) API
+  this.dial = dial(this)
+
+  // Start listening on all available transports
+  this.listen = (callback) => {
+    each(this.availableTransports(peerInfo), (ts, cb) => {
+      // Listen on the given transport
+      this.transport.listen(ts, {}, null, cb)
+    }, callback)
+  }
+
+  this.handle = (protocol, handlerFunc, matchFunc) => {
+    this.protocols[protocol] = {
+      handlerFunc: handlerFunc,
+      matchFunc: matchFunc
+    }
+  }
+
+  this.handle(this.crypto.tag, (protocol, conn) => {
+    const peerId = this._peerInfo.id
+    const wrapped = this.crypto.encrypt(peerId, peerId.privKey, conn)
+    return protocolMuxer(this.protocols, wrapped)
+  })
+
+  this.unhandle = (protocol) => {
+    if (this.protocols[protocol]) {
+      delete this.protocols[protocol]
+    }
+  }
+
+  this.hangUp = (peer, callback) => {
+    const peerInfo = getPeerInfo(peer, this.peerBook)
+    const key = peerInfo.id.toB58String()
+    if (this.muxedConns[key]) {
+      const muxer = this.muxedConns[key].muxer
+      muxer.once('close', () => {
+        delete this.muxedConns[key]
+        callback()
+      })
+      muxer.end()
+    } else {
+      callback()
+    }
+  }
+
+  this.close = (callback) => {
+    series([
+      (cb) => each(this.muxedConns, (conn, cb) => {
+        conn.muxer.end((err) => {
+          // If OK things are fine, and someone just shut down
+          if (err && err.message !== 'Fatal error: OK') {
+            return cb(err)
+          }
+          cb()
+        })
+      }, cb),
+      (cb) => {
+        each(this.transports, (transport, cb) => {
+          each(transport.listeners, (listener, cb) => {
+            listener.close(cb)
+          }, cb)
+        }, cb)
+      }
+    ], callback)
+  }
+}
+
+},{"./connection":268,"./dial":269,"./get-peer-info":270,"./plaintext":274,"./protocol-muxer":275,"./transport":276,"assert":712,"async/each":21,"async/series":53,"events":717,"util":752}],272:[function(require,module,exports){
+'use strict'
+
+const map = require('async/map')
+const debug = require('debug')
+
+const log = debug('libp2p:swarm:dialer')
+
+const DialQueue = require('./queue')
+
+/**
+ * Track dials per peer and limited them.
+ */
+class LimitDialer {
+  /**
+   * Create a new dialer.
+   *
+   * @param {number} perPeerLimit
+   * @param {number} dialTimeout
+   */
+  constructor (perPeerLimit, dialTimeout) {
+    log('create: %s peer limit, %s dial timeout', perPeerLimit, dialTimeout)
+    this.perPeerLimit = perPeerLimit
+    this.dialTimeout = dialTimeout
+    this.queues = new Map()
+  }
+
+  /**
+   * Dial a list of multiaddrs on the given transport.
+   *
+   * @param {PeerId} peer
+   * @param {SwarmTransport} transport
+   * @param {Array<Multiaddr>} addrs
+   * @param {function(Error, Connection)} callback
+   * @returns {void}
+   */
+  dialMany (peer, transport, addrs, callback) {
+    log('dialMany:start')
+    // we use a token to track if we want to cancel following dials
+    const token = { cancel: false }
+
+    map(addrs, (m, cb) => {
+      this.dialSingle(peer, transport, m, token, cb)
+    }, (err, results) => {
+      if (err) {
+        return callback(err)
+      }
+
+      const success = results.filter((res) => res.conn)
+      if (success.length > 0) {
+        log('dialMany:success')
+        return callback(null, success[0])
+      }
+
+      log('dialMany:error')
+      const error = new Error('Failed to dial any provided address')
+      error.errors = results
+        .filter((res) => res.error)
+        .map((res) => res.error)
+      return callback(error)
+    })
+  }
+
+  /**
+   * Dial a single multiaddr on the given transport.
+   *
+   * @param {PeerId} peer
+   * @param {SwarmTransport} transport
+   * @param {Multiaddr} addr
+   * @param {CancelToken} token
+   * @param {function(Error, Connection)} callback
+   * @returns {void}
+   */
+  dialSingle (peer, transport, addr, token, callback) {
+    const ps = peer.toB58String()
+    log('dialSingle: %s:%s', ps, addr.toString())
+    let q
+    if (this.queues.has(ps)) {
+      q = this.queues.get(ps)
+    } else {
+      q = new DialQueue(this.perPeerLimit, this.dialTimeout)
+      this.queues.set(ps, q)
+    }
+
+    q.push(transport, addr, token, callback)
+  }
+}
+
+module.exports = LimitDialer
+
+},{"./queue":273,"async/map":49,"debug":114}],273:[function(require,module,exports){
+'use strict'
+
+const Connection = require('interface-connection').Connection
+const pull = require('pull-stream')
+const timeout = require('async/timeout')
+const queue = require('async/queue')
+const debug = require('debug')
+
+const log = debug('libp2p:swarm:dialer:queue')
+
+/**
+ * Queue up the amount of dials to a given peer.
+ */
+class DialQueue {
+  /**
+   * Create a new dial queue.
+   *
+   * @param {number} limit
+   * @param {number} dialTimeout
+   */
+  constructor (limit, dialTimeout) {
+    this.dialTimeout = dialTimeout
+
+    this.queue = queue((task, cb) => {
+      this._doWork(task.transport, task.addr, task.token, cb)
+    }, limit)
+  }
+
+  /**
+   * The actual work done by the queue.
+   *
+   * @param {SwarmTransport} transport
+   * @param {Multiaddr} addr
+   * @param {CancelToken} token
+   * @param {function(Error, Connection)} callback
+   * @returns {void}
+   * @private
+   */
+  _doWork (transport, addr, token, callback) {
+    log('work')
+    this._dialWithTimeout(transport, addr, (err, conn) => {
+      if (err) {
+        log('work:error')
+        return callback(null, {error: err})
+      }
+
+      if (token.cancel) {
+        log('work:cancel')
+        // clean up already done dials
+        pull(pull.empty(), conn)
+        // TODO: proper cleanup once the connection interface supports it
+        // return conn.close(() => callback(new Error('Manual cancel'))
+        return callback(null, {cancel: true})
+      }
+
+      // one is enough
+      token.cancel = true
+
+      log('work:success')
+
+      const proxyConn = new Connection()
+      proxyConn.setInnerConn(conn)
+      callback(null, { multiaddr: addr, conn: conn })
+    })
+  }
+
+  /**
+   * Dial the given transport, timing out with the set timeout.
+   *
+   * @param {SwarmTransport} transport
+   * @param {Multiaddr} addr
+   * @param {function(Error, Connection)} callback
+   * @returns {void}
+   *
+   * @private
+   */
+  _dialWithTimeout (transport, addr, callback) {
+    timeout((cb) => {
+      const conn = transport.dial(addr, (err) => {
+        if (err) {
+          return cb(err)
+        }
+
+        cb(null, conn)
+      })
+    }, this.dialTimeout)(callback)
+  }
+
+  /**
+   * Add new work to the queue.
+   *
+   * @param {SwarmTransport} transport
+   * @param {Multiaddr} addr
+   * @param {CancelToken} token
+   * @param {function(Error, Connection)} callback
+   * @returns {void}
+   */
+  push (transport, addr, token, callback) {
+    this.queue.push({transport, addr, token}, callback)
+  }
+}
+
+module.exports = DialQueue
+
+},{"async/queue":51,"async/timeout":56,"debug":114,"interface-connection":195,"pull-stream":590}],274:[function(require,module,exports){
+'use strict'
+
+module.exports = {
+  tag: '/plaintext/1.0.0',
+  encrypt (id, privKey, conn) {
+    return conn
+  }
+}
+
+},{}],275:[function(require,module,exports){
+'use strict'
+
+const multistream = require('multistream-select')
+
+module.exports = function protocolMuxer (protocols, conn) {
+  const ms = new multistream.Listener()
+
+  Object.keys(protocols).forEach((protocol) => {
+    if (!protocol) {
+      return
+    }
+
+    ms.addHandler(protocol, protocols[protocol].handlerFunc, protocols[protocol].matchFunc)
+  })
+
+  ms.handle(conn, (err) => {
+    if (err) {
+      // the multistream handshake failed
+    }
+  })
+}
+
+},{"multistream-select":282}],276:[function(require,module,exports){
+'use strict'
+
+const parallel = require('async/parallel')
+const once = require('once')
+const debug = require('debug')
+const log = debug('libp2p:swarm:transport')
+
+const protocolMuxer = require('./protocol-muxer')
+const LimitDialer = require('./limit-dialer')
+
+// number of concurrent outbound dials to make per peer, same as go-libp2p-swarm
+const defaultPerPeerRateLimit = 8
+
+// the amount of time a single dial has to succeed
+// TODO this should be exposed as a option
+const dialTimeout = 30 * 1000
+
+module.exports = function (swarm) {
+  const dialer = new LimitDialer(defaultPerPeerRateLimit, dialTimeout)
+
+  return {
+    add (key, transport, options, callback) {
+      if (typeof options === 'function') {
+        callback = options
+        options = {}
+      }
+
+      callback = callback || noop
+
+      log('adding %s', key)
+      if (swarm.transports[key]) {
+        throw new Error('There is already a transport with this key')
+      }
+      swarm.transports[key] = transport
+      if (!swarm.transports[key].listeners) {
+        swarm.transports[key].listeners = []
+      }
+
+      callback()
+    },
+
+    dial (key, pi, callback) {
+      const t = swarm.transports[key]
+      let multiaddrs = pi.multiaddrs.toArray()
+
+      if (!Array.isArray(multiaddrs)) {
+        multiaddrs = [multiaddrs]
+      }
+      log('dialing %s', key, multiaddrs.map((m) => m.toString()))
+      // filter the multiaddrs that are actually valid for this transport (use a func from the transport itself) (maybe even make the transport do that)
+      multiaddrs = dialables(t, multiaddrs)
+
+      dialer.dialMany(pi.id, t, multiaddrs, (err, success) => {
+        if (err) {
+          return callback(err)
+        }
+
+        pi.connect(success.multiaddr)
+        swarm._peerBook.put(pi)
+        callback(null, success.conn)
+      })
+    },
+
+    listen (key, options, handler, callback) {
+      // if no handler is passed, we pass conns to protocolMuxer
+      if (!handler) {
+        handler = protocolMuxer.bind(null, swarm.protocols)
+      }
+
+      const multiaddrs = dialables(swarm.transports[key], swarm._peerInfo.multiaddrs.distinct())
+
+      const transport = swarm.transports[key]
+
+      if (!transport.listeners) {
+        transport.listeners = []
+      }
+
+      let freshMultiaddrs = []
+
+      const createListeners = multiaddrs.map((ma) => {
+        return (cb) => {
+          const done = once(cb)
+          const listener = transport.createListener(handler)
+          listener.once('error', done)
+
+          listener.listen(ma, (err) => {
+            if (err) {
+              return done(err)
+            }
+            listener.removeListener('error', done)
+            listener.getAddrs((err, addrs) => {
+              if (err) {
+                return done(err)
+              }
+              freshMultiaddrs = freshMultiaddrs.concat(addrs)
+              transport.listeners.push(listener)
+              done()
+            })
+          })
+        }
+      })
+
+      parallel(createListeners, (err) => {
+        if (err) {
+          return callback(err)
+        }
+
+        // cause we can listen on port 0 or 0.0.0.0
+        swarm._peerInfo.multiaddrs.replace(multiaddrs, freshMultiaddrs)
+        callback()
+      })
+    },
+
+    close (key, callback) {
+      const transport = swarm.transports[key]
+
+      if (!transport) {
+        return callback(new Error(`Trying to close non existing transport: ${key}`))
+      }
+
+      parallel(transport.listeners.map((listener) => {
+        return (cb) => {
+          listener.close(cb)
+        }
+      }), callback)
+    }
+  }
+}
+
+function dialables (tp, multiaddrs) {
+  return tp.filter(multiaddrs)
+}
+
+function noop () {}
+
+},{"./limit-dialer":272,"./protocol-muxer":275,"async/parallel":50,"debug":114,"once":544}],277:[function(require,module,exports){
+'use strict'
+
+const EventEmitter = require('events').EventEmitter
+const assert = require('assert')
+
+const setImmediate = require('async/setImmediate')
+const each = require('async/each')
+const series = require('async/series')
+
+const Ping = require('libp2p-ping')
+const Swarm = require('libp2p-swarm')
+const PeerId = require('peer-id')
+const PeerInfo = require('peer-info')
+const PeerBook = require('peer-book')
+const mafmt = require('mafmt')
+const multiaddr = require('multiaddr')
+
+exports = module.exports
+
+const NOT_STARTED_ERROR_MESSAGE = 'The libp2p node is not started yet'
+
+class Node extends EventEmitter {
+  constructor (_modules, _peerInfo, _peerBook, _options) {
+    super()
+    assert(_modules, 'requires modules to equip libp2p with features')
+    assert(_peerInfo, 'requires a PeerInfo instance')
+
+    this.modules = _modules
+    this.peerInfo = _peerInfo
+    this.peerBook = _peerBook || new PeerBook()
+    _options = _options || {}
+
+    this._isStarted = false
+
+    this.swarm = new Swarm(this.peerInfo, this.peerBook)
+
+    // Attach stream multiplexers
+    if (this.modules.connection && this.modules.connection.muxer) {
+      let muxers = this.modules.connection.muxer
+      muxers = Array.isArray(muxers) ? muxers : [muxers]
+      muxers.forEach((muxer) => this.swarm.connection.addStreamMuxer(muxer))
+
+      // If muxer exists, we can use Identify
+      this.swarm.connection.reuse()
+
+      // Received incommind dial and muxer upgrade happened,
+      // reuse this muxed connection
+      this.swarm.on('peer-mux-established', (peerInfo) => {
+        this.emit('peer:connect', peerInfo)
+        this.peerBook.put(peerInfo)
+      })
+
+      this.swarm.on('peer-mux-closed', (peerInfo) => {
+        this.emit('peer:disconnect', peerInfo)
+      })
+    }
+
+    // Attach crypto channels
+    if (this.modules.connection && this.modules.connection.crypto) {
+      let cryptos = this.modules.connection.crypto
+      cryptos = Array.isArray(cryptos) ? cryptos : [cryptos]
+      cryptos.forEach((crypto) => {
+        this.swarm.connection.crypto(crypto.tag, crypto.encrypt)
+      })
+    }
+
+    // Attach discovery mechanisms
+    if (this.modules.discovery) {
+      let discoveries = this.modules.discovery
+      discoveries = Array.isArray(discoveries) ? discoveries : [discoveries]
+
+      discoveries.forEach((discovery) => {
+        discovery.on('peer', (peerInfo) => this.emit('peer:discovery', peerInfo))
+      })
+    }
+
+    // Mount default protocols
+    Ping.mount(this.swarm)
+
+    // dht provided components (peerRouting, contentRouting, dht)
+    if (_modules.DHT) {
+      this._dht = new this.modules.DHT(this.swarm, {
+        kBucketSize: 20,
+        datastoer: _options.DHT && _options.DHT.datastore
+      })
+    }
+
+    this.peerRouting = {
+      findPeer: (id, callback) => {
+        if (!this._dht) {
+          return callback(new Error('DHT is not available'))
+        }
+
+        this._dht.findPeer(id, callback)
+      }
+    }
+
+    this.contentRouting = {
+      findProviders: (key, timeout, callback) => {
+        if (!this._dht) {
+          return callback(new Error('DHT is not available'))
+        }
+
+        this._dht.findProviders(key, timeout, callback)
+      },
+      provide: (key, callback) => {
+        if (!this._dht) {
+          return callback(new Error('DHT is not available'))
+        }
+
+        this._dht.provide(key, callback)
+      }
+    }
+
+    this.dht = {
+      put: (key, value, callback) => {
+        if (!this._dht) {
+          return callback(new Error('DHT is not available'))
+        }
+
+        this._dht.put(key, value, callback)
+      },
+      get: (key, callback) => {
+        if (!this._dht) {
+          return callback(new Error('DHT is not available'))
+        }
+
+        this._dht.get(key, callback)
+      },
+      getMany (key, nVals, callback) {
+        if (!this._dht) {
+          return callback(new Error('DHT is not available'))
+        }
+
+        this._dht.getMany(key, nVals, callback)
+      }
+    }
+  }
+
+  /*
+   * Start the libp2p node
+   *   - create listeners on the multiaddrs the Peer wants to listen
+   */
+  start (callback) {
+    if (!this.modules.transport) {
+      return callback(new Error('no transports were present'))
+    }
+
+    let ws
+    let transports = this.modules.transport
+
+    transports = Array.isArray(transports) ? transports : [transports]
+
+    // so that we can have webrtc-star addrs without adding manually the id
+    const maOld = []
+    const maNew = []
+    this.peerInfo.multiaddrs.forEach((ma) => {
+      if (!mafmt.IPFS.matches(ma)) {
+        maOld.push(ma)
+        maNew.push(ma.encapsulate('/ipfs/' + this.peerInfo.id.toB58String()))
+      }
+    })
+    this.peerInfo.multiaddrs.replace(maOld, maNew)
+    const multiaddrs = this.peerInfo.multiaddrs.toArray()
+
+    transports.forEach((transport) => {
+      if (transport.filter(multiaddrs).length > 0) {
+        this.swarm.transport.add(
+          transport.tag || transport.constructor.name, transport)
+      } else if (transport.constructor &&
+                 transport.constructor.name === 'WebSockets') {
+        // TODO find a cleaner way to signal that a transport is always
+        // used for dialing, even if no listener
+        ws = transport
+      }
+    })
+
+    series([
+      (cb) => this.swarm.listen(cb),
+      (cb) => {
+        if (ws) {
+          // always add dialing on websockets
+          this.swarm.transport.add(ws.tag || ws.constructor.name, ws)
+        }
+
+        // all transports need to be setup before discover starts
+        if (this.modules.discovery) {
+          return each(this.modules.discovery, (d, cb) => d.start(cb), cb)
+        }
+        cb()
+      },
+      (cb) => {
+        // TODO: chicken-and-egg problem:
+        // have to set started here because DHT requires libp2p is already started
+        this._isStarted = true
+        if (this._dht) {
+          return this._dht.start(cb)
+        }
+        cb()
+      },
+      (cb) => {
+        this.emit('start')
+        cb()
+      }
+    ], callback)
+  }
+
+  /*
+   * Stop the libp2p node by closing its listeners and open connections
+   */
+  stop (callback) {
+    this._isStarted = false
+
+    if (this.modules.discovery) {
+      this.modules.discovery.forEach((discovery) => {
+        setImmediate(() => discovery.stop(() => {}))
+      })
+    }
+
+    series([
+      (cb) => {
+        if (this._dht) {
+          return this._dht.stop(cb)
+        }
+        cb()
+      },
+      (cb) => this.swarm.close(cb),
+      (cb) => {
+        this.emit('stop')
+        cb()
+      }
+    ], callback)
+  }
+
+  isStarted () {
+    return this._isStarted
+  }
+
+  ping (peer, callback) {
+    assert(this.isStarted(), NOT_STARTED_ERROR_MESSAGE)
+    this._getPeerInfo(peer, (err, peerInfo) => {
+      if (err) {
+        return callback(err)
+      }
+
+      callback(null, new Ping(this.swarm, peerInfo))
+    })
+  }
+
+  dial (peer, protocol, callback) {
+    assert(this.isStarted(), NOT_STARTED_ERROR_MESSAGE)
+
+    if (typeof protocol === 'function') {
+      callback = protocol
+      protocol = undefined
+    }
+
+    this._getPeerInfo(peer, (err, peerInfo) => {
+      if (err) {
+        return callback(err)
+      }
+
+      this.swarm.dial(peerInfo, protocol, (err, conn) => {
+        if (err) {
+          return callback(err)
+        }
+        this.peerBook.put(peerInfo)
+        callback(null, conn)
+      })
+    })
+  }
+
+  hangUp (peer, callback) {
+    assert(this.isStarted(), NOT_STARTED_ERROR_MESSAGE)
+
+    this._getPeerInfo(peer, (err, peerInfo) => {
+      if (err) {
+        return callback(err)
+      }
+
+      this.swarm.hangUp(peerInfo, callback)
+    })
+  }
+
+  handle (protocol, handlerFunc, matchFunc) {
+    this.swarm.handle(protocol, handlerFunc, matchFunc)
+  }
+
+  unhandle (protocol) {
+    this.swarm.unhandle(protocol)
+  }
+
+  /*
+   * Helper method to check the data type of peer and convert it to PeerInfo
+   */
+  _getPeerInfo (peer, callback) {
+    let p
+    // PeerInfo
+    if (PeerInfo.isPeerInfo(peer)) {
+      p = peer
+    // Multiaddr instance (not string)
+    } else if (multiaddr.isMultiaddr(peer)) {
+      const peerIdB58Str = peer.getPeerId()
+      try {
+        p = this.peerBook.get(peerIdB58Str)
+      } catch (err) {
+        p = new PeerInfo(PeerId.createFromB58String(peerIdB58Str))
+      }
+      p.multiaddrs.add(peer)
+    // PeerId
+    } else if (PeerId.isPeerId(peer)) {
+      const peerIdB58Str = peer.toB58String()
+      try {
+        p = this.peerBook.get(peerIdB58Str)
+      } catch (err) {
+        return this.peerRouting.findPeer(peer, callback)
+      }
+    } else {
+      return setImmediate(() => callback(new Error('peer type not recognized')))
+    }
+
+    setImmediate(() => callback(null, p))
+  }
+}
+
+module.exports = Node
+
+},{"assert":712,"async/each":21,"async/series":53,"async/setImmediate":54,"events":717,"libp2p-ping":432,"libp2p-swarm":271,"mafmt":506,"multiaddr":515,"peer-book":547,"peer-id":548,"peer-info":549}],278:[function(require,module,exports){
+arguments[4][152][0].apply(exports,arguments)
+},{"./debug":279,"_process":726,"dup":152}],279:[function(require,module,exports){
+arguments[4][153][0].apply(exports,arguments)
+},{"dup":153,"ms":512}],280:[function(require,module,exports){
+'use strict'
+
+exports = module.exports
+exports.PROTOCOL_ID = '/multistream/1.0.0'
+
+},{}],281:[function(require,module,exports){
+'use strict'
+
+const varint = require('varint')
+const pull = require('pull-stream')
+const pullLP = require('pull-length-prefixed')
+const Connection = require('interface-connection').Connection
+const util = require('../util')
+const select = require('../select')
+const once = require('once')
+
+const PROTOCOL_ID = require('./../constants').PROTOCOL_ID
+
+/**
+ *
+ */
+class Dialer {
+  /**
+   * Create a new Dialer.
+   */
+  constructor () {
+    this.conn = null
+    this.log = util.log.dialer()
+  }
+
+  /**
+   * Perform the multistream handshake.
+   *
+   * @param {Connection} rawConn - The connection on which
+   * to perform the handshake.
+   * @param {function(Error)} callback - Called when the handshake completed.
+   * @returns {undefined}
+   */
+  handle (rawConn, callback) {
+    this.log('dialer handle conn')
+    callback = once(callback)
+    const s = select(PROTOCOL_ID, (err, conn) => {
+      if (err) {
+        return callback(err)
+      }
+      this.log('handshake success')
+
+      this.conn = new Connection(conn, rawConn)
+
+      callback()
+    }, this.log)
+
+    pull(
+      rawConn,
+      s,
+      rawConn
+    )
+  }
+
+  /**
+   * Select a protocol
+   *
+   * @param {string} protocol - A string of the protocol that we want to handshake.
+   * @param {function(Error, Connection)} callback - `err` is
+   * an error object that gets passed if something wrong happ
+   * end (e.g: if the protocol selected is not supported by
+   * the other end) and conn is the connection handshaked
+   * with the other end.
+   *
+   * @returns {undefined}
+   */
+  select (protocol, callback) {
+    this.log('dialer select ' + protocol)
+    callback = once(callback)
+    if (!this.conn) {
+      return callback(new Error('multistream handshake has not finalized yet'))
+    }
+
+    const s = select(protocol, (err, conn) => {
+      if (err) {
+        this.conn = new Connection(conn, this.conn)
+        return callback(err)
+      }
+      callback(null, new Connection(conn, this.conn))
+    }, this.log)
+
+    pull(
+      this.conn,
+      s,
+      this.conn
+    )
+  }
+
+  /**
+   * List all available protocols.
+   *
+   * @param {function(Error, Array<string>)} callback - If
+   * something wrong happend `Error` exists, otherwise
+   * `protocols` is a list of the supported
+   * protocols on the other end.
+   *
+   * @returns {undefined}
+   */
+  ls (callback) {
+    callback = once(callback)
+
+    const lsStream = select('ls', (err, conn) => {
+      if (err) {
+        return callback(err)
+      }
+
+      pull(
+        conn,
+        pullLP.decode(),
+        collectLs(conn),
+        pull.map(stringify),
+        pull.collect((err, list) => {
+          if (err) {
+            return callback(err)
+          }
+          callback(null, list.slice(1))
+        })
+      )
+    }, this.log)
+
+    pull(
+      this.conn,
+      lsStream,
+      this.conn
+    )
+  }
+}
+
+function stringify (buf) {
+  return buf.toString().slice(0, -1)
+}
+
+function collectLs (conn) {
+  let first = true
+  let counter = 0
+
+  return pull.take((msg) => {
+    if (first) {
+      varint.decode(msg)
+      counter = varint.decode(msg, varint.decode.bytes)
+      return true
+    }
+
+    return counter-- > 0
+  })
+}
+
+module.exports = Dialer
+
+},{"../select":288,"../util":289,"./../constants":280,"interface-connection":195,"once":544,"pull-length-prefixed":579,"pull-stream":590,"varint":705}],282:[function(require,module,exports){
+'use strict'
+
+exports.Listener = exports.listener = require('./listener')
+exports.Dialer = exports.dialer = require('./dialer')
+exports.matchSemver = require('./listener/match-semver')
+exports.matchExact = require('./listener/match-exact')
+
+},{"./dialer":281,"./listener":283,"./listener/match-exact":285,"./listener/match-semver":286}],283:[function(require,module,exports){
+'use strict'
+
+const pull = require('pull-stream')
+const isFunction = require('lodash.isfunction')
+const assert = require('assert')
+const select = require('../select')
+const selectHandler = require('./select-handler')
+const lsHandler = require('./ls-handler')
+const matchExact = require('./match-exact')
+
+const util = require('./../util')
+const Connection = require('interface-connection').Connection
+
+const PROTOCOL_ID = require('./../constants').PROTOCOL_ID
+
+/**
+ * Listener
+ */
+class Listener {
+  /**
+   * Create a new Listener.
+   */
+  constructor () {
+    this.handlers = {
+      ls: {
+        handlerFunc: (protocol, conn) => lsHandler(this, conn),
+        matchFunc: matchExact
+
+      }
+    }
+    this.log = util.log.listener()
+  }
+
+  /**
+   * Perform the multistream handshake.
+   *
+   * @param {Connection} rawConn - The connection on which
+   * to perform the handshake.
+   * @param {function(Error)} callback - Called when the handshake completed.
+   * @returns {undefined}
+   */
+  handle (rawConn, callback) {
+    this.log('listener handle conn')
+
+    const selectStream = select(PROTOCOL_ID, (err, conn) => {
+      if (err) {
+        return callback(err)
+      }
+
+      const shConn = new Connection(conn, rawConn)
+
+      const sh = selectHandler(shConn, this.handlers, this.log)
+
+      pull(
+        shConn,
+        sh,
+        shConn
+      )
+
+      callback()
+    }, this.log)
+
+    pull(
+      rawConn,
+      selectStream,
+      rawConn
+    )
+  }
+
+  /**
+   * Handle a given `protocol`.
+   *
+   * @param {string} protocol - A string identifying the protocol.
+   * @param {function(string, Connection)} handlerFunc - Will be called if there is a handshake performed on `protocol`.
+   * @param {matchHandler} [matchFunc=matchExact]
+   * @returns {undefined}
+   */
+  addHandler (protocol, handlerFunc, matchFunc) {
+    this.log('adding handler: ' + protocol)
+    assert(isFunction(handlerFunc), 'handler must be a function')
+
+    if (this.handlers[protocol]) {
+      this.log('overwriting handler for ' + protocol)
+    }
+
+    if (!matchFunc) {
+      matchFunc = matchExact
+    }
+
+    this.handlers[protocol] = {
+      handlerFunc: handlerFunc,
+      matchFunc: matchFunc
+    }
+  }
+
+  /**
+   * Receives a protocol and a callback and should
+   * call `callback(err, result)` where `err` is if
+   * there was a error on the matching function, and
+   * `result` is a boolean that represents if a
+   * match happened.
+   *
+   * @callback matchHandler
+   * @param {string} myProtocol
+   * @param {string} senderProtocol
+   * @param {function(Error, boolean)} callback
+   * @returns {undefined}
+   */
+}
+
+module.exports = Listener
+
+},{"../select":288,"./../constants":280,"./../util":289,"./ls-handler":284,"./match-exact":285,"./select-handler":287,"assert":712,"interface-connection":195,"lodash.isfunction":459,"pull-stream":590}],284:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const pull = require('pull-stream')
+const pullLP = require('pull-length-prefixed')
+const varint = require('varint')
+
+function lsHandler (self, conn) {
+  const protos = Object.keys(self.handlers)
+                       .filter((key) => key !== 'ls')
+
+  const nProtos = protos.length
+  // total size of the list of protocols, including varint and newline
+  const size = protos.reduce((size, proto) => {
+    const p = new Buffer(proto + '\n')
+    const el = varint.encodingLength(p.length)
+    return size + el
+  }, 0)
+
+  const buf = Buffer.concat([
+    new Buffer(varint.encode(nProtos)),
+    new Buffer(varint.encode(size)),
+    new Buffer('\n')
+  ])
+
+  const encodedProtos = protos.map((proto) => {
+    return new Buffer(proto + '\n')
+  })
+  const values = [buf].concat(encodedProtos)
+
+  pull(
+    pull.values(values),
+    pullLP.encode(),
+    conn
+  )
+}
+
+module.exports = lsHandler
+
+}).call(this,require("buffer").Buffer)
+},{"buffer":715,"pull-length-prefixed":579,"pull-stream":590,"varint":705}],285:[function(require,module,exports){
+'use strict'
+
+/**
+ * Match protocols exactly.
+ *
+ * @param {string} myProtocol
+ * @param {string} senderProtocol
+ * @param {function(Error, boolean)} callback
+ * @returns {undefined}
+ * @type {matchHandler}
+ */
+function matchExact (myProtocol, senderProtocol, callback) {
+  const result = myProtocol === senderProtocol
+  callback(null, result)
+}
+
+module.exports = matchExact
+
+},{}],286:[function(require,module,exports){
+'use strict'
+
+const semver = require('semver')
+
+/**
+ * Match protocols using semver `~` matching.
+ *
+ * @param {string} myProtocol
+ * @param {string} senderProtocol
+ * @param {function(Error, boolean)} callback
+ * @returns {undefined}
+ * @type {matchHandler}
+ */
+function matchSemver (myProtocol, senderProtocol, callback) {
+  const mps = myProtocol.split('/')
+  const sps = senderProtocol.split('/')
+  const myName = mps[1]
+  const myVersion = mps[2]
+
+  const senderName = sps[1]
+  const senderVersion = sps[2]
+
+  if (myName !== senderName) {
+    return callback(null, false)
+  }
+  // does my protocol satisfy the sender?
+  const valid = semver.satisfies(myVersion, '~' + senderVersion)
+
+  callback(null, valid)
+}
+
+module.exports = matchSemver
+
+},{"semver":660}],287:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const handshake = require('pull-handshake')
+const lp = require('pull-length-prefixed')
+const Connection = require('interface-connection').Connection
+const writeEncoded = require('../util.js').writeEncoded
+const some = require('async/some')
+
+function selectHandler (rawConn, handlersMap, log) {
+  const cb = (err) => {
+    // incoming errors are irrelevant for the app
+    log.error(err)
+  }
+
+  const stream = handshake({ timeout: 60 * 1000 }, cb)
+  const shake = stream.handshake
+
+  next()
+  return stream
+
+  function next () {
+    lp.decodeFromReader(shake, (err, data) => {
+      if (err) {
+        return cb(err)
+      }
+      log('received:', data.toString())
+      const protocol = data.toString().slice(0, -1)
+
+      matcher(protocol, handlersMap, (err, result) => {
+        if (err) {
+          return cb(err)
+        }
+        const key = result
+
+        if (key) {
+          log('send ack back of: ' + protocol)
+          writeEncoded(shake, data, cb)
+
+          const conn = new Connection(shake.rest(), rawConn)
+          handlersMap[key].handlerFunc(protocol, conn)
+        } else {
+          log('not supported protocol: ' + protocol)
+          writeEncoded(shake, new Buffer('na\n'))
+          next()
+        }
+      })
+    })
+  }
+}
+
+function matcher (protocol, handlers, callback) {
+  const supportedProtocols = Object.keys(handlers)
+  let supportedProtocol = false
+
+  some(supportedProtocols,
+    (sp, cb) => {
+      handlers[sp].matchFunc(sp, protocol, (err, result) => {
+        if (err) {
+          return cb(err)
+        }
+        if (result) {
+          supportedProtocol = sp
+        }
+        cb()
+      })
+    },
+    (err) => {
+      if (err) {
+        return callback(err)
+      }
+      callback(null, supportedProtocol)
+    }
+  )
+}
+
+module.exports = selectHandler
+
+}).call(this,require("buffer").Buffer)
+},{"../util.js":289,"async/some":55,"buffer":715,"interface-connection":195,"pull-handshake":576,"pull-length-prefixed":579}],288:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const handshake = require('pull-handshake')
+const pullLP = require('pull-length-prefixed')
+const util = require('./util')
+const writeEncoded = util.writeEncoded
+
+function select (multicodec, callback, log) {
+  const stream = handshake({
+    timeout: 60 * 1000
+  }, callback)
+
+  const shake = stream.handshake
+
+  log('writing multicodec: ' + multicodec)
+  writeEncoded(shake, new Buffer(multicodec + '\n'), callback)
+
+  pullLP.decodeFromReader(shake, (err, data) => {
+    if (err) {
+      return callback(err)
+    }
+    const protocol = data.toString().slice(0, -1)
+
+    if (protocol !== multicodec) {
+      return callback(new Error(`"${multicodec}" not supported`), shake.rest())
+    }
+
+    log('received ack: ' + protocol)
+    callback(null, shake.rest())
+  })
+
+  return stream
+}
+
+module.exports = select
+
+}).call(this,require("buffer").Buffer)
+},{"./util":289,"buffer":715,"pull-handshake":576,"pull-length-prefixed":579}],289:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const pull = require('pull-stream')
+const pullLP = require('pull-length-prefixed')
+const debug = require('debug')
+
+exports = module.exports
+
+function randomId () {
+  return ((~~(Math.random() * 1e9)).toString(36))
+}
+
+// prefixes a message with a varint
+// TODO this is a pull-stream 'creep' (pull stream to add a byte?')
+function encode (msg, callback) {
+  const values = Buffer.isBuffer(msg) ? [msg] : [new Buffer(msg)]
+
+  pull(
+    pull.values(values),
+    pullLP.encode(),
+    pull.collect((err, encoded) => {
+      if (err) {
+        return callback(err)
+      }
+      callback(null, encoded[0])
+    })
+  )
+}
+
+exports.writeEncoded = (writer, msg, callback) => {
+  encode(msg, (err, msg) => {
+    if (err) {
+      return callback(err)
+    }
+    writer.write(msg)
+  })
+}
+
+function createLogger (type) {
+  const rId = randomId()
+
+  function printer (logger) {
+    return (msg) => {
+      if (Array.isArray(msg)) {
+        msg = msg.join(' ')
+      }
+      logger('(%s) %s', rId, msg)
+    }
+  }
+
+  const log = printer(debug('mss:' + type))
+  log.error = printer(debug('mss:' + type + ':error'))
+
+  return log
+}
+
+exports.log = {}
+
+exports.log.dialer = () => {
+  return createLogger('dialer\t')
+}
+exports.log.listener = () => {
+  return createLogger('listener\t')
+}
+
+}).call(this,require("buffer").Buffer)
+},{"buffer":715,"debug":278,"pull-length-prefixed":579,"pull-stream":590}],290:[function(require,module,exports){
+module.exports={
+  "_from": "git+https://git@github.com/ipfs/js-ipfs.git#319c1c9830262ab5c05bf99fc525d8883d3178cb",
+  "_id": "ipfs@0.26.0",
+  "_inBundle": false,
+  "_integrity": "sha1-gklKTz4fahp0L8MGEJ9dM+qweR4=",
+  "_location": "/ipfs",
+  "_phantomChildren": {
+    "abstract-leveldown": "0.12.4",
+    "async": "2.6.0",
+    "base32.js": "0.1.0",
+    "browserify-zlib-next": "1.0.1",
+    "bs58": "4.0.1",
+    "camelcase": "4.1.0",
+    "cids": "0.5.2",
+    "cliui": "3.2.0",
+    "concat-stream": "1.6.0",
+    "debug": "3.1.0",
+    "decamelize": "1.2.0",
+    "detect-node": "2.0.3",
+    "error-ex": "1.3.1",
+    "find-up": "2.1.0",
+    "flatmap": "0.0.3",
+    "get-caller-file": "1.0.2",
+    "glob": "7.1.2",
+    "glob-escape": "0.0.2",
+    "graceful-fs": "4.1.11",
+    "hashlru": "2.2.0",
+    "heap": "0.2.6",
+    "hoek": "5.0.2",
+    "idb-wrapper": "1.7.1",
+    "interface-connection": "0.3.2",
+    "ip": "1.1.5",
+    "ip-address": "5.8.8",
+    "ipfs-block": "0.6.1",
+    "ipfs-unixfs": "0.1.14",
+    "ipld-dag-cbor": "0.11.2",
+    "ipld-dag-pb": "0.11.3",
+    "ipld-ethereum": "1.4.4",
+    "ipld-git": "0.1.1",
+    "ipld-raw": "1.0.7",
+    "is-ipfs": "0.3.2",
+    "is-stream": "1.1.0",
+    "isbuffer": "0.0.0",
+    "k-bucket": "3.3.0",
+    "left-pad": "1.1.3",
+    "level-js": "2.2.3",
+    "leveldown": "1.9.0",
+    "levelup": "1.3.9",
+    "libp2p-crypto": "0.10.3",
+    "libp2p-identify": "0.6.1",
+    "libp2p-ping": "0.6.0",
+    "libp2p-record": "0.5.1",
+    "lock-me": "1.0.3",
+    "lodash": "4.17.4",
+    "lodash.filter": "4.6.0",
+    "lodash.flatten": "4.4.0",
+    "lodash.get": "4.4.2",
+    "lodash.has": "4.5.2",
+    "lodash.includes": "4.3.0",
+    "lodash.isfunction": "3.0.8",
+    "lodash.map": "4.6.0",
+    "lodash.range": "3.2.0",
+    "lodash.set": "4.3.2",
+    "lru-cache": "4.1.1",
+    "ltgt": "2.2.0",
+    "mafmt": "3.0.2",
+    "memdown": "1.4.1",
+    "mkdirp": "0.5.1",
+    "ms": "2.0.0",
+    "multiaddr": "3.0.1",
+    "multihashes": "0.4.12",
+    "multihashing-async": "0.4.7",
+    "multipart-stream": "2.0.1",
+    "ndjson": "1.5.0",
+    "normalize-package-data": "2.4.0",
+    "once": "1.4.0",
+    "os-locale": "2.1.0",
+    "peer-book": "0.5.1",
+    "peer-id": "0.10.2",
+    "peer-info": "0.11.1",
+    "priorityqueue": "0.2.0",
+    "promisify-es6": "1.0.3",
+    "protons": "1.0.0",
+    "pull-batch": "1.0.0",
+    "pull-block": "1.2.0",
+    "pull-cat": "1.1.11",
+    "pull-defer": "0.2.2",
+    "pull-glob": "1.0.6",
+    "pull-handshake": "1.1.4",
+    "pull-length-prefixed": "1.3.0",
+    "pull-many": "1.0.8",
+    "pull-pair": "1.1.0",
+    "pull-paramap": "1.2.2",
+    "pull-pause": "0.0.1",
+    "pull-pushable": "2.1.1",
+    "pull-sort": "1.0.1",
+    "pull-stream": "3.6.1",
+    "pull-traverse": "1.0.3",
+    "pull-write": "1.1.4",
+    "pump": "1.0.2",
+    "qs": "6.5.1",
+    "readable-stream": "2.3.3",
+    "require-directory": "2.1.1",
+    "require-main-filename": "1.0.1",
+    "safe-buffer": "5.1.1",
+    "semver": "5.4.1",
+    "set-blocking": "2.0.0",
+    "sparse-array": "1.3.1",
+    "stream-http": "2.7.2",
+    "streamifier": "0.1.1",
+    "strip-bom": "3.0.0",
+    "tar-stream": "1.5.4",
+    "typedarray-to-buffer": "1.0.4",
+    "uuid": "3.1.0",
+    "varint": "5.0.0",
+    "which-module": "2.0.0",
+    "write-file-atomic": "2.3.0",
+    "xor-distance": "1.0.0",
+    "y18n": "3.2.1"
+  },
+  "_requested": {
+    "type": "git",
+    "raw": "git+https://git@github.com/ipfs/js-ipfs.git#319c1c9830262ab5c05bf99fc525d8883d3178cb",
+    "rawSpec": "git+https://git@github.com/ipfs/js-ipfs.git#319c1c9830262ab5c05bf99fc525d8883d3178cb",
+    "saveSpec": "git+https://git@github.com/ipfs/js-ipfs.git#319c1c9830262ab5c05bf99fc525d8883d3178cb",
+    "fetchSpec": "https://git@github.com/ipfs/js-ipfs.git",
+    "gitCommittish": "319c1c9830262ab5c05bf99fc525d8883d3178cb"
+  },
+  "_requiredBy": [
+    "#USER",
+    "/"
+  ],
+  "_resolved": "git+https://git@github.com/ipfs/js-ipfs.git#319c1c9830262ab5c05bf99fc525d8883d3178cb",
+  "_spec": "git+https://git@github.com/ipfs/js-ipfs.git#319c1c9830262ab5c05bf99fc525d8883d3178cb",
+  "_where": "/Users/mitra/git/_github_internetarchive/dweb-transport",
+  "author": {
+    "name": "David Dias",
+    "email": "daviddias@ipfs.io"
+  },
+  "bin": {
+    "jsipfs": "src/cli/bin.js"
+  },
+  "browser": {
+    "./src/core/components/init-assets.js": false,
+    "./src/core/runtime/config-nodejs.json": "./src/core/runtime/config-browser.json",
+    "./src/core/runtime/libp2p-nodejs.js": "./src/core/runtime/libp2p-browser.js",
+    "./src/core/runtime/repo-nodejs.js": "./src/core/runtime/repo-browser.js",
+    "./test/utils/create-repo-nodejs.js": "./test/utils/create-repo-browser.js",
+    "stream": "readable-stream"
+  },
+  "bugs": {
+    "url": "https://github.com/ipfs/js-ipfs/issues"
+  },
+  "bundleDependencies": false,
+  "contributors": [
+    {
+      "name": "Andrew de Andrade",
+      "email": "andrew@deandrade.com.br"
+    },
+    {
+      "name": "Bernard Mordan",
+      "email": "bernard@tableflip.io"
+    },
+    {
+      "name": "CHEVALAY JOSSELIN",
+      "email": "josselin54.chevalay@gmail.com"
+    },
+    {
+      "name": "Caio Gondim",
+      "email": "me@caiogondim.com"
+    },
+    {
+      "name": "Christian Couder",
+      "email": "chriscool@tuxfamily.org"
+    },
+    {
+      "name": "Daniel J. O'Quinn",
+      "email": "danieljoquinn@gmail.com"
+    },
+    {
+      "name": "Daniela Borges Matos de Carvalho",
+      "email": "alunassertiva@gmail.com"
+    },
+    {
+      "name": "David Dias",
+      "email": "daviddias.p@gmail.com"
+    },
+    {
+      "name": "Dmitriy Ryajov",
+      "email": "dryajov@gmail.com"
+    },
+    {
+      "name": "Dzmitry Das",
+      "email": "dbachko@gmail.com"
+    },
+    {
+      "name": "Enrico Marino",
+      "email": "enrico.marino@email.com"
+    },
+    {
+      "name": "Felix Yan",
+      "email": "felixonmars@archlinux.org"
+    },
+    {
+      "name": "Francisco Baio Dias",
+      "email": "xicombd@gmail.com"
+    },
+    {
+      "name": "Francisco Baio Dias",
+      "email": "francisco@typeform.com"
+    },
+    {
+      "name": "Friedel Ziegelmayer",
+      "email": "dignifiedquire@gmail.com"
+    },
+    {
+      "name": "Georgios Rassias",
+      "email": "georassias@gmail.com"
+    },
+    {
+      "name": "Greenkeeper",
+      "email": "support@greenkeeper.io"
+    },
+    {
+      "name": "Haad",
+      "email": "haadcode@users.noreply.github.com"
+    },
+    {
+      "name": "Harsh Vakharia",
+      "email": "harshjv@users.noreply.github.com"
+    },
+    {
+      "name": "Henry Rodrick",
+      "email": "moshisushi@gmail.com"
+    },
+    {
+      "name": "Johannes Wikner",
+      "email": "johannes.wikner@gmail.com"
+    },
+    {
+      "name": "Jon Schlinkert",
+      "email": "dev@sellside.com"
+    },
+    {
+      "name": "João Antunes",
+      "email": "j.goncalo.antunes@gmail.com"
+    },
+    {
+      "name": "Kevin Wang",
+      "email": "kevin@fossa.io"
+    },
+    {
+      "name": "Lars Gierth",
+      "email": "larsg@systemli.org"
+    },
+    {
+      "name": "Maciej Krüger",
+      "email": "mkg20001@gmail.com"
+    },
+    {
+      "name": "Marius Darila",
+      "email": "marius.darila@gmail.com"
+    },
+    {
+      "name": "Michelle Lee",
+      "email": "michelle@protocol.ai"
+    },
+    {
+      "name": "Mikeal Rogers",
+      "email": "mikeal.rogers@gmail.com"
+    },
+    {
+      "name": "Mithgol",
+      "email": "getgit@mithgol.ru"
+    },
+    {
+      "name": "Nuno Nogueira",
+      "email": "nunofmn@gmail.com"
+    },
+    {
+      "name": "Oskar Nyberg",
+      "email": "oskar@oskarnyberg.com"
+    },
+    {
+      "name": "Pau Ramon Revilla",
+      "email": "masylum@gmail.com"
+    },
+    {
+      "name": "Pedro Teixeira",
+      "email": "i@pgte.me"
+    },
+    {
+      "name": "RasmusErik Voel Jensen",
+      "email": "github@solsort.com"
+    },
+    {
+      "name": "Richard Littauer",
+      "email": "richard.littauer@gmail.com"
+    },
+    {
+      "name": "Rod Keys",
+      "email": "rod@zokos.com"
+    },
+    {
+      "name": "Sid Harder",
+      "email": "sideharder@gmail.com"
+    },
+    {
+      "name": "SidHarder",
+      "email": "softwarenavigator@gmail.com"
+    },
+    {
+      "name": "Stephen Whitmore",
+      "email": "stephen.whitmore@gmail.com"
+    },
+    {
+      "name": "Stephen Whitmore",
+      "email": "noffle@users.noreply.github.com"
+    },
+    {
+      "name": "Terence Pae",
+      "email": "terencepae@gmail.com"
+    },
+    {
+      "name": "Uroš Jurglič",
+      "email": "jurglic@gmail.com"
+    },
+    {
+      "name": "Xiao Liang",
+      "email": "yxliang01@users.noreply.github.com"
+    },
+    {
+      "name": "Yahya",
+      "email": "ya7yaz@gmail.com"
+    },
+    {
+      "name": "bitspill",
+      "email": "bitspill+github@bitspill.net"
+    },
+    {
+      "name": "haad",
+      "email": "haad@headbanggames.com"
+    },
+    {
+      "name": "jbenet",
+      "email": "juan@benet.ai"
+    },
+    {
+      "name": "kumavis",
+      "email": "kumavis@users.noreply.github.com"
+    },
+    {
+      "name": "nginnever",
+      "email": "ginneversource@gmail.com"
+    },
+    {
+      "name": "npmcdn-to-unpkg-bot",
+      "email": "npmcdn-to-unpkg-bot@users.noreply.github.com"
+    },
+    {
+      "name": "tcme",
+      "email": "hi@this-connect.me"
+    },
+    {
+      "name": "Łukasz Magiera",
+      "email": "magik6k@users.noreply.github.com"
+    },
+    {
+      "name": "ᴠɪᴄᴛᴏʀ ʙᴊᴇʟᴋʜᴏʟᴍ",
+      "email": "victorbjelkholm@gmail.com"
+    }
+  ],
+  "dependencies": {
+    "async": "^2.5.0",
+    "bl": "^1.2.1",
+    "boom": "^6.0.0",
+    "byteman": "^1.3.5",
+    "cids": "^0.5.2",
+    "debug": "^3.1.0",
+    "file-type": "^7.2.0",
+    "filesize": "^3.5.11",
+    "fsm-event": "^2.1.0",
+    "get-folder-size": "^1.0.0",
+    "glob": "^7.1.2",
+    "hapi": "^16.6.2",
+    "hapi-set-header": "^1.0.2",
+    "hoek": "^5.0.0",
+    "ipfs-api": "^14.3.7",
+    "ipfs-bitswap": "~0.17.2",
+    "ipfs-block": "~0.6.0",
+    "ipfs-block-service": "~0.12.0",
+    "ipfs-multipart": "~0.1.0",
+    "ipfs-repo": "~0.17.0",
+    "ipfs-unixfs": "~0.1.13",
+    "ipfs-unixfs-engine": "~0.22.5",
+    "ipld-resolver": "~0.13.4",
+    "is-ipfs": "^0.3.2",
+    "is-stream": "^1.1.0",
+    "joi": "^13.0.1",
+    "libp2p": "~0.12.4",
+    "libp2p-floodsub": "~0.11.1",
+    "libp2p-kad-dht": "~0.5.1",
+    "libp2p-mdns": "~0.9.1",
+    "libp2p-multiplex": "~0.5.0",
+    "libp2p-railing": "~0.7.1",
+    "libp2p-secio": "~0.8.1",
+    "libp2p-tcp": "~0.11.1",
+    "libp2p-webrtc-star": "~0.13.2",
+    "libp2p-websockets": "~0.10.2",
+    "lodash.flatmap": "^4.5.0",
+    "lodash.get": "^4.4.2",
+    "lodash.sortby": "^4.7.0",
+    "lodash.values": "^4.3.0",
+    "mafmt": "^3.0.1",
+    "mime-types": "^2.1.17",
+    "mkdirp": "~0.5.1",
+    "multiaddr": "^3.0.1",
+    "multihashes": "~0.4.12",
+    "once": "^1.4.0",
+    "path-exists": "^3.0.0",
+    "peer-book": "~0.5.1",
+    "peer-id": "~0.10.2",
+    "peer-info": "~0.11.0",
+    "progress": "^2.0.0",
+    "prom-client": "^10.2.0",
+    "prometheus-gc-stats": "^0.5.0",
+    "promisify-es6": "^1.0.3",
+    "pull-abortable": "^4.1.1",
+    "pull-file": "^1.0.0",
+    "pull-ndjson": "^0.1.1",
+    "pull-paramap": "^1.2.2",
+    "pull-pushable": "^2.1.1",
+    "pull-sort": "^1.0.1",
+    "pull-stream": "^3.6.1",
+    "pull-stream-to-stream": "^1.3.4",
+    "pull-zip": "^2.0.1",
+    "read-pkg-up": "^2.0.0",
+    "readable-stream": "2.3.3",
+    "safe-buffer": "^5.1.1",
+    "stream-to-pull-stream": "^1.7.2",
+    "tar-stream": "^1.5.4",
+    "temp": "~0.8.3",
+    "through2": "^2.0.3",
+    "update-notifier": "^2.3.0",
+    "yargs": "9.0.1"
+  },
+  "deprecated": false,
+  "description": "JavaScript implementation of the IPFS specification",
+  "devDependencies": {
+    "aegir": "^11.0.2",
+    "buffer-loader": "0.0.1",
+    "chai": "^4.1.2",
+    "delay": "^2.0.0",
+    "detect-node": "^2.0.3",
+    "dir-compare": "^1.4.0",
+    "dirty-chai": "^2.0.1",
+    "eslint-plugin-react": "^7.4.0",
+    "execa": "^0.8.0",
+    "expose-loader": "^0.7.3",
+    "form-data": "^2.3.1",
+    "gulp": "^3.9.1",
+    "interface-ipfs-core": "~0.32.1",
+    "ipfsd-ctl": "~0.24.0",
+    "left-pad": "^1.1.3",
+    "lodash": "^4.17.4",
+    "mocha": "^4.0.1",
+    "ncp": "^2.0.0",
+    "nexpect": "^0.5.0",
+    "pre-commit": "^1.2.2",
+    "pretty-bytes": "^4.0.2",
+    "qs": "^6.5.1",
+    "random-fs": "^1.0.3",
+    "rimraf": "^2.6.2",
+    "stream-to-promise": "^2.2.0",
+    "transform-loader": "^0.2.4"
+  },
+  "engines": {
+    "node": ">=6.0.0",
+    "npm": ">=3.0.0"
+  },
+  "homepage": "https://github.com/ipfs/js-ipfs#readme",
+  "keywords": [
+    "IPFS"
+  ],
+  "license": "MIT",
+  "main": "src/core/index.js",
+  "name": "ipfs",
+  "optionalDependencies": {
+    "prom-client": "^10.2.0",
+    "prometheus-gc-stats": "^0.5.0"
+  },
+  "pre-commit": [
+    "lint",
+    "test"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ipfs/js-ipfs.git"
+  },
+  "scripts": {
+    "build": "gulp build",
+    "coverage": "gulp coverage",
+    "coverage-publish": "aegir-coverage publish",
+    "lint": "aegir-lint",
+    "release": "gulp release",
+    "release-major": "gulp release --type major",
+    "release-minor": "gulp release --type minor",
+    "test": "gulp test --dom",
+    "test:benchmark": "echo \"Error: no benchmarks yet\" && exit 1",
+    "test:benchmark:browser": "echo \"Error: no benchmarks yet\" && exit 1",
+    "test:benchmark:node": "echo \"Error: no benchmarks yet\" && exit 1",
+    "test:benchmark:node:core": "echo \"Error: no benchmarks yet\" && exit 1",
+    "test:benchmark:node:http": "echo \"Error: no benchmarks yet\" && exit 1",
+    "test:browser": "npm run test:unit:browser",
+    "test:interop": "npm run test:interop:node",
+    "test:interop:browser": "mocha -t 60000 test/interop/browser.js",
+    "test:interop:node": "mocha -t 60000 test/interop/node.js",
+    "test:node": "npm run test:unit:node",
+    "test:unit:browser": "gulp test:browser",
+    "test:unit:node": "gulp test:node",
+    "test:unit:node:cli": "TEST=cli npm run test:unit:node",
+    "test:unit:node:core": "TEST=core npm run test:unit:node",
+    "test:unit:node:gateway": "TEST=gateway npm run test:unit:node",
+    "test:unit:node:http": "TEST=http npm run test:unit:node"
+  },
+  "version": "0.26.0"
+}
+
+},{}],291:[function(require,module,exports){
+'use strict'
+
+const waterfall = require('async/waterfall')
+const series = require('async/series')
+const extend = require('deep-extend')
+
+// Boot an IPFS node depending on the options set
+module.exports = (self) => {
+  self.log('booting')
+  const options = self._options
+  const doInit = options.init
+  const doStart = options.start
+  const config = options.config
+  const setConfig = config && typeof config === 'object'
+  const repoOpen = !self._repo.closed
+
+  const customInitOptions = typeof options.init === 'object' ? options.init : {}
+  const initOptions = Object.assign({ bits: 2048 }, customInitOptions)
+
+  // Checks if a repo exists, and if so opens it
+  // Will return callback with a bool indicating the existence
+  // of the repo
+  const maybeOpenRepo = (cb) => {
+    // nothing to do
+    if (repoOpen) {
+      return cb(null, true)
+    }
+
+    series([
+      (cb) => self._repo.open(cb),
+      (cb) => self.preStart(cb),
+      (cb) => {
+        self.state.initialized()
+        cb(null, true)
+      }
+    ], (err, res) => {
+      if (err) {
+        // If the error is that no repo exists,
+        // which happens when the version file is not found
+        // we just want to signal that no repo exist, not
+        // fail the whole process.
+        // TODO: improve datastore and ipfs-repo implemenations so this error is a bit more unified
+        if (err.message.match(/not found/) || // indexeddb
+            err.message.match(/ENOENT/) || // fs
+            err.message.match(/No value/) // memory
+           ) {
+          return cb(null, false)
+        }
+        return cb(err)
+      }
+      cb(null, res)
+    })
+  }
+
+  const done = (err) => {
+    if (err) {
+      return self.emit('error', err)
+    }
+    self.emit('ready')
+    self.log('boot:done', err)
+  }
+
+  const tasks = []
+
+  // check if there as a repo and if so open it
+  maybeOpenRepo((err, hasRepo) => {
+    if (err) {
+      return done(err)
+    }
+
+    // No repo, but need should init one
+    if (doInit && !hasRepo) {
+      tasks.push((cb) => self.init(initOptions, cb))
+      // we know we will have a repo for all follwing tasks
+      // if the above succeeds
+      hasRepo = true
+    }
+
+    // Need to set config
+    if (setConfig) {
+      if (!hasRepo) {
+        console.log('WARNING, trying to set config on uninitialized repo, maybe forgot to set "init: true"')
+      } else {
+        tasks.push((cb) => {
+          waterfall([
+            (cb) => self.config.get(cb),
+            (config, cb) => {
+              extend(config, options.config)
+
+              self.config.replace(config, cb)
+            }
+          ], cb)
+        })
+      }
+    }
+
+    // Need to start up the node
+    if (doStart) {
+      if (!hasRepo) {
+        console.log('WARNING, trying to start ipfs node on uninitialized repo, maybe forgot to set "init: true"')
+        return done(new Error('Uninitalized repo'))
+      } else {
+        tasks.push((cb) => self.start(cb))
+      }
+    }
+
+    // Do the actual boot sequence
+    series(tasks, done)
+  })
+}
+
+},{"async/series":53,"async/waterfall":57,"deep-extend":223}],292:[function(require,module,exports){
+'use strict'
+
+const OFFLINE_ERROR = require('../utils').OFFLINE_ERROR
+
+function formatWantlist (list) {
+  return Array.from(list).map((e) => e[1])
+}
+
+module.exports = function bitswap (self) {
+  return {
+    wantlist: () => {
+      if (!self.isOnline()) {
+        throw OFFLINE_ERROR
+      }
+
+      const list = self._bitswap.getWantlist()
+      return formatWantlist(list)
+    },
+    stat: () => {
+      if (!self.isOnline()) {
+        throw OFFLINE_ERROR
+      }
+
+      const stats = self._bitswap.stat()
+      stats.wantlist = formatWantlist(stats.wantlist)
+      stats.peers = stats.peers.map((id) => id.toB58String())
+
+      return stats
+    },
+    unwant: (key) => {
+      if (!self.isOnline()) {
+        throw OFFLINE_ERROR
+      }
+
+      // TODO: implement when https://github.com/ipfs/js-ipfs-bitswap/pull/10 is merged
+    }
+  }
+}
+
+},{"../utils":318}],293:[function(require,module,exports){
+'use strict'
+
+const Block = require('ipfs-block')
+const multihash = require('multihashes')
+const multihashing = require('multihashing-async')
+const CID = require('cids')
+const waterfall = require('async/waterfall')
+
+module.exports = function block (self) {
+  return {
+    get: (cid, callback) => {
+      cid = cleanCid(cid)
+      self._blockService.get(cid, callback)
+    },
+    put: (block, options, callback) => {
+      if (typeof options === 'function') {
+        callback = options
+        options = {}
+      }
+
+      if (Array.isArray(block)) {
+        return callback(new Error('Array is not supported'))
+      }
+
+      waterfall([
+        (cb) => {
+          if (Block.isBlock(block)) {
+            return cb(null, block)
+          }
+
+          if (options.cid && CID.isCID(options.cid)) {
+            return cb(null, new Block(block, options.cid))
+          }
+
+          const mhtype = options.mhtype || 'sha2-256'
+          const format = options.format || 'dag-pb'
+          const cidVersion = options.version || 0
+          // const mhlen = options.mhlen || 0
+
+          multihashing(block, mhtype, (err, multihash) => {
+            if (err) {
+              return cb(err)
+            }
+
+            cb(null, new Block(block, new CID(cidVersion, format, multihash)))
+          })
+        },
+        (block, cb) => self._blockService.put(block, (err) => {
+          if (err) {
+            return cb(err)
+          }
+          cb(null, block)
+        })
+      ], callback)
+    },
+    rm: (cid, callback) => {
+      cid = cleanCid(cid)
+      self._blockService.delete(cid, callback)
+    },
+    stat: (cid, callback) => {
+      cid = cleanCid(cid)
+
+      self._blockService.get(cid, (err, block) => {
+        if (err) {
+          return callback(err)
+        }
+        callback(null, {
+          key: multihash.toB58String(cid.multihash),
+          size: block.data.length
+        })
+      })
+    }
+  }
+}
+
+function cleanCid (cid) {
+  if (CID.isCID(cid)) {
+    return cid
+  }
+
+  // CID constructor knows how to do the cleaning :)
+  return new CID(cid)
+}
+
+},{"async/waterfall":57,"cids":103,"ipfs-block":211,"multihashes":527,"multihashing-async":531}],294:[function(require,module,exports){
+'use strict'
+
+const defaultNodes = require('../runtime/config-nodejs.json').Bootstrap
+
+module.exports = function bootstrap (self) {
+  return {
+    list: (callback) => {
+      self._repo.config.get((err, config) => {
+        if (err) {
+          return callback(err)
+        }
+        callback(null, {Peers: config.Bootstrap})
+      })
+    },
+    add: (multiaddr, args, callback) => {
+      if (typeof args === 'function') {
+        callback = args
+        args = {default: false}
+      }
+      self._repo.config.get((err, config) => {
+        if (err) {
+          return callback(err)
+        }
+        if (args.default) {
+          config.Bootstrap = defaultNodes
+        } else if (multiaddr && config.Bootstrap.indexOf(multiaddr) === -1) {
+          config.Bootstrap.push(multiaddr)
+        }
+        self._repo.config.set(config, (err) => {
+          if (err) {
+            return callback(err)
+          }
+
+          callback(null, {
+            Peers: args.default ? defaultNodes : [multiaddr]
+          })
+        })
+      })
+    },
+    rm: (multiaddr, args, callback) => {
+      if (typeof args === 'function') {
+        callback = args
+        args = {all: false}
+      }
+      self._repo.config.get((err, config) => {
+        if (err) {
+          return callback(err)
+        }
+        if (args.all) {
+          config.Bootstrap = []
+        } else {
+          config.Bootstrap = config.Bootstrap.filter((mh) => mh !== multiaddr)
+        }
+
+        self._repo.config.set(config, (err) => {
+          if (err) {
+            return callback(err)
+          }
+
+          const res = []
+          if (!args.all && multiaddr) {
+            res.push(multiaddr)
+          }
+
+          callback(null, {Peers: res})
+        })
+      })
+    }
+  }
+}
+
+},{"../runtime/config-nodejs.json":314}],295:[function(require,module,exports){
+'use strict'
+
+const promisify = require('promisify-es6')
+
+module.exports = function config (self) {
+  return {
+    get: promisify((key, callback) => {
+      if (typeof key === 'function') {
+        callback = key
+        key = undefined
+      }
+
+      return self._repo.config.get(key, callback)
+    }),
+    set: promisify((key, value, callback) => {
+      self._repo.config.set(key, value, callback)
+    }),
+    replace: promisify((config, callback) => {
+      self._repo.config.set(config, callback)
+    })
+  }
+}
+
+},{"promisify-es6":554}],296:[function(require,module,exports){
+'use strict'
+
+const promisify = require('promisify-es6')
+const CID = require('cids')
+const pull = require('pull-stream')
+
+module.exports = function dag (self) {
+  return {
+    put: promisify((dagNode, options, callback) => {
+      self._ipldResolver.put(dagNode, options, callback)
+    }),
+
+    get: promisify((cid, path, options, callback) => {
+      if (typeof path === 'function') {
+        callback = path
+        path = undefined
+      }
+
+      if (typeof options === 'function') {
+        callback = options
+        options = {}
+      }
+
+      options = options || {}
+
+      if (typeof cid === 'string') {
+        const split = cid.split('/')
+        cid = new CID(split[0])
+        split.shift()
+
+        if (split.length > 0) {
+          path = split.join('/')
+        } else {
+          path = '/'
+        }
+      }
+
+      self._ipldResolver.get(cid, path, options, callback)
+    }),
+
+    tree: promisify((cid, path, options, callback) => {
+      if (typeof path === 'object') {
+        callback = options
+        options = path
+        path = undefined
+      }
+
+      if (typeof path === 'function') {
+        callback = path
+        path = undefined
+      }
+
+      if (typeof options === 'function') {
+        callback = options
+        options = {}
+      }
+
+      options = options || {}
+
+      if (typeof cid === 'string') {
+        const split = cid.split('/')
+        cid = new CID(split[0])
+        split.shift()
+
+        if (split.length > 0) {
+          path = split.join('/')
+        } else {
+          path = undefined
+        }
+      }
+
+      pull(
+        self._ipldResolver.treeStream(cid, path, options),
+        pull.collect(callback)
+      )
+    })
+  }
+}
+
+},{"cids":103,"promisify-es6":554,"pull-stream":590}],297:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const promisify = require('promisify-es6')
+const every = require('async/every')
+const PeerId = require('peer-id')
+const CID = require('cids')
+const each = require('async/each')
+// const bsplit = require('buffer-split')
+
+module.exports = (self) => {
+  return {
+    /**
+     * Given a key, query the DHT for its best value.
+     *
+     * @param {Buffer} key
+     * @param {function(Error)} [callback]
+     * @returns {Promise|void}
+     */
+    get: promisify((key, options, callback) => {
+      if (!Buffer.isBuffer(key)) {
+        return callback(new Error('Not valid key'))
+      }
+
+      if (typeof options === 'function') {
+        callback = options
+        options = {}
+      }
+
+      self._libp2pNode.dht.get(key, options.timeout, callback)
+    }),
+
+    /**
+     * Write a key/value pair to the DHT.
+     *
+     * Given a key of the form /foo/bar and a value of any
+     * form, this will write that value to the DHT with
+     * that key.
+     *
+     * @param {Buffer} key
+     * @param {Buffer} value
+     * @param {function(Error)} [callback]
+     * @returns {Promise|void}
+     */
+    put: promisify((key, value, callback) => {
+      if (!Buffer.isBuffer(key)) {
+        return callback(new Error('Not valid key'))
+      }
+
+      self._libp2pNode.dht.put(key, value, callback)
+    }),
+
+    /**
+     * Find peers in the DHT that can provide a specific value, given a key.
+     *
+     * @param {CID} key - They key to find providers for.
+     * @param {function(Error, Array<PeerInfo>)} [callback]
+     * @returns {Promise<PeerInfo>|void}
+     */
+    findprovs: promisify((key, callback) => {
+      if (typeof key === 'string') {
+        key = new CID(key)
+      }
+
+      self._libp2pNode.contentRouting.findProviders(key, callback)
+    }),
+
+    /**
+     * Query the DHT for all multiaddresses associated with a `PeerId`.
+     *
+     * @param {PeerId} peer - The id of the peer to search for.
+     * @param {function(Error, Array<Multiaddr>)} [callback]
+     * @returns {Promise<Array<Multiaddr>>|void}
+     */
+    findpeer: promisify((peer, callback) => {
+      if (typeof peer === 'string') {
+        peer = PeerId.createFromB58String(peer)
+      }
+
+      self._libp2pNode.peerRouting.findPeer(peer, (err, info) => {
+        if (err) {
+          return callback(err)
+        }
+
+        // convert to go-ipfs return value, we need to revisit
+        // this. For now will just conform.
+        const goResult = [
+          {
+            Responses: [{
+              ID: info.id.toB58String(),
+              Addresses: info.multiaddrs.toArray().map((a) => a.toString())
+            }]
+          }
+        ]
+
+        callback(null, goResult)
+      })
+    }),
+
+    /**
+     * Announce to the network that we are providing given values.
+     *
+     * @param {CID|Array<CID>} keys - The keys that should be announced.
+     * @param {Object} [options={}]
+     * @param {bool} [options.recursive=false] - Provide not only the given object but also all objects linked from it.
+     * @param {function(Error)} [callback]
+     * @returns {Promise|void}
+     */
+    provide: promisify((keys, options, callback) => {
+      if (!Array.isArray(keys)) {
+        keys = [keys]
+      }
+      if (typeof options === 'function') {
+        callback = options
+        options = {}
+      }
+
+      // ensure blocks are actually local
+      every(keys, (key, cb) => {
+        self._repo.blocks.has(key, cb)
+      }, (err, has) => {
+        if (err) {
+          return callback(err)
+        }
+        /* TODO reconsider this. go-ipfs provides anyway
+        if (!has) {
+          return callback(new Error('Not all blocks exist locally, can not provide'))
+        }
+        */
+
+        if (options.recursive) {
+          // TODO: Implement recursive providing
+        } else {
+          each(keys, (cid, cb) => {
+            self._libp2pNode.contentRouting.provide(cid, cb)
+          }, callback)
+        }
+      })
+    }),
+
+    /**
+     * Find the closest peers to a given `PeerId`, by querying the DHT.
+     *
+     * @param {PeerId} peer - The `PeerId` to run the query agains.
+     * @param {function(Error, Array<PeerId>)} [callback]
+     * @returns {Promise<Array<PeerId>>|void}
+     */
+    query: promisify((peerId, callback) => {
+      if (typeof peerId === 'string') {
+        peerId = PeerId.createFromB58String(peerId)
+      }
+
+      // TODO expose this method in peerRouting
+      self._libp2pNode._dht.getClosestPeers(peerId.toBytes(), (err, peerIds) => {
+        if (err) {
+          return callback(err)
+        }
+        callback(null, peerIds.map((id) => {
+          return { ID: id.toB58String() }
+        }))
+      })
+    })
+  }
+}
+
+}).call(this,{"isBuffer":require("../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
+},{"../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721,"async/each":21,"async/every":27,"cids":103,"peer-id":548,"promisify-es6":554}],298:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const unixfsEngine = require('ipfs-unixfs-engine')
+const importer = unixfsEngine.importer
+const exporter = unixfsEngine.exporter
+const promisify = require('promisify-es6')
+const pull = require('pull-stream')
+const sort = require('pull-sort')
+const pushable = require('pull-pushable')
+const toStream = require('pull-stream-to-stream')
+const toPull = require('stream-to-pull-stream')
+const waterfall = require('async/waterfall')
+const isStream = require('is-stream')
+const Duplex = require('stream').Duplex
+const CID = require('cids')
+
+module.exports = function files (self) {
+  const createAddPullStream = (options) => {
+    const opts = Object.assign({}, {
+      shardSplitThreshold: self._options.EXPERIMENTAL.sharding ? 1000 : Infinity
+    }, options)
+
+    let total = 0
+    let prog = opts.progress || (() => {})
+    const progress = (bytes) => {
+      total += bytes
+      prog(total)
+    }
+
+    opts.progress = progress
+    return pull(
+      pull.map(normalizeContent),
+      pull.flatten(),
+      importer(self._ipldResolver, opts),
+      pull.asyncMap(prepareFile.bind(null, self, opts))
+    )
+  }
+
+  return {
+    createAddStream: (options, callback) => {
+      if (typeof options === 'function') {
+        callback = options
+        options = undefined
+      }
+
+      const addPullStream = createAddPullStream(options)
+      const p = pushable()
+      const s = pull(
+        p,
+        addPullStream
+      )
+
+      const retStream = new AddStreamDuplex(s, p)
+
+      retStream.once('finish', () => p.end())
+
+      callback(null, retStream)
+    },
+
+    createAddPullStream: createAddPullStream,
+
+    add: promisify((data, options, callback) => {
+      if (typeof options === 'function') {
+        callback = options
+        options = {}
+      } else if (!callback || typeof callback !== 'function') {
+        callback = noop
+      }
+
+      if (typeof data !== 'object' &&
+          !Buffer.isBuffer(data) &&
+          !isStream(data)) {
+        return callback(new Error('Invalid arguments, data must be an object, Buffer or readable stream'))
+      }
+
+      pull(
+        pull.values([data]),
+        createAddPullStream(options),
+        sort((a, b) => {
+          if (a.path < b.path) return 1
+          if (a.path > b.path) return -1
+          return 0
+        }),
+        pull.collect(callback)
+      )
+    }),
+
+    cat: promisify((ipfsPath, callback) => {
+      if (typeof ipfsPath === 'function') {
+        return callback(new Error('You must supply an ipfsPath'))
+      }
+
+      pull(
+        exporter(ipfsPath, self._ipldResolver),
+        pull.collect((err, files) => {
+          if (err) {
+            return callback(err)
+          }
+          if (!files || !files.length) return callback(new Error('No such file'))
+          callback(null, toStream.source(files[files.length - 1].content))
+        })
+      )
+    }),
+
+    get: promisify((ipfsPath, callback) => {
+      callback(null, toStream.source(pull(
+        exporter(ipfsPath, self._ipldResolver),
+        pull.map((file) => {
+          if (file.content) {
+            file.content = toStream.source(file.content)
+            file.content.pause()
+          }
+
+          return file
+        })
+      )))
+    }),
+
+    getPull: promisify((ipfsPath, callback) => {
+      callback(null, exporter(ipfsPath, self._ipldResolver))
+    })
+  }
+}
+
+function prepareFile (self, opts, file, callback) {
+  opts = opts || {}
+
+  waterfall([
+    (cb) => self.object.get(file.multihash, cb),
+    (node, cb) => {
+      let cid = new CID(node.multihash)
+
+      if (opts['cid-version'] === 1) {
+        cid = cid.toV1()
+      }
+
+      const b58Hash = cid.toBaseEncodedString()
+
+      cb(null, {
+        path: file.path || b58Hash,
+        hash: b58Hash,
+        size: node.size
+      })
+    }
+  ], callback)
+}
+
+function normalizeContent (content) {
+  if (!Array.isArray(content)) {
+    content = [content]
+  }
+
+  return content.map((data) => {
+    // Buffer input
+    if (Buffer.isBuffer(data)) {
+      data = {
+        path: '',
+        content: pull.values([data])
+      }
+    }
+
+    // Readable stream input
+    if (isStream.readable(data)) {
+      data = {
+        path: '',
+        content: toPull.source(data)
+      }
+    }
+
+    if (data && data.content && typeof data.content !== 'function') {
+      if (Buffer.isBuffer(data.content)) {
+        data.content = pull.values([data.content])
+      }
+
+      if (isStream.readable(data.content)) {
+        data.content = toPull.source(data.content)
+      }
+    }
+
+    return data
+  })
+}
+
+function noop () {}
+
+class AddStreamDuplex extends Duplex {
+  constructor (pullStream, push, options) {
+    super(Object.assign({ objectMode: true }, options))
+    this._pullStream = pullStream
+    this._pushable = push
+    this._waitingPullFlush = []
+  }
+
+  _read () {
+    this._pullStream(null, (end, data) => {
+      while (this._waitingPullFlush.length) {
+        const cb = this._waitingPullFlush.shift()
+        cb()
+      }
+      if (end) {
+        if (end instanceof Error) {
+          this.emit('error', end)
+        }
+      } else {
+        this.push(data)
+      }
+    })
+  }
+
+  _write (chunk, encoding, callback) {
+    this._waitingPullFlush.push(callback)
+    this._pushable.push(chunk)
+  }
+}
+
+}).call(this,{"isBuffer":require("../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
+},{"../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721,"async/waterfall":57,"cids":103,"ipfs-unixfs-engine":266,"is-stream":362,"promisify-es6":554,"pull-pushable":585,"pull-sort":588,"pull-stream":590,"pull-stream-to-stream":589,"stream":642,"stream-to-pull-stream":691}],299:[function(require,module,exports){
+'use strict'
+
+const promisify = require('promisify-es6')
+const setImmediate = require('async/setImmediate')
+
+module.exports = function id (self) {
+  return promisify((opts, callback) => {
+    if (typeof opts === 'function') {
+      callback = opts
+      opts = {}
+    }
+
+    setImmediate(() => callback(null, {
+      id: self._peerInfo.id.toB58String(),
+      publicKey: self._peerInfo.id.pubKey.bytes.toString('base64'),
+      addresses: self._peerInfo.multiaddrs
+                               .toArray()
+                               .map((ma) => ma.toString())
+                               .filter((ma) => ma.indexOf('ipfs') >= 0)
+                               .sort(),
+      agentVersion: 'js-ipfs',
+      protocolVersion: '9000'
+    }))
+  })
+}
+
+},{"async/setImmediate":54,"promisify-es6":554}],300:[function(require,module,exports){
+'use strict'
+
+exports.preStart = require('./pre-start')
+exports.start = require('./start')
+exports.stop = require('./stop')
+exports.isOnline = require('./is-online')
+exports.version = require('./version')
+exports.id = require('./id')
+exports.repo = require('./repo')
+exports.init = require('./init')
+exports.bootstrap = require('./bootstrap')
+exports.config = require('./config')
+exports.block = require('./block')
+exports.object = require('./object')
+exports.dag = require('./dag')
+exports.libp2p = require('./libp2p')
+exports.swarm = require('./swarm')
+exports.ping = require('./ping')
+exports.files = require('./files')
+exports.bitswap = require('./bitswap')
+exports.pubsub = require('./pubsub')
+exports.dht = require('./dht')
+
+},{"./bitswap":292,"./block":293,"./bootstrap":294,"./config":295,"./dag":296,"./dht":297,"./files":298,"./id":299,"./init":301,"./is-online":302,"./libp2p":303,"./object":304,"./ping":305,"./pre-start":306,"./pubsub":307,"./repo":308,"./start":309,"./stop":310,"./swarm":311,"./version":312}],301:[function(require,module,exports){
+'use strict'
+
+const peerId = require('peer-id')
+const waterfall = require('async/waterfall')
+const parallel = require('async/parallel')
+const promisify = require('promisify-es6')
+const config = require('../runtime/config-nodejs.json')
+
+const addDefaultAssets = require('./init-assets')
+
+module.exports = function init (self) {
+  return promisify((opts, callback) => {
+    if (typeof opts === 'function') {
+      callback = opts
+      opts = {}
+    }
+
+    const done = (err, res) => {
+      if (err) {
+        self.emit('error', err)
+        return callback(err)
+      }
+
+      self.state.initialized()
+      self.emit('init')
+      callback(null, res)
+    }
+
+    if (self.state.state() !== 'uninitalized') {
+      return done(new Error('Not able to init from state: ' + self.state.state()))
+    }
+
+    self.state.init()
+    self.log('init')
+
+    opts.emptyRepo = opts.emptyRepo || false
+    opts.bits = Number(opts.bits) || 2048
+    opts.log = opts.log || function () {}
+
+    waterfall([
+      // Verify repo does not yet exist.
+      (cb) => self._repo.exists(cb),
+      (exists, cb) => {
+        self.log('repo exists?', exists)
+        if (exists === true) {
+          return cb(new Error('repo already exists'))
+        }
+
+        // Generate peer identity keypair + transform to desired format + add to config.
+        opts.log(`generating ${opts.bits}-bit RSA keypair...`, false)
+        self.log('generating peer id: %s bits', opts.bits)
+        peerId.create({bits: opts.bits}, cb)
+      },
+      (keys, cb) => {
+        self.log('identity generated')
+        config.Identity = {
+          PeerID: keys.toB58String(),
+          PrivKey: keys.privKey.bytes.toString('base64')
+        }
+        opts.log('done')
+        opts.log('peer identity: ' + config.Identity.PeerID)
+
+        self._repo.init(config, cb)
+      },
+      (_, cb) => self._repo.open(cb),
+      (cb) => {
+        self.log('repo opened')
+        if (opts.emptyRepo) {
+          return cb(null, true)
+        }
+
+        const tasks = [
+          // add empty unixfs dir object (go-ipfs assumes this exists)
+          (cb) => self.object.new('unixfs-dir', cb)
+        ]
+
+        if (typeof addDefaultAssets === 'function') {
+          tasks.push((cb) => addDefaultAssets(self, opts.log, cb))
+        }
+
+        parallel(tasks, (err) => {
+          if (err) {
+            cb(err)
+          } else {
+            cb(null, true)
+          }
+        })
+      }
+    ], done)
+  })
+}
+
+},{"../runtime/config-nodejs.json":314,"./init-assets":714,"async/parallel":50,"async/waterfall":57,"peer-id":548,"promisify-es6":554}],302:[function(require,module,exports){
+'use strict'
+
+module.exports = function isOnline (self) {
+  return () => {
+    return Boolean(self._bitswap && self._libp2pNode && self._libp2pNode.isStarted())
+  }
+}
+
+},{}],303:[function(require,module,exports){
+'use strict'
+
+// libp2p-nodejs gets replaced by libp2p-browser when webpacked/browserified
+const Node = require('../runtime/libp2p-nodejs')
+const promisify = require('promisify-es6')
+const get = require('lodash.get')
+
+module.exports = function libp2p (self) {
+  return {
+    start: promisify((callback) => {
+      self.config.get(gotConfig)
+
+      function gotConfig (err, config) {
+        if (err) {
+          return callback(err)
+        }
+
+        const options = {
+          mdns: get(config, 'Discovery.MDNS.Enabled'),
+          webRTCStar: get(config, 'Discovery.webRTCStar.Enabled'),
+          bootstrap: get(config, 'Bootstrap'),
+          dht: get(self._options, 'EXPERIMENTAL.dht'),
+          modules: self._libp2pModules
+        }
+
+        self._libp2pNode = new Node(self._peerInfo, self._peerInfoBook, options)
+
+        self._libp2pNode.on('peer:discovery', (peerInfo) => {
+          const dial = () => {
+            self._peerInfoBook.put(peerInfo)
+            self._libp2pNode.dial(peerInfo, () => {})
+          }
+          if (self.isOnline()) {
+            dial()
+          } else {
+            self._libp2pNode.once('start', dial)
+          }
+        })
+
+        self._libp2pNode.on('peer:connect', (peerInfo) => {
+          self._peerInfoBook.put(peerInfo)
+        })
+
+        self._libp2pNode.start((err) => {
+          if (err) {
+            return callback(err)
+          }
+
+          self._libp2pNode.peerInfo.multiaddrs.forEach((ma) => {
+            console.log('Swarm listening on', ma.toString())
+          })
+
+          callback()
+        })
+      }
+    }),
+    stop: promisify((callback) => {
+      self._libp2pNode.stop(callback)
+    })
+  }
+}
+
+},{"../runtime/libp2p-nodejs":315,"lodash.get":454,"promisify-es6":554}],304:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const waterfall = require('async/waterfall')
+const promisify = require('promisify-es6')
+const dagPB = require('ipld-dag-pb')
+const DAGNode = dagPB.DAGNode
+const DAGLink = dagPB.DAGLink
+const CID = require('cids')
+const mh = require('multihashes')
+const Unixfs = require('ipfs-unixfs')
+const assert = require('assert')
+
+function normalizeMultihash (multihash, enc) {
+  if (typeof multihash === 'string') {
+    if (enc === 'base58' || !enc) {
+      return multihash
+    }
+
+    return new Buffer(multihash, enc)
+  } else if (Buffer.isBuffer(multihash)) {
+    return multihash
+  } else {
+    throw new Error('unsupported multihash')
+  }
+}
+
+function parseBuffer (buf, encoding, callback) {
+  switch (encoding) {
+    case 'json':
+      return parseJSONBuffer(buf, callback)
+    case 'protobuf':
+      return parseProtoBuffer(buf, callback)
+    default:
+      callback(new Error(`unkown encoding: ${encoding}`))
+  }
+}
+
+function parseJSONBuffer (buf, callback) {
+  let data
+  let links
+
+  try {
+    const parsed = JSON.parse(buf.toString())
+
+    links = (parsed.Links || []).map((link) => {
+      return new DAGLink(
+        link.Name || link.name,
+        link.Size || link.size,
+        mh.fromB58String(link.Hash || link.hash || link.multihash)
+      )
+    })
+    data = new Buffer(parsed.Data)
+  } catch (err) {
+    return callback(new Error('failed to parse JSON: ' + err))
+  }
+
+  DAGNode.create(data, links, callback)
+}
+
+function parseProtoBuffer (buf, callback) {
+  dagPB.util.deserialize(buf, callback)
+}
+
+module.exports = function object (self) {
+  function editAndSave (edit) {
+    return (multihash, options, callback) => {
+      if (typeof options === 'function') {
+        callback = options
+        options = {}
+      }
+
+      waterfall([
+        (cb) => {
+          self.object.get(multihash, options, cb)
+        },
+        (node, cb) => {
+          // edit applies the edit func passed to
+          // editAndSave
+          edit(node, (err, node) => {
+            if (err) {
+              return cb(err)
+            }
+            self._ipldResolver.put(node, {
+              cid: new CID(node.multihash)
+            }, (err) => {
+              cb(err, node)
+            })
+          })
+        }
+      ], callback)
+    }
+  }
+
+  return {
+    new: promisify((template, callback) => {
+      if (typeof template === 'function') {
+        callback = template
+        template = undefined
+      }
+
+      let data
+
+      if (template) {
+        assert(template === 'unixfs-dir', 'unkown template')
+        data = (new Unixfs('directory')).marshal()
+      } else {
+        data = new Buffer(0)
+      }
+
+      DAGNode.create(data, (err, node) => {
+        if (err) {
+          return callback(err)
+        }
+        self._ipldResolver.put(node, {
+          cid: new CID(node.multihash)
+        }, (err) => {
+          if (err) {
+            return callback(err)
+          }
+
+          callback(null, node)
+        })
+      })
+    }),
+    put: promisify((obj, options, callback) => {
+      if (typeof options === 'function') {
+        callback = options
+        options = {}
+      }
+
+      const encoding = options.enc
+      let node
+
+      if (Buffer.isBuffer(obj)) {
+        if (encoding) {
+          parseBuffer(obj, encoding, (err, _node) => {
+            if (err) {
+              return callback(err)
+            }
+            node = _node
+            next()
+          })
+        } else {
+          DAGNode.create(obj, (err, _node) => {
+            if (err) {
+              return callback(err)
+            }
+            node = _node
+            next()
+          })
+        }
+      } else if (obj.multihash) {
+        // already a dag node
+        node = obj
+        next()
+      } else if (typeof obj === 'object') {
+        DAGNode.create(obj.Data, obj.Links, (err, _node) => {
+          if (err) {
+            return callback(err)
+          }
+          node = _node
+          next()
+        })
+      } else {
+        return callback(new Error('obj not recognized'))
+      }
+
+      function next () {
+        self._ipldResolver.put(node, {
+          cid: new CID(node.multihash)
+        }, (err) => {
+          if (err) {
+            return callback(err)
+          }
+
+          self.object.get(node.multihash, callback)
+        })
+      }
+    }),
+
+    get: promisify((multihash, options, callback) => {
+      if (typeof options === 'function') {
+        callback = options
+        options = {}
+      }
+
+      let mh
+
+      try {
+        mh = normalizeMultihash(multihash, options.enc)
+      } catch (err) {
+        return callback(err)
+      }
+      const cid = new CID(mh)
+
+      self._ipldResolver.get(cid, (err, result) => {
+        if (err) {
+          return callback(err)
+        }
+
+        const node = result.value
+
+        callback(null, node)
+      })
+    }),
+
+    data: promisify((multihash, options, callback) => {
+      if (typeof options === 'function') {
+        callback = options
+        options = {}
+      }
+
+      self.object.get(multihash, options, (err, node) => {
+        if (err) {
+          return callback(err)
+        }
+        callback(null, node.data)
+      })
+    }),
+
+    links: promisify((multihash, options, callback) => {
+      if (typeof options === 'function') {
+        callback = options
+        options = {}
+      }
+
+      self.object.get(multihash, options, (err, node) => {
+        if (err) {
+          return callback(err)
+        }
+
+        callback(null, node.links)
+      })
+    }),
+
+    stat: promisify((multihash, options, callback) => {
+      if (typeof options === 'function') {
+        callback = options
+        options = {}
+      }
+
+      self.object.get(multihash, options, (err, node) => {
+        if (err) {
+          return callback(err)
+        }
+
+        dagPB.util.serialize(node, (err, serialized) => {
+          if (err) {
+            return callback(err)
+          }
+
+          const blockSize = serialized.length
+          const linkLength = node.links.reduce((a, l) => a + l.size, 0)
+
+          const nodeJSON = node.toJSON()
+
+          callback(null, {
+            Hash: nodeJSON.multihash,
+            NumLinks: node.links.length,
+            BlockSize: blockSize,
+            LinksSize: blockSize - node.data.length,
+            DataSize: node.data.length,
+            CumulativeSize: blockSize + linkLength
+          })
+        })
+      })
+    }),
+
+    patch: promisify({
+      addLink (multihash, link, options, callback) {
+        editAndSave((node, cb) => {
+          DAGNode.addLink(node, link, cb)
+        })(multihash, options, callback)
+      },
+
+      rmLink (multihash, linkRef, options, callback) {
+        editAndSave((node, cb) => {
+          if (linkRef.constructor &&
+              linkRef.constructor.name === 'DAGLink') {
+            linkRef = linkRef._name
+          }
+          DAGNode.rmLink(node, linkRef, cb)
+        })(multihash, options, callback)
+      },
+
+      appendData (multihash, data, options, callback) {
+        editAndSave((node, cb) => {
+          const newData = Buffer.concat([node.data, data])
+          DAGNode.create(newData, node.links, cb)
+        })(multihash, options, callback)
+      },
+
+      setData (multihash, data, options, callback) {
+        editAndSave((node, cb) => {
+          DAGNode.create(data, node.links, cb)
+        })(multihash, options, callback)
+      }
+    })
+  }
+}
+
+}).call(this,require("buffer").Buffer)
+},{"assert":712,"async/waterfall":57,"buffer":715,"cids":103,"ipfs-unixfs":212,"ipld-dag-pb":331,"multihashes":527,"promisify-es6":554}],305:[function(require,module,exports){
+'use strict'
+
+const promisify = require('promisify-es6')
+
+module.exports = function ping (self) {
+  return promisify((callback) => {
+    callback(new Error('Not implemented'))
+  })
+}
+
+},{"promisify-es6":554}],306:[function(require,module,exports){
+'use strict'
+
+const peerId = require('peer-id')
+const PeerInfo = require('peer-info')
+const multiaddr = require('multiaddr')
+const waterfall = require('async/waterfall')
+const mafmt = require('mafmt')
+
+/*
+ * Load stuff from Repo into memory
+ */
+module.exports = function preStart (self) {
+  return (callback) => {
+    self.log('pre-start')
+
+    waterfall([
+      (cb) => self._repo.config.get(cb),
+      (config, cb) => {
+        const privKey = config.Identity.PrivKey
+
+        peerId.createFromPrivKey(privKey, (err, id) => cb(err, config, id))
+      },
+      (config, id, cb) => {
+        self._peerInfo = new PeerInfo(id)
+
+        config.Addresses.Swarm.forEach((addr) => {
+          let ma = multiaddr(addr)
+
+          if (!mafmt.IPFS.matches(ma)) {
+            ma = ma.encapsulate('/ipfs/' + self._peerInfo.id.toB58String())
+          }
+
+          self._peerInfo.multiaddrs.add(ma)
+        })
+
+        cb()
+      }
+    ], callback)
+  }
+}
+
+},{"async/waterfall":57,"mafmt":506,"multiaddr":515,"peer-id":548,"peer-info":549}],307:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const promisify = require('promisify-es6')
+const setImmediate = require('async/setImmediate')
+
+const OFFLINE_ERROR = require('../utils').OFFLINE_ERROR
+
+module.exports = function pubsub (self) {
+  return {
+    subscribe: (topic, options, handler, callback) => {
+      if (!self.isOnline()) {
+        throw OFFLINE_ERROR
+      }
+
+      if (typeof options === 'function') {
+        callback = handler
+        handler = options
+        options = {}
+      }
+
+      if (!callback) {
+        return new Promise((resolve, reject) => {
+          subscribe(topic, options, handler, (err) => {
+            if (err) {
+              return reject(err)
+            }
+            resolve()
+          })
+        })
+      }
+
+      subscribe(topic, options, handler, callback)
+    },
+
+    unsubscribe: (topic, handler) => {
+      const ps = self._pubsub
+
+      ps.removeListener(topic, handler)
+
+      if (ps.listenerCount(topic) === 0) {
+        ps.unsubscribe(topic)
+      }
+    },
+
+    publish: promisify((topic, data, callback) => {
+      if (!self.isOnline()) {
+        return setImmediate(() => callback(OFFLINE_ERROR))
+      }
+
+      if (!Buffer.isBuffer(data)) {
+        return setImmediate(() => callback(new Error('data must be a Buffer')))
+      }
+
+      self._pubsub.publish(topic, data)
+      setImmediate(() => callback())
+    }),
+
+    ls: promisify((callback) => {
+      if (!self.isOnline()) {
+        return setImmediate(() => callback(OFFLINE_ERROR))
+      }
+
+      const subscriptions = Array.from(
+        self._pubsub.subscriptions
+      )
+
+      setImmediate(() => callback(null, subscriptions))
+    }),
+
+    peers: promisify((topic, callback) => {
+      if (!self.isOnline()) {
+        return setImmediate(() => callback(OFFLINE_ERROR))
+      }
+
+      const peers = Array.from(self._pubsub.peers.values())
+          .filter((peer) => peer.topics.has(topic))
+          .map((peer) => peer.info.id.toB58String())
+
+      setImmediate(() => callback(null, peers))
+    }),
+
+    setMaxListeners (n) {
+      return self._pubsub.setMaxListeners(n)
+    }
+  }
+
+  function subscribe (topic, options, handler, callback) {
+    const ps = self._pubsub
+
+    if (ps.listenerCount(topic) === 0) {
+      ps.subscribe(topic)
+    }
+
+    ps.on(topic, handler)
+    setImmediate(() => callback())
+  }
+}
+
+}).call(this,{"isBuffer":require("../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
+},{"../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721,"../utils":318,"async/setImmediate":54,"promisify-es6":554}],308:[function(require,module,exports){
+'use strict'
+
+module.exports = function repo (self) {
+  return {
+    init: (bits, empty, callback) => {
+      // 1. check if repo already exists
+    },
+
+    version: (callback) => {
+      self._repo.version.get(callback)
+    },
+
+    gc: function () {},
+
+    path: () => self._repo.path
+  }
+}
+
+},{}],309:[function(require,module,exports){
+'use strict'
+
+const series = require('async/series')
+const Bitswap = require('ipfs-bitswap')
+const FloodSub = require('libp2p-floodsub')
+const setImmediate = require('async/setImmediate')
+const promisify = require('promisify-es6')
+
+module.exports = (self) => {
+  return promisify((callback) => {
+    callback = callback || function noop () {}
+
+    const done = (err) => {
+      if (err) {
+        setImmediate(() => self.emit('error', err))
+        return callback(err)
+      }
+
+      self.state.started()
+      setImmediate(() => self.emit('start'))
+      callback()
+    }
+
+    if (self.state.state() !== 'stopped') {
+      return done(new Error('Not able to start from state: ' + self.state.state()))
+    }
+
+    self.log('starting')
+    self.state.start()
+
+    series([
+      (cb) => {
+        self._repo.closed
+          ? self._repo.open(cb)
+          : cb()
+      },
+      (cb) => self.preStart(cb),
+      (cb) => self.libp2p.start(cb)
+    ], (err) => {
+      if (err) {
+        return done(err)
+      }
+
+      self._bitswap = new Bitswap(
+        self._libp2pNode,
+        self._repo.blocks,
+        self._peerInfoBook
+      )
+
+      self._bitswap.start()
+      self._blockService.setExchange(self._bitswap)
+
+      if (self._options.EXPERIMENTAL.pubsub) {
+        self._pubsub = new FloodSub(self._libp2pNode)
+        self._pubsub.start(done)
+      } else {
+        done()
+      }
+    })
+  })
+}
+
+},{"async/series":53,"async/setImmediate":54,"ipfs-bitswap":200,"libp2p-floodsub":417,"promisify-es6":554}],310:[function(require,module,exports){
+'use strict'
+
+const series = require('async/series')
+
+module.exports = (self) => {
+  return (callback) => {
+    callback = callback || function noop () {}
+    self.log('stop')
+
+    if (self.state.state() === 'stopped') {
+      return callback()
+    }
+
+    const done = (err) => {
+      if (err) {
+        self.emit('error', err)
+        return callback(err)
+      }
+      self.state.stopped()
+      self.emit('stop')
+      callback()
+    }
+
+    if (self.state.state() !== 'running') {
+      return done(new Error('Not able to stop from state: ' + self.state.state()))
+    }
+
+    self.state.stop()
+    self._blockService.unsetExchange()
+    self._bitswap.stop()
+
+    series([
+      (cb) => {
+        if (self._options.EXPERIMENTAL.pubsub) {
+          self._pubsub.stop(cb)
+        } else {
+          cb()
+        }
+      },
+      (cb) => self.libp2p.stop(cb),
+      (cb) => self._repo.close(cb)
+    ], done)
+  }
+}
+
+},{"async/series":53}],311:[function(require,module,exports){
+'use strict'
+
+const multiaddr = require('multiaddr')
+const promisify = require('promisify-es6')
+const values = require('lodash.values')
+
+const OFFLINE_ERROR = require('../utils').OFFLINE_ERROR
+
+module.exports = function swarm (self) {
+  return {
+    peers: promisify((opts, callback) => {
+      if (typeof opts === 'function') {
+        callback = opts
+        opts = {}
+      }
+
+      if (!self.isOnline()) {
+        return callback(OFFLINE_ERROR)
+      }
+
+      const verbose = opts.v || opts.verbose
+      // TODO: return latency and streams when verbose is set
+      // we currently don't have this information
+
+      const peers = []
+
+      values(self._peerInfoBook.getAll()).forEach((peer) => {
+        const connectedAddr = peer.isConnected()
+
+        if (!connectedAddr) { return }
+
+        const tupple = {
+          addr: connectedAddr,
+          peer: peer
+        }
+        if (verbose) {
+          tupple.latency = 'unknown'
+        }
+
+        peers.push(tupple)
+      })
+
+      callback(null, peers)
+    }),
+
+    // all the addrs we know
+    addrs: promisify((callback) => {
+      if (!self.isOnline()) {
+        return callback(OFFLINE_ERROR)
+      }
+
+      const peers = values(self._peerInfoBook.getAll())
+
+      callback(null, peers)
+    }),
+
+    localAddrs: promisify((callback) => {
+      if (!self.isOnline()) {
+        return callback(OFFLINE_ERROR)
+      }
+
+      callback(null, self._libp2pNode.peerInfo.multiaddrs.toArray())
+    }),
+
+    connect: promisify((maddr, callback) => {
+      if (!self.isOnline()) {
+        return callback(OFFLINE_ERROR)
+      }
+
+      if (typeof maddr === 'string') {
+        maddr = multiaddr(maddr)
+      }
+
+      self._libp2pNode.dial(maddr, callback)
+    }),
+
+    disconnect: promisify((maddr, callback) => {
+      if (!self.isOnline()) {
+        return callback(OFFLINE_ERROR)
+      }
+
+      if (typeof maddr === 'string') {
+        maddr = multiaddr(maddr)
+      }
+
+      self._libp2pNode.hangUp(maddr, callback)
+    }),
+
+    filters: promisify((callback) => callback(new Error('Not implemented')))
+  }
+}
+
+},{"../utils":318,"lodash.values":467,"multiaddr":515,"promisify-es6":554}],312:[function(require,module,exports){
+'use strict'
+
+const pkg = require('../../../package.json')
+const promisify = require('promisify-es6')
+
+module.exports = function version (self) {
+  return promisify((opts, callback) => {
+    if (typeof opts === 'function') {
+      callback = opts
+      opts = {}
+    }
+
+    callback(null, {
+      version: pkg.version,
+      repo: '',
+      commit: ''
+    })
+  })
+}
+
+},{"../../../package.json":290,"promisify-es6":554}],313:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const BlockService = require('ipfs-block-service')
+const IPLDResolver = require('ipld-resolver')
+const PeerId = require('peer-id')
+const PeerInfo = require('peer-info')
+const multiaddr = require('multiaddr')
+const multihash = require('multihashes')
+const PeerBook = require('peer-book')
+const CID = require('cids')
+const debug = require('debug')
+const extend = require('deep-extend')
+const EventEmitter = require('events')
+
+const boot = require('./boot')
+const components = require('./components')
+// replaced by repo-browser when running in the browser
+const defaultRepo = require('./runtime/repo-nodejs')
+
+class IPFS extends EventEmitter {
+  constructor (options) {
+    super()
+
+    this._options = {
+      init: true,
+      start: true,
+      EXPERIMENTAL: {}
+    }
+
+    options = options || {}
+    this._libp2pModules = options.libp2p && options.libp2p.modules
+
+    extend(this._options, options)
+
+    if (options.init === false) {
+      this._options.init = false
+    }
+
+    if (!(options.start === false)) {
+      this._options.start = true
+    }
+
+    if (typeof options.repo === 'string' ||
+        options.repo === undefined) {
+      this._repo = defaultRepo(options.repo)
+    } else {
+      this._repo = options.repo
+    }
+
+    // IPFS utils
+    this.log = debug('jsipfs')
+    this.log.err = debug('jsipfs:err')
+
+    this.on('error', (err) => this.log(err))
+
+    // IPFS types
+    this.types = {
+      Buffer: Buffer,
+      PeerId: PeerId,
+      PeerInfo: PeerInfo,
+      multiaddr: multiaddr,
+      multihash: multihash,
+      CID: CID
+    }
+
+    // IPFS Core Internals
+    // this._repo - assigned above
+    this._peerInfoBook = new PeerBook()
+    this._peerInfo = undefined
+    this._libp2pNode = undefined
+    this._bitswap = undefined
+    this._blockService = new BlockService(this._repo)
+    this._ipldResolver = new IPLDResolver(this._blockService)
+    this._pubsub = undefined
+
+    // IPFS Core exposed components
+    //   - for booting up a node
+    this.init = components.init(this)
+    this.preStart = components.preStart(this)
+    this.start = components.start(this)
+    this.stop = components.stop(this)
+    this.isOnline = components.isOnline(this)
+    //   - interface-ipfs-core defined API
+    this.version = components.version(this)
+    this.id = components.id(this)
+    this.repo = components.repo(this)
+    this.bootstrap = components.bootstrap(this)
+    this.config = components.config(this)
+    this.block = components.block(this)
+    this.object = components.object(this)
+    this.dag = components.dag(this)
+    this.libp2p = components.libp2p(this)
+    this.swarm = components.swarm(this)
+    this.files = components.files(this)
+    this.bitswap = components.bitswap(this)
+    this.ping = components.ping(this)
+    this.pubsub = components.pubsub(this)
+    this.dht = components.dht(this)
+
+    if (this._options.EXPERIMENTAL.pubsub) {
+      this.log('EXPERIMENTAL pubsub is enabled')
+    }
+    if (this._options.EXPERIMENTAL.sharding) {
+      this.log('EXPERIMENTAL sharding is enabled')
+    }
+    if (this._options.EXPERIMENTAL.dht) {
+      this.log('EXPERIMENTAL Kademlia DHT is enabled')
+    }
+
+    this.state = require('./state')(this)
+
+    boot(this)
+  }
+}
+
+exports = module.exports = IPFS
+
+exports.createNode = (options) => {
+  return new IPFS(options)
+}
+
+}).call(this,require("buffer").Buffer)
+},{"./boot":291,"./components":300,"./runtime/repo-nodejs":316,"./state":317,"buffer":715,"cids":103,"debug":114,"deep-extend":223,"events":717,"ipfs-block-service":228,"ipld-resolver":267,"multiaddr":515,"multihashes":527,"peer-book":547,"peer-id":548,"peer-info":549}],314:[function(require,module,exports){
+module.exports={
+  "Addresses": {
+    "Swarm": [
+      "/dns4/star-signal.cloud.ipfs.team/wss/p2p-webrtc-star"
+    ],
+    "API": "",
+    "Gateway": ""
+  },
+  "Discovery": {
+    "MDNS": {
+      "Enabled": false,
+      "Interval": 10
+    },
+    "webRTCStar": {
+      "Enabled": true
+    }
+  },
+  "Bootstrap": [
+    "/dns4/ams-1.bootstrap.libp2p.io/tcp/443/wss/ipfs/QmSoLer265NRgSp2LA3dPaeykiS1J6DifTC88f5uVQKNAd",
+    "/dns4/lon-1.bootstrap.libp2p.io/tcp/443/wss/ipfs/QmSoLMeWqB7YGVLJN3pNLQpmmEk35v6wYtsMGLzSr5QBU3",
+    "/dns4/sfo-3.bootstrap.libp2p.io/tcp/443/wss/ipfs/QmSoLPppuBtQSGwKDZT2M73ULpjvfd3aZ6ha4oFGL1KrGM",
+    "/dns4/sgp-1.bootstrap.libp2p.io/tcp/443/wss/ipfs/QmSoLSafTMBsPKadTEgaXctDQVcqN88CNLHXMkTNwMKPnu",
+    "/dns4/nyc-1.bootstrap.libp2p.io/tcp/443/wss/ipfs/QmSoLueR4xBeUbY9WZ9xGUUxunbKWcrNFTDAadQJmocnWm",
+    "/dns4/nyc-2.bootstrap.libp2p.io/tcp/443/wss/ipfs/QmSoLV4Bbm51jM9C4gDYZQ9Cy3U6aXMJDAbzgu2fzaDs64",
+    "/dns4/wss0.bootstrap.libp2p.io/tcp/443/wss/ipfs/QmZMxNdpMkewiVZLMRxaNxUeZpDUb34pWjZ1kZvsd16Zic",
+    "/dns4/wss1.bootstrap.libp2p.io/tcp/443/wss/ipfs/Qmbut9Ywz9YEDrz8ySBSgWyJk41Uvm2QJPhwDJzJyGFsD6"
+  ]
+}
+
+},{}],315:[function(require,module,exports){
+'use strict'
+
+const WS = require('libp2p-websockets')
+const WebRTCStar = require('libp2p-webrtc-star')
+const Multiplex = require('libp2p-multiplex')
+const SECIO = require('libp2p-secio')
+const Railing = require('libp2p-railing')
+const libp2p = require('libp2p')
+
+class Node extends libp2p {
+  constructor (peerInfo, peerBook, options) {
+    options = options || {}
+    const wstar = new WebRTCStar()
+
+    const modules = {
+      transport: [new WS(), wstar],
+      connection: {
+        muxer: [Multiplex],
+        crypto: [SECIO]
+      },
+      discovery: [wstar.discovery]
+    }
+
+    if (options.bootstrap) {
+      const r = new Railing(options.bootstrap)
+      modules.discovery.push(r)
+    }
+
+    if (options.modules && options.modules.transport) {
+      options.modules.transport.forEach((t) => modules.transport.push(t))
+    }
+
+    if (options.modules && options.modules.discovery) {
+      options.modules.discovery.forEach((d) => modules.discovery.push(d))
+    }
+
+    super(modules, peerInfo, peerBook, options)
+  }
+}
+
+module.exports = Node
+
+},{"libp2p":277,"libp2p-multiplex":427,"libp2p-railing":435,"libp2p-secio":443,"libp2p-webrtc-star":446,"libp2p-websockets":448}],316:[function(require,module,exports){
+'use strict'
+
+const IPFSRepo = require('ipfs-repo')
+
+module.exports = (dir) => {
+  const repoPath = dir || 'ipfs'
+  return new IPFSRepo(repoPath)
+}
+
+},{"ipfs-repo":236}],317:[function(require,module,exports){
+'use strict'
+
+const debug = require('debug')
+const log = debug('jsipfs:state')
+log.error = debug('jsipfs:state:error')
+
+const fsm = require('fsm-event')
+
+module.exports = (self) => {
+  const s = fsm('uninitalized', {
+    uninitalized: {
+      init: 'initializing',
+      initialized: 'stopped'
+    },
+    initializing: {
+      initialized: 'stopped'
+    },
+    stopped: {
+      start: 'starting'
+    },
+    starting: {
+      started: 'running'
+    },
+    running: {
+      stop: 'stopping'
+    },
+    stopping: {
+      stopped: 'stopped'
+    }
+  })
+
+  // log events
+  s.on('error', (err) => log.error(err))
+  s.on('done', () => log('-> ' + s._state))
+
+  // -- Actions
+
+  s.init = () => {
+    s('init')
+  }
+
+  s.initialized = () => {
+    s('initialized')
+  }
+
+  s.stop = () => {
+    s('stop')
+  }
+
+  s.stopped = () => {
+    s('stopped')
+  }
+
+  s.start = () => {
+    s('start')
+  }
+
+  s.started = () => {
+    s('started')
+  }
+
+  s.state = () => s._state
+
+  return s
+}
+
+},{"debug":114,"fsm-event":170}],318:[function(require,module,exports){
+'use strict'
+
+exports.OFFLINE_ERROR = new Error('This command must be run in online mode. Try running \'ipfs daemon\' first.')
+
+},{}],319:[function(require,module,exports){
+'use strict'
+
+exports.util = require('./util.js')
+exports.resolver = require('./resolver.js')
+
+},{"./resolver.js":320,"./util.js":321}],320:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const util = require('./util')
+const traverse = require('traverse')
+
+exports = module.exports
+
+exports.multicodec = 'dag-cbor'
+
+/*
+ * resolve: receives a path and a block and returns the value on path,
+ * throw if not possible. `block` is an IPFS Block instance (contains data + cid)
+ */
+exports.resolve = (block, path, callback) => {
+  if (typeof path === 'function') {
+    callback = path
+    path = undefined
+  }
+
+  util.deserialize(block.data, (err, node) => {
+    if (err) {
+      return callback(err)
+    }
+
+    // root
+
+    if (!path || path === '/') {
+      return callback(null, {
+        value: node,
+        remainderPath: ''
+      })
+    }
+
+    // within scope
+
+    // const tree = exports.tree(block)
+    const parts = path.split('/')
+    const val = traverse(node).get(parts)
+
+    if (val) {
+      return callback(null, {
+        value: val,
+        remainderPath: ''
+      })
+    }
+
+    // out of scope
+    let value
+    let len = parts.length
+
+    for (let i = 0; i < len; i++) {
+      const partialPath = parts.shift()
+
+      if (Array.isArray(node) && !Buffer.isBuffer(node)) {
+        value = node[Number(partialPath)]
+      } if (node[partialPath]) {
+        value = node[partialPath]
+      } else {
+        // can't traverse more
+        if (!value) {
+          return callback(new Error('path not available at root'))
+        } else {
+          parts.unshift(partialPath)
+          return callback(null, {
+            value: value,
+            remainderPath: parts.join('/')
+          })
+        }
+      }
+      node = value
+    }
+  })
+}
+
+function flattenObject (obj, delimiter) {
+  delimiter = delimiter || '/'
+
+  if (Object.keys(obj).length === 0) {
+    return []
+  }
+
+  return traverse(obj).reduce(function (acc, x) {
+    if (typeof x === 'object' && x['/']) {
+      this.update(undefined)
+    }
+    const path = this.path.join(delimiter)
+
+    if (path !== '') {
+      acc.push({ path: path, value: x })
+    }
+    return acc
+  }, [])
+}
+
+/*
+ * tree: returns a flattened array with paths: values of the project. options
+ * are option (i.e. nestness)
+ */
+exports.tree = (block, options, callback) => {
+  if (typeof options === 'function') {
+    callback = options
+    options = undefined
+  }
+
+  options = options || {}
+
+  util.deserialize(block.data, (err, node) => {
+    if (err) {
+      return callback(err)
+    }
+    const flat = flattenObject(node)
+    const paths = flat.map((el) => el.path)
+
+    callback(null, paths)
+  })
+}
+
+exports.isLink = (block, path, callback) => {
+  exports.resolve(block, path, (err, result) => {
+    if (err) {
+      return callback(err)
+    }
+
+    if (result.remainderPath.length > 0) {
+      return callback(new Error('path out of scope'))
+    }
+
+    if (typeof result.value === 'object' && result.value['/']) {
+      callback(null, result.value)
+    } else {
+      callback(null, false)
+    }
+  })
+}
+
+}).call(this,{"isBuffer":require("../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
+},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721,"./util":321,"traverse":696}],321:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const cbor = require('borc')
+const multihashing = require('multihashing-async')
+const CID = require('cids')
+const waterfall = require('async/waterfall')
+const setImmediate = require('async/setImmediate')
+const isCircular = require('is-circular')
+
+const resolver = require('./resolver')
+
+// https://github.com/ipfs/go-ipfs/issues/3570#issuecomment-273931692
+const CID_CBOR_TAG = 42
+
+function tagCID (cid) {
+  if (typeof cid === 'string') {
+    cid = new CID(cid).buffer
+  }
+
+  return new cbor.Tagged(CID_CBOR_TAG, Buffer.concat([
+    Buffer.from('00', 'hex'), // thanks jdag
+    cid
+  ]))
+}
+
+const decoder = new cbor.Decoder({
+  tags: {
+    [CID_CBOR_TAG]: (val) => {
+      // remove that 0
+      val = val.slice(1)
+      return {'/': val}
+    }
+  }
+})
+
+function replaceCIDbyTAG (dagNode) {
+  let circular
+  try {
+    circular = isCircular(dagNode)
+  } catch (e) {
+    circular = false
+  }
+  if (circular) {
+    throw new Error('The object passed has circular references')
+  }
+
+  function transform (obj) {
+    if (!obj || Buffer.isBuffer(obj) || typeof obj === 'string') {
+      return obj
+    }
+
+    if (Array.isArray(obj)) {
+      return obj.map(transform)
+    }
+
+    const keys = Object.keys(obj)
+
+    // only `{'/': 'link'}` are valid
+    if (keys.length === 1 && keys[0] === '/') {
+      // Multiaddr encoding
+      // if (typeof link === 'string' && isMultiaddr(link)) {
+      //  link = new Multiaddr(link).buffer
+      // }
+
+      return tagCID(obj['/'])
+    } else if (keys.length > 0) {
+      // Recursive transform
+      let out = {}
+      keys.forEach((key) => {
+        if (typeof obj[key] === 'object') {
+          out[key] = transform(obj[key])
+        } else {
+          out[key] = obj[key]
+        }
+      })
+      return out
+    } else {
+      return obj
+    }
+  }
+
+  return transform(dagNode)
+}
+
+exports = module.exports
+
+exports.serialize = (dagNode, callback) => {
+  let serialized
+
+  try {
+    const dagNodeTagged = replaceCIDbyTAG(dagNode)
+    serialized = cbor.encode(dagNodeTagged)
+  } catch (err) {
+    return setImmediate(() => callback(err))
+  }
+  setImmediate(() => callback(null, serialized))
+}
+
+exports.deserialize = (data, callback) => {
+  let deserialized
+
+  try {
+    deserialized = decoder.decodeFirst(data)
+  } catch (err) {
+    return setImmediate(() => callback(err))
+  }
+
+  setImmediate(() => callback(null, deserialized))
+}
+
+exports.cid = (dagNode, callback) => {
+  waterfall([
+    (cb) => exports.serialize(dagNode, cb),
+    (serialized, cb) => multihashing(serialized, 'sha2-256', cb),
+    (mh, cb) => cb(null, new CID(1, resolver.multicodec, mh))
+  ], callback)
+}
+
+}).call(this,require("buffer").Buffer)
+},{"./resolver":320,"async/setImmediate":54,"async/waterfall":57,"borc":76,"buffer":715,"cids":103,"is-circular":359,"multihashing-async":531}],322:[function(require,module,exports){
+'use strict'
+
+const DAGLink = require('./index.js')
+
+function create (name, size, multihash, callback) {
+  const link = new DAGLink(name, size, multihash)
+  callback(null, link)
+}
+
+module.exports = create
+
+},{"./index.js":323}],323:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const mh = require('multihashes')
+const assert = require('assert')
+
+// Link represents an IPFS Merkle DAG Link between Nodes.
+class DAGLink {
+  constructor (name, size, multihash) {
+    assert(multihash, 'A link requires a multihash to point to')
+    assert(size, 'A link requires a size')
+
+    this._name = name
+    this._size = size
+
+    if (typeof multihash === 'string') {
+      this._multihash = mh.fromB58String(multihash)
+    } else if (Buffer.isBuffer(multihash)) {
+      this._multihash = multihash
+    }
+  }
+
+  toString () {
+    const mhStr = mh.toB58String(this.multihash)
+    return `DAGLink <${mhStr} - name: "${this.name}", size: ${this.size}>`
+  }
+
+  toJSON () {
+    return {
+      name: this.name,
+      size: this.size,
+      multihash: mh.toB58String(this._multihash)
+    }
+  }
+
+  get name () {
+    return this._name
+  }
+
+  set name (name) {
+    throw new Error("Can't set property: 'name' is immutable")
+  }
+
+  get size () {
+    return this._size
+  }
+
+  set size (size) {
+    throw new Error("Can't set property: 'size' is immutable")
+  }
+
+  get multihash () {
+    return this._multihash
+  }
+
+  set multihash (multihash) {
+    throw new Error("Can't set property: 'multihash' is immutable")
+  }
+}
+
+exports = module.exports = DAGLink
+exports.create = require('./create')
+
+}).call(this,{"isBuffer":require("../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
+},{"../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721,"./create":322,"assert":712,"multihashes":527}],324:[function(require,module,exports){
+'use strict'
+
+const dagNodeUtil = require('./util')
+const cloneLinks = dagNodeUtil.cloneLinks
+const cloneData = dagNodeUtil.cloneData
+const toDAGLink = dagNodeUtil.toDAGLink
+const DAGLink = require('./../dag-link')
+const create = require('./create')
+
+function addLink (node, link, callback) {
+  const links = cloneLinks(node)
+  const data = cloneData(node)
+
+  if ((link.constructor && link.constructor.name === 'DAGLink')) {
+    // It's a DAGLink instance
+    // no need to do anything
+  } else if (link.constructor && link.constructor.name === 'DAGNode') {
+    // It's a DAGNode instance
+    // convert to link
+    link = toDAGLink(link)
+  } else {
+    // It's a Object with name, multihash/link and size
+    link.multihash = link.multihash || link.hash
+    try {
+      link = new DAGLink(link.name, link.size, link.multihash)
+    } catch (err) {
+      return callback(err)
+    }
+  }
+
+  links.push(link)
+  create(data, links, callback)
+}
+
+module.exports = addLink
+
+},{"./../dag-link":323,"./create":326,"./util":329}],325:[function(require,module,exports){
+'use strict'
+
+const dagNodeUtil = require('./util')
+const cloneLinks = dagNodeUtil.cloneLinks
+const cloneData = dagNodeUtil.cloneData
+const create = require('./create')
+
+function clone (dagNode, callback) {
+  const data = cloneData(dagNode)
+  const links = cloneLinks(dagNode)
+  create(data, links, callback)
+}
+
+module.exports = clone
+
+},{"./create":326,"./util":329}],326:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const multihashing = require('multihashing-async')
+const sort = require('stable')
+const dagPBUtil = require('../util.js')
+const serialize = dagPBUtil.serialize
+const dagNodeUtil = require('./util.js')
+const linkSort = dagNodeUtil.linkSort
+const DAGNode = require('./index.js')
+const DAGLink = require('./../dag-link')
+
+function create (data, dagLinks, hashAlg, callback) {
+  if (typeof data === 'function') {
+    callback = data
+    data = undefined
+  } else if (typeof data === 'string') {
+    data = Buffer.from(data)
+  }
+  if (typeof dagLinks === 'function') {
+    callback = dagLinks
+    dagLinks = []
+  }
+  if (typeof hashAlg === 'function') {
+    callback = hashAlg
+    hashAlg = undefined
+  }
+
+  if (!Buffer.isBuffer(data)) {
+    return callback(new Error('Passed \'data\' is not a buffer or a string!'))
+  }
+
+  if (!hashAlg) {
+    hashAlg = 'sha2-256'
+  }
+
+  const links = dagLinks.map((l) => {
+    if (l.constructor && l.constructor.name === 'DAGLink') {
+      return l
+    }
+
+    return new DAGLink(
+      l.name ? l.name : l.Name,
+      l.size ? l.size : l.Size,
+      l.hash || l.Hash || l.multihash
+    )
+  })
+  const sortedLinks = sort(links, linkSort)
+
+  serialize({
+    data: data,
+    links: sortedLinks
+  }, (err, serialized) => {
+    if (err) {
+      return callback(err)
+    }
+    multihashing(serialized, hashAlg, (err, multihash) => {
+      if (err) {
+        return callback(err)
+      }
+      const dagNode = new DAGNode(data, sortedLinks, serialized, multihash)
+      callback(null, dagNode)
+    })
+  })
+}
+
+module.exports = create
+
+}).call(this,require("buffer").Buffer)
+},{"../util.js":333,"./../dag-link":323,"./index.js":327,"./util.js":329,"buffer":715,"multihashing-async":531,"stable":689}],327:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const mh = require('multihashes')
+const assert = require('assert')
+
+class DAGNode {
+  constructor (data, links, serialized, multihash) {
+    assert(serialized, 'DAGNode needs its serialized format')
+    assert(multihash, 'DAGNode needs its multihash')
+
+    if (typeof multihash === 'string') {
+      multihash = mh.fromB58String(multihash)
+    }
+
+    this._data = data || Buffer.alloc(0)
+    this._links = links || []
+    this._serialized = serialized
+    this._multihash = multihash
+
+    this._size = this.links.reduce((sum, l) => sum + l.size, this.serialized.length)
+
+    this._json = {
+      data: this.data,
+      links: this.links.map((l) => l.toJSON()),
+      multihash: mh.toB58String(this.multihash),
+      size: this.size
+    }
+  }
+
+  toJSON () {
+    return this._json
+  }
+
+  toString () {
+    const mhStr = mh.toB58String(this.multihash)
+    return `DAGNode <${mhStr} - data: "${this.data.toString()}", links: ${this.links.length}, size: ${this.size}>`
+  }
+
+  get data () {
+    return this._data
+  }
+
+  set data (data) {
+    throw new Error("Can't set property: 'data' is immutable")
+  }
+
+  get links () {
+    return this._links
+  }
+
+  set links (links) {
+    throw new Error("Can't set property: 'links' is immutable")
+  }
+
+  get serialized () {
+    return this._serialized
+  }
+
+  set serialized (serialized) {
+    throw new Error("Can't set property: 'serialized' is immutable")
+  }
+
+  get size () {
+    return this._size
+  }
+
+  set size (size) {
+    throw new Error("Can't set property: 'size' is immutable")
+  }
+
+  get multihash () {
+    return this._multihash
+  }
+
+  set multihash (multihash) {
+    throw new Error("Can't set property: 'multihash' is immutable")
+  }
+}
+
+exports = module.exports = DAGNode
+exports.create = require('./create')
+exports.clone = require('./clone')
+exports.addLink = require('./addLink')
+exports.rmLink = require('./rmLink')
+
+}).call(this,require("buffer").Buffer)
+},{"./addLink":324,"./clone":325,"./create":326,"./rmLink":328,"assert":712,"buffer":715,"multihashes":527}],328:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const dagNodeUtil = require('./util')
+const cloneLinks = dagNodeUtil.cloneLinks
+const cloneData = dagNodeUtil.cloneData
+const create = require('./create')
+
+function rmLink (dagNode, nameOrMultihash, callback) {
+  const data = cloneData(dagNode)
+  let links = cloneLinks(dagNode)
+
+  if (typeof nameOrMultihash === 'string') {
+    links = links.filter((link) => link.name !== nameOrMultihash)
+  } else if (Buffer.isBuffer(nameOrMultihash)) {
+    links = links.filter((link) => !link.multihash.equals(nameOrMultihash))
+  } else {
+    return callback(new Error('second arg needs to be a name or multihash'), null)
+  }
+
+  create(data, links, callback)
+}
+
+module.exports = rmLink
+
+}).call(this,{"isBuffer":require("../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
+},{"../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721,"./create":326,"./util":329}],329:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const DAGLink = require('./../dag-link')
+
+exports = module.exports
+
+function cloneData (dagNode) {
+  let data
+
+  if (dagNode.data && dagNode.data.length > 0) {
+    data = Buffer.alloc(dagNode.data.length)
+    dagNode.data.copy(data)
+  } else {
+    data = Buffer.alloc(0)
+  }
+
+  return data
+}
+
+function cloneLinks (dagNode) {
+  return dagNode.links.slice()
+}
+
+function linkSort (a, b) {
+  const aBuf = Buffer.from(a.name || '')
+  const bBuf = Buffer.from(b.name || '')
+
+  return aBuf.compare(bBuf)
+}
+
+/*
+ * toDAGLink converts a DAGNode to a DAGLink
+ */
+function toDAGLink (node) {
+  return new DAGLink('', node.size, node.multihash)
+}
+
+exports.cloneData = cloneData
+exports.cloneLinks = cloneLinks
+exports.linkSort = linkSort
+exports.toDAGLink = toDAGLink
+
+}).call(this,require("buffer").Buffer)
+},{"./../dag-link":323,"buffer":715}],330:[function(require,module,exports){
+'use strict'
+
+module.exports = `// An IPFS MerkleDAG Link
+message PBLink {
+
+  // multihash of the target object
+  optional bytes Hash = 1;
+
+  // utf string name. should be unique per object
+  optional string Name = 2;
+
+  // cumulative size of target object
+  optional uint64 Tsize = 3;
+}
+
+// An IPFS MerkleDAG Node
+message PBNode {
+
+  // refs to other objects
+  repeated PBLink Links = 2;
+
+  // opaque user data
+  optional bytes Data = 1;
+}`
+
+},{}],331:[function(require,module,exports){
+'use strict'
+
+exports.DAGNode = require('./dag-node')
+exports.DAGLink = require('./dag-link')
+
+/*
+ * Functions to fulfil IPLD Format interface
+ * https://github.com/ipld/interface-ipld-format
+ */
+exports.resolver = require('./resolver')
+exports.util = require('./util')
+
+},{"./dag-link":323,"./dag-node":327,"./resolver":332,"./util":333}],332:[function(require,module,exports){
+'use strict'
+
+const waterfall = require('async/waterfall')
+
+const util = require('./util')
+
+exports = module.exports
+exports.multicodec = 'dag-pb'
+
+/*
+ * resolve: receives a path and a block and returns the value on path,
+ * throw if not possible. `block` is an IPFS Block instance (contains data+key)
+ */
+exports.resolve = (block, path, callback) => {
+  waterfall([
+    (cb) => util.deserialize(block.data, cb),
+    (node, cb) => {
+      const split = path.split('/')
+
+      if (split[0] === 'Links') {
+        let remainderPath = ''
+
+        // all links
+        if (!split[1]) {
+          return cb(null, {
+            value: node.links.map((l) => l.toJSON()),
+            remainderPath: ''
+          })
+        }
+
+        // select one link
+
+        const values = {}
+
+        // populate both index number and name to enable both cases
+        // for the resolver
+        node.links.forEach((l, i) => {
+          const link = l.toJSON()
+          values[i] = {
+            hash: link.multihash,
+            name: link.name,
+            size: link.size
+          }
+          // TODO by enabling something to resolve through link name, we are
+          // applying a transformation (a view) to the data, confirm if this
+          // is exactly what we want
+          values[link.name] = link.multihash
+        })
+
+        let value = values[split[1]]
+
+        // if remainderPath exists, value needs to be CID
+        if (split[2] === 'Hash') {
+          value = { '/': value.hash }
+        } else if (split[2] === 'Tsize') {
+          value = { '/': value.size }
+        } else if (split[2] === 'Name') {
+          value = { '/': value.name }
+        }
+
+        remainderPath = split.slice(3).join('/')
+
+        cb(null, { value: value, remainderPath: remainderPath })
+      } else if (split[0] === 'Data') {
+        cb(null, { value: node.data, remainderPath: '' })
+      } else {
+        cb(new Error('path not available'))
+      }
+    }
+  ], callback)
+}
+
+/*
+ * tree: returns a flattened array with paths: values of the project. options
+ * is an object that can carry several options (i.e. nestness)
+ */
+exports.tree = (block, options, callback) => {
+  if (typeof options === 'function') {
+    callback = options
+    options = {}
+  }
+
+  options = options || {}
+
+  util.deserialize(block.data, (err, node) => {
+    if (err) {
+      return callback(err)
+    }
+
+    const paths = []
+
+    paths.push('Links')
+
+    node.links.forEach((link, i) => {
+      paths.push(`Links/${i}/Name`)
+      paths.push(`Links/${i}/Tsize`)
+      paths.push(`Links/${i}/Hash`)
+    })
+
+    paths.push('Data')
+
+    callback(null, paths)
+  })
+}
+
+/*
+ * isLink: returns the Link if a given path in a block is a Link, false otherwise
+ */
+exports.isLink = (block, path, callback) => {
+  exports.resolve(block, path, (err, result) => {
+    if (err) {
+      return callback(err)
+    }
+
+    if (result.remainderPath.length > 0) {
+      return callback(new Error('path out of scope'))
+    }
+
+    if (typeof result.value === 'object' && result.value['/']) {
+      callback(null, result.value)
+    } else {
+      callback(null, false)
+    }
+  })
+}
+
+},{"./util":333,"async/waterfall":57}],333:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const CID = require('cids')
+const protons = require('protons')
+const proto = protons(require('./dag.proto.js'))
+const DAGLink = require('./dag-link')
+const DAGNode = require('./dag-node')
+
+exports = module.exports
+
+function cid (node, callback) {
+  if (node.multihash) {
+    return callback(null, new CID(node.multihash))
+  }
+  callback(new Error('not valid dagPB node'))
+}
+
+function serialize (node, callback) {
+  let serialized
+
+  try {
+    serialized = proto.PBNode.encode(toProtoBuf(node))
+  } catch (err) {
+    return callback(err)
+  }
+
+  callback(null, serialized)
+}
+
+function deserialize (data, callback) {
+  const pbn = proto.PBNode.decode(data)
+
+  const links = pbn.Links.map((link) => {
+    return new DAGLink(link.Name, link.Tsize, link.Hash)
+  })
+
+  const buf = pbn.Data == null ? Buffer.alloc(0) : Buffer.from(pbn.Data)
+
+  DAGNode.create(buf, links, callback)
+}
+
+function toProtoBuf (node) {
+  const pbn = {}
+
+  if (node.data && node.data.length > 0) {
+    pbn.Data = node.data
+  } else {
+    // NOTE: this has to be null in order to match go-ipfs serialization `null !== new Buffer(0)`
+    pbn.Data = null
+  }
+
+  if (node.links && node.links.length > 0) {
+    pbn.Links = node.links.map((link) => {
+      return {
+        Hash: link.multihash,
+        Name: link.name,
+        Tsize: link.size
+      }
+    })
+  } else {
+    pbn.Links = null
+  }
+
+  return pbn
+}
+
+exports.serialize = serialize
+exports.deserialize = deserialize
+exports.cid = cid
+
+}).call(this,require("buffer").Buffer)
+},{"./dag-link":323,"./dag-node":327,"./dag.proto.js":330,"buffer":715,"cids":103,"protons":565}],334:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+const EthAccount = require('ethereumjs-account')
+const createResolver = require('../util/createResolver')
+const cidFromHash = require('../util/cidFromHash')
+const emptyCodeHash = require('../util/emptyCodeHash')
+
+module.exports = createResolver('eth-account-snapshot', EthAccount, mapFromEthObj)
+
+
+function mapFromEthObj (account, options, callback) {
+  const paths = []
+
+  // external links
+
+  paths.push({
+    path: 'storage',
+    value: { '/': cidFromHash('eth-storage-trie', account.stateRoot).toBaseEncodedString() }
+  })
+
+  // resolve immediately if empty, otherwise link to code
+  if (emptyCodeHash.equals(account.codeHash)) {
+    paths.push({
+      path: 'code',
+      value: Buffer.from(''),
+    })
+  } else {
+    paths.push({
+      path: 'code',
+      value: { '/': cidFromHash('raw', account.codeHash).toBaseEncodedString() }
+    })
+  }
+
+  // external links as data
+
+  paths.push({
+    path: 'stateRoot',
+    value: account.stateRoot
+  })
+
+  paths.push({
+    path: 'codeHash',
+    value: account.codeHash
+  })
+
+  // internal data
+
+  paths.push({
+    path: 'nonce',
+    value: account.nonce
+  })
+
+  paths.push({
+    path: 'balance',
+    value: account.balance
+  })
+
+  // helpers
+
+  paths.push({
+    path: 'isEmpty',
+    value: account.isEmpty()
+  })
+
+  paths.push({
+    path: 'isContract',
+    value: account.isContract()
+  })
+
+  callback(null, paths)
+}
+
+}).call(this,require("buffer").Buffer)
+},{"../util/cidFromHash":343,"../util/createResolver":345,"../util/emptyCodeHash":348,"buffer":715,"ethereumjs-account":161}],335:[function(require,module,exports){
+'use strict'
+const waterfall = require('async/waterfall')
+const each = require('async/each')
+const asyncify = require('async/asyncify')
+const RLP = require('rlp')
+const EthBlockHead = require('ethereumjs-block/header')
+const multihash = require('multihashing-async')
+const ethBlockResolver = require('../eth-block').resolver
+const createResolver = require('../util/createResolver')
+const cidFromHash = require('../util/cidFromHash')
+
+const ethBlockListResolver = createResolver('eth-block-list', undefined, mapFromEthObj)
+const util = ethBlockListResolver.util
+util.serialize = asyncify((ethBlockList) => {
+  const rawOmmers = ethBlockList.map((ethBlock) => ethBlock.raw)
+  return RLP.encode(rawOmmers)
+})
+util.deserialize = asyncify((serialized) => {
+  const rawOmmers = RLP.decode(serialized)
+  return rawOmmers.map((rawBlock) => new EthBlockHead(rawBlock))
+})
+util.cid = (blockList, callback) => {
+  waterfall([
+    (cb) => util.serialize(blockList, cb),
+    (data, cb) => multihash.digest(data, 'keccak-256', cb),
+    asyncify((mhash) => cidFromHash('eth-block-list', mhash))
+  ], callback)
+}
+
+module.exports = ethBlockListResolver
+
+
+function mapFromEthObj (ethBlockList, options, callback) {
+  let paths = []
+
+  // external links (none)
+
+  // external links as data (none)
+
+  // helpers
+
+  paths.push({
+    path: 'count',
+    value: ethBlockList.length
+  })
+
+  // internal data
+
+  // add paths for each block
+  each(ethBlockList, (ethBlock, next) => {
+    const index = ethBlockList.indexOf(ethBlock)
+    const blockPath = index.toString()
+    // block root
+    paths.push({
+      path: blockPath,
+      value: ethBlock
+    })
+    // block children
+    ethBlockResolver._mapFromEthObject(ethBlock, {}, (err, subpaths) => {
+      if (err) return next(err)
+      // append blockPath to each subpath
+      subpaths.forEach((path) => path.path = blockPath + '/' + path.path)
+      paths = paths.concat(subpaths)
+      next()
+    })
+  }, (err) => {
+    if (err) return callback(err)
+    callback(null, paths)
+  })
+}
+
+},{"../eth-block":336,"../util/cidFromHash":343,"../util/createResolver":345,"async/asyncify":18,"async/each":21,"async/waterfall":57,"ethereumjs-block/header":162,"multihashing-async":531,"rlp":645}],336:[function(require,module,exports){
+'use strict'
+const EthBlockHeader = require('ethereumjs-block/header')
+const createResolver = require('../util/createResolver')
+const cidFromHash = require('../util/cidFromHash')
+
+module.exports = createResolver('eth-block', EthBlockHeader, mapFromEthObj)
+
+
+function mapFromEthObj (ethObj, options, callback) {
+  const paths = []
+
+  // external links
+  paths.push({
+    path: 'parent',
+    value: { '/': cidFromHash('eth-block', ethObj.parentHash).toBaseEncodedString() }
+  })
+  paths.push({
+    path: 'ommers',
+    value: { '/': cidFromHash('eth-block-list', ethObj.uncleHash).toBaseEncodedString() }
+  })
+  paths.push({
+    path: 'transactions',
+    value: { '/': cidFromHash('eth-tx-trie', ethObj.transactionsTrie).toBaseEncodedString() }
+  })
+  paths.push({
+    path: 'transactionReceipts',
+    value: { '/': cidFromHash('eth-tx-receipt-trie', ethObj.receiptTrie).toBaseEncodedString() }
+  })
+  paths.push({
+    path: 'state',
+    value: { '/': cidFromHash('eth-state-trie', ethObj.stateRoot).toBaseEncodedString() }
+  })
+
+  // external links as data
+  paths.push({
+    path: 'parentHash',
+    value: ethObj.parentHash
+  })
+  paths.push({
+    path: 'ommerHash',
+    value: ethObj.uncleHash
+  })
+  paths.push({
+    path: 'transactionTrieRoot',
+    value: ethObj.transactionsTrie
+  })
+  paths.push({
+    path: 'transactionReceiptTrieRoot',
+    value: ethObj.receiptTrie
+  })
+  paths.push({
+    path: 'stateRoot',
+    value: ethObj.stateRoot
+  })
+
+  // internal data
+  paths.push({
+    path: 'authorAddress',
+    value: ethObj.coinbase
+  })
+  paths.push({
+    path: 'bloom',
+    value: ethObj.bloom
+  })
+  paths.push({
+    path: 'difficulty',
+    value: ethObj.difficulty
+  })
+  paths.push({
+    path: 'number',
+    value: ethObj.number
+  })
+  paths.push({
+    path: 'gasLimit',
+    value: ethObj.gasLimit
+  })
+  paths.push({
+    path: 'gasUsed',
+    value: ethObj.gasUsed
+  })
+  paths.push({
+    path: 'timestamp',
+    value: ethObj.timestamp
+  })
+  paths.push({
+    path: 'extraData',
+    value: ethObj.extraData
+  })
+  paths.push({
+    path: 'mixHash',
+    value: ethObj.mixHash
+  })
+  paths.push({
+    path: 'nonce',
+    value: ethObj.nonce
+  })
+
+  callback(null, paths)
+}
+
+},{"../util/cidFromHash":343,"../util/createResolver":345,"ethereumjs-block/header":162}],337:[function(require,module,exports){
+'use strict'
+/* eslint max-nested-callbacks: ["error", 5] */
+
+const ethAccountSnapshotResolver = require('../eth-account-snapshot')
+const createTrieResolver = require('../util/createTrieResolver')
+
+const ethStateTrieResolver = createTrieResolver('eth-state-trie', ethAccountSnapshotResolver)
+
+module.exports = ethStateTrieResolver
+
+},{"../eth-account-snapshot":334,"../util/createTrieResolver":346}],338:[function(require,module,exports){
+'use strict'
+/* eslint max-nested-callbacks: ["error", 5] */
+
+const createTrieResolver = require('../util/createTrieResolver')
+
+const ethStorageTrieResolver = createTrieResolver('eth-storage-trie')
+
+module.exports = ethStorageTrieResolver
+
+},{"../util/createTrieResolver":346}],339:[function(require,module,exports){
+'use strict'
+/* eslint max-nested-callbacks: ["error", 5] */
+
+const ethTxResolver = require('../eth-tx')
+const createTrieResolver = require('../util/createTrieResolver')
+
+const ethTxTrieResolver = createTrieResolver('eth-tx-trie', ethTxResolver)
+
+module.exports = ethTxTrieResolver
+
+},{"../eth-tx":340,"../util/createTrieResolver":346}],340:[function(require,module,exports){
+'use strict'
+const EthTx = require('ethereumjs-tx')
+const createResolver = require('../util/createResolver')
+const cidFromHash = require('../util/cidFromHash')
+
+module.exports = createResolver('eth-tx', EthTx, mapFromEthObj)
+
+
+function mapFromEthObj (tx, options, callback) {
+  const paths = []
+
+  // external links (none)
+
+  // external links as data (none)
+
+  // internal data
+
+  paths.push({
+    path: 'nonce',
+    value: tx.nonce
+  })
+  paths.push({
+    path: 'gasPrice',
+    value: tx.gasPrice
+  })
+  paths.push({
+    path: 'gasLimit',
+    value: tx.gasLimit
+  })
+  paths.push({
+    path: 'toAddress',
+    value: tx.to
+  })
+  paths.push({
+    path: 'value',
+    value: tx.value
+  })
+  paths.push({
+    path: 'data',
+    value: tx.data
+  })
+  paths.push({
+    path: 'v',
+    value: tx.v
+  })
+  paths.push({
+    path: 'r',
+    value: tx.r
+  })
+  paths.push({
+    path: 's',
+    value: tx.s
+  })
+
+  // helpers
+
+  paths.push({
+    path: 'fromAddress',
+    value: tx.from
+  })
+
+  paths.push({
+    path: 'signature',
+    value: [tx.v, tx.r, tx.s]
+  })
+
+  paths.push({
+    path: 'isContractPublish',
+    value: tx.toCreationAddress()
+  })
+
+  callback(null, paths)
+}
+
+},{"../util/cidFromHash":343,"../util/createResolver":345,"ethereumjs-tx":164}],341:[function(require,module,exports){
+'use strict'
+
+exports.ethAccountSnapshot = require('../eth-account-snapshot')
+exports.ethBlock = require('../eth-block')
+exports.ethBlockList = require('../eth-block-list')
+exports.ethStateTrie = require('../eth-state-trie')
+exports.ethStorageTrie = require('../eth-storage-trie')
+exports.ethTx = require('../eth-tx')
+exports.ethTxTrie = require('../eth-tx-trie')
+
+},{"../eth-account-snapshot":334,"../eth-block":336,"../eth-block-list":335,"../eth-state-trie":337,"../eth-storage-trie":338,"../eth-tx":340,"../eth-tx-trie":339}],342:[function(require,module,exports){
+'use strict'
+const cidFromHash = require('./cidFromHash')
+
+module.exports = cidFromEthObj
+
+function cidFromEthObj (multicodec, ethObj) {
+  const hashBuffer = ethObj.hash()
+  const cid = cidFromHash(multicodec, hashBuffer)
+  return cid
+}
+
+},{"./cidFromHash":343}],343:[function(require,module,exports){
+'use strict'
+const CID = require('cids')
+const multihashes = require('multihashes')
+
+module.exports = cidFromHash
+
+function cidFromHash (codec, hashBuffer) {
+  const multihash = multihashes.encode(hashBuffer, 'keccak-256')
+  const cid = new CID(1, codec, multihash)
+  return cid
+}
+
+},{"cids":103,"multihashes":527}],344:[function(require,module,exports){
+module.exports = createIsLink
+
+function createIsLink (resolve) {
+  return function isLink (block, path, callback) {
+    resolve(block, path, (err, result) => {
+      if (err) {
+        return callback(err)
+      }
+
+      if (result.remainderPath.length > 0) {
+        return callback(new Error('path out of scope'))
+      }
+
+      if (typeof result.value === 'object' && result.value['/']) {
+        callback(null, result.value)
+      } else {
+        callback(null, false)
+      }
+    })
+  }
+}
+
+},{}],345:[function(require,module,exports){
+'use strict'
+const waterfall = require('async/waterfall')
+const createIsLink = require('../util/createIsLink')
+const createUtil = require('../util/createUtil')
+
+module.exports = createResolver
+
+function createResolver (multicodec, EthObjClass, mapFromEthObject) {
+  const util = createUtil(multicodec, EthObjClass)
+  const resolver = {
+    multicodec: multicodec,
+    resolve: resolve,
+    tree: tree,
+    isLink: createIsLink(resolve),
+    _resolveFromEthObject: resolveFromEthObject,
+    _treeFromEthObject: treeFromEthObject,
+    _mapFromEthObject: mapFromEthObject
+  }
+
+  return {
+    resolver: resolver,
+    util: util,
+  }
+
+  /*
+   * tree: returns a flattened array with paths: values of the project. options
+   * are option (i.e. nestness)
+   */
+
+  function tree (ipfsBlock, options, callback) {
+    // parse arguments
+    if (typeof options === 'function') {
+      callback = options
+      options = undefined
+    }
+    if (!options) {
+      options = {}
+    }
+
+    waterfall([
+      (cb) => util.deserialize(ipfsBlock.data, cb),
+      (ethObj, cb) => treeFromEthObject(ethObj, options, cb)
+    ], callback)
+  }
+
+  function treeFromEthObject (ethObj, options, callback) {
+    waterfall([
+      (cb) => mapFromEthObject(ethObj, options, cb),
+      (tuples, cb) => cb(null, tuples.map((tuple) => tuple.path))
+    ], callback)
+  }
+
+  /*
+   * resolve: receives a path and a ipfsBlock and returns the value on path,
+   * throw if not possible. `ipfsBlock` is an IPFS Block instance (contains data + key)
+   */
+
+  function resolve (ipfsBlock, path, callback) {
+    waterfall([
+      (cb) => util.deserialize(ipfsBlock.data, cb),
+      (ethObj, cb) => resolveFromEthObject(ethObj, path, cb)
+    ], callback)
+  }
+
+  function resolveFromEthObject (ethObj, path, callback) {
+    // root
+    if (!path || path === '/') {
+      const result = { value: ethObj, remainderPath: '' }
+      return callback(null, result)
+    }
+
+    // check tree results
+    mapFromEthObject(ethObj, {}, (err, paths) => {
+      if (err) return callback(err)
+
+      // parse path
+      const pathParts = path.split('/')
+      // find potential matches
+      let matches = paths.filter((child) => child.path === path.slice(0, child.path.length))
+      // only match whole path chunks
+      matches = matches.filter((child) => child.path.split('/').every((part, index) => part === pathParts[index]))
+      // take longest match
+      const sortedMatches = matches.sort((a, b) => a.path.length < b.path.length)
+      const treeResult = sortedMatches[0]
+
+      if (!treeResult) {
+        let err = new Error('Path not found ("' + path + '").')
+        return callback(err)
+      }
+
+      // slice off remaining path (after match and following slash)
+      const remainderPath = path.slice(treeResult.path.length + 1)
+
+      const result = {
+        value: treeResult.value,
+        remainderPath: remainderPath
+      }
+
+      return callback(null, result)
+    })
+  }
+}
+},{"../util/createIsLink":344,"../util/createUtil":347,"async/waterfall":57}],346:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+const each = require('async/each')
+const waterfall = require('async/waterfall')
+const asyncify = require('async/asyncify')
+const rlp = require('rlp')
+const EthTrieNode = require('merkle-patricia-tree/trieNode')
+// const createBaseTrieResolver = require('./createBaseTrieResolver.js')
+const createResolver = require('./createResolver')
+const isExternalLink = require('./isExternalLink')
+const toIpfsBlock = require('./toIpfsBlock')
+const createUtil = require('./createUtil')
+const createIsLink = require('./createIsLink')
+const cidFromEthObj = require('./cidFromEthObj')
+const cidFromHash = require('./cidFromHash')
+
+
+module.exports = createTrieResolver
+
+function createTrieResolver(multicodec, leafResolver){
+  const baseTrie = createResolver(multicodec, EthTrieNode, mapFromEthObj)
+  baseTrie.util.deserialize = asyncify((serialized) => {
+    const rawNode = rlp.decode(serialized)
+    const trieNode = new EthTrieNode(rawNode)
+    return trieNode
+  })
+
+  return baseTrie
+
+  // create map using both baseTrie and leafResolver
+  function mapFromEthObj (trieNode, options, callback) {
+    // expand from merkle-patricia-tree using leafResolver
+    mapFromBaseTrie(trieNode, options, (err, basePaths) => {
+      if (err) return callback(err)
+      if (!leafResolver) return callback(null, basePaths)
+      // expand children
+      let paths = basePaths.slice()
+      const leafTerminatingPaths = basePaths.filter(child => Buffer.isBuffer(child.value))
+      each(leafTerminatingPaths, (child, cb) => {
+        return waterfall([
+          (cb) => leafResolver.util.deserialize(child.value, cb),
+          (ethObj, cb) => leafResolver.resolver._mapFromEthObject(ethObj, options, cb)
+        ], (err, grandChildren) => {
+          if (err) return cb(err)
+          // add prefix to grandchildren
+          grandChildren.forEach((grandChild) => {
+            paths.push({
+              path: child.path + '/' + grandChild.path,
+              value: grandChild.value,
+            })
+          })
+          cb()
+        })
+      }, (err) => {
+        if (err) return callback(err)
+        callback(null, paths)
+      })
+    })
+  }
+
+  // create map from merkle-patricia-tree nodes
+  function mapFromBaseTrie (trieNode, options, callback) {
+    let paths = []
+
+    if (trieNode.type === 'leaf') {
+      // leaf nodes resolve to their actual value
+      paths.push({
+        path: nibbleToPath(trieNode.getKey()),
+        value: trieNode.getValue()
+      })
+    }
+
+    each(trieNode.getChildren(), (childData, next) => {
+      const key = nibbleToPath(childData[0])
+      const value = childData[1]
+      if (EthTrieNode.isRawNode(value)) {
+        // inline child root
+        const childNode = new EthTrieNode(value)
+        paths.push({
+          path: key,
+          value: childNode
+        })
+        // inline child non-leaf subpaths
+        mapFromBaseTrie(childNode, options, (err, subtree) => {
+          if (err) return next(err)
+          subtree.forEach((path) => {
+            path.path = key + '/' + path.path
+          })
+          paths = paths.concat(subtree)
+          next()
+        })
+      } else {
+        // other nodes link by hash
+        let link = { '/': cidFromHash(multicodec, value).toBaseEncodedString() }
+        paths.push({
+          path: key,
+          value: link
+        })
+        next()
+      }
+    }, (err) => {
+      if (err) return callback(err)
+      callback(null, paths)
+    })
+  }
+}
+
+function nibbleToPath (data) {
+  return data.map((num) => num.toString(16)).join('/')
+}
+}).call(this,{"isBuffer":require("../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
+},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721,"./cidFromEthObj":342,"./cidFromHash":343,"./createIsLink":344,"./createResolver":345,"./createUtil":347,"./isExternalLink":349,"./toIpfsBlock":350,"async/asyncify":18,"async/each":21,"async/waterfall":57,"merkle-patricia-tree/trieNode":509,"rlp":645}],347:[function(require,module,exports){
+const cidFromEthObj = require('./cidFromEthObj')
+const asyncify = require('async/asyncify')
+
+module.exports = createUtil
+
+function createUtil (multicodec, EthObjClass) {
+  return {
+    deserialize: asyncify((serialized) => new EthObjClass(serialized)),
+    serialize: asyncify((ethObj) => ethObj.serialize()),
+    cid: asyncify((ethObj) => cidFromEthObj(multicodec, ethObj))
+  }
+}
+
+},{"./cidFromEthObj":342,"async/asyncify":18}],348:[function(require,module,exports){
+(function (Buffer){
+// this is the hash of the empty code (SHA3_NULL)
+module.exports = new Buffer('c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470', 'hex')
+
+}).call(this,require("buffer").Buffer)
+},{"buffer":715}],349:[function(require,module,exports){
+module.exports = isExternalLink
+
+function isExternalLink (obj) {
+  return Boolean(obj['/'])
+}
+},{}],350:[function(require,module,exports){
+const IpfsBlock = require('ipfs-block')
+const CID = require('cids')
+const multihashing = require('multihashing-async')
+
+module.exports = toIpfsBlock
+
+function toIpfsBlock (multicodec, value, callback) {
+  multihashing(value, 'keccak-256', (err, hash) => {
+    if (err) {
+      return callback(err)
+    }
+    const cid = new CID(1, multicodec, hash)
+    callback(null, new IpfsBlock(value, cid))
+  })
+}
+
+},{"cids":103,"ipfs-block":211,"multihashing-async":531}],351:[function(require,module,exports){
+arguments[4][319][0].apply(exports,arguments)
+},{"./resolver.js":352,"./util.js":353,"dup":319}],352:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const util = require('./util')
+const traverse = require('traverse')
+
+exports = module.exports
+
+exports.multicodec = 'git-raw'
+
+const personInfoPaths = [
+  'original',
+  'name',
+  'email',
+  'date'
+]
+
+exports.resolve = (block, path, callback) => {
+  if (typeof path === 'function') {
+    callback = path
+    path = undefined
+  }
+
+  util.deserialize(block.data, (err, node) => {
+    if (err) {
+      return callback(err)
+    }
+
+    if (!path || path === '/') {
+      return callback(null, {
+        value: node,
+        remainderPath: ''
+      })
+    }
+
+    if (Buffer.isBuffer(node)) { // git blob
+      return callback(null, {
+        value: node,
+        remainderPath: path
+      })
+    }
+
+    const parts = path.split('/')
+    const val = traverse(node).get(parts)
+
+    if (val) {
+      return callback(null, {
+        value: val,
+        remainderPath: ''
+      })
+    }
+
+    let value
+    let len = parts.length
+
+    for (let i = 0; i < len; i++) {
+      const partialPath = parts.shift()
+
+      if (Array.isArray(node)) {
+        value = node[Number(partialPath)]
+      } if (node[partialPath]) {
+        value = node[partialPath]
+      } else {
+        // can't traverse more
+        if (!value) {
+          return callback(new Error('path not available at root'))
+        } else {
+          parts.unshift(partialPath)
+          return callback(null, {
+            value: value,
+            remainderPath: parts.join('/')
+          })
+        }
+      }
+      node = value
+    }
+  })
+}
+
+exports.tree = (block, options, callback) => {
+  if (typeof options === 'function') {
+    callback = options
+    options = undefined
+  }
+
+  options = options || {}
+
+  util.deserialize(block.data, (err, node) => {
+    if (err) {
+      return callback(err)
+    }
+
+    if (Buffer.isBuffer(node)) { // git blob
+      return callback(null, [])
+    }
+
+    let paths = []
+    switch (node.gitType) {
+      case 'commit':
+        paths = [
+          'message',
+          'tree'
+        ]
+
+        paths = paths.concat(personInfoPaths.map((e) => 'author/' + e))
+        paths = paths.concat(personInfoPaths.map((e) => 'committer/' + e))
+        paths = paths.concat(node.parents.map((_, e) => 'parents/' + e))
+
+        if (node.encoding) {
+          paths.push('encoding')
+        }
+        break
+      case 'tag':
+        paths = [
+          'object',
+          'type',
+          'tag',
+          'message'
+        ]
+
+        if (node.tagger) {
+          paths = paths.concat(personInfoPaths.map((e) => 'tagger/' + e))
+        }
+
+        break
+      default: // tree
+        Object.keys(node).forEach(dir => {
+          paths.push(dir)
+          paths.push(dir + '/hash')
+          paths.push(dir + '/mode')
+        })
+    }
+    callback(null, paths)
+  })
+}
+
+exports.isLink = (block, path, callback) => {
+  exports.resolve(block, path, (err, result) => {
+    if (err) {
+      return callback(err)
+    }
+
+    if (result.remainderPath.length > 0) {
+      return callback(new Error('path out of scope'))
+    }
+
+    if (typeof result.value === 'object' && result.value['/']) {
+      callback(null, result.value)
+    } else {
+      callback(null, false)
+    }
+  })
+}
+
+}).call(this,{"isBuffer":require("../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
+},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721,"./util":353,"traverse":696}],353:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const setImmediate = require('async/setImmediate')
+const waterfall = require('async/waterfall')
+const multihashing = require('multihashing-async')
+const CID = require('cids')
+
+const resolver = require('./resolver')
+const gitUtil = require('./util/util')
+
+const commit = require('./util/commit')
+const tag = require('./util/tag')
+const tree = require('./util/tree')
+
+exports = module.exports
+
+exports.serialize = (dagNode, callback) => {
+  if (dagNode === null) {
+    setImmediate(() => callback(new Error('dagNode passed to serialize was null'), null))
+    return
+  }
+
+  if (Buffer.isBuffer(dagNode)) {
+    if (dagNode.slice(0, 4).toString() === 'blob') {
+      setImmediate(() => callback(null, dagNode))
+    } else {
+      setImmediate(() => callback(new Error('unexpected dagNode passed to serialize'), null))
+    }
+    return
+  }
+
+  switch (dagNode.gitType) {
+    case 'commit':
+      commit.serialize(dagNode, callback)
+      break
+    case 'tag':
+      tag.serialize(dagNode, callback)
+      break
+    default:
+      // assume tree as a file named 'type' is legal
+      tree.serialize(dagNode, callback)
+  }
+}
+
+exports.deserialize = (data, callback) => {
+  let headLen = gitUtil.find(data, 0)
+  let head = data.slice(0, headLen).toString()
+  let typeLen = head.match(/([^ ]+) (\d+)/)
+  if (!typeLen) {
+    setImmediate(() => callback(new Error('invalid object header'), null))
+    return
+  }
+
+  switch (typeLen[1]) {
+    case 'blob':
+      callback(null, data)
+      break
+    case 'commit':
+      commit.deserialize(data.slice(headLen + 1), callback)
+      break
+    case 'tag':
+      tag.deserialize(data.slice(headLen + 1), callback)
+      break
+    case 'tree':
+      tree.deserialize(data.slice(headLen + 1), callback)
+      break
+    default:
+      setImmediate(() => callback(new Error('unknown object type ' + typeLen[1]), null))
+  }
+}
+
+exports.cid = (dagNode, callback) => {
+  waterfall([
+    (cb) => exports.serialize(dagNode, cb),
+    (serialized, cb) => multihashing(serialized, 'sha1', cb),
+    (mh, cb) => cb(null, new CID(1, resolver.multicodec, mh))
+  ], callback)
+}
+
+}).call(this,{"isBuffer":require("../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
+},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721,"./resolver":352,"./util/commit":354,"./util/tag":355,"./util/tree":356,"./util/util":357,"async/setImmediate":54,"async/waterfall":57,"cids":103,"multihashing-async":531}],354:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const setImmediate = require('async/setImmediate')
+const SmartBuffer = require('smart-buffer').SmartBuffer
+const gitUtil = require('./util')
+
+exports = module.exports
+
+exports.serialize = (dagNode, callback) => {
+  let lines = []
+  lines.push('tree ' + gitUtil.cidToSha(dagNode.tree['/']).toString('hex'))
+  dagNode.parents.forEach((parent) => {
+    lines.push('parent ' + gitUtil.cidToSha(parent['/']).toString('hex'))
+  })
+  lines.push('author ' + gitUtil.serializePersonLine(dagNode.author))
+  lines.push('committer ' + gitUtil.serializePersonLine(dagNode.committer))
+  if (dagNode.encoding) {
+    lines.push('encoding ' + dagNode.encoding)
+  }
+  if (dagNode.signature) {
+    lines.push('gpgsig -----BEGIN PGP SIGNATURE-----')
+    lines.push(dagNode.signature.text)
+  }
+  lines.push('')
+  lines.push(dagNode.message)
+
+  let data = lines.join('\n')
+
+  let outBuf = new SmartBuffer()
+  outBuf.writeString('commit ')
+  outBuf.writeString(data.length.toString())
+  outBuf.writeUInt8(0)
+  outBuf.writeString(data)
+  setImmediate(() => callback(null, outBuf.toBuffer()))
+}
+
+exports.deserialize = (data, callback) => {
+  let lines = data.toString().split('\n')
+  let res = {gitType: 'commit', parents: []}
+
+  for (let line = 0; line < lines.length; line++) {
+    let m = lines[line].match(/^([^ ]+) (.+)$/)
+    if (!m) {
+      if (lines[line] !== '') {
+        setImmediate(() => callback(new Error('Invalid commit line ' + line)))
+      }
+      res.message = lines.slice(line + 1).join('\n')
+      break
+    }
+
+    let key = m[1]
+    let value = m[2]
+    switch (key) {
+      case 'tree':
+        res.tree = {'/': gitUtil.shaToCid(Buffer.from(value, 'hex'))}
+        break
+      case 'committer':
+        res.committer = gitUtil.parsePersonLine(value)
+        break
+      case 'author':
+        res.author = gitUtil.parsePersonLine(value)
+        break
+      case 'parent':
+        res.parents.push({'/': gitUtil.shaToCid(Buffer.from(value, 'hex'))})
+        break
+      case 'gpgsig': {
+        if (value !== '-----BEGIN PGP SIGNATURE-----') {
+          setImmediate(() => callback(new Error('Invalid commit line ' + line)))
+        }
+        res.signature = {}
+
+        let startLine = line
+        for (; line < lines.length - 1; line++) {
+          if (lines[line + 1][0] !== ' ') {
+            res.signature.text = lines.slice(startLine + 1, line + 1).join('\n')
+            break
+          }
+        }
+        break
+      }
+      default:
+        res[key] = value
+    }
+  }
+
+  setImmediate(() => callback(null, res))
+}
+
+}).call(this,require("buffer").Buffer)
+},{"./util":357,"async/setImmediate":54,"buffer":715,"smart-buffer":673}],355:[function(require,module,exports){
+(function (Buffer){
+'use strict'
+
+const setImmediate = require('async/setImmediate')
+const SmartBuffer = require('smart-buffer').SmartBuffer
+const gitUtil = require('./util')
+
+exports = module.exports
+
+exports.serialize = (dagNode, callback) => {
+  let lines = []
+  lines.push('object ' + gitUtil.cidToSha(dagNode.object['/']).toString('hex'))
+  lines.push('type ' + dagNode.type)
+  lines.push('tag ' + dagNode.tag)
+  if (dagNode.tagger !== null) {
+    lines.push('tagger ' + gitUtil.serializePersonLine(dagNode.tagger))
+  }
+  lines.push('')
+  lines.push(dagNode.message)
+
+  let data = lines.join('\n')
+
+  let outBuf = new SmartBuffer()
+  outBuf.writeString('tag ')
+  outBuf.writeString(data.length.toString())
+  outBuf.writeUInt8(0)
+  outBuf.writeString(data)
+  setImmediate(() => callback(null, outBuf.toBuffer()))
+}
+
+exports.deserialize = (data, callback) => {
+  let lines = data.toString().split('\n')
+  let res = {gitType: 'tag'}
+
+  for (let line = 0; line < lines.length; line++) {
+    let m = lines[line].match(/^([^ ]+) (.+)$/)
+    if (m === null) {
+      if (lines[line] !== '') {
+        setImmediate(() => callback(new Error('Invalid tag line ' + line)))
+      }
+      res.message = lines.slice(line + 1).join('\n')
+      break
+    }
+
+    let key = m[1]
+    let value = m[2]
+    switch (key) {
+      case 'object':
+        res.object = {'/': gitUtil.shaToCid(Buffer.from(value, 'hex'))}
+        break
+      case 'tagger':
+        res.tagger = gitUtil.parsePersonLine(value)
+        break
+      case 'tag':
+        res.tag = value
+        break
+      case 'type':
+        res.type = value
+        break
+      default:
+        res[key] = value
+    }
+  }
+
+  setImmediate(() => callback(null, res))
+}
+
+}).call(this,require("buffer").Buffer)
+},{"./util":357,"async/setImmediate":54,"buffer":715,"smart-buffer":673}],356:[function(require,module,exports){
+'use strict'
+
+const setImmediate = require('async/setImmediate')
+const SmartBuffer = require('smart-buffer').SmartBuffer
+const gitUtil = require('./util')
+
+exports = module.exports
+
+exports.serialize = (dagNode, callback) => {
+  let entries = []
+  Object.keys(dagNode).forEach((name) => {
+    entries.push([name, dagNode[name]])
+  })
+  entries.sort((a, b) => a[0] > b[0] ? 1 : -1)
+  let buf = new SmartBuffer()
+  entries.forEach((entry) => {
+    buf.writeStringNT(entry[1].mode + ' ' + entry[0])
+    buf.writeBuffer(gitUtil.cidToSha(entry[1].hash['/']))
+  })
+
+  let outBuf = new SmartBuffer()
+  outBuf.writeString('tree ')
+  outBuf.writeString(buf.length.toString())
+  outBuf.writeUInt8(0)
+  outBuf.writeBuffer(buf.toBuffer())
+  setImmediate(() => callback(null, outBuf.toBuffer()))
+}
+
+exports.deserialize = (data, callback) => {
+  let res = {}
+  let buf = SmartBuffer.fromBuffer(data, 'utf8')
+
+  for (;;) {
+    let modeName = buf.readStringNT()
+    if (modeName === '') {
+      break
+    }
+
+    let hash = buf.readBuffer(gitUtil.SHA1_LENGTH)
+    let modNameMatched = modeName.match(/^(\d+) (.+)$/)
+    if (!modNameMatched) {
+      setImmediate(() => callback(new Error('invalid file mode/name')))
+    }
+
+    if (res[modNameMatched[2]]) {
+      setImmediate(() => callback(new Error('duplicate file in tree')))
+    }
+
+    res[modNameMatched[2]] = {
+      mode: modNameMatched[1],
+      hash: {'/': gitUtil.shaToCid(hash)}
+    }
+  }
+
+  setImmediate(() => callback(null, res))
+}
+
+},{"./util":357,"async/setImmediate":54,"smart-buffer":673}],357:[function(require,module,exports){
+'use strict'
+
+const SmartBuffer = require('smart-buffer').SmartBuffer
+const multihashes = require('multihashes/src/constants')
+const multicodecs = require('multicodec/src/base-table')
+const multihash = require('multihashes')
+const CID = require('cids')
+
+exports = module.exports
+
+exports.SHA1_LENGTH = multihashes.defaultLengths[multihashes.names.sha1]
+
+exports.find = (buf, byte) => {
+  for (let i = 0; i < buf.length; i++) {
+    if (buf[i] === byte) {
+      return i
+    }
+  }
+  return -1
+}
+
+exports.parsePersonLine = (line) => {
+  let matched = line.match(/^(([^<]+)\s)?\s?<([^>]+)>\s?(\d+\s[+\-\d]+)?$/)
+  if (matched === null) {
+    return null
+  }
+
+  return {
+    name: matched[2],
+    email: matched[3],
+    date: matched[4]
+  }
+}
+
+exports.serializePersonLine = (node) => {
+  let parts = []
+  if (node.name) {
+    parts.push(node.name)
+  }
+  parts.push('<' + node.email + '>')
+  if (node.date) {
+    parts.push(node.date)
+  }
+
+  return parts.join(' ')
+}
+
+exports.shaToCid = (buf) => {
+  let mhashBuf = new SmartBuffer()
+  mhashBuf.writeUInt8(1)
+  mhashBuf.writeBuffer(multicodecs['git-raw'])
+  mhashBuf.writeUInt8(multihashes.names.sha1)
+  mhashBuf.writeUInt8(exports.SHA1_LENGTH)
+  mhashBuf.writeBuffer(buf)
+  return mhashBuf.toBuffer()
+}
+
+exports.cidToSha = (cidBuf) => {
+  let mh = multihash.decode(new CID(cidBuf).multihash)
+  if (mh.name !== 'sha1') {
+    return null
+  }
+
+  return mh.digest
+}
+
+},{"cids":103,"multicodec/src/base-table":521,"multihashes":527,"multihashes/src/constants":526,"smart-buffer":673}],358:[function(require,module,exports){
+'use strict'
+const CID = require('cids')
+
+// binary resolver
+module.exports = {
+  resolver: {
+    multicodec: 'raw',
+    resolve: (ipfsBlock, path, callback) => {
+      callback(null, {
+        value: ipfsBlock.data,
+        remainderPath: ''
+      })
+    },
+    tree: (ipfsBlock, options, callback) => {
+      callback(null, [])
+    }
+  },
+  util: {
+    deserialize: (data, cb) => {
+      cb(null, data)
+    },
+    serialize: (data, cb) => {
+      cb(null, data)
+    },
+    cid: (data, cb) => {
+      cb(null, new CID(1, 'raw', data))
+    }
+  }
+}
+
+},{"cids":103}],359:[function(require,module,exports){
 module.exports = isCircular
 
 /**
@@ -44170,7 +45712,7 @@ CircularChecker.prototype.isCircular = function (obj, seen) {
   return false
 }
 
-},{}],346:[function(require,module,exports){
+},{}],360:[function(require,module,exports){
 /**
  * Returns a `Boolean` on whether or not the a `String` starts with '0x'
  * @param {String} str the string input value
@@ -44185,13 +45727,13 @@ module.exports = function isHexPrefixed(str) {
   return str.slice(0, 2) === '0x';
 }
 
-},{}],347:[function(require,module,exports){
+},{}],361:[function(require,module,exports){
 module.exports = isPromise;
 
 function isPromise(obj) {
   return obj && typeof obj.then === 'function';
 }
-},{}],348:[function(require,module,exports){
+},{}],362:[function(require,module,exports){
 'use strict';
 
 var isStream = module.exports = function (stream) {
@@ -44214,9 +45756,9 @@ isStream.transform = function (stream) {
 	return isStream.duplex(stream) && typeof stream._transform === 'function' && typeof stream._transformState === 'object';
 };
 
-},{}],349:[function(require,module,exports){
-arguments[4][184][0].apply(exports,arguments)
-},{"dup":184}],350:[function(require,module,exports){
+},{}],363:[function(require,module,exports){
+arguments[4][174][0].apply(exports,arguments)
+},{"dup":174}],364:[function(require,module,exports){
 (function (process,global){
 /**
  * [js-sha3]{@link https://github.com/emn178/js-sha3}
@@ -44842,11 +46384,11 @@ arguments[4][184][0].apply(exports,arguments)
 })();
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"_process":733}],351:[function(require,module,exports){
+},{"_process":726}],365:[function(require,module,exports){
 'use strict'
 module.exports = require('./lib/api')(require('./lib/keccak'))
 
-},{"./lib/api":352,"./lib/keccak":356}],352:[function(require,module,exports){
+},{"./lib/api":366,"./lib/keccak":370}],366:[function(require,module,exports){
 'use strict'
 var createKeccak = require('./keccak')
 var createShake = require('./shake')
@@ -44876,7 +46418,7 @@ module.exports = function (KeccakState) {
   }
 }
 
-},{"./keccak":353,"./shake":354}],353:[function(require,module,exports){
+},{"./keccak":367,"./shake":368}],367:[function(require,module,exports){
 'use strict'
 var Buffer = require('safe-buffer').Buffer
 var Transform = require('stream').Transform
@@ -44962,7 +46504,7 @@ module.exports = function (KeccakState) {
   return Keccak
 }
 
-},{"inherits":203,"safe-buffer":654,"stream":752}],354:[function(require,module,exports){
+},{"inherits":193,"safe-buffer":646,"stream":745}],368:[function(require,module,exports){
 'use strict'
 var Buffer = require('safe-buffer').Buffer
 var Transform = require('stream').Transform
@@ -45039,7 +46581,7 @@ module.exports = function (KeccakState) {
   return Shake
 }
 
-},{"inherits":203,"safe-buffer":654,"stream":752}],355:[function(require,module,exports){
+},{"inherits":193,"safe-buffer":646,"stream":745}],369:[function(require,module,exports){
 'use strict'
 var P1600_ROUND_CONSTANTS = [1, 0, 32898, 0, 32906, 2147483648, 2147516416, 2147483648, 32907, 0, 2147483649, 0, 2147516545, 2147483648, 32777, 2147483648, 138, 0, 136, 0, 2147516425, 0, 2147483658, 0, 2147516555, 0, 139, 2147483648, 32905, 2147483648, 32771, 2147483648, 32770, 2147483648, 128, 2147483648, 32778, 0, 2147483658, 2147483648, 2147516545, 2147483648, 32896, 2147483648, 2147483649, 0, 2147516424, 2147483648]
 
@@ -45228,7 +46770,7 @@ exports.p1600 = function (s) {
   }
 }
 
-},{}],356:[function(require,module,exports){
+},{}],370:[function(require,module,exports){
 'use strict'
 var Buffer = require('safe-buffer').Buffer
 var keccakState = require('./keccak-state-unroll')
@@ -45300,10 +46842,10 @@ Keccak.prototype.copy = function (dest) {
 
 module.exports = Keccak
 
-},{"./keccak-state-unroll":355,"safe-buffer":654}],357:[function(require,module,exports){
+},{"./keccak-state-unroll":369,"safe-buffer":646}],371:[function(require,module,exports){
 module.exports = require('browserify-sha3').SHA3Hash
 
-},{"browserify-sha3":98}],358:[function(require,module,exports){
+},{"browserify-sha3":98}],372:[function(require,module,exports){
 /* This program is free software. It comes without any warranty, to
      * the extent permitted by applicable law. You can redistribute it
      * and/or modify it under the terms of the Do What The Fuck You Want
@@ -45357,7 +46899,7 @@ function leftPad (str, len, ch) {
   return pad + str;
 }
 
-},{}],359:[function(require,module,exports){
+},{}],373:[function(require,module,exports){
 var encodings = require('./lib/encodings');
 
 module.exports = Codec;
@@ -45465,7 +47007,7 @@ Codec.prototype.valueAsBuffer = function(opts){
 };
 
 
-},{"./lib/encodings":360}],360:[function(require,module,exports){
+},{"./lib/encodings":374}],374:[function(require,module,exports){
 (function (Buffer){
 exports.utf8 = exports['utf-8'] = {
   encode: function(data){
@@ -45545,7 +47087,7 @@ function isBinary(data){
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722}],361:[function(require,module,exports){
+},{"buffer":715}],375:[function(require,module,exports){
 /* Copyright (c) 2012-2017 LevelUP contributors
  * See list at <https://github.com/rvagg/node-levelup#contributing>
  * MIT License
@@ -45569,7 +47111,7 @@ module.exports = {
   , EncodingError       : createError('EncodingError', LevelUPError)
 }
 
-},{"errno":168}],362:[function(require,module,exports){
+},{"errno":158}],376:[function(require,module,exports){
 var inherits = require('inherits');
 var Readable = require('readable-stream').Readable;
 var extend = require('xtend');
@@ -45627,12 +47169,12 @@ ReadStream.prototype._cleanup = function(){
 };
 
 
-},{"inherits":203,"level-errors":361,"readable-stream":369,"xtend":717}],363:[function(require,module,exports){
+},{"inherits":193,"level-errors":375,"readable-stream":383,"xtend":710}],377:[function(require,module,exports){
 module.exports = Array.isArray || function (arr) {
   return Object.prototype.toString.call(arr) == '[object Array]';
 };
 
-},{}],364:[function(require,module,exports){
+},{}],378:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -45725,7 +47267,7 @@ function forEach (xs, f) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_readable":366,"./_stream_writable":368,"_process":733,"core-util-is":108,"inherits":203}],365:[function(require,module,exports){
+},{"./_stream_readable":380,"./_stream_writable":382,"_process":726,"core-util-is":108,"inherits":193}],379:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -45773,7 +47315,7 @@ PassThrough.prototype._transform = function(chunk, encoding, cb) {
   cb(null, chunk);
 };
 
-},{"./_stream_transform":367,"core-util-is":108,"inherits":203}],366:[function(require,module,exports){
+},{"./_stream_transform":381,"core-util-is":108,"inherits":193}],380:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -46728,7 +48270,7 @@ function indexOf (xs, x) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_duplex":364,"_process":733,"buffer":722,"core-util-is":108,"events":724,"inherits":203,"isarray":363,"stream":752,"string_decoder/":370,"util":721}],367:[function(require,module,exports){
+},{"./_stream_duplex":378,"_process":726,"buffer":715,"core-util-is":108,"events":717,"inherits":193,"isarray":377,"stream":745,"string_decoder/":384,"util":714}],381:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -46939,7 +48481,7 @@ function done(stream, er) {
   return stream.push(null);
 }
 
-},{"./_stream_duplex":364,"core-util-is":108,"inherits":203}],368:[function(require,module,exports){
+},{"./_stream_duplex":378,"core-util-is":108,"inherits":193}],382:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -47420,7 +48962,7 @@ function endWritable(stream, state, cb) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_duplex":364,"_process":733,"buffer":722,"core-util-is":108,"inherits":203,"stream":752}],369:[function(require,module,exports){
+},{"./_stream_duplex":378,"_process":726,"buffer":715,"core-util-is":108,"inherits":193,"stream":745}],383:[function(require,module,exports){
 (function (process){
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = require('stream');
@@ -47434,7 +48976,7 @@ if (!process.browser && process.env.READABLE_STREAM === 'disable') {
 }
 
 }).call(this,require('_process'))
-},{"./lib/_stream_duplex.js":364,"./lib/_stream_passthrough.js":365,"./lib/_stream_readable.js":366,"./lib/_stream_transform.js":367,"./lib/_stream_writable.js":368,"_process":733,"stream":752}],370:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":378,"./lib/_stream_passthrough.js":379,"./lib/_stream_readable.js":380,"./lib/_stream_transform.js":381,"./lib/_stream_writable.js":382,"_process":726,"stream":745}],384:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -47657,7 +49199,7 @@ function base64DetectIncompleteChar(buffer) {
   this.charLength = this.charReceived ? 3 : 0;
 }
 
-},{"buffer":722}],371:[function(require,module,exports){
+},{"buffer":715}],385:[function(require,module,exports){
 (function (process,Buffer){
 module.exports = Level
 
@@ -47959,7 +49501,7 @@ Level.destroy = function(db, callback) {
 }
 
 }).call(this,require('_process'),require("buffer").Buffer)
-},{"./iterator":372,"_process":733,"abstract-leveldown":376,"buffer":722,"util":759,"xtend":717}],372:[function(require,module,exports){
+},{"./iterator":386,"_process":726,"abstract-leveldown":390,"buffer":715,"util":752,"xtend":710}],386:[function(require,module,exports){
 (function (process,Buffer){
 var util = require('util')
 var AbstractIterator  = require('abstract-leveldown').AbstractIterator
@@ -48146,7 +49688,7 @@ Iterator.prototype._next = function(callback) {
 }
 
 }).call(this,require('_process'),require("buffer").Buffer)
-},{"_process":733,"abstract-leveldown":376,"buffer":722,"idb-readable-stream":200,"ltgt":501,"stream":752,"util":759,"xtend":717}],373:[function(require,module,exports){
+},{"_process":726,"abstract-leveldown":390,"buffer":715,"idb-readable-stream":190,"ltgt":505,"stream":745,"util":752,"xtend":710}],387:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -48229,7 +49771,7 @@ AbstractChainedBatch.prototype.write = function (options, callback) {
 
 module.exports = AbstractChainedBatch
 }).call(this,require('_process'))
-},{"_process":733}],374:[function(require,module,exports){
+},{"_process":726}],388:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -48282,7 +49824,7 @@ AbstractIterator.prototype.end = function (callback) {
 module.exports = AbstractIterator
 
 }).call(this,require('_process'))
-},{"_process":733}],375:[function(require,module,exports){
+},{"_process":726}],389:[function(require,module,exports){
 (function (Buffer,process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -48558,11 +50100,11 @@ AbstractLevelDOWN.prototype._checkKey = function (obj, type) {
 module.exports = AbstractLevelDOWN
 
 }).call(this,{"isBuffer":require("../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")},require('_process'))
-},{"../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728,"./abstract-chained-batch":373,"./abstract-iterator":374,"_process":733,"xtend":717}],376:[function(require,module,exports){
-arguments[4][131][0].apply(exports,arguments)
-},{"./abstract-chained-batch":373,"./abstract-iterator":374,"./abstract-leveldown":375,"./is-leveldown":377,"dup":131}],377:[function(require,module,exports){
-arguments[4][132][0].apply(exports,arguments)
-},{"./abstract-leveldown":375,"dup":132}],378:[function(require,module,exports){
+},{"../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721,"./abstract-chained-batch":387,"./abstract-iterator":388,"_process":726,"xtend":710}],390:[function(require,module,exports){
+arguments[4][121][0].apply(exports,arguments)
+},{"./abstract-chained-batch":387,"./abstract-iterator":388,"./abstract-leveldown":389,"./is-leveldown":391,"dup":121}],391:[function(require,module,exports){
+arguments[4][122][0].apply(exports,arguments)
+},{"./abstract-leveldown":389,"dup":122}],392:[function(require,module,exports){
 /* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
  * MIT License
@@ -48647,7 +50189,7 @@ Batch.prototype.write = function (callback) {
 
 module.exports = Batch
 
-},{"./util":380,"level-errors":361}],379:[function(require,module,exports){
+},{"./util":394,"level-errors":375}],393:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
@@ -49014,7 +50556,7 @@ module.exports.repair = deprecate(
 )
 
 }).call(this,require('_process'))
-},{"./batch":378,"./leveldown":721,"./util":380,"_process":733,"deferred-leveldown":127,"events":724,"level-codec":359,"level-errors":361,"level-iterator-stream":362,"prr":574,"util":759,"xtend":717}],380:[function(require,module,exports){
+},{"./batch":392,"./leveldown":714,"./util":394,"_process":726,"deferred-leveldown":117,"events":717,"level-codec":373,"level-errors":375,"level-iterator-stream":376,"prr":566,"util":752,"xtend":710}],394:[function(require,module,exports){
 /* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
  * MIT License
@@ -49050,7 +50592,7 @@ module.exports = {
   isDefined: isDefined
 }
 
-},{}],381:[function(require,module,exports){
+},{}],395:[function(require,module,exports){
 'use strict'
 
 const secp256k1 = require('secp256k1')
@@ -49141,7 +50683,7 @@ module.exports = (randomBytes) => {
   }
 }
 
-},{"async/setImmediate":54,"multihashing-async":527,"secp256k1":656}],382:[function(require,module,exports){
+},{"async/setImmediate":54,"multihashing-async":531,"secp256k1":648}],396:[function(require,module,exports){
 'use strict'
 
 const multihashing = require('multihashing-async')
@@ -49261,7 +50803,7 @@ module.exports = (keysProtobuf, randomBytes, crypto) => {
   }
 }
 
-},{"./crypto":381,"multihashing-async":527}],383:[function(require,module,exports){
+},{"./crypto":395,"multihashing-async":531}],397:[function(require,module,exports){
 'use strict'
 
 const crypto = require('browserify-aes')
@@ -49271,7 +50813,7 @@ module.exports = {
   createDecipheriv: crypto.createDecipheriv
 }
 
-},{"browserify-aes":83}],384:[function(require,module,exports){
+},{"browserify-aes":83}],398:[function(require,module,exports){
 'use strict'
 
 const ciphers = require('./ciphers')
@@ -49303,7 +50845,7 @@ exports.create = function (key, iv, callback) {
   callback(null, res)
 }
 
-},{"./ciphers":383}],385:[function(require,module,exports){
+},{"./ciphers":397}],399:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -49346,7 +50888,7 @@ exports.create = function (hashType, secret, callback) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"../nodeify":398,"../webcrypto.js":401,"./lengths":386,"buffer":722}],386:[function(require,module,exports){
+},{"../nodeify":412,"../webcrypto.js":415,"./lengths":400,"buffer":715}],400:[function(require,module,exports){
 'use strict'
 
 module.exports = {
@@ -49355,7 +50897,7 @@ module.exports = {
   SHA512: 64
 }
 
-},{}],387:[function(require,module,exports){
+},{}],401:[function(require,module,exports){
 'use strict'
 
 const hmac = require('./hmac')
@@ -49369,7 +50911,7 @@ exports.hmac = hmac
 exports.keys = keys
 exports.randomBytes = require('./random-bytes')
 
-},{"./aes":384,"./hmac":385,"./keys":392,"./random-bytes":399}],388:[function(require,module,exports){
+},{"./aes":398,"./hmac":399,"./keys":406,"./random-bytes":413}],402:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -49500,7 +51042,7 @@ function unmarshalPrivateKey (curve, key) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"../nodeify":398,"../util":400,"../webcrypto.js":401,"asn1.js":4,"buffer":722}],389:[function(require,module,exports){
+},{"../nodeify":412,"../util":414,"../webcrypto.js":415,"asn1.js":4,"buffer":715}],403:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -49667,7 +51209,7 @@ module.exports = {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./ed25519":390,"./keys.proto":394,"buffer":722,"multihashing-async":527,"protons":573}],390:[function(require,module,exports){
+},{"./ed25519":404,"./keys.proto":408,"buffer":715,"multihashing-async":531,"protons":565}],404:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -49717,7 +51259,7 @@ exports.hashAndVerify = function (key, sig, msg, callback) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"async/setImmediate":54,"buffer":722,"tweetnacl":704}],391:[function(require,module,exports){
+},{"async/setImmediate":54,"buffer":715,"tweetnacl":697}],405:[function(require,module,exports){
 'use strict'
 
 const ecdh = require('./ecdh')
@@ -49730,7 +51272,7 @@ module.exports = (curve, callback) => {
   ecdh.generateEphmeralKeyPair(curve, callback)
 }
 
-},{"./ecdh":388}],392:[function(require,module,exports){
+},{"./ecdh":402}],406:[function(require,module,exports){
 'use strict'
 
 const protobuf = require('protons')
@@ -49843,7 +51385,7 @@ exports.marshalPrivateKey = (key, type) => {
   return key.bytes
 }
 
-},{"../random-bytes":399,"./ed25519-class":389,"./ephemeral-keys":391,"./key-stretcher":393,"./keys.proto":394,"./rsa-class":396,"libp2p-crypto-secp256k1":382,"protons":573}],393:[function(require,module,exports){
+},{"../random-bytes":413,"./ed25519-class":403,"./ephemeral-keys":405,"./key-stretcher":407,"./keys.proto":408,"./rsa-class":410,"libp2p-crypto-secp256k1":396,"protons":565}],407:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -49955,7 +51497,7 @@ module.exports = (cipherType, hash, secret, callback) => {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"../hmac":385,"async/whilst":58,"buffer":722}],394:[function(require,module,exports){
+},{"../hmac":399,"async/whilst":58,"buffer":715}],408:[function(require,module,exports){
 'use strict'
 
 module.exports = `enum KeyType {
@@ -49971,7 +51513,7 @@ message PrivateKey {
   required KeyType Type = 1;
   required bytes Data = 2;
 }`
-},{}],395:[function(require,module,exports){
+},{}],409:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -50094,7 +51636,7 @@ function derivePublicFromPrivate (jwKey) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"../nodeify":398,"../webcrypto.js":401,"./rsa-utils":397,"buffer":722}],396:[function(require,module,exports){
+},{"../nodeify":412,"../webcrypto.js":415,"./rsa-utils":411,"buffer":715}],410:[function(require,module,exports){
 'use strict'
 
 const multihashing = require('multihashing-async')
@@ -50229,7 +51771,7 @@ module.exports = {
   generateKeyPair
 }
 
-},{"./keys.proto":394,"./rsa":395,"multihashing-async":527,"protons":573}],397:[function(require,module,exports){
+},{"./keys.proto":408,"./rsa":409,"multihashing-async":531,"protons":565}],411:[function(require,module,exports){
 'use strict'
 
 const asn1 = require('asn1.js')
@@ -50345,7 +51887,7 @@ exports.jwkToPkix = function (jwk) {
   }, 'der')
 }
 
-},{"./../util":400,"asn1.js":4}],398:[function(require,module,exports){
+},{"./../util":414,"asn1.js":4}],412:[function(require,module,exports){
 'use strict'
 
 // Based on npmjs.com/nodeify but without additional `nextTick` calls
@@ -50358,7 +51900,7 @@ module.exports = function nodeify (promise, cb) {
   })
 }
 
-},{}],399:[function(require,module,exports){
+},{}],413:[function(require,module,exports){
 'use strict'
 
 const rsa = require('./keys/rsa')
@@ -50373,7 +51915,7 @@ function randomBytes (number) {
 
 module.exports = randomBytes
 
-},{"./keys/rsa":395}],400:[function(require,module,exports){
+},{"./keys/rsa":409}],414:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -50397,7 +51939,7 @@ exports.toBn = function toBn (str) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"asn1.js":4,"buffer":722}],401:[function(require,module,exports){
+},{"asn1.js":4,"buffer":715}],415:[function(require,module,exports){
 /* global self */
 
 'use strict'
@@ -50415,7 +51957,7 @@ module.exports = () => {
   throw new Error('Please use an environment with crypto support')
 }
 
-},{"webcrypto-shim":714}],402:[function(require,module,exports){
+},{"webcrypto-shim":707}],416:[function(require,module,exports){
 'use strict'
 
 const debug = require('debug')
@@ -50428,7 +51970,7 @@ module.exports = {
   multicodec: '/floodsub/1.0.0'
 }
 
-},{"debug":123}],403:[function(require,module,exports){
+},{"debug":114}],417:[function(require,module,exports){
 'use strict'
 
 const EventEmitter = require('events')
@@ -50771,7 +52313,7 @@ class FloodSub extends EventEmitter {
 
 module.exports = FloodSub
 
-},{"./config":402,"./message":404,"./peer":407,"./utils":408,"assert":719,"async/each":21,"async/setImmediate":54,"events":724,"lodash.values":463,"pull-length-prefixed":587,"pull-stream":598,"safe-buffer":654,"time-cache":701}],404:[function(require,module,exports){
+},{"./config":416,"./message":418,"./peer":421,"./utils":422,"assert":712,"async/each":21,"async/setImmediate":54,"events":717,"lodash.values":467,"pull-length-prefixed":579,"pull-stream":590,"safe-buffer":646,"time-cache":694}],418:[function(require,module,exports){
 'use strict'
 
 const protons = require('protons')
@@ -50783,7 +52325,7 @@ exports = module.exports
 exports.rpc = rpcProto
 exports.td = topicDescriptorProto
 
-},{"./rpc.proto.js":405,"./topic-descriptor.proto.js":406,"protons":573}],405:[function(require,module,exports){
+},{"./rpc.proto.js":419,"./topic-descriptor.proto.js":420,"protons":565}],419:[function(require,module,exports){
 'use strict'
 module.exports = `
 message RPC {
@@ -50803,7 +52345,7 @@ message RPC {
   }
 }`
 
-},{}],406:[function(require,module,exports){
+},{}],420:[function(require,module,exports){
 'use strict'
 module.exports = `
 // topicCID = cid(merkledag_protobuf(topicDescriptor)); (not the topic.name)
@@ -50835,7 +52377,7 @@ message TopicDescriptor {
   }
 }`
 
-},{}],407:[function(require,module,exports){
+},{}],421:[function(require,module,exports){
 'use strict'
 
 const lp = require('pull-length-prefixed')
@@ -51010,7 +52552,7 @@ class Peer {
 
 module.exports = Peer
 
-},{"./message":404,"async/setImmediate":54,"pull-length-prefixed":587,"pull-pushable":593,"pull-stream":598}],408:[function(require,module,exports){
+},{"./message":418,"async/setImmediate":54,"pull-length-prefixed":579,"pull-pushable":585,"pull-stream":590}],422:[function(require,module,exports){
 'use strict'
 
 const crypto = require('libp2p-crypto')
@@ -51080,7 +52622,7 @@ exports.ensureArray = (maybeArray) => {
   return maybeArray
 }
 
-},{"libp2p-crypto":387}],409:[function(require,module,exports){
+},{"libp2p-crypto":401}],423:[function(require,module,exports){
 'use strict'
 const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
@@ -51141,7 +52683,7 @@ function hasObservedAddr (input) {
   return input.observedAddr && input.observedAddr.length > 0
 }
 
-},{"./message":412,"multiaddr":511,"peer-id":556,"peer-info":557,"pull-length-prefixed":587,"pull-stream":598}],410:[function(require,module,exports){
+},{"./message":426,"multiaddr":515,"peer-id":548,"peer-info":549,"pull-length-prefixed":579,"pull-stream":590}],424:[function(require,module,exports){
 'use strict'
 
 exports = module.exports
@@ -51149,7 +52691,7 @@ exports.multicodec = '/ipfs/id/1.0.0'
 exports.listener = require('./listener')
 exports.dialer = require('./dialer')
 
-},{"./dialer":409,"./listener":411}],411:[function(require,module,exports){
+},{"./dialer":423,"./listener":425}],425:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -51186,7 +52728,7 @@ module.exports = (conn, pInfoSelf) => {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./message":412,"buffer":722,"pull-length-prefixed":587,"pull-stream":598}],412:[function(require,module,exports){
+},{"./message":426,"buffer":715,"pull-length-prefixed":579,"pull-stream":590}],426:[function(require,module,exports){
 'use strict'
 
 const protons = require('protons')
@@ -51218,7 +52760,7 @@ message Identify {
 
 module.exports = protons(schema).Identify
 
-},{"protons":573}],413:[function(require,module,exports){
+},{"protons":565}],427:[function(require,module,exports){
 'use strict'
 
 const Multiplex = require('multiplex')
@@ -51251,12 +52793,12 @@ exports.multicodec = MULTIPLEX_CODEC
 exports.dialer = (conn) => create(conn, false)
 exports.listener = (conn) => create(conn, true)
 
-},{"./multiplex-codec":414,"./muxer":415,"multiplex":536,"pull-stream-to-stream":597,"pump":640}],414:[function(require,module,exports){
+},{"./multiplex-codec":428,"./muxer":429,"multiplex":540,"pull-stream-to-stream":589,"pump":632}],428:[function(require,module,exports){
 'use strict'
 
 module.exports = '/mplex/6.7.0'
 
-},{}],415:[function(require,module,exports){
+},{}],429:[function(require,module,exports){
 'use strict'
 
 const EventEmitter = require('events').EventEmitter
@@ -51327,7 +52869,7 @@ function catchError (stream) {
   }
 }
 
-},{"./multiplex-codec":414,"async/setImmediate":54,"events":724,"interface-connection":205,"pull-catch":578,"pull-stream":598,"stream-to-pull-stream":698}],416:[function(require,module,exports){
+},{"./multiplex-codec":428,"async/setImmediate":54,"events":717,"interface-connection":195,"pull-catch":570,"pull-stream":590,"stream-to-pull-stream":691}],430:[function(require,module,exports){
 'use strict'
 
 module.exports = {
@@ -51335,7 +52877,7 @@ module.exports = {
   PING_LENGTH: 32
 }
 
-},{}],417:[function(require,module,exports){
+},{}],431:[function(require,module,exports){
 'use strict'
 
 const pull = require('pull-stream')
@@ -51387,7 +52929,7 @@ exports = module.exports
 exports.mount = mount
 exports.unmount = unmount
 
-},{"./constants":416,"debug":123,"pull-handshake":584,"pull-stream":598}],418:[function(require,module,exports){
+},{"./constants":430,"debug":114,"pull-handshake":576,"pull-stream":590}],432:[function(require,module,exports){
 'use strict'
 
 const handler = require('./handler')
@@ -51396,7 +52938,7 @@ exports = module.exports = require('./ping')
 exports.mount = handler.mount
 exports.unmount = handler.unmount
 
-},{"./handler":417,"./ping":419}],419:[function(require,module,exports){
+},{"./handler":431,"./ping":433}],433:[function(require,module,exports){
 'use strict'
 
 const EventEmitter = require('events').EventEmitter
@@ -51477,7 +53019,7 @@ class Ping extends EventEmitter {
 
 module.exports = Ping
 
-},{"./constants":416,"./util":420,"debug":123,"events":724,"pull-handshake":584,"pull-stream":598}],420:[function(require,module,exports){
+},{"./constants":430,"./util":434,"debug":114,"events":717,"pull-handshake":576,"pull-stream":590}],434:[function(require,module,exports){
 'use strict'
 
 const crypto = require('libp2p-crypto')
@@ -51492,7 +53034,7 @@ exports.rnd = (length) => {
   return crypto.randomBytes(length)
 }
 
-},{"./constants":416,"libp2p-crypto":387}],421:[function(require,module,exports){
+},{"./constants":430,"libp2p-crypto":401}],435:[function(require,module,exports){
 'use strict'
 
 const PeerId = require('peer-id')
@@ -51544,7 +53086,7 @@ class Railing extends EventEmitter {
 
 module.exports = Railing
 
-},{"async/setImmediate":54,"debug":123,"events":724,"multiaddr":511,"peer-id":556,"peer-info":557}],422:[function(require,module,exports){
+},{"async/setImmediate":54,"debug":114,"events":717,"multiaddr":515,"peer-id":548,"peer-info":549}],436:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -51627,7 +53169,7 @@ function ensureBuffer () {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722,"pull-length-prefixed":587,"pull-stream":598}],423:[function(require,module,exports){
+},{"buffer":715,"pull-length-prefixed":579,"pull-stream":590}],437:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -51829,7 +53371,7 @@ exports.verifyNonce = (state, n2) => {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"../support":431,"./secio.proto":428,"async/parallel":50,"async/waterfall":57,"buffer":722,"debug":123,"libp2p-crypto":387,"peer-id":556,"protons":573}],424:[function(require,module,exports){
+},{"../support":445,"./secio.proto":442,"async/parallel":50,"async/waterfall":57,"buffer":715,"debug":114,"libp2p-crypto":401,"peer-id":548,"protons":565}],438:[function(require,module,exports){
 'use strict'
 
 const debug = require('debug')
@@ -51868,7 +53410,7 @@ module.exports = function exchange (state, cb) {
   })
 }
 
-},{"../support":431,"./crypto":423,"async/waterfall":57,"debug":123}],425:[function(require,module,exports){
+},{"../support":445,"./crypto":437,"async/waterfall":57,"debug":114}],439:[function(require,module,exports){
 'use strict'
 
 const pull = require('pull-stream')
@@ -51930,7 +53472,7 @@ module.exports = function finish (state, cb) {
   })
 }
 
-},{"../etm":422,"./crypto":423,"debug":123,"pull-handshake":584,"pull-stream":598}],426:[function(require,module,exports){
+},{"../etm":436,"./crypto":437,"debug":114,"pull-handshake":576,"pull-stream":590}],440:[function(require,module,exports){
 'use strict'
 
 const series = require('async/series')
@@ -51960,7 +53502,7 @@ module.exports = function handshake (state) {
   return state.stream
 }
 
-},{"./exchange":424,"./finish":425,"./propose":427,"async/series":53}],427:[function(require,module,exports){
+},{"./exchange":438,"./finish":439,"./propose":441,"async/series":53}],441:[function(require,module,exports){
 'use strict'
 
 const debug = require('debug')
@@ -51997,7 +53539,7 @@ module.exports = function propose (state, cb) {
   })
 }
 
-},{"../support":431,"./crypto":423,"async/waterfall":57,"debug":123}],428:[function(require,module,exports){
+},{"../support":445,"./crypto":437,"async/waterfall":57,"debug":114}],442:[function(require,module,exports){
 'use strict'
 
 module.exports = `message Propose {
@@ -52013,7 +53555,7 @@ message Exchange {
   optional bytes signature = 2;
 }`
 
-},{}],429:[function(require,module,exports){
+},{}],443:[function(require,module,exports){
 'use strict'
 
 const pull = require('pull-stream')
@@ -52057,7 +53599,7 @@ module.exports = {
   }
 }
 
-},{"./handshake":426,"./state":430,"interface-connection":205,"pull-stream":598}],430:[function(require,module,exports){
+},{"./handshake":440,"./state":444,"interface-connection":195,"pull-stream":590}],444:[function(require,module,exports){
 'use strict'
 
 const handshake = require('pull-handshake')
@@ -52131,7 +53673,7 @@ class State {
 
 module.exports = State
 
-},{"pull-defer":580,"pull-handshake":584}],431:[function(require,module,exports){
+},{"pull-defer":572,"pull-handshake":576}],445:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -52270,870 +53812,7 @@ exports.read = function read (reader, cb) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"async/parallel":50,"buffer":722,"libp2p-crypto":387,"multihashing-async":527,"pull-length-prefixed":587,"pull-stream":598}],432:[function(require,module,exports){
-'use strict'
-
-const identify = require('libp2p-identify')
-const multistream = require('multistream-select')
-const waterfall = require('async/waterfall')
-const debug = require('debug')
-const log = debug('libp2p:swarm:connection')
-const setImmediate = require('async/setImmediate')
-
-const protocolMuxer = require('./protocol-muxer')
-const plaintext = require('./plaintext')
-
-module.exports = function connection (swarm) {
-  return {
-    addUpgrade () {},
-
-    addStreamMuxer (muxer) {
-      // for dialing
-      swarm.muxers[muxer.multicodec] = muxer
-
-      // for listening
-      swarm.handle(muxer.multicodec, (protocol, conn) => {
-        const muxedConn = muxer.listener(conn)
-
-        muxedConn.on('stream', (conn) => {
-          protocolMuxer(swarm.protocols, conn)
-        })
-
-        // If identify is enabled
-        //   1. overload getPeerInfo
-        //   2. call getPeerInfo
-        //   3. add this conn to the pool
-        if (swarm.identify) {
-          // overload peerInfo to use Identify instead
-          conn.getPeerInfo = (cb) => {
-            const conn = muxedConn.newStream()
-            const ms = new multistream.Dialer()
-
-            waterfall([
-              (cb) => ms.handle(conn, cb),
-              (cb) => ms.select(identify.multicodec, cb),
-              (conn, cb) => identify.dialer(conn, cb),
-              (peerInfo, observedAddrs, cb) => {
-                observedAddrs.forEach((oa) => {
-                  swarm._peerInfo.multiaddrs.addSafe(oa)
-                })
-                cb(null, peerInfo)
-              }
-            ], cb)
-          }
-
-          conn.getPeerInfo((err, peerInfo) => {
-            if (err) {
-              return log('Identify not successful')
-            }
-            const b58Str = peerInfo.id.toB58String()
-
-            swarm.muxedConns[b58Str] = { muxer: muxedConn }
-
-            if (peerInfo.multiaddrs.size > 0) {
-              // with incomming conn and through identify, going to pick one
-              // of the available multiaddrs from the other peer as the one
-              // I'm connected to as we really can't be sure at the moment
-              // TODO add this consideration to the connection abstraction!
-              peerInfo.connect(peerInfo.multiaddrs.toArray()[0])
-            } else {
-              // for the case of websockets in the browser, where peers have
-              // no addr, use just their IPFS id
-              peerInfo.connect(`/ipfs/${b58Str}`)
-            }
-            peerInfo = swarm._peerBook.put(peerInfo)
-
-            muxedConn.on('close', () => {
-              delete swarm.muxedConns[b58Str]
-              peerInfo.disconnect()
-              peerInfo = swarm._peerBook.put(peerInfo)
-              setImmediate(() => swarm.emit('peer-mux-closed', peerInfo))
-            })
-
-            setImmediate(() => swarm.emit('peer-mux-established', peerInfo))
-          })
-        }
-
-        return conn
-      })
-    },
-
-    reuse () {
-      swarm.identify = true
-      swarm.handle(identify.multicodec, (protocol, conn) => {
-        identify.listener(conn, swarm._peerInfo)
-      })
-    },
-
-    crypto (tag, encrypt) {
-      if (!tag && !encrypt) {
-        tag = plaintext.tag
-        encrypt = plaintext.encrypt
-      }
-
-      swarm.unhandle(swarm.crypto.tag)
-      swarm.handle(tag, (protocol, conn) => {
-        const id = swarm._peerInfo.id
-        const secure = encrypt(id, id.privKey, conn)
-
-        protocolMuxer(swarm.protocols, secure)
-      })
-
-      swarm.crypto = {tag, encrypt}
-    }
-  }
-}
-
-},{"./plaintext":438,"./protocol-muxer":439,"async/setImmediate":54,"async/waterfall":57,"debug":123,"libp2p-identify":410,"multistream-select":541}],433:[function(require,module,exports){
-'use strict'
-
-const multistream = require('multistream-select')
-const Connection = require('interface-connection').Connection
-const setImmediate = require('async/setImmediate')
-const getPeerInfo = require('./get-peer-info')
-const debug = require('debug')
-const log = debug('libp2p:swarm:dial')
-
-const protocolMuxer = require('./protocol-muxer')
-
-function dial (swarm) {
-  return (peer, protocol, callback) => {
-    if (typeof protocol === 'function') {
-      callback = protocol
-      protocol = null
-    }
-
-    callback = callback || function noop () {}
-    const pi = getPeerInfo(peer, swarm._peerBook)
-
-    const proxyConn = new Connection()
-
-    const b58Id = pi.id.toB58String()
-    log('dialing %s', b58Id)
-
-    if (!swarm.muxedConns[b58Id]) {
-      if (!swarm.conns[b58Id]) {
-        attemptDial(pi, (err, conn) => {
-          if (err) {
-            return callback(err)
-          }
-          gotWarmedUpConn(conn)
-        })
-      } else {
-        const conn = swarm.conns[b58Id]
-        swarm.conns[b58Id] = undefined
-        gotWarmedUpConn(conn)
-      }
-    } else {
-      if (!protocol) {
-        return callback()
-      }
-      gotMuxer(swarm.muxedConns[b58Id].muxer)
-    }
-
-    return proxyConn
-
-    function gotWarmedUpConn (conn) {
-      conn.setPeerInfo(pi)
-      attemptMuxerUpgrade(conn, (err, muxer) => {
-        if (!protocol) {
-          if (err) {
-            swarm.conns[b58Id] = conn
-          }
-          return callback()
-        }
-
-        if (err) {
-          // couldn't upgrade to Muxer, it is ok
-          protocolHandshake(conn, protocol, callback)
-        } else {
-          gotMuxer(muxer)
-        }
-      })
-    }
-
-    function gotMuxer (muxer) {
-      if (swarm.identify) {
-        // TODO: Consider:
-        // 1. overload getPeerInfo
-        // 2. exec identify (through getPeerInfo)
-        // 3. update the peerInfo that is already stored in the conn
-      }
-
-      openConnInMuxedConn(muxer, (conn) => {
-        protocolHandshake(conn, protocol, callback)
-      })
-    }
-
-    function attemptDial (pi, cb) {
-      const tKeys = swarm.availableTransports(pi)
-
-      if (tKeys.length === 0) {
-        return cb(new Error('No available transport to dial to'))
-      }
-
-      nextTransport(tKeys.shift())
-
-      function nextTransport (key) {
-        swarm.transport.dial(key, pi, (err, conn) => {
-          if (err) {
-            if (tKeys.length === 0) {
-              return cb(new Error('Could not dial in any of the transports'))
-            }
-            return nextTransport(tKeys.shift())
-          }
-
-          cryptoDial()
-
-          function cryptoDial () {
-            const ms = new multistream.Dialer()
-            ms.handle(conn, (err) => {
-              if (err) {
-                return cb(err)
-              }
-
-              const id = swarm._peerInfo.id
-              log('selecting crypto: %s', swarm.crypto.tag)
-              ms.select(swarm.crypto.tag, (err, conn) => {
-                if (err) {
-                  return cb(err)
-                }
-
-                const wrapped = swarm.crypto.encrypt(id, id.privKey, conn)
-                cb(null, wrapped)
-              })
-            })
-          }
-        })
-      }
-    }
-
-    function attemptMuxerUpgrade (conn, cb) {
-      const muxers = Object.keys(swarm.muxers)
-      if (muxers.length === 0) {
-        return cb(new Error('no muxers available'))
-      }
-
-      // 1. try to handshake in one of the muxers available
-      // 2. if succeeds
-      //  - add the muxedConn to the list of muxedConns
-      //  - add incomming new streams to connHandler
-
-      const ms = new multistream.Dialer()
-      ms.handle(conn, (err) => {
-        if (err) {
-          return callback(new Error('multistream not supported'))
-        }
-
-        nextMuxer(muxers.shift())
-      })
-
-      function nextMuxer (key) {
-        log('selecting %s', key)
-        ms.select(key, (err, conn) => {
-          if (err) {
-            if (muxers.length === 0) {
-              cb(new Error('could not upgrade to stream muxing'))
-            } else {
-              nextMuxer(muxers.shift())
-            }
-            return
-          }
-
-          const muxedConn = swarm.muxers[key].dialer(conn)
-          swarm.muxedConns[b58Id] = {}
-          swarm.muxedConns[b58Id].muxer = muxedConn
-          // should not be needed anymore - swarm.muxedConns[b58Id].conn = conn
-
-          muxedConn.once('close', () => {
-            const b58Str = pi.id.toB58String()
-            delete swarm.muxedConns[b58Str]
-            pi.disconnect()
-            swarm._peerBook.get(b58Str).disconnect()
-            setImmediate(() => swarm.emit('peer-mux-closed', pi))
-          })
-
-          // For incoming streams, in case identify is on
-          muxedConn.on('stream', (conn) => {
-            protocolMuxer(swarm.protocols, conn)
-          })
-
-          setImmediate(() => swarm.emit('peer-mux-established', pi))
-
-          cb(null, muxedConn)
-        })
-      }
-    }
-
-    function openConnInMuxedConn (muxer, cb) {
-      cb(muxer.newStream())
-    }
-
-    function protocolHandshake (conn, protocol, cb) {
-      const ms = new multistream.Dialer()
-      ms.handle(conn, (err) => {
-        if (err) {
-          return cb(err)
-        }
-        ms.select(protocol, (err, conn) => {
-          if (err) {
-            return cb(err)
-          }
-          proxyConn.setInnerConn(conn)
-          cb(null, proxyConn)
-        })
-      })
-    }
-  }
-}
-
-module.exports = dial
-
-},{"./get-peer-info":434,"./protocol-muxer":439,"async/setImmediate":54,"debug":123,"interface-connection":205,"multistream-select":541}],434:[function(require,module,exports){
-'use strict'
-
-const PeerId = require('peer-id')
-const PeerInfo = require('peer-info')
-const multiaddr = require('multiaddr')
-
-/*
- * Helper method to check the data type of peer and convert it to PeerInfo
- */
-function getPeerInfo (peer, peerBook) {
-  let p
-
-  // PeerInfo
-  if (PeerInfo.isPeerInfo(peer)) {
-    p = peer
-  // Multiaddr instance (not string)
-  } else if (multiaddr.isMultiaddr(peer)) {
-    const peerIdB58Str = peer.getPeerId()
-    try {
-      p = peerBook.get(peerIdB58Str)
-    } catch (err) {
-      p = new PeerInfo(PeerId.createFromB58String(peerIdB58Str))
-    }
-    p.multiaddrs.add(peer)
-
-  // PeerId
-  } else if (PeerId.isPeerId(peer)) {
-    const peerIdB58Str = peer.toB58String()
-    try {
-      p = peerBook.get(peerIdB58Str)
-    } catch (err) {
-      throw new Error('Couldnt get PeerInfo')
-    }
-  } else {
-    throw new Error('peer type not recognized')
-  }
-
-  return p
-}
-
-module.exports = getPeerInfo
-
-},{"multiaddr":511,"peer-id":556,"peer-info":557}],435:[function(require,module,exports){
-'use strict'
-
-const util = require('util')
-const EE = require('events').EventEmitter
-const each = require('async/each')
-const series = require('async/series')
-const transport = require('./transport')
-const connection = require('./connection')
-const getPeerInfo = require('./get-peer-info')
-const dial = require('./dial')
-const protocolMuxer = require('./protocol-muxer')
-const plaintext = require('./plaintext')
-const assert = require('assert')
-
-exports = module.exports = Swarm
-
-util.inherits(Swarm, EE)
-
-function Swarm (peerInfo, peerBook) {
-  if (!(this instanceof Swarm)) {
-    return new Swarm(peerInfo)
-  }
-
-  assert(peerInfo, 'You must provide a `peerInfo`')
-  assert(peerBook, 'You must provide a `peerBook`')
-
-  this._peerInfo = peerInfo
-  this._peerBook = peerBook
-
-  this.setMaxListeners(Infinity)
-  // transports --
-  // { key: transport }; e.g { tcp: <tcp> }
-  this.transports = {}
-
-  // connections --
-  // { peerIdB58: { conn: <conn> }}
-  this.conns = {}
-
-  // {
-  //   peerIdB58: {
-  //     muxer: <muxer>
-  //     conn: <transport socket> // to extract info required for the Identify Protocol
-  //   }
-  // }
-  this.muxedConns = {}
-
-  // { protocol: handler }
-  this.protocols = {}
-
-  // { muxerCodec: <muxer> } e.g { '/spdy/0.3.1': spdy }
-  this.muxers = {}
-
-  // is the Identify protocol enabled?
-  this.identify = false
-
-  // Crypto details
-  this.crypto = plaintext
-
-  this.transport = transport(this)
-  this.connection = connection(this)
-
-  this.availableTransports = (pi) => {
-    const myAddrs = pi.multiaddrs.toArray()
-    const myTransports = Object.keys(this.transports)
-
-    // Only listen on transports we actually have addresses for
-    return myTransports.filter((ts) => this.transports[ts].filter(myAddrs).length > 0)
-  }
-
-  // higher level (public) API
-  this.dial = dial(this)
-
-  // Start listening on all available transports
-  this.listen = (callback) => {
-    each(this.availableTransports(peerInfo), (ts, cb) => {
-      // Listen on the given transport
-      this.transport.listen(ts, {}, null, cb)
-    }, callback)
-  }
-
-  this.handle = (protocol, handlerFunc, matchFunc) => {
-    this.protocols[protocol] = {
-      handlerFunc: handlerFunc,
-      matchFunc: matchFunc
-    }
-  }
-
-  this.handle(this.crypto.tag, (protocol, conn) => {
-    const peerId = this._peerInfo.id
-    const wrapped = this.crypto.encrypt(peerId, peerId.privKey, conn)
-    return protocolMuxer(this.protocols, wrapped)
-  })
-
-  this.unhandle = (protocol) => {
-    if (this.protocols[protocol]) {
-      delete this.protocols[protocol]
-    }
-  }
-
-  this.hangUp = (peer, callback) => {
-    const peerInfo = getPeerInfo(peer, this.peerBook)
-    const key = peerInfo.id.toB58String()
-    if (this.muxedConns[key]) {
-      const muxer = this.muxedConns[key].muxer
-      muxer.once('close', () => {
-        delete this.muxedConns[key]
-        callback()
-      })
-      muxer.end()
-    } else {
-      callback()
-    }
-  }
-
-  this.close = (callback) => {
-    series([
-      (cb) => each(this.muxedConns, (conn, cb) => {
-        conn.muxer.end((err) => {
-          // If OK things are fine, and someone just shut down
-          if (err && err.message !== 'Fatal error: OK') {
-            return cb(err)
-          }
-          cb()
-        })
-      }, cb),
-      (cb) => {
-        each(this.transports, (transport, cb) => {
-          each(transport.listeners, (listener, cb) => {
-            listener.close(cb)
-          }, cb)
-        }, cb)
-      }
-    ], callback)
-  }
-}
-
-},{"./connection":432,"./dial":433,"./get-peer-info":434,"./plaintext":438,"./protocol-muxer":439,"./transport":440,"assert":719,"async/each":21,"async/series":53,"events":724,"util":759}],436:[function(require,module,exports){
-'use strict'
-
-const map = require('async/map')
-const debug = require('debug')
-
-const log = debug('libp2p:swarm:dialer')
-
-const DialQueue = require('./queue')
-
-/**
- * Track dials per peer and limited them.
- */
-class LimitDialer {
-  /**
-   * Create a new dialer.
-   *
-   * @param {number} perPeerLimit
-   * @param {number} dialTimeout
-   */
-  constructor (perPeerLimit, dialTimeout) {
-    log('create: %s peer limit, %s dial timeout', perPeerLimit, dialTimeout)
-    this.perPeerLimit = perPeerLimit
-    this.dialTimeout = dialTimeout
-    this.queues = new Map()
-  }
-
-  /**
-   * Dial a list of multiaddrs on the given transport.
-   *
-   * @param {PeerId} peer
-   * @param {SwarmTransport} transport
-   * @param {Array<Multiaddr>} addrs
-   * @param {function(Error, Connection)} callback
-   * @returns {void}
-   */
-  dialMany (peer, transport, addrs, callback) {
-    log('dialMany:start')
-    // we use a token to track if we want to cancel following dials
-    const token = { cancel: false }
-
-    map(addrs, (m, cb) => {
-      this.dialSingle(peer, transport, m, token, cb)
-    }, (err, results) => {
-      if (err) {
-        return callback(err)
-      }
-
-      const success = results.filter((res) => res.conn)
-      if (success.length > 0) {
-        log('dialMany:success')
-        return callback(null, success[0])
-      }
-
-      log('dialMany:error')
-      const error = new Error('Failed to dial any provided address')
-      error.errors = results
-        .filter((res) => res.error)
-        .map((res) => res.error)
-      return callback(error)
-    })
-  }
-
-  /**
-   * Dial a single multiaddr on the given transport.
-   *
-   * @param {PeerId} peer
-   * @param {SwarmTransport} transport
-   * @param {Multiaddr} addr
-   * @param {CancelToken} token
-   * @param {function(Error, Connection)} callback
-   * @returns {void}
-   */
-  dialSingle (peer, transport, addr, token, callback) {
-    const ps = peer.toB58String()
-    log('dialSingle: %s:%s', ps, addr.toString())
-    let q
-    if (this.queues.has(ps)) {
-      q = this.queues.get(ps)
-    } else {
-      q = new DialQueue(this.perPeerLimit, this.dialTimeout)
-      this.queues.set(ps, q)
-    }
-
-    q.push(transport, addr, token, callback)
-  }
-}
-
-module.exports = LimitDialer
-
-},{"./queue":437,"async/map":49,"debug":123}],437:[function(require,module,exports){
-'use strict'
-
-const Connection = require('interface-connection').Connection
-const pull = require('pull-stream')
-const timeout = require('async/timeout')
-const queue = require('async/queue')
-const debug = require('debug')
-
-const log = debug('libp2p:swarm:dialer:queue')
-
-/**
- * Queue up the amount of dials to a given peer.
- */
-class DialQueue {
-  /**
-   * Create a new dial queue.
-   *
-   * @param {number} limit
-   * @param {number} dialTimeout
-   */
-  constructor (limit, dialTimeout) {
-    this.dialTimeout = dialTimeout
-
-    this.queue = queue((task, cb) => {
-      this._doWork(task.transport, task.addr, task.token, cb)
-    }, limit)
-  }
-
-  /**
-   * The actual work done by the queue.
-   *
-   * @param {SwarmTransport} transport
-   * @param {Multiaddr} addr
-   * @param {CancelToken} token
-   * @param {function(Error, Connection)} callback
-   * @returns {void}
-   * @private
-   */
-  _doWork (transport, addr, token, callback) {
-    log('work')
-    this._dialWithTimeout(transport, addr, (err, conn) => {
-      if (err) {
-        log('work:error')
-        return callback(null, {error: err})
-      }
-
-      if (token.cancel) {
-        log('work:cancel')
-        // clean up already done dials
-        pull(pull.empty(), conn)
-        // TODO: proper cleanup once the connection interface supports it
-        // return conn.close(() => callback(new Error('Manual cancel'))
-        return callback(null, {cancel: true})
-      }
-
-      // one is enough
-      token.cancel = true
-
-      log('work:success')
-
-      const proxyConn = new Connection()
-      proxyConn.setInnerConn(conn)
-      callback(null, { multiaddr: addr, conn: conn })
-    })
-  }
-
-  /**
-   * Dial the given transport, timing out with the set timeout.
-   *
-   * @param {SwarmTransport} transport
-   * @param {Multiaddr} addr
-   * @param {function(Error, Connection)} callback
-   * @returns {void}
-   *
-   * @private
-   */
-  _dialWithTimeout (transport, addr, callback) {
-    timeout((cb) => {
-      const conn = transport.dial(addr, (err) => {
-        if (err) {
-          return cb(err)
-        }
-
-        cb(null, conn)
-      })
-    }, this.dialTimeout)(callback)
-  }
-
-  /**
-   * Add new work to the queue.
-   *
-   * @param {SwarmTransport} transport
-   * @param {Multiaddr} addr
-   * @param {CancelToken} token
-   * @param {function(Error, Connection)} callback
-   * @returns {void}
-   */
-  push (transport, addr, token, callback) {
-    this.queue.push({transport, addr, token}, callback)
-  }
-}
-
-module.exports = DialQueue
-
-},{"async/queue":51,"async/timeout":56,"debug":123,"interface-connection":205,"pull-stream":598}],438:[function(require,module,exports){
-'use strict'
-
-module.exports = {
-  tag: '/plaintext/1.0.0',
-  encrypt (id, privKey, conn) {
-    return conn
-  }
-}
-
-},{}],439:[function(require,module,exports){
-'use strict'
-
-const multistream = require('multistream-select')
-
-module.exports = function protocolMuxer (protocols, conn) {
-  const ms = new multistream.Listener()
-
-  Object.keys(protocols).forEach((protocol) => {
-    if (!protocol) {
-      return
-    }
-
-    ms.addHandler(protocol, protocols[protocol].handlerFunc, protocols[protocol].matchFunc)
-  })
-
-  ms.handle(conn, (err) => {
-    if (err) {
-      // the multistream handshake failed
-    }
-  })
-}
-
-},{"multistream-select":541}],440:[function(require,module,exports){
-'use strict'
-
-const parallel = require('async/parallel')
-const once = require('once')
-const debug = require('debug')
-const log = debug('libp2p:swarm:transport')
-
-const protocolMuxer = require('./protocol-muxer')
-const LimitDialer = require('./limit-dialer')
-
-// number of concurrent outbound dials to make per peer, same as go-libp2p-swarm
-const defaultPerPeerRateLimit = 8
-
-// the amount of time a single dial has to succeed
-// TODO this should be exposed as a option
-const dialTimeout = 30 * 1000
-
-module.exports = function (swarm) {
-  const dialer = new LimitDialer(defaultPerPeerRateLimit, dialTimeout)
-
-  return {
-    add (key, transport, options, callback) {
-      if (typeof options === 'function') {
-        callback = options
-        options = {}
-      }
-
-      callback = callback || noop
-
-      log('adding %s', key)
-      if (swarm.transports[key]) {
-        throw new Error('There is already a transport with this key')
-      }
-      swarm.transports[key] = transport
-      if (!swarm.transports[key].listeners) {
-        swarm.transports[key].listeners = []
-      }
-
-      callback()
-    },
-
-    dial (key, pi, callback) {
-      const t = swarm.transports[key]
-      let multiaddrs = pi.multiaddrs.toArray()
-
-      if (!Array.isArray(multiaddrs)) {
-        multiaddrs = [multiaddrs]
-      }
-      log('dialing %s', key, multiaddrs.map((m) => m.toString()))
-      // filter the multiaddrs that are actually valid for this transport (use a func from the transport itself) (maybe even make the transport do that)
-      multiaddrs = dialables(t, multiaddrs)
-
-      dialer.dialMany(pi.id, t, multiaddrs, (err, success) => {
-        if (err) {
-          return callback(err)
-        }
-
-        pi.connect(success.multiaddr)
-        swarm._peerBook.put(pi)
-        callback(null, success.conn)
-      })
-    },
-
-    listen (key, options, handler, callback) {
-      // if no handler is passed, we pass conns to protocolMuxer
-      if (!handler) {
-        handler = protocolMuxer.bind(null, swarm.protocols)
-      }
-
-      const multiaddrs = dialables(swarm.transports[key], swarm._peerInfo.multiaddrs.distinct())
-
-      const transport = swarm.transports[key]
-
-      if (!transport.listeners) {
-        transport.listeners = []
-      }
-
-      let freshMultiaddrs = []
-
-      const createListeners = multiaddrs.map((ma) => {
-        return (cb) => {
-          const done = once(cb)
-          const listener = transport.createListener(handler)
-          listener.once('error', done)
-
-          listener.listen(ma, (err) => {
-            if (err) {
-              return done(err)
-            }
-            listener.removeListener('error', done)
-            listener.getAddrs((err, addrs) => {
-              if (err) {
-                return done(err)
-              }
-              freshMultiaddrs = freshMultiaddrs.concat(addrs)
-              transport.listeners.push(listener)
-              done()
-            })
-          })
-        }
-      })
-
-      parallel(createListeners, (err) => {
-        if (err) {
-          return callback(err)
-        }
-
-        // cause we can listen on port 0 or 0.0.0.0
-        swarm._peerInfo.multiaddrs.replace(multiaddrs, freshMultiaddrs)
-        callback()
-      })
-    },
-
-    close (key, callback) {
-      const transport = swarm.transports[key]
-
-      if (!transport) {
-        return callback(new Error(`Trying to close non existing transport: ${key}`))
-      }
-
-      parallel(transport.listeners.map((listener) => {
-        return (cb) => {
-          listener.close(cb)
-        }
-      }), callback)
-    }
-  }
-}
-
-function dialables (tp, multiaddrs) {
-  return tp.filter(multiaddrs)
-}
-
-function noop () {}
-
-},{"./limit-dialer":436,"./protocol-muxer":439,"async/parallel":50,"debug":123,"once":552}],441:[function(require,module,exports){
+},{"async/parallel":50,"buffer":715,"libp2p-crypto":401,"multihashing-async":531,"pull-length-prefixed":579,"pull-stream":590}],446:[function(require,module,exports){
 'use strict'
 
 const debug = require('debug')
@@ -53366,7 +54045,7 @@ class WebRTCStar {
 
 module.exports = WebRTCStar
 
-},{"./utils":442,"async/setImmediate":54,"debug":123,"events":724,"interface-connection":205,"mafmt":502,"multiaddr":511,"once":552,"peer-id":556,"peer-info":557,"simple-peer":678,"socket.io-client":682,"stream-to-pull-stream":698,"webrtcsupport":715}],442:[function(require,module,exports){
+},{"./utils":447,"async/setImmediate":54,"debug":114,"events":717,"interface-connection":195,"mafmt":506,"multiaddr":515,"once":544,"peer-id":548,"peer-info":549,"simple-peer":670,"socket.io-client":675,"stream-to-pull-stream":691,"webrtcsupport":708}],447:[function(require,module,exports){
 'use strict'
 
 const multiaddr = require('multiaddr')
@@ -53412,7 +54091,7 @@ exports = module.exports
 exports.cleanUrlSIO = cleanUrlSIO
 exports.cleanMultiaddr = cleanMultiaddr
 
-},{"multiaddr":511}],443:[function(require,module,exports){
+},{"multiaddr":515}],448:[function(require,module,exports){
 'use strict'
 
 const connect = require('pull-ws/client')
@@ -53482,7 +54161,7 @@ class WebSockets {
 
 module.exports = WebSockets
 
-},{"./listener":444,"./ma-to-url":445,"debug":123,"interface-connection":205,"lodash.includes":453,"mafmt":502,"pull-ws/client":633}],444:[function(require,module,exports){
+},{"./listener":449,"./ma-to-url":450,"debug":114,"interface-connection":195,"lodash.includes":457,"mafmt":506,"pull-ws/client":625}],449:[function(require,module,exports){
 'use strict'
 
 const Connection = require('interface-connection').Connection
@@ -53557,7 +54236,7 @@ module.exports = (options, handler) => {
   return listener
 }
 
-},{"interface-connection":205,"lodash.includes":453,"multiaddr":511,"os":730,"pull-ws/server":721}],445:[function(require,module,exports){
+},{"interface-connection":195,"lodash.includes":457,"multiaddr":515,"os":723,"pull-ws/server":714}],450:[function(require,module,exports){
 'use strict'
 
 const debug = require('debug')
@@ -53596,335 +54275,7 @@ function maToUrl (ma) {
 
 module.exports = maToUrl
 
-},{"debug":123}],446:[function(require,module,exports){
-'use strict'
-
-const EventEmitter = require('events').EventEmitter
-const assert = require('assert')
-
-const setImmediate = require('async/setImmediate')
-const each = require('async/each')
-const series = require('async/series')
-
-const Ping = require('libp2p-ping')
-const Swarm = require('libp2p-swarm')
-const PeerId = require('peer-id')
-const PeerInfo = require('peer-info')
-const PeerBook = require('peer-book')
-const mafmt = require('mafmt')
-const multiaddr = require('multiaddr')
-
-exports = module.exports
-
-const NOT_STARTED_ERROR_MESSAGE = 'The libp2p node is not started yet'
-
-class Node extends EventEmitter {
-  constructor (_modules, _peerInfo, _peerBook, _options) {
-    super()
-    assert(_modules, 'requires modules to equip libp2p with features')
-    assert(_peerInfo, 'requires a PeerInfo instance')
-
-    this.modules = _modules
-    this.peerInfo = _peerInfo
-    this.peerBook = _peerBook || new PeerBook()
-    _options = _options || {}
-
-    this._isStarted = false
-
-    this.swarm = new Swarm(this.peerInfo, this.peerBook)
-
-    // Attach stream multiplexers
-    if (this.modules.connection && this.modules.connection.muxer) {
-      let muxers = this.modules.connection.muxer
-      muxers = Array.isArray(muxers) ? muxers : [muxers]
-      muxers.forEach((muxer) => this.swarm.connection.addStreamMuxer(muxer))
-
-      // If muxer exists, we can use Identify
-      this.swarm.connection.reuse()
-
-      // Received incommind dial and muxer upgrade happened,
-      // reuse this muxed connection
-      this.swarm.on('peer-mux-established', (peerInfo) => {
-        this.emit('peer:connect', peerInfo)
-        this.peerBook.put(peerInfo)
-      })
-
-      this.swarm.on('peer-mux-closed', (peerInfo) => {
-        this.emit('peer:disconnect', peerInfo)
-      })
-    }
-
-    // Attach crypto channels
-    if (this.modules.connection && this.modules.connection.crypto) {
-      let cryptos = this.modules.connection.crypto
-      cryptos = Array.isArray(cryptos) ? cryptos : [cryptos]
-      cryptos.forEach((crypto) => {
-        this.swarm.connection.crypto(crypto.tag, crypto.encrypt)
-      })
-    }
-
-    // Attach discovery mechanisms
-    if (this.modules.discovery) {
-      let discoveries = this.modules.discovery
-      discoveries = Array.isArray(discoveries) ? discoveries : [discoveries]
-
-      discoveries.forEach((discovery) => {
-        discovery.on('peer', (peerInfo) => this.emit('peer:discovery', peerInfo))
-      })
-    }
-
-    // Mount default protocols
-    Ping.mount(this.swarm)
-
-    // dht provided components (peerRouting, contentRouting, dht)
-    if (_modules.DHT) {
-      this._dht = new this.modules.DHT(this.swarm, {
-        kBucketSize: 20,
-        datastoer: _options.DHT && _options.DHT.datastore
-      })
-    }
-
-    this.peerRouting = {
-      findPeer: (id, callback) => {
-        if (!this._dht) {
-          return callback(new Error('DHT is not available'))
-        }
-
-        this._dht.findPeer(id, callback)
-      }
-    }
-
-    this.contentRouting = {
-      findProviders: (key, timeout, callback) => {
-        if (!this._dht) {
-          return callback(new Error('DHT is not available'))
-        }
-
-        this._dht.findProviders(key, timeout, callback)
-      },
-      provide: (key, callback) => {
-        if (!this._dht) {
-          return callback(new Error('DHT is not available'))
-        }
-
-        this._dht.provide(key, callback)
-      }
-    }
-
-    this.dht = {
-      put: (key, value, callback) => {
-        if (!this._dht) {
-          return callback(new Error('DHT is not available'))
-        }
-
-        this._dht.put(key, value, callback)
-      },
-      get: (key, callback) => {
-        if (!this._dht) {
-          return callback(new Error('DHT is not available'))
-        }
-
-        this._dht.get(key, callback)
-      },
-      getMany (key, nVals, callback) {
-        if (!this._dht) {
-          return callback(new Error('DHT is not available'))
-        }
-
-        this._dht.getMany(key, nVals, callback)
-      }
-    }
-  }
-
-  /*
-   * Start the libp2p node
-   *   - create listeners on the multiaddrs the Peer wants to listen
-   */
-  start (callback) {
-    if (!this.modules.transport) {
-      return callback(new Error('no transports were present'))
-    }
-
-    let ws
-    let transports = this.modules.transport
-
-    transports = Array.isArray(transports) ? transports : [transports]
-
-    // so that we can have webrtc-star addrs without adding manually the id
-    const maOld = []
-    const maNew = []
-    this.peerInfo.multiaddrs.forEach((ma) => {
-      if (!mafmt.IPFS.matches(ma)) {
-        maOld.push(ma)
-        maNew.push(ma.encapsulate('/ipfs/' + this.peerInfo.id.toB58String()))
-      }
-    })
-    this.peerInfo.multiaddrs.replace(maOld, maNew)
-    const multiaddrs = this.peerInfo.multiaddrs.toArray()
-
-    transports.forEach((transport) => {
-      if (transport.filter(multiaddrs).length > 0) {
-        this.swarm.transport.add(
-          transport.tag || transport.constructor.name, transport)
-      } else if (transport.constructor &&
-                 transport.constructor.name === 'WebSockets') {
-        // TODO find a cleaner way to signal that a transport is always
-        // used for dialing, even if no listener
-        ws = transport
-      }
-    })
-
-    series([
-      (cb) => this.swarm.listen(cb),
-      (cb) => {
-        if (ws) {
-          // always add dialing on websockets
-          this.swarm.transport.add(ws.tag || ws.constructor.name, ws)
-        }
-
-        // all transports need to be setup before discover starts
-        if (this.modules.discovery) {
-          return each(this.modules.discovery, (d, cb) => d.start(cb), cb)
-        }
-        cb()
-      },
-      (cb) => {
-        // TODO: chicken-and-egg problem:
-        // have to set started here because DHT requires libp2p is already started
-        this._isStarted = true
-        if (this._dht) {
-          return this._dht.start(cb)
-        }
-        cb()
-      },
-      (cb) => {
-        this.emit('start')
-        cb()
-      }
-    ], callback)
-  }
-
-  /*
-   * Stop the libp2p node by closing its listeners and open connections
-   */
-  stop (callback) {
-    this._isStarted = false
-
-    if (this.modules.discovery) {
-      this.modules.discovery.forEach((discovery) => {
-        setImmediate(() => discovery.stop(() => {}))
-      })
-    }
-
-    series([
-      (cb) => {
-        if (this._dht) {
-          return this._dht.stop(cb)
-        }
-        cb()
-      },
-      (cb) => this.swarm.close(cb),
-      (cb) => {
-        this.emit('stop')
-        cb()
-      }
-    ], callback)
-  }
-
-  isStarted () {
-    return this._isStarted
-  }
-
-  ping (peer, callback) {
-    assert(this.isStarted(), NOT_STARTED_ERROR_MESSAGE)
-    this._getPeerInfo(peer, (err, peerInfo) => {
-      if (err) {
-        return callback(err)
-      }
-
-      callback(null, new Ping(this.swarm, peerInfo))
-    })
-  }
-
-  dial (peer, protocol, callback) {
-    assert(this.isStarted(), NOT_STARTED_ERROR_MESSAGE)
-
-    if (typeof protocol === 'function') {
-      callback = protocol
-      protocol = undefined
-    }
-
-    this._getPeerInfo(peer, (err, peerInfo) => {
-      if (err) {
-        return callback(err)
-      }
-
-      this.swarm.dial(peerInfo, protocol, (err, conn) => {
-        if (err) {
-          return callback(err)
-        }
-        this.peerBook.put(peerInfo)
-        callback(null, conn)
-      })
-    })
-  }
-
-  hangUp (peer, callback) {
-    assert(this.isStarted(), NOT_STARTED_ERROR_MESSAGE)
-
-    this._getPeerInfo(peer, (err, peerInfo) => {
-      if (err) {
-        return callback(err)
-      }
-
-      this.swarm.hangUp(peerInfo, callback)
-    })
-  }
-
-  handle (protocol, handlerFunc, matchFunc) {
-    this.swarm.handle(protocol, handlerFunc, matchFunc)
-  }
-
-  unhandle (protocol) {
-    this.swarm.unhandle(protocol)
-  }
-
-  /*
-   * Helper method to check the data type of peer and convert it to PeerInfo
-   */
-  _getPeerInfo (peer, callback) {
-    let p
-    // PeerInfo
-    if (PeerInfo.isPeerInfo(peer)) {
-      p = peer
-    // Multiaddr instance (not string)
-    } else if (multiaddr.isMultiaddr(peer)) {
-      const peerIdB58Str = peer.getPeerId()
-      try {
-        p = this.peerBook.get(peerIdB58Str)
-      } catch (err) {
-        p = new PeerInfo(PeerId.createFromB58String(peerIdB58Str))
-      }
-      p.multiaddrs.add(peer)
-    // PeerId
-    } else if (PeerId.isPeerId(peer)) {
-      const peerIdB58Str = peer.toB58String()
-      try {
-        p = this.peerBook.get(peerIdB58Str)
-      } catch (err) {
-        return this.peerRouting.findPeer(peer, callback)
-      }
-    } else {
-      return setImmediate(() => callback(new Error('peer type not recognized')))
-    }
-
-    setImmediate(() => callback(null, p))
-  }
-}
-
-module.exports = Node
-
-},{"assert":719,"async/each":21,"async/series":53,"async/setImmediate":54,"events":724,"libp2p-ping":418,"libp2p-swarm":435,"mafmt":502,"multiaddr":511,"peer-book":555,"peer-id":556,"peer-info":557}],447:[function(require,module,exports){
+},{"debug":114}],451:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -54305,7 +54656,7 @@ function toNumber(value) {
 module.exports = debounce;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],448:[function(require,module,exports){
+},{}],452:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -56675,7 +57026,7 @@ function property(path) {
 module.exports = filter;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],449:[function(require,module,exports){
+},{}],453:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -59132,7 +59483,7 @@ function property(path) {
 module.exports = find;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],450:[function(require,module,exports){
+},{}],454:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -60067,7 +60418,7 @@ function get(object, path, defaultValue) {
 module.exports = get;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],451:[function(require,module,exports){
+},{}],455:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -62440,7 +62791,7 @@ function property(path) {
 module.exports = groupBy;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],452:[function(require,module,exports){
+},{}],456:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -63533,7 +63884,7 @@ function has(object, path) {
 module.exports = has;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],453:[function(require,module,exports){
+},{}],457:[function(require,module,exports){
 /**
  * lodash (Custom Build) <https://lodash.com/>
  * Build: `lodash modularize exports="npm" -o ./`
@@ -64280,7 +64631,7 @@ function values(object) {
 
 module.exports = includes;
 
-},{}],454:[function(require,module,exports){
+},{}],458:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -65939,7 +66290,7 @@ function keys(object) {
 module.exports = isEqualWith;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],455:[function(require,module,exports){
+},{}],459:[function(require,module,exports){
 /**
  * lodash 3.0.8 (Custom Build) <https://lodash.com/>
  * Build: `lodash modularize exports="npm" -o ./`
@@ -66016,7 +66367,7 @@ function isObject(value) {
 
 module.exports = isFunction;
 
-},{}],456:[function(require,module,exports){
+},{}],460:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -68386,7 +68737,7 @@ function property(path) {
 module.exports = map;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],457:[function(require,module,exports){
+},{}],461:[function(require,module,exports){
 /**
  * lodash (Custom Build) <https://lodash.com/>
  * Build: `lodash modularize exports="npm" -o ./`
@@ -68603,7 +68954,7 @@ function pullAllWith(array, values, comparator) {
 
 module.exports = pullAllWith;
 
-},{}],458:[function(require,module,exports){
+},{}],462:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -69597,7 +69948,7 @@ function set(object, path, value) {
 module.exports = set;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],459:[function(require,module,exports){
+},{}],463:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -72231,7 +72582,7 @@ function property(path) {
 module.exports = sortBy;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],460:[function(require,module,exports){
+},{}],464:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -72674,7 +73025,7 @@ function toNumber(value) {
 module.exports = throttle;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],461:[function(require,module,exports){
+},{}],465:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -75092,7 +75443,7 @@ function property(path) {
 module.exports = uniqBy;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],462:[function(require,module,exports){
+},{}],466:[function(require,module,exports){
 (function (global){
 /**
  * lodash (Custom Build) <https://lodash.com/>
@@ -75994,7 +76345,7 @@ function noop() {
 module.exports = uniqWith;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],463:[function(require,module,exports){
+},{}],467:[function(require,module,exports){
 /**
  * lodash (Custom Build) <https://lodash.com/>
  * Build: `lodash modularize exports="npm" -o ./`
@@ -76463,7 +76814,7 @@ function values(object) {
 
 module.exports = values;
 
-},{}],464:[function(require,module,exports){
+},{}],468:[function(require,module,exports){
 var root = require('./_root');
 
 /** Built-in value references. */
@@ -76471,7 +76822,7 @@ var Symbol = root.Symbol;
 
 module.exports = Symbol;
 
-},{"./_root":485}],465:[function(require,module,exports){
+},{"./_root":489}],469:[function(require,module,exports){
 var baseTimes = require('./_baseTimes'),
     isArguments = require('./isArguments'),
     isArray = require('./isArray'),
@@ -76522,7 +76873,7 @@ function arrayLikeKeys(value, inherited) {
 
 module.exports = arrayLikeKeys;
 
-},{"./_baseTimes":475,"./_isIndex":479,"./isArguments":488,"./isArray":489,"./isBuffer":491,"./isTypedArray":496}],466:[function(require,module,exports){
+},{"./_baseTimes":479,"./_isIndex":483,"./isArguments":492,"./isArray":493,"./isBuffer":495,"./isTypedArray":500}],470:[function(require,module,exports){
 /**
  * A specialized version of `_.map` for arrays without support for iteratee
  * shorthands.
@@ -76545,7 +76896,7 @@ function arrayMap(array, iteratee) {
 
 module.exports = arrayMap;
 
-},{}],467:[function(require,module,exports){
+},{}],471:[function(require,module,exports){
 /**
  * The base implementation of `_.findIndex` and `_.findLastIndex` without
  * support for iteratee shorthands.
@@ -76571,7 +76922,7 @@ function baseFindIndex(array, predicate, fromIndex, fromRight) {
 
 module.exports = baseFindIndex;
 
-},{}],468:[function(require,module,exports){
+},{}],472:[function(require,module,exports){
 var Symbol = require('./_Symbol'),
     getRawTag = require('./_getRawTag'),
     objectToString = require('./_objectToString');
@@ -76601,7 +76952,7 @@ function baseGetTag(value) {
 
 module.exports = baseGetTag;
 
-},{"./_Symbol":464,"./_getRawTag":478,"./_objectToString":483}],469:[function(require,module,exports){
+},{"./_Symbol":468,"./_getRawTag":482,"./_objectToString":487}],473:[function(require,module,exports){
 var baseFindIndex = require('./_baseFindIndex'),
     baseIsNaN = require('./_baseIsNaN'),
     strictIndexOf = require('./_strictIndexOf');
@@ -76623,7 +76974,7 @@ function baseIndexOf(array, value, fromIndex) {
 
 module.exports = baseIndexOf;
 
-},{"./_baseFindIndex":467,"./_baseIsNaN":471,"./_strictIndexOf":486}],470:[function(require,module,exports){
+},{"./_baseFindIndex":471,"./_baseIsNaN":475,"./_strictIndexOf":490}],474:[function(require,module,exports){
 var baseGetTag = require('./_baseGetTag'),
     isObjectLike = require('./isObjectLike');
 
@@ -76643,7 +76994,7 @@ function baseIsArguments(value) {
 
 module.exports = baseIsArguments;
 
-},{"./_baseGetTag":468,"./isObjectLike":495}],471:[function(require,module,exports){
+},{"./_baseGetTag":472,"./isObjectLike":499}],475:[function(require,module,exports){
 /**
  * The base implementation of `_.isNaN` without support for number objects.
  *
@@ -76657,7 +77008,7 @@ function baseIsNaN(value) {
 
 module.exports = baseIsNaN;
 
-},{}],472:[function(require,module,exports){
+},{}],476:[function(require,module,exports){
 var baseGetTag = require('./_baseGetTag'),
     isLength = require('./isLength'),
     isObjectLike = require('./isObjectLike');
@@ -76719,7 +77070,7 @@ function baseIsTypedArray(value) {
 
 module.exports = baseIsTypedArray;
 
-},{"./_baseGetTag":468,"./isLength":493,"./isObjectLike":495}],473:[function(require,module,exports){
+},{"./_baseGetTag":472,"./isLength":497,"./isObjectLike":499}],477:[function(require,module,exports){
 var isPrototype = require('./_isPrototype'),
     nativeKeys = require('./_nativeKeys');
 
@@ -76751,7 +77102,7 @@ function baseKeys(object) {
 
 module.exports = baseKeys;
 
-},{"./_isPrototype":480,"./_nativeKeys":481}],474:[function(require,module,exports){
+},{"./_isPrototype":484,"./_nativeKeys":485}],478:[function(require,module,exports){
 /**
  * The base implementation of `_.property` without support for deep paths.
  *
@@ -76767,7 +77118,7 @@ function baseProperty(key) {
 
 module.exports = baseProperty;
 
-},{}],475:[function(require,module,exports){
+},{}],479:[function(require,module,exports){
 /**
  * The base implementation of `_.times` without support for iteratee shorthands
  * or max array length checks.
@@ -76789,7 +77140,7 @@ function baseTimes(n, iteratee) {
 
 module.exports = baseTimes;
 
-},{}],476:[function(require,module,exports){
+},{}],480:[function(require,module,exports){
 /**
  * The base implementation of `_.unary` without support for storing metadata.
  *
@@ -76805,7 +77156,7 @@ function baseUnary(func) {
 
 module.exports = baseUnary;
 
-},{}],477:[function(require,module,exports){
+},{}],481:[function(require,module,exports){
 (function (global){
 /** Detect free variable `global` from Node.js. */
 var freeGlobal = typeof global == 'object' && global && global.Object === Object && global;
@@ -76813,7 +77164,7 @@ var freeGlobal = typeof global == 'object' && global && global.Object === Object
 module.exports = freeGlobal;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],478:[function(require,module,exports){
+},{}],482:[function(require,module,exports){
 var Symbol = require('./_Symbol');
 
 /** Used for built-in method references. */
@@ -76861,7 +77212,7 @@ function getRawTag(value) {
 
 module.exports = getRawTag;
 
-},{"./_Symbol":464}],479:[function(require,module,exports){
+},{"./_Symbol":468}],483:[function(require,module,exports){
 /** Used as references for various `Number` constants. */
 var MAX_SAFE_INTEGER = 9007199254740991;
 
@@ -76885,7 +77236,7 @@ function isIndex(value, length) {
 
 module.exports = isIndex;
 
-},{}],480:[function(require,module,exports){
+},{}],484:[function(require,module,exports){
 /** Used for built-in method references. */
 var objectProto = Object.prototype;
 
@@ -76905,7 +77256,7 @@ function isPrototype(value) {
 
 module.exports = isPrototype;
 
-},{}],481:[function(require,module,exports){
+},{}],485:[function(require,module,exports){
 var overArg = require('./_overArg');
 
 /* Built-in method references for those with the same name as other `lodash` methods. */
@@ -76913,7 +77264,7 @@ var nativeKeys = overArg(Object.keys, Object);
 
 module.exports = nativeKeys;
 
-},{"./_overArg":484}],482:[function(require,module,exports){
+},{"./_overArg":488}],486:[function(require,module,exports){
 var freeGlobal = require('./_freeGlobal');
 
 /** Detect free variable `exports`. */
@@ -76937,7 +77288,7 @@ var nodeUtil = (function() {
 
 module.exports = nodeUtil;
 
-},{"./_freeGlobal":477}],483:[function(require,module,exports){
+},{"./_freeGlobal":481}],487:[function(require,module,exports){
 /** Used for built-in method references. */
 var objectProto = Object.prototype;
 
@@ -76961,7 +77312,7 @@ function objectToString(value) {
 
 module.exports = objectToString;
 
-},{}],484:[function(require,module,exports){
+},{}],488:[function(require,module,exports){
 /**
  * Creates a unary function that invokes `func` with its argument transformed.
  *
@@ -76978,7 +77329,7 @@ function overArg(func, transform) {
 
 module.exports = overArg;
 
-},{}],485:[function(require,module,exports){
+},{}],489:[function(require,module,exports){
 var freeGlobal = require('./_freeGlobal');
 
 /** Detect free variable `self`. */
@@ -76989,7 +77340,7 @@ var root = freeGlobal || freeSelf || Function('return this')();
 
 module.exports = root;
 
-},{"./_freeGlobal":477}],486:[function(require,module,exports){
+},{"./_freeGlobal":481}],490:[function(require,module,exports){
 /**
  * A specialized version of `_.indexOf` which performs strict equality
  * comparisons of values, i.e. `===`.
@@ -77014,7 +77365,7 @@ function strictIndexOf(array, value, fromIndex) {
 
 module.exports = strictIndexOf;
 
-},{}],487:[function(require,module,exports){
+},{}],491:[function(require,module,exports){
 /**
  * This method returns the first argument it receives.
  *
@@ -77037,7 +77388,7 @@ function identity(value) {
 
 module.exports = identity;
 
-},{}],488:[function(require,module,exports){
+},{}],492:[function(require,module,exports){
 var baseIsArguments = require('./_baseIsArguments'),
     isObjectLike = require('./isObjectLike');
 
@@ -77075,7 +77426,7 @@ var isArguments = baseIsArguments(function() { return arguments; }()) ? baseIsAr
 
 module.exports = isArguments;
 
-},{"./_baseIsArguments":470,"./isObjectLike":495}],489:[function(require,module,exports){
+},{"./_baseIsArguments":474,"./isObjectLike":499}],493:[function(require,module,exports){
 /**
  * Checks if `value` is classified as an `Array` object.
  *
@@ -77103,7 +77454,7 @@ var isArray = Array.isArray;
 
 module.exports = isArray;
 
-},{}],490:[function(require,module,exports){
+},{}],494:[function(require,module,exports){
 var isFunction = require('./isFunction'),
     isLength = require('./isLength');
 
@@ -77138,7 +77489,7 @@ function isArrayLike(value) {
 
 module.exports = isArrayLike;
 
-},{"./isFunction":492,"./isLength":493}],491:[function(require,module,exports){
+},{"./isFunction":496,"./isLength":497}],495:[function(require,module,exports){
 var root = require('./_root'),
     stubFalse = require('./stubFalse');
 
@@ -77178,7 +77529,7 @@ var isBuffer = nativeIsBuffer || stubFalse;
 
 module.exports = isBuffer;
 
-},{"./_root":485,"./stubFalse":499}],492:[function(require,module,exports){
+},{"./_root":489,"./stubFalse":503}],496:[function(require,module,exports){
 var baseGetTag = require('./_baseGetTag'),
     isObject = require('./isObject');
 
@@ -77217,7 +77568,7 @@ function isFunction(value) {
 
 module.exports = isFunction;
 
-},{"./_baseGetTag":468,"./isObject":494}],493:[function(require,module,exports){
+},{"./_baseGetTag":472,"./isObject":498}],497:[function(require,module,exports){
 /** Used as references for various `Number` constants. */
 var MAX_SAFE_INTEGER = 9007199254740991;
 
@@ -77254,7 +77605,7 @@ function isLength(value) {
 
 module.exports = isLength;
 
-},{}],494:[function(require,module,exports){
+},{}],498:[function(require,module,exports){
 /**
  * Checks if `value` is the
  * [language type](http://www.ecma-international.org/ecma-262/7.0/#sec-ecmascript-language-types)
@@ -77287,7 +77638,7 @@ function isObject(value) {
 
 module.exports = isObject;
 
-},{}],495:[function(require,module,exports){
+},{}],499:[function(require,module,exports){
 /**
  * Checks if `value` is object-like. A value is object-like if it's not `null`
  * and has a `typeof` result of "object".
@@ -77318,7 +77669,7 @@ function isObjectLike(value) {
 
 module.exports = isObjectLike;
 
-},{}],496:[function(require,module,exports){
+},{}],500:[function(require,module,exports){
 var baseIsTypedArray = require('./_baseIsTypedArray'),
     baseUnary = require('./_baseUnary'),
     nodeUtil = require('./_nodeUtil');
@@ -77347,7 +77698,7 @@ var isTypedArray = nodeIsTypedArray ? baseUnary(nodeIsTypedArray) : baseIsTypedA
 
 module.exports = isTypedArray;
 
-},{"./_baseIsTypedArray":472,"./_baseUnary":476,"./_nodeUtil":482}],497:[function(require,module,exports){
+},{"./_baseIsTypedArray":476,"./_baseUnary":480,"./_nodeUtil":486}],501:[function(require,module,exports){
 var arrayLikeKeys = require('./_arrayLikeKeys'),
     baseKeys = require('./_baseKeys'),
     isArrayLike = require('./isArrayLike');
@@ -77386,7 +77737,7 @@ function keys(object) {
 
 module.exports = keys;
 
-},{"./_arrayLikeKeys":465,"./_baseKeys":473,"./isArrayLike":490}],498:[function(require,module,exports){
+},{"./_arrayLikeKeys":469,"./_baseKeys":477,"./isArrayLike":494}],502:[function(require,module,exports){
 /**
  * This method returns `undefined`.
  *
@@ -77405,7 +77756,7 @@ function noop() {
 
 module.exports = noop;
 
-},{}],499:[function(require,module,exports){
+},{}],503:[function(require,module,exports){
 /**
  * This method returns `false`.
  *
@@ -77425,7 +77776,7 @@ function stubFalse() {
 
 module.exports = stubFalse;
 
-},{}],500:[function(require,module,exports){
+},{}],504:[function(require,module,exports){
 
 var looper = module.exports = function (fun) {
   (function next () {
@@ -77441,7 +77792,7 @@ var looper = module.exports = function (fun) {
   })()
 }
 
-},{}],501:[function(require,module,exports){
+},{}],505:[function(require,module,exports){
 (function (Buffer){
 
 exports.compare = function (a, b) {
@@ -77614,7 +77965,7 @@ exports.filter = function (range, compare) {
 
 
 }).call(this,{"isBuffer":require("../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
-},{"../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728}],502:[function(require,module,exports){
+},{"../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721}],506:[function(require,module,exports){
 'use strict'
 
 const multiaddr = require('multiaddr')
@@ -77841,7 +78192,7 @@ function base (n) {
   }
 }
 
-},{"multiaddr":511}],503:[function(require,module,exports){
+},{"multiaddr":515}],507:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 var inherits = require('inherits')
@@ -77990,7 +78341,7 @@ function fnI (a, b, c, d, m, k, s) {
 module.exports = MD5
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722,"hash-base":504,"inherits":203}],504:[function(require,module,exports){
+},{"buffer":715,"hash-base":508,"inherits":193}],508:[function(require,module,exports){
 'use strict'
 var Buffer = require('safe-buffer').Buffer
 var Transform = require('stream').Transform
@@ -78087,7 +78438,7 @@ HashBase.prototype._digest = function () {
 
 module.exports = HashBase
 
-},{"inherits":203,"safe-buffer":654,"stream":752}],505:[function(require,module,exports){
+},{"inherits":193,"safe-buffer":646,"stream":745}],509:[function(require,module,exports){
 (function (Buffer){
 const rlp = require('rlp')
 const ethUtil = require('ethereumjs-util')
@@ -78346,7 +78697,7 @@ function isRawNode (node) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722,"ethereumjs-util":177,"rlp":653}],506:[function(require,module,exports){
+},{"buffer":715,"ethereumjs-util":167,"rlp":645}],510:[function(require,module,exports){
 module.exports = assert;
 
 function assert(val, msg) {
@@ -78359,7 +78710,7 @@ assert.equal = function assertEqual(l, r, msg) {
     throw new Error(msg || ('Assertion failed: ' + l + ' != ' + r));
 };
 
-},{}],507:[function(require,module,exports){
+},{}],511:[function(require,module,exports){
 'use strict';
 
 var utils = exports;
@@ -78419,7 +78770,7 @@ utils.encode = function encode(arr, enc) {
     return arr;
 };
 
-},{}],508:[function(require,module,exports){
+},{}],512:[function(require,module,exports){
 /**
  * Helpers.
  */
@@ -78573,7 +78924,7 @@ function plural(ms, n, name) {
   return Math.ceil(ms / n) + ' ' + name + 's';
 }
 
-},{}],509:[function(require,module,exports){
+},{}],513:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -78788,7 +79139,7 @@ function protoFromTuple (tup) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./convert":510,"./protocols-table":512,"buffer":722,"lodash.filter":448,"lodash.map":456,"varint":712}],510:[function(require,module,exports){
+},{"./convert":514,"./protocols-table":516,"buffer":715,"lodash.filter":452,"lodash.map":460,"varint":705}],514:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -78904,7 +79255,7 @@ function buf2mh (buf) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./protocols-table":512,"bs58":100,"buffer":722,"ip":210,"varint":712}],511:[function(require,module,exports){
+},{"./protocols-table":516,"bs58":100,"buffer":715,"ip":196,"varint":705}],515:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -79367,7 +79718,7 @@ Multiaddr.resolve = function resolve (addr, callback) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./codec":509,"./protocols-table":512,"bs58":100,"buffer":722,"lodash.map":456,"varint":712,"xtend":717}],512:[function(require,module,exports){
+},{"./codec":513,"./protocols-table":516,"bs58":100,"buffer":715,"lodash.map":460,"varint":705,"xtend":710}],516:[function(require,module,exports){
 'use strict'
 
 const map = require('lodash.map')
@@ -79440,7 +79791,7 @@ function p (code, size, name, resolvable) {
 
 module.exports = Protocols
 
-},{"lodash.map":456}],513:[function(require,module,exports){
+},{"lodash.map":460}],517:[function(require,module,exports){
 'use strict'
 
 class Base {
@@ -79468,7 +79819,7 @@ class Base {
 
 module.exports = Base
 
-},{}],514:[function(require,module,exports){
+},{}],518:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -79492,7 +79843,7 @@ module.exports = function base16 (alphabet) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722}],515:[function(require,module,exports){
+},{"buffer":715}],519:[function(require,module,exports){
 'use strict'
 
 const Base = require('./base.js')
@@ -79530,7 +79881,7 @@ module.exports = {
   codes: codes
 }
 
-},{"./base.js":513,"./base16":514,"base-x":60}],516:[function(require,module,exports){
+},{"./base.js":517,"./base16":518,"base-x":60}],520:[function(require,module,exports){
 (function (Buffer){
 /**
  * Implementation of the [multibase](https://github.com/multiformats/multibase) specification.
@@ -79670,7 +80021,7 @@ function getBase (nameOrCode) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./constants":515,"buffer":722}],517:[function(require,module,exports){
+},{"./constants":519,"buffer":715}],521:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -79763,11 +80114,88 @@ exports['torrent-info'] = Buffer.from('7b', 'hex')
 exports['torrent-file'] = Buffer.from('7c', 'hex')
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722}],518:[function(require,module,exports){
-arguments[4][228][0].apply(exports,arguments)
-},{"./name-table":519,"./util":520,"./varint-table":521,"buffer":722,"dup":228,"varint":712}],519:[function(require,module,exports){
-arguments[4][229][0].apply(exports,arguments)
-},{"./base-table":517,"dup":229}],520:[function(require,module,exports){
+},{"buffer":715}],522:[function(require,module,exports){
+(function (Buffer){
+/**
+ * Implementation of the multicodec specification.
+ *
+ * @module multicodec
+ * @example
+ * const multicodec = require('multicodec')
+ *
+ * const prefixedProtobuf = multicodec.addPrefix('protobuf', protobufBuffer)
+ * // prefixedProtobuf 0x50...
+ *
+ */
+'use strict'
+
+const varint = require('varint')
+const codecNameToCodeVarint = require('./varint-table')
+const codeToCodecName = require('./name-table')
+const util = require('./util')
+
+exports = module.exports
+
+/**
+ * Prefix a buffer with a multicodec-packed.
+ *
+ * @param {string|number} multicodecStrOrCode
+ * @param {Buffer} data
+ * @returns {Buffer}
+ */
+exports.addPrefix = (multicodecStrOrCode, data) => {
+  let prefix
+
+  if (Buffer.isBuffer(multicodecStrOrCode)) {
+    prefix = util.varintBufferEncode(multicodecStrOrCode)
+  } else {
+    if (codecNameToCodeVarint[multicodecStrOrCode]) {
+      prefix = codecNameToCodeVarint[multicodecStrOrCode]
+    } else {
+      throw new Error('multicodec not recognized')
+    }
+  }
+  return Buffer.concat([prefix, data])
+}
+
+/**
+ * Decapsulate the multicodec-packed prefix from the data.
+ *
+ * @param {Buffer} data
+ * @returns {Buffer}
+ */
+exports.rmPrefix = (data) => {
+  varint.decode(data)
+  return data.slice(varint.decode.bytes)
+}
+
+/**
+ * Get the codec of the prefixed data.
+ * @param {Buffer} prefixedData
+ * @returns {string}
+ */
+exports.getCodec = (prefixedData) => {
+  const code = util.varintBufferDecode(prefixedData)
+  const codecName = codeToCodecName[code.toString('hex')]
+  return codecName
+}
+
+}).call(this,require("buffer").Buffer)
+},{"./name-table":523,"./util":524,"./varint-table":525,"buffer":715,"varint":705}],523:[function(require,module,exports){
+'use strict'
+const baseTable = require('./base-table')
+
+// this creates a map for code as hexString -> codecName
+
+const nameTable = {}
+module.exports = nameTable
+
+for (let encodingName in baseTable) {
+  let code = baseTable[encodingName]
+  nameTable[code.toString('hex')] = encodingName
+}
+
+},{"./base-table":521}],524:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 const varint = require('varint')
@@ -79800,9 +80228,22 @@ function varintBufferDecode (input) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722,"varint":712}],521:[function(require,module,exports){
-arguments[4][231][0].apply(exports,arguments)
-},{"./base-table":517,"./util":520,"dup":231}],522:[function(require,module,exports){
+},{"buffer":715,"varint":705}],525:[function(require,module,exports){
+'use strict'
+const baseTable = require('./base-table')
+const varintBufferEncode = require('./util').varintBufferEncode
+
+// this creates a map for codecName -> codeVarintBuffer
+
+const varintTable = {}
+module.exports = varintTable
+
+for (let encodingName in baseTable) {
+  let code = baseTable[encodingName]
+  varintTable[encodingName] = varintBufferEncode(code)
+}
+
+},{"./base-table":521,"./util":524}],526:[function(require,module,exports){
 /* eslint quote-props: off */
 /* eslint key-spacing: off */
 'use strict'
@@ -80825,7 +81266,7 @@ exports.defaultLengths = Object.freeze({
   0xb3e0: 0x80
 })
 
-},{}],523:[function(require,module,exports){
+},{}],527:[function(require,module,exports){
 (function (Buffer){
 /**
  * Multihash implementation in JavaScript.
@@ -81054,7 +81495,7 @@ exports.prefix = function prefix (multihash) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./constants":522,"bs58":100,"buffer":722,"varint":712}],524:[function(require,module,exports){
+},{"./constants":526,"bs58":100,"buffer":715,"varint":705}],528:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -81093,7 +81534,7 @@ module.exports = (table) => {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./utils":528,"blakejs":67,"buffer":722}],525:[function(require,module,exports){
+},{"./utils":532,"blakejs":67,"buffer":715}],529:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -81155,7 +81596,7 @@ module.exports = {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722,"nodeify":551}],526:[function(require,module,exports){
+},{"buffer":715,"nodeify":543}],530:[function(require,module,exports){
 'use strict'
 
 const sha3 = require('js-sha3')
@@ -81188,7 +81629,7 @@ module.exports = {
   addBlake: require('./blake')
 }
 
-},{"./blake":524,"./crypto-sha1-2":525,"./utils":528,"js-sha3":350,"murmurhash3js":549}],527:[function(require,module,exports){
+},{"./blake":528,"./crypto-sha1-2":529,"./utils":532,"js-sha3":364,"murmurhash3js":541}],531:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -81331,7 +81772,7 @@ Multihashing.functions = {
 crypto.addBlake(Multihashing.functions)
 
 }).call(this,require("buffer").Buffer)
-},{"./crypto":526,"buffer":722,"multihashes":523}],528:[function(require,module,exports){
+},{"./crypto":530,"buffer":715,"multihashes":527}],532:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -81378,11 +81819,11 @@ exports.fromNumberTo32BitBuf = (doWork, other) => (input) => {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"async/setImmediate":54,"buffer":722}],529:[function(require,module,exports){
-arguments[4][162][0].apply(exports,arguments)
-},{"./debug":530,"_process":733,"dup":162}],530:[function(require,module,exports){
-arguments[4][163][0].apply(exports,arguments)
-},{"dup":163,"ms":508}],531:[function(require,module,exports){
+},{"async/setImmediate":54,"buffer":715}],533:[function(require,module,exports){
+arguments[4][152][0].apply(exports,arguments)
+},{"./debug":534,"_process":726,"dup":152}],534:[function(require,module,exports){
+arguments[4][153][0].apply(exports,arguments)
+},{"dup":153,"ms":512}],535:[function(require,module,exports){
 module.exports = read
 
 var MSB = 0x80
@@ -81414,7 +81855,7 @@ function read(buf, offset) {
   return res
 }
 
-},{}],532:[function(require,module,exports){
+},{}],536:[function(require,module,exports){
 module.exports = encode
 
 var MSB = 0x80
@@ -81442,14 +81883,14 @@ function encode(num, out, offset) {
   return out
 }
 
-},{}],533:[function(require,module,exports){
+},{}],537:[function(require,module,exports){
 module.exports = {
     encode: require('./encode.js')
   , decode: require('./decode.js')
   , encodingLength: require('./length.js')
 }
 
-},{"./decode.js":531,"./encode.js":532,"./length.js":534}],534:[function(require,module,exports){
+},{"./decode.js":535,"./encode.js":536,"./length.js":538}],538:[function(require,module,exports){
 
 var N1 = Math.pow(2,  7)
 var N2 = Math.pow(2, 14)
@@ -81476,7 +81917,7 @@ module.exports = function (value) {
   )
 }
 
-},{}],535:[function(require,module,exports){
+},{}],539:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 /* @flow */
@@ -81674,7 +82115,7 @@ class Channel extends stream.Duplex {
 module.exports = Channel
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722,"debug":529,"events":724,"readable-stream":650}],536:[function(require,module,exports){
+},{"buffer":715,"debug":533,"events":717,"readable-stream":642}],540:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 /* @flow */
@@ -82163,571 +82604,10 @@ class Multiplex extends stream.Duplex {
 module.exports = Multiplex
 
 }).call(this,require("buffer").Buffer)
-},{"./channel":535,"buffer":722,"debug":529,"duplexify":135,"readable-stream":650,"varint":533}],537:[function(require,module,exports){
-arguments[4][162][0].apply(exports,arguments)
-},{"./debug":538,"_process":733,"dup":162}],538:[function(require,module,exports){
-arguments[4][163][0].apply(exports,arguments)
-},{"dup":163,"ms":508}],539:[function(require,module,exports){
-'use strict'
-
-exports = module.exports
-exports.PROTOCOL_ID = '/multistream/1.0.0'
-
-},{}],540:[function(require,module,exports){
-'use strict'
-
-const varint = require('varint')
-const pull = require('pull-stream')
-const pullLP = require('pull-length-prefixed')
-const Connection = require('interface-connection').Connection
-const util = require('../util')
-const select = require('../select')
-const once = require('once')
-
-const PROTOCOL_ID = require('./../constants').PROTOCOL_ID
-
-/**
- *
- */
-class Dialer {
-  /**
-   * Create a new Dialer.
-   */
-  constructor () {
-    this.conn = null
-    this.log = util.log.dialer()
-  }
-
-  /**
-   * Perform the multistream handshake.
-   *
-   * @param {Connection} rawConn - The connection on which
-   * to perform the handshake.
-   * @param {function(Error)} callback - Called when the handshake completed.
-   * @returns {undefined}
-   */
-  handle (rawConn, callback) {
-    this.log('dialer handle conn')
-    callback = once(callback)
-    const s = select(PROTOCOL_ID, (err, conn) => {
-      if (err) {
-        return callback(err)
-      }
-      this.log('handshake success')
-
-      this.conn = new Connection(conn, rawConn)
-
-      callback()
-    }, this.log)
-
-    pull(
-      rawConn,
-      s,
-      rawConn
-    )
-  }
-
-  /**
-   * Select a protocol
-   *
-   * @param {string} protocol - A string of the protocol that we want to handshake.
-   * @param {function(Error, Connection)} callback - `err` is
-   * an error object that gets passed if something wrong happ
-   * end (e.g: if the protocol selected is not supported by
-   * the other end) and conn is the connection handshaked
-   * with the other end.
-   *
-   * @returns {undefined}
-   */
-  select (protocol, callback) {
-    this.log('dialer select ' + protocol)
-    callback = once(callback)
-    if (!this.conn) {
-      return callback(new Error('multistream handshake has not finalized yet'))
-    }
-
-    const s = select(protocol, (err, conn) => {
-      if (err) {
-        this.conn = new Connection(conn, this.conn)
-        return callback(err)
-      }
-      callback(null, new Connection(conn, this.conn))
-    }, this.log)
-
-    pull(
-      this.conn,
-      s,
-      this.conn
-    )
-  }
-
-  /**
-   * List all available protocols.
-   *
-   * @param {function(Error, Array<string>)} callback - If
-   * something wrong happend `Error` exists, otherwise
-   * `protocols` is a list of the supported
-   * protocols on the other end.
-   *
-   * @returns {undefined}
-   */
-  ls (callback) {
-    callback = once(callback)
-
-    const lsStream = select('ls', (err, conn) => {
-      if (err) {
-        return callback(err)
-      }
-
-      pull(
-        conn,
-        pullLP.decode(),
-        collectLs(conn),
-        pull.map(stringify),
-        pull.collect((err, list) => {
-          if (err) {
-            return callback(err)
-          }
-          callback(null, list.slice(1))
-        })
-      )
-    }, this.log)
-
-    pull(
-      this.conn,
-      lsStream,
-      this.conn
-    )
-  }
-}
-
-function stringify (buf) {
-  return buf.toString().slice(0, -1)
-}
-
-function collectLs (conn) {
-  let first = true
-  let counter = 0
-
-  return pull.take((msg) => {
-    if (first) {
-      varint.decode(msg)
-      counter = varint.decode(msg, varint.decode.bytes)
-      return true
-    }
-
-    return counter-- > 0
-  })
-}
-
-module.exports = Dialer
-
-},{"../select":547,"../util":548,"./../constants":539,"interface-connection":205,"once":552,"pull-length-prefixed":587,"pull-stream":598,"varint":712}],541:[function(require,module,exports){
-'use strict'
-
-exports.Listener = exports.listener = require('./listener')
-exports.Dialer = exports.dialer = require('./dialer')
-exports.matchSemver = require('./listener/match-semver')
-exports.matchExact = require('./listener/match-exact')
-
-},{"./dialer":540,"./listener":542,"./listener/match-exact":544,"./listener/match-semver":545}],542:[function(require,module,exports){
-'use strict'
-
-const pull = require('pull-stream')
-const isFunction = require('lodash.isfunction')
-const assert = require('assert')
-const select = require('../select')
-const selectHandler = require('./select-handler')
-const lsHandler = require('./ls-handler')
-const matchExact = require('./match-exact')
-
-const util = require('./../util')
-const Connection = require('interface-connection').Connection
-
-const PROTOCOL_ID = require('./../constants').PROTOCOL_ID
-
-/**
- * Listener
- */
-class Listener {
-  /**
-   * Create a new Listener.
-   */
-  constructor () {
-    this.handlers = {
-      ls: {
-        handlerFunc: (protocol, conn) => lsHandler(this, conn),
-        matchFunc: matchExact
-
-      }
-    }
-    this.log = util.log.listener()
-  }
-
-  /**
-   * Perform the multistream handshake.
-   *
-   * @param {Connection} rawConn - The connection on which
-   * to perform the handshake.
-   * @param {function(Error)} callback - Called when the handshake completed.
-   * @returns {undefined}
-   */
-  handle (rawConn, callback) {
-    this.log('listener handle conn')
-
-    const selectStream = select(PROTOCOL_ID, (err, conn) => {
-      if (err) {
-        return callback(err)
-      }
-
-      const shConn = new Connection(conn, rawConn)
-
-      const sh = selectHandler(shConn, this.handlers, this.log)
-
-      pull(
-        shConn,
-        sh,
-        shConn
-      )
-
-      callback()
-    }, this.log)
-
-    pull(
-      rawConn,
-      selectStream,
-      rawConn
-    )
-  }
-
-  /**
-   * Handle a given `protocol`.
-   *
-   * @param {string} protocol - A string identifying the protocol.
-   * @param {function(string, Connection)} handlerFunc - Will be called if there is a handshake performed on `protocol`.
-   * @param {matchHandler} [matchFunc=matchExact]
-   * @returns {undefined}
-   */
-  addHandler (protocol, handlerFunc, matchFunc) {
-    this.log('adding handler: ' + protocol)
-    assert(isFunction(handlerFunc), 'handler must be a function')
-
-    if (this.handlers[protocol]) {
-      this.log('overwriting handler for ' + protocol)
-    }
-
-    if (!matchFunc) {
-      matchFunc = matchExact
-    }
-
-    this.handlers[protocol] = {
-      handlerFunc: handlerFunc,
-      matchFunc: matchFunc
-    }
-  }
-
-  /**
-   * Receives a protocol and a callback and should
-   * call `callback(err, result)` where `err` is if
-   * there was a error on the matching function, and
-   * `result` is a boolean that represents if a
-   * match happened.
-   *
-   * @callback matchHandler
-   * @param {string} myProtocol
-   * @param {string} senderProtocol
-   * @param {function(Error, boolean)} callback
-   * @returns {undefined}
-   */
-}
-
-module.exports = Listener
-
-},{"../select":547,"./../constants":539,"./../util":548,"./ls-handler":543,"./match-exact":544,"./select-handler":546,"assert":719,"interface-connection":205,"lodash.isfunction":455,"pull-stream":598}],543:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const pull = require('pull-stream')
-const pullLP = require('pull-length-prefixed')
-const varint = require('varint')
-
-function lsHandler (self, conn) {
-  const protos = Object.keys(self.handlers)
-                       .filter((key) => key !== 'ls')
-
-  const nProtos = protos.length
-  // total size of the list of protocols, including varint and newline
-  const size = protos.reduce((size, proto) => {
-    const p = new Buffer(proto + '\n')
-    const el = varint.encodingLength(p.length)
-    return size + el
-  }, 0)
-
-  const buf = Buffer.concat([
-    new Buffer(varint.encode(nProtos)),
-    new Buffer(varint.encode(size)),
-    new Buffer('\n')
-  ])
-
-  const encodedProtos = protos.map((proto) => {
-    return new Buffer(proto + '\n')
-  })
-  const values = [buf].concat(encodedProtos)
-
-  pull(
-    pull.values(values),
-    pullLP.encode(),
-    conn
-  )
-}
-
-module.exports = lsHandler
-
-}).call(this,require("buffer").Buffer)
-},{"buffer":722,"pull-length-prefixed":587,"pull-stream":598,"varint":712}],544:[function(require,module,exports){
-'use strict'
-
-/**
- * Match protocols exactly.
- *
- * @param {string} myProtocol
- * @param {string} senderProtocol
- * @param {function(Error, boolean)} callback
- * @returns {undefined}
- * @type {matchHandler}
- */
-function matchExact (myProtocol, senderProtocol, callback) {
-  const result = myProtocol === senderProtocol
-  callback(null, result)
-}
-
-module.exports = matchExact
-
-},{}],545:[function(require,module,exports){
-'use strict'
-
-const semver = require('semver')
-
-/**
- * Match protocols using semver `~` matching.
- *
- * @param {string} myProtocol
- * @param {string} senderProtocol
- * @param {function(Error, boolean)} callback
- * @returns {undefined}
- * @type {matchHandler}
- */
-function matchSemver (myProtocol, senderProtocol, callback) {
-  const mps = myProtocol.split('/')
-  const sps = senderProtocol.split('/')
-  const myName = mps[1]
-  const myVersion = mps[2]
-
-  const senderName = sps[1]
-  const senderVersion = sps[2]
-
-  if (myName !== senderName) {
-    return callback(null, false)
-  }
-  // does my protocol satisfy the sender?
-  const valid = semver.satisfies(myVersion, '~' + senderVersion)
-
-  callback(null, valid)
-}
-
-module.exports = matchSemver
-
-},{"semver":668}],546:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const handshake = require('pull-handshake')
-const lp = require('pull-length-prefixed')
-const Connection = require('interface-connection').Connection
-const writeEncoded = require('../util.js').writeEncoded
-const some = require('async/some')
-
-function selectHandler (rawConn, handlersMap, log) {
-  const cb = (err) => {
-    // incoming errors are irrelevant for the app
-    log.error(err)
-  }
-
-  const stream = handshake({ timeout: 60 * 1000 }, cb)
-  const shake = stream.handshake
-
-  next()
-  return stream
-
-  function next () {
-    lp.decodeFromReader(shake, (err, data) => {
-      if (err) {
-        return cb(err)
-      }
-      log('received:', data.toString())
-      const protocol = data.toString().slice(0, -1)
-
-      matcher(protocol, handlersMap, (err, result) => {
-        if (err) {
-          return cb(err)
-        }
-        const key = result
-
-        if (key) {
-          log('send ack back of: ' + protocol)
-          writeEncoded(shake, data, cb)
-
-          const conn = new Connection(shake.rest(), rawConn)
-          handlersMap[key].handlerFunc(protocol, conn)
-        } else {
-          log('not supported protocol: ' + protocol)
-          writeEncoded(shake, new Buffer('na\n'))
-          next()
-        }
-      })
-    })
-  }
-}
-
-function matcher (protocol, handlers, callback) {
-  const supportedProtocols = Object.keys(handlers)
-  let supportedProtocol = false
-
-  some(supportedProtocols,
-    (sp, cb) => {
-      handlers[sp].matchFunc(sp, protocol, (err, result) => {
-        if (err) {
-          return cb(err)
-        }
-        if (result) {
-          supportedProtocol = sp
-        }
-        cb()
-      })
-    },
-    (err) => {
-      if (err) {
-        return callback(err)
-      }
-      callback(null, supportedProtocol)
-    }
-  )
-}
-
-module.exports = selectHandler
-
-}).call(this,require("buffer").Buffer)
-},{"../util.js":548,"async/some":55,"buffer":722,"interface-connection":205,"pull-handshake":584,"pull-length-prefixed":587}],547:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const handshake = require('pull-handshake')
-const pullLP = require('pull-length-prefixed')
-const util = require('./util')
-const writeEncoded = util.writeEncoded
-
-function select (multicodec, callback, log) {
-  const stream = handshake({
-    timeout: 60 * 1000
-  }, callback)
-
-  const shake = stream.handshake
-
-  log('writing multicodec: ' + multicodec)
-  writeEncoded(shake, new Buffer(multicodec + '\n'), callback)
-
-  pullLP.decodeFromReader(shake, (err, data) => {
-    if (err) {
-      return callback(err)
-    }
-    const protocol = data.toString().slice(0, -1)
-
-    if (protocol !== multicodec) {
-      return callback(new Error(`"${multicodec}" not supported`), shake.rest())
-    }
-
-    log('received ack: ' + protocol)
-    callback(null, shake.rest())
-  })
-
-  return stream
-}
-
-module.exports = select
-
-}).call(this,require("buffer").Buffer)
-},{"./util":548,"buffer":722,"pull-handshake":584,"pull-length-prefixed":587}],548:[function(require,module,exports){
-(function (Buffer){
-'use strict'
-
-const pull = require('pull-stream')
-const pullLP = require('pull-length-prefixed')
-const debug = require('debug')
-
-exports = module.exports
-
-function randomId () {
-  return ((~~(Math.random() * 1e9)).toString(36))
-}
-
-// prefixes a message with a varint
-// TODO this is a pull-stream 'creep' (pull stream to add a byte?')
-function encode (msg, callback) {
-  const values = Buffer.isBuffer(msg) ? [msg] : [new Buffer(msg)]
-
-  pull(
-    pull.values(values),
-    pullLP.encode(),
-    pull.collect((err, encoded) => {
-      if (err) {
-        return callback(err)
-      }
-      callback(null, encoded[0])
-    })
-  )
-}
-
-exports.writeEncoded = (writer, msg, callback) => {
-  encode(msg, (err, msg) => {
-    if (err) {
-      return callback(err)
-    }
-    writer.write(msg)
-  })
-}
-
-function createLogger (type) {
-  const rId = randomId()
-
-  function printer (logger) {
-    return (msg) => {
-      if (Array.isArray(msg)) {
-        msg = msg.join(' ')
-      }
-      logger('(%s) %s', rId, msg)
-    }
-  }
-
-  const log = printer(debug('mss:' + type))
-  log.error = printer(debug('mss:' + type + ':error'))
-
-  return log
-}
-
-exports.log = {}
-
-exports.log.dialer = () => {
-  return createLogger('dialer\t')
-}
-exports.log.listener = () => {
-  return createLogger('listener\t')
-}
-
-}).call(this,require("buffer").Buffer)
-},{"buffer":722,"debug":537,"pull-length-prefixed":587,"pull-stream":598}],549:[function(require,module,exports){
+},{"./channel":539,"buffer":715,"debug":533,"duplexify":125,"readable-stream":642,"varint":537}],541:[function(require,module,exports){
 module.exports = require('./lib/murmurHash3js');
 
-},{"./lib/murmurHash3js":550}],550:[function(require,module,exports){
+},{"./lib/murmurHash3js":542}],542:[function(require,module,exports){
 /* jshint -W086: true */
 // +----------------------------------------------------------------------+
 // | murmurHash3js.js v3.0.1 // https://github.com/pid/murmurHash3js
@@ -83291,7 +83171,7 @@ module.exports = require('./lib/murmurHash3js');
     }
 })(this);
 
-},{}],551:[function(require,module,exports){
+},{}],543:[function(require,module,exports){
 (function (process){
 var Promise = require('promise');
 var isPromise = require('is-promise');
@@ -83348,7 +83228,7 @@ function NodeifyPromise(fn) {
 NodeifyPromise.prototype = Object.create(Promise.prototype);
 NodeifyPromise.prototype.constructor = NodeifyPromise;
 }).call(this,require('_process'))
-},{"_process":733,"is-promise":347,"promise":561}],552:[function(require,module,exports){
+},{"_process":726,"is-promise":361,"promise":553}],544:[function(require,module,exports){
 var wrappy = require('wrappy')
 module.exports = wrappy(once)
 module.exports.strict = wrappy(onceStrict)
@@ -83392,7 +83272,7 @@ function onceStrict (fn) {
   return f
 }
 
-},{"wrappy":716}],553:[function(require,module,exports){
+},{"wrappy":709}],545:[function(require,module,exports){
 /**
  * Compiles a querystring
  * Returns string representation of the object
@@ -83431,7 +83311,7 @@ exports.decode = function(qs){
   return qry;
 };
 
-},{}],554:[function(require,module,exports){
+},{}],546:[function(require,module,exports){
 /**
  * Parses an URI
  *
@@ -83472,7 +83352,7 @@ module.exports = function parseuri(str) {
     return uri;
 };
 
-},{}],555:[function(require,module,exports){
+},{}],547:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -83591,7 +83471,7 @@ class PeerBook {
 module.exports = PeerBook
 
 }).call(this,{"isBuffer":require("../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728,"bs58":100,"peer-id":556,"peer-info":557}],556:[function(require,module,exports){
+},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721,"bs58":100,"peer-id":548,"peer-info":549}],548:[function(require,module,exports){
 (function (Buffer){
 /*
  * Id is an object representation of a peer Id. a peer Id is a multihash
@@ -83859,7 +83739,7 @@ function toB64Opt (val) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"assert":719,"async/waterfall":57,"buffer":722,"libp2p-crypto":387,"multihashes":523}],557:[function(require,module,exports){
+},{"assert":712,"async/waterfall":57,"buffer":715,"libp2p-crypto":401,"multihashes":527}],549:[function(require,module,exports){
 'use strict'
 
 const Id = require('peer-id')
@@ -83922,7 +83802,7 @@ PeerInfo.isPeerInfo = (peerInfo) => {
 
 module.exports = PeerInfo
 
-},{"./multiaddr-set":558,"./utils":559,"assert":719,"peer-id":556}],558:[function(require,module,exports){
+},{"./multiaddr-set":550,"./utils":551,"assert":712,"peer-id":548}],550:[function(require,module,exports){
 'use strict'
 
 const ensureMultiaddr = require('./utils').ensureMultiaddr
@@ -84022,7 +83902,7 @@ class MultiaddrSet {
 
 module.exports = MultiaddrSet
 
-},{"./utils":559,"lodash.uniqby":461}],559:[function(require,module,exports){
+},{"./utils":551,"lodash.uniqby":465}],551:[function(require,module,exports){
 'use strict'
 
 const multiaddr = require('multiaddr')
@@ -84039,7 +83919,7 @@ module.exports = {
   ensureMultiaddr: ensureMultiaddr
 }
 
-},{"multiaddr":511}],560:[function(require,module,exports){
+},{"multiaddr":515}],552:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -84086,7 +83966,7 @@ function nextTick(fn, arg1, arg2, arg3) {
 }
 
 }).call(this,require('_process'))
-},{"_process":733}],561:[function(require,module,exports){
+},{"_process":726}],553:[function(require,module,exports){
 (function (process){
 var isPromise = require('is-promise')
 
@@ -84187,7 +84067,7 @@ Promise.use = function (extension) {
   extensions.push(extension);
 };
 }).call(this,require('_process'))
-},{"_process":733,"is-promise":347}],562:[function(require,module,exports){
+},{"_process":726,"is-promise":361}],554:[function(require,module,exports){
 /** PROMISIFY CALLBACK-STYLE FUNCTIONS TO ES6 PROMISES
 *
 * EXAMPLE:
@@ -84255,7 +84135,7 @@ if (typeof exports === "undefined") {
     this["promisify"] = module.exports;
 }
 
-},{}],563:[function(require,module,exports){
+},{}],555:[function(require,module,exports){
 var parse = require('./parse')
 var stringify = require('./stringify')
 
@@ -84263,7 +84143,7 @@ module.exports = parse
 module.exports.parse = parse
 module.exports.stringify = stringify
 
-},{"./parse":564,"./stringify":565}],564:[function(require,module,exports){
+},{"./parse":556,"./stringify":557}],556:[function(require,module,exports){
 var tokenize = require('./tokenize')
 var MAX_RANGE = 0x1FFFFFFF
 
@@ -84973,7 +84853,7 @@ var parse = function (buf) {
 
 module.exports = parse
 
-},{"./tokenize":566}],565:[function(require,module,exports){
+},{"./tokenize":558}],557:[function(require,module,exports){
 var onfield = function (f, result) {
   var prefix = f.repeated ? 'repeated' : f.required ? 'required' : 'optional'
   if (f.type === 'map') prefix = 'map<' + f.map.from + ',' + f.map.to + '>'
@@ -85167,7 +85047,7 @@ module.exports = function (schema) {
   return result.map(indent('')).join('\n')
 }
 
-},{}],566:[function(require,module,exports){
+},{}],558:[function(require,module,exports){
 module.exports = function (sch) {
   var noComments = function (line) {
     var i = line.indexOf('//')
@@ -85206,7 +85086,7 @@ module.exports = function (sch) {
     .filter(noMultilineComments())
 }
 
-},{}],567:[function(require,module,exports){
+},{}],559:[function(require,module,exports){
 /* eslint max-depth: 1 */
 'use strict'
 
@@ -85440,7 +85320,7 @@ var defaultValue = function (f, def) {
 
 module.exports = compileDecode
 
-},{"./utils":572,"varint":712}],568:[function(require,module,exports){
+},{"./utils":564,"varint":705}],560:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -85574,7 +85454,7 @@ function compileEncode (m, resolve, enc, oneofs, encodingLength) {
 module.exports = compileEncode
 
 }).call(this,require("buffer").Buffer)
-},{"./utils":572,"buffer":722,"varint":712}],569:[function(require,module,exports){
+},{"./utils":564,"buffer":715,"varint":705}],561:[function(require,module,exports){
 'use strict'
 
 var defined = require('./utils').defined
@@ -85678,7 +85558,7 @@ function compileEncodingLength (m, enc, oneofs) {
 
 module.exports = compileEncodingLength
 
-},{"./utils":572,"varint":712}],570:[function(require,module,exports){
+},{"./utils":564,"varint":705}],562:[function(require,module,exports){
 'use strict'
 
 var varint = require('varint')
@@ -85973,7 +85853,7 @@ exports.float = (function () {
   return encoder(5, encode, decode, encodingLength)
 })()
 
-},{"safe-buffer":654,"signed-varint":677,"varint":712}],571:[function(require,module,exports){
+},{"safe-buffer":646,"signed-varint":669,"varint":705}],563:[function(require,module,exports){
 'use strict'
 
 var encodings = require('./encodings')
@@ -86140,14 +86020,14 @@ module.exports = function (schema, extraEncodings) {
   }))
 }
 
-},{"./decode":567,"./encode":568,"./encoding-length":569,"./encodings":570,"varint":712}],572:[function(require,module,exports){
+},{"./decode":559,"./encode":560,"./encoding-length":561,"./encodings":562,"varint":705}],564:[function(require,module,exports){
 'use strict'
 
 exports.defined = function (val) {
   return val !== null && val !== undefined && (typeof val !== 'number' || !isNaN(val))
 }
 
-},{}],573:[function(require,module,exports){
+},{}],565:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -86190,9 +86070,9 @@ module.exports = function (proto, opts) {
 }
 
 }).call(this,{"isBuffer":require("../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728,"./compile":571,"protocol-buffers-schema":563}],574:[function(require,module,exports){
-arguments[4][169][0].apply(exports,arguments)
-},{"dup":169}],575:[function(require,module,exports){
+},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721,"./compile":563,"protocol-buffers-schema":555}],566:[function(require,module,exports){
+arguments[4][159][0].apply(exports,arguments)
+},{"dup":159}],567:[function(require,module,exports){
 'use strict'
 
 const through = require('pull-through')
@@ -86226,16 +86106,11 @@ module.exports = function block (_maxLength) {
   )
 }
 
-},{"pull-through":629}],576:[function(require,module,exports){
+},{"pull-through":621}],568:[function(require,module,exports){
 'use strict'
 
 var through = require('pull-through')
 var Buffer = require('safe-buffer').Buffer
-
-function lazyConcat (buffers) {
-  if (buffers.length === 1) return buffers[0]
-  return Buffer.concat(buffers)
-}
 
 module.exports = function block (size, opts) {
   if (!opts) opts = {}
@@ -86255,43 +86130,20 @@ module.exports = function block (size, opts) {
 
   var buffered = []
   var bufferedBytes = 0
-  var bufferSkip = 0
   var emittedChunk = false
 
   return through(function transform (data) {
     if (typeof data === 'number') {
-      data = Buffer.from([data])
+      data = Buffer([data])
     }
     bufferedBytes += data.length
     buffered.push(data)
 
     while (bufferedBytes >= size) {
-      var targetLength = 0
-      var target = []
-      var b, end, out
-
-      while (targetLength < size) {
-        b = buffered[0]
-
-        // Slice as much as we can from the next buffer.
-        end = Math.min(bufferSkip + size - targetLength, b.length)
-        out = b.slice(bufferSkip, end)
-        targetLength += out.length
-        target.push(out)
-
-        if (end === b.length) {
-          // If that "consumes" the buffer, remove it.
-          buffered.shift()
-          bufferSkip = 0
-        } else {
-          // Otherwise keep track of how much we used.
-          bufferSkip += out.length
-        }
-      }
-
-      bufferedBytes -= targetLength
-      this.queue(lazyConcat(target))
-
+      var b = Buffer.concat(buffered)
+      bufferedBytes -= size
+      this.queue(b.slice(0, size))
+      buffered = [ b.slice(size, b.length) ]
       emittedChunk = true
     }
   }, function flush (end) {
@@ -86302,12 +86154,7 @@ module.exports = function block (size, opts) {
         buffered.push(zeroes)
       }
       if (buffered) {
-        if (buffered.length > 0) {
-          // Don't copy the bufferSkip bytes through concat.
-          buffered[0] = buffered[0].slice(bufferSkip)
-        }
-
-        this.queue(lazyConcat(buffered))
+        this.queue(Buffer.concat(buffered))
         buffered = null
       }
     }
@@ -86315,7 +86162,7 @@ module.exports = function block (size, opts) {
   })
 }
 
-},{"pull-through":629,"safe-buffer":654}],577:[function(require,module,exports){
+},{"pull-through":621,"safe-buffer":646}],569:[function(require,module,exports){
 var noop = function () {}
 
 function abortAll(ary, abort, cb) {
@@ -86358,7 +86205,7 @@ module.exports = function (streams) {
 
 
 
-},{}],578:[function(require,module,exports){
+},{}],570:[function(require,module,exports){
 module.exports = function Catch (onError) {
     onError = onError || function noop () {}
     var errd
@@ -86381,7 +86228,7 @@ module.exports = function Catch (onError) {
     }
 }
 
-},{}],579:[function(require,module,exports){
+},{}],571:[function(require,module,exports){
 
 var Source = require('./source')
 var Sink = require('./sink')
@@ -86404,14 +86251,14 @@ module.exports = function () {
 
 }
 
-},{"./sink":581,"./source":582}],580:[function(require,module,exports){
+},{"./sink":573,"./source":574}],572:[function(require,module,exports){
 
 exports.source = require('./source')
 exports.through = require('./through')
 exports.sink = require('./sink')
 exports.duplex = require('./duplex')
 
-},{"./duplex":579,"./sink":581,"./source":582,"./through":583}],581:[function(require,module,exports){
+},{"./duplex":571,"./sink":573,"./source":574,"./through":575}],573:[function(require,module,exports){
 module.exports = function (stream) {
   var read, started = false, id = Math.random()
 
@@ -86432,7 +86279,7 @@ module.exports = function (stream) {
   return consume
 }
 
-},{}],582:[function(require,module,exports){
+},{}],574:[function(require,module,exports){
 
 module.exports = function () {
   var _read, _cb, abortCb, _end
@@ -86464,7 +86311,7 @@ module.exports = function () {
 }
 
 
-},{}],583:[function(require,module,exports){
+},{}],575:[function(require,module,exports){
 
 module.exports = function () {
   var read, reader, cb, abort, stream
@@ -86494,7 +86341,7 @@ module.exports = function () {
   return delayed
 }
 
-},{}],584:[function(require,module,exports){
+},{}],576:[function(require,module,exports){
 var Reader = require('pull-reader')
 var Writer = require('pull-pushable')
 var cat = require('pull-cat')
@@ -86545,7 +86392,7 @@ module.exports = function (opts, _cb) {
   }
 }
 
-},{"pull-cat":577,"pull-pair":589,"pull-pushable":593,"pull-reader":594}],585:[function(require,module,exports){
+},{"pull-cat":569,"pull-pair":581,"pull-pushable":585,"pull-reader":586}],577:[function(require,module,exports){
 'use strict'
 
 const varint = require('varint')
@@ -86670,7 +86517,7 @@ function readMessage (reader, size, cb) {
   })
 }
 
-},{"pull-pushable":593,"pull-reader":594,"safe-buffer":654,"varint":712}],586:[function(require,module,exports){
+},{"pull-pushable":585,"pull-reader":586,"safe-buffer":646,"varint":705}],578:[function(require,module,exports){
 'use strict'
 
 const Buffer = require('safe-buffer').Buffer
@@ -86732,7 +86579,7 @@ function createPool () {
   return Buffer.alloc(poolSize)
 }
 
-},{"safe-buffer":654,"varint":712}],587:[function(require,module,exports){
+},{"safe-buffer":646,"varint":705}],579:[function(require,module,exports){
 'use strict'
 
 const encode = require('./encode')
@@ -86742,7 +86589,7 @@ exports.encode = encode
 exports.decode = d.decode
 exports.decodeFromReader = d.decodeFromReader
 
-},{"./decode":585,"./encode":586}],588:[function(require,module,exports){
+},{"./decode":577,"./encode":578}],580:[function(require,module,exports){
 
 
 /*
@@ -86878,7 +86725,7 @@ module.exports = function (ary) {
 }
 
 
-},{}],589:[function(require,module,exports){
+},{}],581:[function(require,module,exports){
 'use strict'
 
 //a pair of pull streams where one drains from the other
@@ -86910,7 +86757,7 @@ module.exports = function () {
 }
 
 
-},{}],590:[function(require,module,exports){
+},{}],582:[function(require,module,exports){
 var looper = require('looper')
 module.exports = function (map, width, inOrder) {
   inOrder = inOrder === undefined ? true : inOrder
@@ -86980,7 +86827,7 @@ module.exports = function (map, width, inOrder) {
 }
 
 
-},{"looper":591}],591:[function(require,module,exports){
+},{"looper":583}],583:[function(require,module,exports){
 
 
 module.exports = function (fn) {
@@ -87006,7 +86853,7 @@ module.exports = function (fn) {
 
 
 
-},{}],592:[function(require,module,exports){
+},{}],584:[function(require,module,exports){
 
 
 module.exports = function (onPause) {
@@ -87043,7 +86890,7 @@ module.exports = function (onPause) {
 
 
 
-},{}],593:[function(require,module,exports){
+},{}],585:[function(require,module,exports){
 module.exports = pullPushable
 
 function pullPushable (separated, onClose) {
@@ -87132,7 +86979,7 @@ function pullPushable (separated, onClose) {
   }
 }
 
-},{}],594:[function(require,module,exports){
+},{}],586:[function(require,module,exports){
 'use strict'
 var State = require('./state')
 
@@ -87256,7 +87103,7 @@ module.exports = function (timeout) {
 
 
 
-},{"./state":595}],595:[function(require,module,exports){
+},{"./state":587}],587:[function(require,module,exports){
 (function (Buffer){
 
 module.exports = function () {
@@ -87333,7 +87180,7 @@ module.exports = function () {
 
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722}],596:[function(require,module,exports){
+},{"buffer":715}],588:[function(require,module,exports){
 
 var Source = require('pull-defer/source')
 var pull = require('pull-stream')
@@ -87353,7 +87200,7 @@ module.exports = function (compare) {
 
 }
 
-},{"pull-defer/source":582,"pull-stream":598}],597:[function(require,module,exports){
+},{"pull-defer/source":574,"pull-stream":590}],589:[function(require,module,exports){
 (function (process){
 
 var Stream = require('stream')
@@ -87507,7 +87354,7 @@ function duplex (reader, read) {
 }
 
 }).call(this,require('_process'))
-},{"_process":733,"stream":752}],598:[function(require,module,exports){
+},{"_process":726,"stream":745}],590:[function(require,module,exports){
 'use strict'
 
 var sources  = require('./sources')
@@ -87528,7 +87375,7 @@ for(var k in sinks)
   exports[k] = sinks[k]
 
 
-},{"./pull":599,"./sinks":604,"./sources":611,"./throughs":620}],599:[function(require,module,exports){
+},{"./pull":591,"./sinks":596,"./sources":603,"./throughs":612}],591:[function(require,module,exports){
 'use strict'
 
 module.exports = function pull (a) {
@@ -87579,7 +87426,7 @@ module.exports = function pull (a) {
   return read
 }
 
-},{}],600:[function(require,module,exports){
+},{}],592:[function(require,module,exports){
 'use strict'
 
 var reduce = require('./reduce')
@@ -87591,7 +87438,7 @@ module.exports = function collect (cb) {
   }, [], cb)
 }
 
-},{"./reduce":607}],601:[function(require,module,exports){
+},{"./reduce":599}],593:[function(require,module,exports){
 'use strict'
 
 var reduce = require('./reduce')
@@ -87602,7 +87449,7 @@ module.exports = function concat (cb) {
   }, '', cb)
 }
 
-},{"./reduce":607}],602:[function(require,module,exports){
+},{"./reduce":599}],594:[function(require,module,exports){
 'use strict'
 
 module.exports = function drain (op, done) {
@@ -87652,7 +87499,7 @@ module.exports = function drain (op, done) {
   return sink
 }
 
-},{}],603:[function(require,module,exports){
+},{}],595:[function(require,module,exports){
 'use strict'
 
 function id (e) { return e }
@@ -87682,7 +87529,7 @@ module.exports = function find (test, cb) {
 
 
 
-},{"../util/prop":627,"./drain":602}],604:[function(require,module,exports){
+},{"../util/prop":619,"./drain":594}],596:[function(require,module,exports){
 'use strict'
 
 module.exports = {
@@ -87696,7 +87543,7 @@ module.exports = {
 }
 
 
-},{"./collect":600,"./concat":601,"./drain":602,"./find":603,"./log":605,"./on-end":606,"./reduce":607}],605:[function(require,module,exports){
+},{"./collect":592,"./concat":593,"./drain":594,"./find":595,"./log":597,"./on-end":598,"./reduce":599}],597:[function(require,module,exports){
 'use strict'
 
 var drain = require('./drain')
@@ -87707,7 +87554,7 @@ module.exports = function log (done) {
   }, done)
 }
 
-},{"./drain":602}],606:[function(require,module,exports){
+},{"./drain":594}],598:[function(require,module,exports){
 'use strict'
 
 var drain = require('./drain')
@@ -87716,7 +87563,7 @@ module.exports = function onEnd (done) {
   return drain(null, done)
 }
 
-},{"./drain":602}],607:[function(require,module,exports){
+},{"./drain":594}],599:[function(require,module,exports){
 'use strict'
 
 var drain = require('./drain')
@@ -87740,7 +87587,7 @@ module.exports = function reduce (reducer, acc, cb ) {
     return sink
 }
 
-},{"./drain":602}],608:[function(require,module,exports){
+},{"./drain":594}],600:[function(require,module,exports){
 'use strict'
 
 module.exports = function count (max) {
@@ -87755,7 +87602,7 @@ module.exports = function count (max) {
 
 
 
-},{}],609:[function(require,module,exports){
+},{}],601:[function(require,module,exports){
 'use strict'
 //a stream that ends immediately.
 module.exports = function empty () {
@@ -87764,7 +87611,7 @@ module.exports = function empty () {
   }
 }
 
-},{}],610:[function(require,module,exports){
+},{}],602:[function(require,module,exports){
 'use strict'
 //a stream that errors immediately.
 module.exports = function error (err) {
@@ -87774,7 +87621,7 @@ module.exports = function error (err) {
 }
 
 
-},{}],611:[function(require,module,exports){
+},{}],603:[function(require,module,exports){
 'use strict'
 module.exports = {
   keys: require('./keys'),
@@ -87786,7 +87633,7 @@ module.exports = {
   error: require('./error')
 }
 
-},{"./count":608,"./empty":609,"./error":610,"./infinite":612,"./keys":613,"./once":614,"./values":615}],612:[function(require,module,exports){
+},{"./count":600,"./empty":601,"./error":602,"./infinite":604,"./keys":605,"./once":606,"./values":607}],604:[function(require,module,exports){
 'use strict'
 module.exports = function infinite (generate) {
   generate = generate || Math.random
@@ -87798,7 +87645,7 @@ module.exports = function infinite (generate) {
 
 
 
-},{}],613:[function(require,module,exports){
+},{}],605:[function(require,module,exports){
 'use strict'
 var values = require('./values')
 module.exports = function (object) {
@@ -87807,7 +87654,7 @@ module.exports = function (object) {
 
 
 
-},{"./values":615}],614:[function(require,module,exports){
+},{"./values":607}],606:[function(require,module,exports){
 'use strict'
 var abortCb = require('../util/abort-cb')
 
@@ -87825,7 +87672,7 @@ module.exports = function once (value, onAbort) {
 
 
 
-},{"../util/abort-cb":626}],615:[function(require,module,exports){
+},{"../util/abort-cb":618}],607:[function(require,module,exports){
 'use strict'
 var abortCb = require('../util/abort-cb')
 
@@ -87850,7 +87697,7 @@ module.exports = function values (array, onAbort) {
   }
 }
 
-},{"../util/abort-cb":626}],616:[function(require,module,exports){
+},{"../util/abort-cb":618}],608:[function(require,module,exports){
 'use strict'
 
 function id (e) { return e }
@@ -87895,7 +87742,7 @@ module.exports = function asyncMap (map) {
 
 
 
-},{"../util/prop":627}],617:[function(require,module,exports){
+},{"../util/prop":619}],609:[function(require,module,exports){
 'use strict'
 
 var tester = require('../util/tester')
@@ -87906,7 +87753,7 @@ module.exports = function filterNot (test) {
   return filter(function (data) { return !test(data) })
 }
 
-},{"../util/tester":628,"./filter":618}],618:[function(require,module,exports){
+},{"../util/tester":620,"./filter":610}],610:[function(require,module,exports){
 'use strict'
 
 var tester = require('../util/tester')
@@ -87932,7 +87779,7 @@ module.exports = function filter (test) {
 }
 
 
-},{"../util/tester":628}],619:[function(require,module,exports){
+},{"../util/tester":620}],611:[function(require,module,exports){
 'use strict'
 
 var values = require('../sources/values')
@@ -87981,7 +87828,7 @@ module.exports = function flatten () {
 }
 
 
-},{"../sources/once":614,"../sources/values":615}],620:[function(require,module,exports){
+},{"../sources/once":606,"../sources/values":607}],612:[function(require,module,exports){
 'use strict'
 
 module.exports = {
@@ -87999,7 +87846,7 @@ module.exports = {
 
 
 
-},{"./async-map":616,"./filter":618,"./filter-not":617,"./flatten":619,"./map":621,"./non-unique":622,"./take":623,"./through":624,"./unique":625}],621:[function(require,module,exports){
+},{"./async-map":608,"./filter":610,"./filter-not":609,"./flatten":611,"./map":613,"./non-unique":614,"./take":615,"./through":616,"./unique":617}],613:[function(require,module,exports){
 'use strict'
 
 function id (e) { return e }
@@ -88024,7 +87871,7 @@ module.exports = function map (mapper) {
   }
 }
 
-},{"../util/prop":627}],622:[function(require,module,exports){
+},{"../util/prop":619}],614:[function(require,module,exports){
 'use strict'
 
 var unique = require('./unique')
@@ -88034,7 +87881,7 @@ module.exports = function nonUnique (field) {
   return unique(field, true)
 }
 
-},{"./unique":625}],623:[function(require,module,exports){
+},{"./unique":617}],615:[function(require,module,exports){
 'use strict'
 
 //read a number of items and then stop.
@@ -88077,7 +87924,7 @@ module.exports = function take (test, opts) {
   }
 }
 
-},{}],624:[function(require,module,exports){
+},{}],616:[function(require,module,exports){
 'use strict'
 
 //a pass through stream that doesn't change the value.
@@ -88102,7 +87949,7 @@ module.exports = function through (op, onEnd) {
   }
 }
 
-},{}],625:[function(require,module,exports){
+},{}],617:[function(require,module,exports){
 'use strict'
 
 function id (e) { return e }
@@ -88122,7 +87969,7 @@ module.exports = function unique (field, invert) {
 }
 
 
-},{"../util/prop":627,"./filter":618}],626:[function(require,module,exports){
+},{"../util/prop":619,"./filter":610}],618:[function(require,module,exports){
 module.exports = function abortCb(cb, abort, onAbort) {
   cb(abort)
   onAbort && onAbort(abort === true ? null: abort)
@@ -88130,7 +87977,7 @@ module.exports = function abortCb(cb, abort, onAbort) {
 }
 
 
-},{}],627:[function(require,module,exports){
+},{}],619:[function(require,module,exports){
 module.exports = function prop (key) {
   return key && (
     'string' == typeof key
@@ -88141,7 +87988,7 @@ module.exports = function prop (key) {
   )
 }
 
-},{}],628:[function(require,module,exports){
+},{}],620:[function(require,module,exports){
 var prop = require('./prop')
 
 function id (e) { return e }
@@ -88154,7 +88001,7 @@ module.exports = function tester (test) {
   )
 }
 
-},{"./prop":627}],629:[function(require,module,exports){
+},{"./prop":619}],621:[function(require,module,exports){
 var looper = require('looper')
 
 module.exports = function (writer, ender) {
@@ -88225,7 +88072,7 @@ module.exports = function (writer, ender) {
 }
 
 
-},{"looper":500}],630:[function(require,module,exports){
+},{"looper":504}],622:[function(require,module,exports){
 
 var once = exports.once =
 function (value) {
@@ -88318,7 +88165,7 @@ function (start, createStream) {
 }
 
 
-},{}],631:[function(require,module,exports){
+},{}],623:[function(require,module,exports){
 //another idea: buffer 2* the max, but only call write with half of that,
 //this could manage cases where the read ahead is latent. Hmm, we probably
 //shouldn't guess at that here, just handle write latency.
@@ -88410,9 +88257,9 @@ module.exports = function (write, reduce, max, cb) {
 }
 
 
-},{"looper":632}],632:[function(require,module,exports){
-arguments[4][591][0].apply(exports,arguments)
-},{"dup":591}],633:[function(require,module,exports){
+},{"looper":624}],624:[function(require,module,exports){
+arguments[4][583][0].apply(exports,arguments)
+},{"dup":583}],625:[function(require,module,exports){
 'use strict';
 
 //load websocket library if we are not in the browser
@@ -88452,7 +88299,7 @@ module.exports = function (addr, opts) {
 
 module.exports.connect = module.exports
 
-},{"./duplex":634,"./web-socket":638,"./ws-url":639}],634:[function(require,module,exports){
+},{"./duplex":626,"./web-socket":630,"./ws-url":631}],626:[function(require,module,exports){
 var source = require('./source')
 var sink = require('./sink')
 
@@ -88477,7 +88324,7 @@ function duplex (ws, opts) {
 };
 
 
-},{"./sink":636,"./source":637}],635:[function(require,module,exports){
+},{"./sink":628,"./source":629}],627:[function(require,module,exports){
 module.exports = function(socket, callback) {
   var remove = socket && (socket.removeEventListener || socket.removeListener);
 
@@ -88510,7 +88357,7 @@ module.exports = function(socket, callback) {
   socket.addEventListener('error', handleErr);
 };
 
-},{}],636:[function(require,module,exports){
+},{}],628:[function(require,module,exports){
 (function (process){
 var ready = require('./ready');
 
@@ -88568,7 +88415,7 @@ module.exports = function(socket, opts) {
 }
 
 }).call(this,require('_process'))
-},{"./ready":635,"_process":733}],637:[function(require,module,exports){
+},{"./ready":627,"_process":726}],629:[function(require,module,exports){
 /**
   ### `source(socket)`
 
@@ -88656,11 +88503,11 @@ module.exports = function(socket, cb) {
   return read;
 };
 
-},{"safe-buffer":654}],638:[function(require,module,exports){
+},{"safe-buffer":646}],630:[function(require,module,exports){
 
 module.exports = 'undefined' === typeof WebSocket ? require('ws') : WebSocket
 
-},{"ws":721}],639:[function(require,module,exports){
+},{"ws":714}],631:[function(require,module,exports){
 var rurl = require('relative-url')
 var map = {http:'ws', https:'wss'}
 var def = 'ws'
@@ -88670,7 +88517,7 @@ module.exports = function (url, location) {
 
 
 
-},{"relative-url":651}],640:[function(require,module,exports){
+},{"relative-url":643}],632:[function(require,module,exports){
 var once = require('once')
 var eos = require('end-of-stream')
 var fs = require('fs') // we only need fs to get the ReadStream and WriteStream prototypes
@@ -88752,7 +88599,7 @@ var pump = function () {
 
 module.exports = pump
 
-},{"end-of-stream":152,"fs":721,"once":552}],641:[function(require,module,exports){
+},{"end-of-stream":142,"fs":714,"once":544}],633:[function(require,module,exports){
 (function (process,global){
 'use strict'
 
@@ -88794,7 +88641,7 @@ function randomBytes (size, cb) {
 }
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"_process":733,"safe-buffer":654}],642:[function(require,module,exports){
+},{"_process":726,"safe-buffer":646}],634:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -88919,7 +88766,7 @@ function forEach(xs, f) {
     f(xs[i], i);
   }
 }
-},{"./_stream_readable":644,"./_stream_writable":646,"core-util-is":108,"inherits":203,"process-nextick-args":560}],643:[function(require,module,exports){
+},{"./_stream_readable":636,"./_stream_writable":638,"core-util-is":108,"inherits":193,"process-nextick-args":552}],635:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -88967,7 +88814,7 @@ function PassThrough(options) {
 PassThrough.prototype._transform = function (chunk, encoding, cb) {
   cb(null, chunk);
 };
-},{"./_stream_transform":645,"core-util-is":108,"inherits":203}],644:[function(require,module,exports){
+},{"./_stream_transform":637,"core-util-is":108,"inherits":193}],636:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -89977,7 +89824,7 @@ function indexOf(xs, x) {
   return -1;
 }
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./_stream_duplex":642,"./internal/streams/BufferList":647,"./internal/streams/destroy":648,"./internal/streams/stream":649,"_process":733,"core-util-is":108,"events":724,"inherits":203,"isarray":349,"process-nextick-args":560,"safe-buffer":654,"string_decoder/":699,"util":721}],645:[function(require,module,exports){
+},{"./_stream_duplex":634,"./internal/streams/BufferList":639,"./internal/streams/destroy":640,"./internal/streams/stream":641,"_process":726,"core-util-is":108,"events":717,"inherits":193,"isarray":363,"process-nextick-args":552,"safe-buffer":646,"string_decoder/":692,"util":714}],637:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -90192,7 +90039,7 @@ function done(stream, er, data) {
 
   return stream.push(null);
 }
-},{"./_stream_duplex":642,"core-util-is":108,"inherits":203}],646:[function(require,module,exports){
+},{"./_stream_duplex":634,"core-util-is":108,"inherits":193}],638:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -90859,7 +90706,7 @@ Writable.prototype._destroy = function (err, cb) {
   cb(err);
 };
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./_stream_duplex":642,"./internal/streams/destroy":648,"./internal/streams/stream":649,"_process":733,"core-util-is":108,"inherits":203,"process-nextick-args":560,"safe-buffer":654,"util-deprecate":705}],647:[function(require,module,exports){
+},{"./_stream_duplex":634,"./internal/streams/destroy":640,"./internal/streams/stream":641,"_process":726,"core-util-is":108,"inherits":193,"process-nextick-args":552,"safe-buffer":646,"util-deprecate":698}],639:[function(require,module,exports){
 'use strict';
 
 /*<replacement>*/
@@ -90934,7 +90781,7 @@ module.exports = function () {
 
   return BufferList;
 }();
-},{"safe-buffer":654}],648:[function(require,module,exports){
+},{"safe-buffer":646}],640:[function(require,module,exports){
 'use strict';
 
 /*<replacement>*/
@@ -91007,10 +90854,10 @@ module.exports = {
   destroy: destroy,
   undestroy: undestroy
 };
-},{"process-nextick-args":560}],649:[function(require,module,exports){
+},{"process-nextick-args":552}],641:[function(require,module,exports){
 module.exports = require('events').EventEmitter;
 
-},{"events":724}],650:[function(require,module,exports){
+},{"events":717}],642:[function(require,module,exports){
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = exports;
 exports.Readable = exports;
@@ -91019,7 +90866,7 @@ exports.Duplex = require('./lib/_stream_duplex.js');
 exports.Transform = require('./lib/_stream_transform.js');
 exports.PassThrough = require('./lib/_stream_passthrough.js');
 
-},{"./lib/_stream_duplex.js":642,"./lib/_stream_passthrough.js":643,"./lib/_stream_readable.js":644,"./lib/_stream_transform.js":645,"./lib/_stream_writable.js":646}],651:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":634,"./lib/_stream_passthrough.js":635,"./lib/_stream_readable.js":636,"./lib/_stream_transform.js":637,"./lib/_stream_writable.js":638}],643:[function(require,module,exports){
 
 //normalize a ws url.
 var URL = require('url')
@@ -91117,7 +90964,7 @@ module.exports = function (url, location, protocolMap, defaultProtocol) {
 
 
 
-},{"url":754}],652:[function(require,module,exports){
+},{"url":747}],644:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 var inherits = require('inherits')
@@ -91412,7 +91259,7 @@ function fn5 (a, b, c, d, e, m, k, s) {
 module.exports = RIPEMD160
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722,"hash-base":186,"inherits":203}],653:[function(require,module,exports){
+},{"buffer":715,"hash-base":176,"inherits":193}],645:[function(require,module,exports){
 (function (Buffer){
 const assert = require('assert')
 /**
@@ -91645,7 +91492,7 @@ function toBuffer (v) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"assert":719,"buffer":722}],654:[function(require,module,exports){
+},{"assert":712,"buffer":715}],646:[function(require,module,exports){
 /* eslint-disable node/no-deprecated-api */
 var buffer = require('buffer')
 var Buffer = buffer.Buffer
@@ -91709,15 +91556,15 @@ SafeBuffer.allocUnsafeSlow = function (size) {
   return buffer.SlowBuffer(size)
 }
 
-},{"buffer":722}],655:[function(require,module,exports){
+},{"buffer":715}],647:[function(require,module,exports){
 'use strict'
 module.exports = require('./lib')(require('./lib/elliptic'))
 
-},{"./lib":660,"./lib/elliptic":659}],656:[function(require,module,exports){
+},{"./lib":652,"./lib/elliptic":651}],648:[function(require,module,exports){
 'use strict'
 module.exports = require('./lib')(require('./lib/js'))
 
-},{"./lib":660,"./lib/js":666}],657:[function(require,module,exports){
+},{"./lib":652,"./lib/js":658}],649:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 var toString = Object.prototype.toString
@@ -91765,7 +91612,7 @@ exports.isNumberInInterval = function (number, x, y, message) {
 }
 
 }).call(this,{"isBuffer":require("../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728}],658:[function(require,module,exports){
+},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721}],650:[function(require,module,exports){
 'use strict'
 var Buffer = require('safe-buffer').Buffer
 var bip66 = require('bip66')
@@ -91816,11 +91663,6 @@ var EC_PRIVKEY_EXPORT_DER_UNCOMPRESSED = Buffer.from([
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00
-])
-
-var ZERO_BUFFER_32 = Buffer.from([
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 ])
 
 exports.privateKeyExport = function (privateKey, publicKey, compressed) {
@@ -91882,8 +91724,8 @@ exports.signatureExport = function (sigObj) {
 }
 
 exports.signatureImport = function (sig) {
-  var r = Buffer.from(ZERO_BUFFER_32)
-  var s = Buffer.from(ZERO_BUFFER_32)
+  var r = Buffer.alloc(32, 0)
+  var s = Buffer.alloc(32, 0)
 
   try {
     var sigObj = bip66.decode(sig)
@@ -91902,8 +91744,8 @@ exports.signatureImport = function (sig) {
 }
 
 exports.signatureImportLax = function (sig) {
-  var r = Buffer.from(ZERO_BUFFER_32)
-  var s = Buffer.from(ZERO_BUFFER_32)
+  var r = Buffer.alloc(32, 0)
+  var s = Buffer.alloc(32, 0)
 
   var length = sig.length
   var index = 0
@@ -91965,7 +91807,7 @@ exports.signatureImportLax = function (sig) {
   return { r: r, s: s }
 }
 
-},{"bip66":64,"safe-buffer":654}],659:[function(require,module,exports){
+},{"bip66":64,"safe-buffer":646}],651:[function(require,module,exports){
 'use strict'
 var Buffer = require('safe-buffer').Buffer
 var createHash = require('create-hash')
@@ -92215,7 +92057,7 @@ exports.ecdhUnsafe = function (publicKey, privateKey, compressed) {
   return Buffer.from(pair.pub.mul(scalar).encode(true, compressed))
 }
 
-},{"../messages.json":667,"bn.js":70,"create-hash":109,"elliptic":136,"safe-buffer":654}],660:[function(require,module,exports){
+},{"../messages.json":659,"bn.js":70,"create-hash":109,"elliptic":126,"safe-buffer":646}],652:[function(require,module,exports){
 'use strict'
 var assert = require('./assert')
 var der = require('./der')
@@ -92448,7 +92290,7 @@ module.exports = function (secp256k1) {
   }
 }
 
-},{"./assert":657,"./der":658,"./messages.json":667}],661:[function(require,module,exports){
+},{"./assert":649,"./der":650,"./messages.json":659}],653:[function(require,module,exports){
 'use strict'
 var Buffer = require('safe-buffer').Buffer
 var optimized = require('./optimized')
@@ -93112,7 +92954,7 @@ BN.tmp.words = new Array(10)
 
 module.exports = BN
 
-},{"./optimized":662,"safe-buffer":654}],662:[function(require,module,exports){
+},{"./optimized":654,"safe-buffer":646}],654:[function(require,module,exports){
 'use strict'
 exports.umulTo10x10 = function (num1, num2, out) {
   var a = num1.words
@@ -93686,7 +93528,7 @@ exports.umulTo10x10 = function (num1, num2, out) {
   return out
 }
 
-},{}],663:[function(require,module,exports){
+},{}],655:[function(require,module,exports){
 'use strict'
 var BN = require('./bn')
 
@@ -93867,7 +93709,7 @@ Object.defineProperty(ECJPoint.prototype, 'inf', {
 
 module.exports = ECJPoint
 
-},{"./bn":661}],664:[function(require,module,exports){
+},{"./bn":653}],656:[function(require,module,exports){
 'use strict'
 var Buffer = require('safe-buffer').Buffer
 var BN = require('./bn')
@@ -94051,7 +93893,7 @@ ECPoint.prototype._getNAFPoints = function (wnd) {
 
 module.exports = ECPoint
 
-},{"./bn":661,"./ecjpoint":663,"safe-buffer":654}],665:[function(require,module,exports){
+},{"./bn":653,"./ecjpoint":655,"safe-buffer":646}],657:[function(require,module,exports){
 'use strict'
 var Buffer = require('safe-buffer').Buffer
 var BN = require('./bn')
@@ -94169,7 +94011,7 @@ ECPointG.prototype.mulAdd = function (k1, p2, k2) {
 
 module.exports = new ECPointG()
 
-},{"./bn":661,"./ecjpoint":663,"./ecpoint":664,"safe-buffer":654}],666:[function(require,module,exports){
+},{"./bn":653,"./ecjpoint":655,"./ecpoint":656,"safe-buffer":646}],658:[function(require,module,exports){
 'use strict'
 var Buffer = require('safe-buffer').Buffer
 var createHash = require('create-hash')
@@ -94396,7 +94238,7 @@ exports.ecdhUnsafe = function (publicKey, privateKey, compressed) {
   return point.mul(scalar).toPublicKey(compressed)
 }
 
-},{"../messages.json":667,"./bn":661,"./ecpoint":664,"./ecpointg":665,"create-hash":109,"drbg.js/hmac":133,"safe-buffer":654}],667:[function(require,module,exports){
+},{"../messages.json":659,"./bn":653,"./ecpoint":656,"./ecpointg":657,"create-hash":109,"drbg.js/hmac":123,"safe-buffer":646}],659:[function(require,module,exports){
 module.exports={
   "COMPRESSED_TYPE_INVALID": "compressed should be a boolean",
   "EC_PRIVATE_KEY_TYPE_INVALID": "private key should be a Buffer",
@@ -94434,7 +94276,7 @@ module.exports={
   "TWEAK_LENGTH_INVALID": "tweak length is invalid"
 }
 
-},{}],668:[function(require,module,exports){
+},{}],660:[function(require,module,exports){
 (function (process){
 exports = module.exports = SemVer;
 
@@ -95734,7 +95576,7 @@ function intersects(r1, r2, loose) {
 }
 
 }).call(this,require('_process'))
-},{"_process":733}],669:[function(require,module,exports){
+},{"_process":726}],661:[function(require,module,exports){
 var Buffer = require('safe-buffer').Buffer
 
 // prototype class for hash functions
@@ -95817,7 +95659,7 @@ Hash.prototype._update = function () {
 
 module.exports = Hash
 
-},{"safe-buffer":654}],670:[function(require,module,exports){
+},{"safe-buffer":646}],662:[function(require,module,exports){
 var exports = module.exports = function SHA (algorithm) {
   algorithm = algorithm.toLowerCase()
 
@@ -95834,7 +95676,7 @@ exports.sha256 = require('./sha256')
 exports.sha384 = require('./sha384')
 exports.sha512 = require('./sha512')
 
-},{"./sha":671,"./sha1":672,"./sha224":673,"./sha256":674,"./sha384":675,"./sha512":676}],671:[function(require,module,exports){
+},{"./sha":663,"./sha1":664,"./sha224":665,"./sha256":666,"./sha384":667,"./sha512":668}],663:[function(require,module,exports){
 /*
  * A JavaScript implementation of the Secure Hash Algorithm, SHA-0, as defined
  * in FIPS PUB 180-1
@@ -95930,7 +95772,7 @@ Sha.prototype._hash = function () {
 
 module.exports = Sha
 
-},{"./hash":669,"inherits":203,"safe-buffer":654}],672:[function(require,module,exports){
+},{"./hash":661,"inherits":193,"safe-buffer":646}],664:[function(require,module,exports){
 /*
  * A JavaScript implementation of the Secure Hash Algorithm, SHA-1, as defined
  * in FIPS PUB 180-1
@@ -96031,7 +95873,7 @@ Sha1.prototype._hash = function () {
 
 module.exports = Sha1
 
-},{"./hash":669,"inherits":203,"safe-buffer":654}],673:[function(require,module,exports){
+},{"./hash":661,"inherits":193,"safe-buffer":646}],665:[function(require,module,exports){
 /**
  * A JavaScript implementation of the Secure Hash Algorithm, SHA-256, as defined
  * in FIPS 180-2
@@ -96086,7 +95928,7 @@ Sha224.prototype._hash = function () {
 
 module.exports = Sha224
 
-},{"./hash":669,"./sha256":674,"inherits":203,"safe-buffer":654}],674:[function(require,module,exports){
+},{"./hash":661,"./sha256":666,"inherits":193,"safe-buffer":646}],666:[function(require,module,exports){
 /**
  * A JavaScript implementation of the Secure Hash Algorithm, SHA-256, as defined
  * in FIPS 180-2
@@ -96223,7 +96065,7 @@ Sha256.prototype._hash = function () {
 
 module.exports = Sha256
 
-},{"./hash":669,"inherits":203,"safe-buffer":654}],675:[function(require,module,exports){
+},{"./hash":661,"inherits":193,"safe-buffer":646}],667:[function(require,module,exports){
 var inherits = require('inherits')
 var SHA512 = require('./sha512')
 var Hash = require('./hash')
@@ -96282,7 +96124,7 @@ Sha384.prototype._hash = function () {
 
 module.exports = Sha384
 
-},{"./hash":669,"./sha512":676,"inherits":203,"safe-buffer":654}],676:[function(require,module,exports){
+},{"./hash":661,"./sha512":668,"inherits":193,"safe-buffer":646}],668:[function(require,module,exports){
 var inherits = require('inherits')
 var Hash = require('./hash')
 var Buffer = require('safe-buffer').Buffer
@@ -96544,7 +96386,7 @@ Sha512.prototype._hash = function () {
 
 module.exports = Sha512
 
-},{"./hash":669,"inherits":203,"safe-buffer":654}],677:[function(require,module,exports){
+},{"./hash":661,"inherits":193,"safe-buffer":646}],669:[function(require,module,exports){
 var varint = require('varint')
 exports.encode = function encode (v, b, o) {
   v = v >= 0 ? v*2 : v*-2 - 1
@@ -96562,7 +96404,7 @@ exports.encodingLength = function (v) {
   return varint.encodingLength(v >= 0 ? v*2 : v*-2 - 1)
 }
 
-},{"varint":712}],678:[function(require,module,exports){
+},{"varint":705}],670:[function(require,module,exports){
 (function (Buffer){
 module.exports = Peer
 
@@ -97368,107 +97210,76 @@ Peer.prototype._transformConstraints = function (constraints) {
 function noop () {}
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722,"debug":679,"get-browser-rtc":182,"inherits":203,"randombytes":641,"readable-stream":650}],679:[function(require,module,exports){
-arguments[4][162][0].apply(exports,arguments)
-},{"./debug":680,"_process":733,"dup":162}],680:[function(require,module,exports){
-arguments[4][163][0].apply(exports,arguments)
-},{"dup":163,"ms":508}],681:[function(require,module,exports){
+},{"buffer":715,"debug":671,"get-browser-rtc":172,"inherits":193,"randombytes":633,"readable-stream":642}],671:[function(require,module,exports){
+arguments[4][152][0].apply(exports,arguments)
+},{"./debug":672,"_process":726,"dup":152}],672:[function(require,module,exports){
+arguments[4][153][0].apply(exports,arguments)
+},{"dup":153,"ms":512}],673:[function(require,module,exports){
 (function (Buffer){
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const utils_1 = require("./utils");
 // The default Buffer size if one is not provided.
 const DEFAULT_SMARTBUFFER_SIZE = 4096;
-// The default string encoding to use for reading/writing strings. 
+// The default string encoding to use for reading/writing strings.
 const DEFAULT_SMARTBUFFER_ENCODING = 'utf8';
 class SmartBuffer {
     /**
-     * Creates a new SmartBuffer instance.
-     *
-     * @param arg1 { Number | BufferEncoding | Buffer | SmartBufferOptions }
-     * @param arg2 { BufferEncoding }
-     */
-    constructor(arg1, arg2) {
+       * Creates a new SmartBuffer instance.
+       *
+       * @param options { SmartBufferOptions } The SmartBufferOptions to apply to this instance.
+       */
+    constructor(options) {
         this.length = 0;
-        this.encoding = DEFAULT_SMARTBUFFER_ENCODING;
-        this.writeOffset = 0;
-        this.readOffset = 0;
-        // Initial buffer size provided
-        if (typeof arg1 === 'number') {
-            if (Number.isFinite(arg1) && Number.isInteger(arg1) && arg1 > 0) {
-                this.buff = Buffer.allocUnsafe(arg1);
-            }
-            else {
-                throw new Error('Invalid size provided. Size must be a valid integer greater than zero.');
-            }
-        }
-        else if (typeof arg1 === 'string') {
-            if (Buffer.isEncoding(arg1)) {
-                this.buff = Buffer.allocUnsafe(DEFAULT_SMARTBUFFER_SIZE);
-                this.encoding = arg1;
-            }
-            else {
-                throw new Error('Invalid encoding provided. Please specify a valid encoding the internal Node.js Buffer supports.');
-            }
-        }
-        else if (arg1 instanceof Buffer) {
-            this.buff = arg1;
-            this.length = arg1.length;
-        }
-        else if (SmartBuffer.isSmartBufferOptions(arg1)) {
+        this._encoding = DEFAULT_SMARTBUFFER_ENCODING;
+        this._writeOffset = 0;
+        this._readOffset = 0;
+        if (SmartBuffer.isSmartBufferOptions(options)) {
             // Checks for encoding
-            if (arg1.encoding) {
-                if (Buffer.isEncoding(arg1.encoding)) {
-                    this.encoding = arg1.encoding;
-                }
-                else {
-                    throw new Error('Invalid encoding provided. Please specify a valid encoding the internal Node.js Buffer supports.');
-                }
+            if (options.encoding) {
+                utils_1.checkEncoding(options.encoding);
+                this._encoding = options.encoding;
             }
             // Checks for initial size length
-            if (arg1.size) {
-                if (Number.isFinite(arg1.size) && Number.isInteger(arg1.size) && arg1.size > 0) {
-                    this.buff = Buffer.allocUnsafe(arg1.size);
+            if (options.size) {
+                if (utils_1.isFiniteInteger(options.size) && options.size > 0) {
+                    this._buff = Buffer.allocUnsafe(options.size);
                 }
                 else {
-                    throw new Error('Invalid size provided. Size must be a valid integer greater than zero.');
+                    throw new Error(utils_1.ERRORS.INVALID_SMARTBUFFER_SIZE);
                 }
+                // Check for initial Buffer
             }
-            else if (arg1.buff) {
-                if (arg1.buff instanceof Buffer) {
-                    this.buff = arg1.buff;
-                    this.length = arg1.buff.length;
+            else if (options.buff) {
+                if (options.buff instanceof Buffer) {
+                    this._buff = options.buff;
+                    this.length = options.buff.length;
                 }
                 else {
-                    throw new Error('Invalid buffer provided in SmartBufferOptions.');
+                    throw new Error(utils_1.ERRORS.INVALID_SMARTBUFFER_BUFFER);
                 }
             }
             else {
-                this.buff = Buffer.allocUnsafe(DEFAULT_SMARTBUFFER_SIZE);
+                this._buff = Buffer.allocUnsafe(DEFAULT_SMARTBUFFER_SIZE);
             }
-        }
-        else if (typeof arg1 === 'object') {
-            throw new Error('Invalid object supplied to SmartBuffer constructor.');
         }
         else {
-            this.buff = Buffer.allocUnsafe(DEFAULT_SMARTBUFFER_SIZE);
-        }
-        // Check for encoding (Buffer, Encoding) constructor.
-        if (typeof arg2 === 'string') {
-            if (Buffer.isEncoding(arg2)) {
-                this.encoding = arg2;
+            // If something was passed but it's not a SmartBufferOptions object
+            if (typeof options !== 'undefined') {
+                throw new Error(utils_1.ERRORS.INVALID_SMARTBUFFER_OBJECT);
             }
-            else {
-                throw new Error('Invalid encoding provided. Please specify a valid encoding the internal Node.js Buffer supports.');
-            }
+            // Otherwise default to sane options
+            this._buff = Buffer.allocUnsafe(DEFAULT_SMARTBUFFER_SIZE);
         }
     }
     /**
-     * Creates a new SmartBuffer instance with the provided internal Buffer size and optional encoding.
-     *
-     * @param size { Number } The size of the internal Buffer.
-     * @param encoding { String } The BufferEncoding to use for strings.
-     *
-     * @return { SmartBuffer }
-     */
+       * Creates a new SmartBuffer instance with the provided internal Buffer size and optional encoding.
+       *
+       * @param size { Number } The size of the internal Buffer.
+       * @param encoding { String } The BufferEncoding to use for strings.
+       *
+       * @return { SmartBuffer }
+       */
     static fromSize(size, encoding) {
         return new this({
             size: size,
@@ -97476,13 +97287,13 @@ class SmartBuffer {
         });
     }
     /**
-     * Creates a new SmartBuffer instance with the provided Buffer and optional encoding.
-     *
-     * @param buffer { Buffer } The Buffer to use as the internal Buffer value.
-     * @param encoding { String } The BufferEncoding to use for strings.
-     *
-     * @return { SmartBuffer }
-     */
+       * Creates a new SmartBuffer instance with the provided Buffer and optional encoding.
+       *
+       * @param buffer { Buffer } The Buffer to use as the internal Buffer value.
+       * @param encoding { String } The BufferEncoding to use for strings.
+       *
+       * @return { SmartBuffer }
+       */
     static fromBuffer(buff, encoding) {
         return new this({
             buff: buff,
@@ -97490,629 +97301,1116 @@ class SmartBuffer {
         });
     }
     /**
-     * Creates a new SmartBuffer instance with the provided SmartBufferOptions options.
-     *
-     * @param options { SmartBufferOptions } The options to use when creating the SmartBuffer instance.
-     */
+       * Creates a new SmartBuffer instance with the provided SmartBufferOptions options.
+       *
+       * @param options { SmartBufferOptions } The options to use when creating the SmartBuffer instance.
+       */
     static fromOptions(options) {
         return new this(options);
     }
     /**
-     * Type checking function that determines if an object is a SmartBufferOptions object.
-     */
+       * Type checking function that determines if an object is a SmartBufferOptions object.
+       */
     static isSmartBufferOptions(options) {
         const castOptions = options;
         return castOptions && (castOptions.encoding !== undefined || castOptions.size !== undefined || castOptions.buff !== undefined);
     }
     // Signed integers
     /**
-     * Reads an Int8 value from the current read position.
-     *
-     * @return { Number }
-     */
-    readInt8() {
-        return this.readNumberValue(Buffer.prototype.readInt8, 1);
+       * Reads an Int8 value from the current read position or an optionally provided offset.
+       *
+       * @param offset { Number } The offset to read data from (optional)
+       * @return { Number }
+       */
+    readInt8(offset) {
+        return this._readNumberValue(Buffer.prototype.readInt8, 1, offset);
     }
     /**
-     * Reads an Int16BE value from the current read position.
-     *
-     * @return { Number }
-     */
-    readInt16BE() {
-        return this.readNumberValue(Buffer.prototype.readInt16BE, 2);
+       * Reads an Int16BE value from the current read position or an optionally provided offset.
+       *
+       * @param offset { Number } The offset to read data from (optional)
+       * @return { Number }
+       */
+    readInt16BE(offset) {
+        return this._readNumberValue(Buffer.prototype.readInt16BE, 2, offset);
     }
     /**
-     * Reads an Int16LE value from the current read position.
-     *
-     * @return { Number }
-     */
-    readInt16LE() {
-        return this.readNumberValue(Buffer.prototype.readInt16LE, 2);
+       * Reads an Int16LE value from the current read position or an optionally provided offset.
+       *
+       * @param offset { Number } The offset to read data from (optional)
+       * @return { Number }
+       */
+    readInt16LE(offset) {
+        return this._readNumberValue(Buffer.prototype.readInt16LE, 2, offset);
     }
     /**
-     * Reads an Int32BE value from the current read position.
-     *
-     * @return { Number }
-     */
-    readInt32BE() {
-        return this.readNumberValue(Buffer.prototype.readInt32BE, 4);
+       * Reads an Int32BE value from the current read position or an optionally provided offset.
+       *
+       * @param offset { Number } The offset to read data from (optional)
+       * @return { Number }
+       */
+    readInt32BE(offset) {
+        return this._readNumberValue(Buffer.prototype.readInt32BE, 4, offset);
     }
     /**
-     * Reads an Int32LE value from the current read position.
-     *
-     * @return { Number }
-     */
-    readInt32LE() {
-        return this.readNumberValue(Buffer.prototype.readInt32LE, 4);
+       * Reads an Int32LE value from the current read position or an optionally provided offset.
+       *
+       * @param offset { Number } The offset to read data from (optional)
+       * @return { Number }
+       */
+    readInt32LE(offset) {
+        return this._readNumberValue(Buffer.prototype.readInt32LE, 4, offset);
     }
     /**
-     * Writes an Int8 value to the current write position (or at optional offset).
-     *
-     * @param value { Number } The value to write.
-     * @param offset { Number } The offset to write the value at.
-     *
-     * @return this
-     */
+       * Writes an Int8 value to the current write position (or at optional offset).
+       *
+       * @param value { Number } The value to write.
+       * @param offset { Number } The offset to write the value at.
+       *
+       * @return this
+       */
     writeInt8(value, offset) {
-        this.writeNumberValue(Buffer.prototype.writeInt8, 1, value, offset);
+        this._writeNumberValue(Buffer.prototype.writeInt8, 1, value, offset);
         return this;
     }
     /**
-     * Writes an Int16BE value to the current write position (or at optional offset).
-     *
-     * @param value { Number } The value to write.
-     * @param offset { Number } The offset to write the value at.
-     *
-     * @return this
-     */
+       * Inserts an Int8 value at the given offset value.
+       *
+       * @param value { Number } The value to insert.
+       * @param offset { Number } The offset to insert the value at.
+       *
+       * @return this
+       */
+    insertInt8(value, offset) {
+        this._insertNumberValue(Buffer.prototype.writeInt8, 1, value, offset);
+        return this;
+    }
+    /**
+       * Writes an Int16BE value to the current write position (or at optional offset).
+       *
+       * @param value { Number } The value to write.
+       * @param offset { Number } The offset to write the value at.
+       *
+       * @return this
+       */
     writeInt16BE(value, offset) {
-        this.writeNumberValue(Buffer.prototype.writeInt16BE, 2, value, offset);
+        this._writeNumberValue(Buffer.prototype.writeInt16BE, 2, value, offset);
         return this;
     }
     /**
-     * Writes an Int16LE value to the current write position (or at optional offset).
-     *
-     * @param value { Number } The value to write.
-     * @param offset { Number } The offset to write the value at.
-     *
-     * @return this
-     */
+       * Inserts an Int16BE value at the given offset value.
+       *
+       * @param value { Number } The value to insert.
+       * @param offset { Number } The offset to insert the value at.
+       *
+       * @return this
+       */
+    insertInt16BE(value, offset) {
+        this._insertNumberValue(Buffer.prototype.writeInt16BE, 2, value, offset);
+        return this;
+    }
+    /**
+       * Writes an Int16LE value to the current write position (or at optional offset).
+       *
+       * @param value { Number } The value to write.
+       * @param offset { Number } The offset to write the value at.
+       *
+       * @return this
+       */
     writeInt16LE(value, offset) {
-        this.writeNumberValue(Buffer.prototype.writeInt16LE, 2, value, offset);
+        this._writeNumberValue(Buffer.prototype.writeInt16LE, 2, value, offset);
         return this;
     }
     /**
-     * Writes an Int32BE value to the current write position (or at optional offset).
-     *
-     * @param value { Number } The value to write.
-     * @param offset { Number } The offset to write the value at.
-     *
-     * @return this
-     */
+       * Inserts an Int16LE value at the given offset value.
+       *
+       * @param value { Number } The value to insert.
+       * @param offset { Number } The offset to insert the value at.
+       *
+       * @return this
+       */
+    insertInt16LE(value, offset) {
+        this._insertNumberValue(Buffer.prototype.writeInt16LE, 2, value, offset);
+        return this;
+    }
+    /**
+       * Writes an Int32BE value to the current write position (or at optional offset).
+       *
+       * @param value { Number } The value to write.
+       * @param offset { Number } The offset to write the value at.
+       *
+       * @return this
+       */
     writeInt32BE(value, offset) {
-        this.writeNumberValue(Buffer.prototype.writeInt32BE, 4, value, offset);
+        this._writeNumberValue(Buffer.prototype.writeInt32BE, 4, value, offset);
         return this;
     }
     /**
-     * Writes an Int32LE value to the current write position (or at optional offset).
-     *
-     * @param value { Number } The value to write.
-     * @param offset { Number } The offset to write the value at.
-     *
-     * @return this
-     */
+       * Inserts an Int32BE value at the given offset value.
+       *
+       * @param value { Number } The value to insert.
+       * @param offset { Number } The offset to insert the value at.
+       *
+       * @return this
+       */
+    insertInt32BE(value, offset) {
+        this._insertNumberValue(Buffer.prototype.writeInt32BE, 4, value, offset);
+        return this;
+    }
+    /**
+       * Writes an Int32LE value to the current write position (or at optional offset).
+       *
+       * @param value { Number } The value to write.
+       * @param offset { Number } The offset to write the value at.
+       *
+       * @return this
+       */
     writeInt32LE(value, offset) {
-        this.writeNumberValue(Buffer.prototype.writeInt32LE, 4, value, offset);
+        this._writeNumberValue(Buffer.prototype.writeInt32LE, 4, value, offset);
+        return this;
+    }
+    /**
+       * Inserts an Int32LE value at the given offset value.
+       *
+       * @param value { Number } The value to insert.
+       * @param offset { Number } The offset to insert the value at.
+       *
+       * @return this
+       */
+    insertInt32LE(value, offset) {
+        this._insertNumberValue(Buffer.prototype.writeInt32LE, 4, value, offset);
         return this;
     }
     // Unsigned Integers
     /**
-     * Reads an UInt8 value from the current read position.
-     *
-     * @return { Number }
-     */
-    readUInt8() {
-        return this.readNumberValue(Buffer.prototype.readUInt8, 1);
+       * Reads an UInt8 value from the current read position or an optionally provided offset.
+       *
+       * @param offset { Number } The offset to read data from (optional)
+       * @return { Number }
+       */
+    readUInt8(offset) {
+        return this._readNumberValue(Buffer.prototype.readUInt8, 1, offset);
     }
     /**
-     * Reads an UInt16BE value from the current read position.
-     *
-     * @return { Number }
-     */
-    readUInt16BE() {
-        return this.readNumberValue(Buffer.prototype.readUInt16BE, 2);
+       * Reads an UInt16BE value from the current read position or an optionally provided offset.
+       *
+       * @param offset { Number } The offset to read data from (optional)
+       * @return { Number }
+       */
+    readUInt16BE(offset) {
+        return this._readNumberValue(Buffer.prototype.readUInt16BE, 2, offset);
     }
     /**
-     * Reads an UInt16LE value from the current read position.
-     *
-     * @return { Number }
-     */
-    readUInt16LE() {
-        return this.readNumberValue(Buffer.prototype.readUInt16LE, 2);
+       * Reads an UInt16LE value from the current read position or an optionally provided offset.
+       *
+       * @param offset { Number } The offset to read data from (optional)
+       * @return { Number }
+       */
+    readUInt16LE(offset) {
+        return this._readNumberValue(Buffer.prototype.readUInt16LE, 2, offset);
     }
     /**
-     * Reads an UInt32BE value from the current read position.
-     *
-     * @return { Number }
-     */
-    readUInt32BE() {
-        return this.readNumberValue(Buffer.prototype.readUInt32BE, 4);
+       * Reads an UInt32BE value from the current read position or an optionally provided offset.
+       *
+       * @param offset { Number } The offset to read data from (optional)
+       * @return { Number }
+       */
+    readUInt32BE(offset) {
+        return this._readNumberValue(Buffer.prototype.readUInt32BE, 4, offset);
     }
     /**
-     * Reads an UInt32LE value from the current read position.
-     *
-     * @return { Number }
-     */
-    readUInt32LE() {
-        return this.readNumberValue(Buffer.prototype.readUInt32LE, 4);
+       * Reads an UInt32LE value from the current read position or an optionally provided offset.
+       *
+       * @param offset { Number } The offset to read data from (optional)
+       * @return { Number }
+       */
+    readUInt32LE(offset) {
+        return this._readNumberValue(Buffer.prototype.readUInt32LE, 4, offset);
     }
     /**
-     * Writes an UInt8 value to the current write position (or at optional offset).
-     *
-     * @param value { Number } The value to write.
-     * @param offset { Number } The offset to write the value at.
-     *
-     * @return this
-     */
+       * Writes an UInt8 value to the current write position (or at optional offset).
+       *
+       * @param value { Number } The value to write.
+       * @param offset { Number } The offset to write the value at.
+       *
+       * @return this
+       */
     writeUInt8(value, offset) {
-        this.writeNumberValue(Buffer.prototype.writeUInt8, 1, value, offset);
+        this._writeNumberValue(Buffer.prototype.writeUInt8, 1, value, offset);
         return this;
     }
     /**
-     * Writes an UInt16BE value to the current write position (or at optional offset).
-     *
-     * @param value { Number } The value to write.
-     * @param offset { Number } The offset to write the value at.
-     *
-     * @return this
-     */
+       * Inserts an UInt8 value at the given offset value.
+       *
+       * @param value { Number } The value to insert.
+       * @param offset { Number } The offset to insert the value at.
+       *
+       * @return this
+       */
+    insertUInt8(value, offset) {
+        this._insertNumberValue(Buffer.prototype.writeUInt8, 1, value, offset);
+        return this;
+    }
+    /**
+       * Writes an UInt16BE value to the current write position (or at optional offset).
+       *
+       * @param value { Number } The value to write.
+       * @param offset { Number } The offset to write the value at.
+       *
+       * @return this
+       */
     writeUInt16BE(value, offset) {
-        this.writeNumberValue(Buffer.prototype.writeUInt16BE, 2, value, offset);
+        this._writeNumberValue(Buffer.prototype.writeUInt16BE, 2, value, offset);
         return this;
     }
     /**
-     * Writes an UInt16LE value to the current write position (or at optional offset).
-     *
-     * @param value { Number } The value to write.
-     * @param offset { Number } The offset to write the value at.
-     *
-     * @return this
-     */
+       * Inserts an UInt16BE value at the given offset value.
+       *
+       * @param value { Number } The value to insert.
+       * @param offset { Number } The offset to insert the value at.
+       *
+       * @return this
+       */
+    insertUInt16BE(value, offset) {
+        this._insertNumberValue(Buffer.prototype.writeUInt16BE, 2, value, offset);
+        return this;
+    }
+    /**
+       * Writes an UInt16LE value to the current write position (or at optional offset).
+       *
+       * @param value { Number } The value to write.
+       * @param offset { Number } The offset to write the value at.
+       *
+       * @return this
+       */
     writeUInt16LE(value, offset) {
-        this.writeNumberValue(Buffer.prototype.writeUInt16LE, 2, value, offset);
+        this._writeNumberValue(Buffer.prototype.writeUInt16LE, 2, value, offset);
         return this;
     }
     /**
-     * Writes an UInt32BE value to the current write position (or at optional offset).
-     *
-     * @param value { Number } The value to write.
-     * @param offset { Number } The offset to write the value at.
-     *
-     * @return this
-     */
+       * Inserts an UInt16LE value at the given offset value.
+       *
+       * @param value { Number } The value to insert.
+       * @param offset { Number } The offset to insert the value at.
+       *
+       * @return this
+       */
+    insertUInt16LE(value, offset) {
+        this._insertNumberValue(Buffer.prototype.writeUInt16LE, 2, value, offset);
+        return this;
+    }
+    /**
+       * Writes an UInt32BE value to the current write position (or at optional offset).
+       *
+       * @param value { Number } The value to write.
+       * @param offset { Number } The offset to write the value at.
+       *
+       * @return this
+       */
     writeUInt32BE(value, offset) {
-        this.writeNumberValue(Buffer.prototype.writeUInt32BE, 4, value, offset);
+        this._writeNumberValue(Buffer.prototype.writeUInt32BE, 4, value, offset);
         return this;
     }
     /**
-     * Writes an UInt32LE value to the current write position (or at optional offset).
-     *
-     * @param value { Number } The value to write.
-     * @param offset { Number } The offset to write the value at.
-     *
-     * @return this
-     */
+       * Inserts an UInt32BE value at the given offset value.
+       *
+       * @param value { Number } The value to insert.
+       * @param offset { Number } The offset to insert the value at.
+       *
+       * @return this
+       */
+    insertUInt32BE(value, offset) {
+        this._insertNumberValue(Buffer.prototype.writeUInt32BE, 4, value, offset);
+        return this;
+    }
+    /**
+       * Writes an UInt32LE value to the current write position (or at optional offset).
+       *
+       * @param value { Number } The value to write.
+       * @param offset { Number } The offset to write the value at.
+       *
+       * @return this
+       */
     writeUInt32LE(value, offset) {
-        this.writeNumberValue(Buffer.prototype.writeUInt32LE, 4, value, offset);
+        this._writeNumberValue(Buffer.prototype.writeUInt32LE, 4, value, offset);
+        return this;
+    }
+    /**
+       * Inserts an UInt32LE value at the given offset value.
+       *
+       * @param value { Number } The value to insert.
+       * @param offset { Number } The offset to insert the value at.
+       *
+       * @return this
+       */
+    insertUInt32LE(value, offset) {
+        this._insertNumberValue(Buffer.prototype.writeUInt32LE, 4, value, offset);
         return this;
     }
     // Floating Point
     /**
-     * Reads an FloatBE value from the current read position.
-     *
-     * @return { Number }
-     */
-    readFloatBE() {
-        return this.readNumberValue(Buffer.prototype.readFloatBE, 4);
+       * Reads an FloatBE value from the current read position or an optionally provided offset.
+       *
+       * @param offset { Number } The offset to read data from (optional)
+       * @return { Number }
+       */
+    readFloatBE(offset) {
+        return this._readNumberValue(Buffer.prototype.readFloatBE, 4, offset);
     }
     /**
-     * Reads an FloatLE value from the current read position.
-     *
-     * @return { Number }
-     */
-    readFloatLE() {
-        return this.readNumberValue(Buffer.prototype.readFloatLE, 4);
+       * Reads an FloatLE value from the current read position or an optionally provided offset.
+       *
+       * @param offset { Number } The offset to read data from (optional)
+       * @return { Number }
+       */
+    readFloatLE(offset) {
+        return this._readNumberValue(Buffer.prototype.readFloatLE, 4, offset);
     }
     /**
-     * Writes a FloatBE value to the current write position (or at optional offset).
-     *
-     * @param value { Number } The value to write.
-     * @param offset { Number } The offset to write the value at.
-     *
-     * @return this
-     */
+       * Writes a FloatBE value to the current write position (or at optional offset).
+       *
+       * @param value { Number } The value to write.
+       * @param offset { Number } The offset to write the value at.
+       *
+       * @return this
+       */
     writeFloatBE(value, offset) {
-        this.writeNumberValue(Buffer.prototype.writeFloatBE, 4, value, offset);
+        this._writeNumberValue(Buffer.prototype.writeFloatBE, 4, value, offset);
         return this;
     }
     /**
-     * Writes a FloatLE value to the current write position (or at optional offset).
-     *
-     * @param value { Number } The value to write.
-     * @param offset { Number } The offset to write the value at.
-     *
-     * @return this
-     */
+       * Inserts a FloatBE value at the given offset value.
+       *
+       * @param value { Number } The value to insert.
+       * @param offset { Number } The offset to insert the value at.
+       *
+       * @return this
+       */
+    insertFloatBE(value, offset) {
+        this._insertNumberValue(Buffer.prototype.writeFloatBE, 4, value, offset);
+        return this;
+    }
+    /**
+       * Writes a FloatLE value to the current write position (or at optional offset).
+       *
+       * @param value { Number } The value to write.
+       * @param offset { Number } The offset to write the value at.
+       *
+       * @return this
+       */
     writeFloatLE(value, offset) {
-        this.writeNumberValue(Buffer.prototype.writeFloatLE, 4, value, offset);
+        this._writeNumberValue(Buffer.prototype.writeFloatLE, 4, value, offset);
+        return this;
+    }
+    /**
+       * Inserts a FloatLE value at the given offset value.
+       *
+       * @param value { Number } The value to insert.
+       * @param offset { Number } The offset to insert the value at.
+       *
+       * @return this
+       */
+    insertFloatLE(value, offset) {
+        this._insertNumberValue(Buffer.prototype.writeFloatLE, 4, value, offset);
         return this;
     }
     // Double Floating Point
     /**
-     * Reads an DoublEBE value from the current read position.
-     *
-     * @return { Number }
-     */
-    readDoubleBE() {
-        return this.readNumberValue(Buffer.prototype.readDoubleBE, 8);
+       * Reads an DoublEBE value from the current read position or an optionally provided offset.
+       *
+       * @param offset { Number } The offset to read data from (optional)
+       * @return { Number }
+       */
+    readDoubleBE(offset) {
+        return this._readNumberValue(Buffer.prototype.readDoubleBE, 8, offset);
     }
     /**
-     * Reads an DoubleLE value from the current read position.
-     *
-     * @return { Number }
-     */
-    readDoubleLE() {
-        return this.readNumberValue(Buffer.prototype.readDoubleLE, 8);
+       * Reads an DoubleLE value from the current read position or an optionally provided offset.
+       *
+       * @param offset { Number } The offset to read data from (optional)
+       * @return { Number }
+       */
+    readDoubleLE(offset) {
+        return this._readNumberValue(Buffer.prototype.readDoubleLE, 8, offset);
     }
     /**
-     * Writes a DoubleBE value to the current write position (or at optional offset).
-     *
-     * @param value { Number } The value to write.
-     * @param offset { Number } The offset to write the value at.
-     *
-     * @return this
-     */
+       * Writes a DoubleBE value to the current write position (or at optional offset).
+       *
+       * @param value { Number } The value to write.
+       * @param offset { Number } The offset to write the value at.
+       *
+       * @return this
+       */
     writeDoubleBE(value, offset) {
-        this.writeNumberValue(Buffer.prototype.writeDoubleBE, 8, value, offset);
+        this._writeNumberValue(Buffer.prototype.writeDoubleBE, 8, value, offset);
         return this;
     }
     /**
-     * Writes a DoubleLE value to the current write position (or at optional offset).
-     *
-     * @param value { Number } The value to write.
-     * @param offset { Number } The offset to write the value at.
-     *
-     * @return this
-     */
+       * Inserts a DoubleBE value at the given offset value.
+       *
+       * @param value { Number } The value to insert.
+       * @param offset { Number } The offset to insert the value at.
+       *
+       * @return this
+       */
+    insertDoubleBE(value, offset) {
+        this._insertNumberValue(Buffer.prototype.writeDoubleBE, 8, value, offset);
+        return this;
+    }
+    /**
+       * Writes a DoubleLE value to the current write position (or at optional offset).
+       *
+       * @param value { Number } The value to write.
+       * @param offset { Number } The offset to write the value at.
+       *
+       * @return this
+       */
     writeDoubleLE(value, offset) {
-        this.writeNumberValue(Buffer.prototype.writeDoubleLE, 8, value, offset);
+        this._writeNumberValue(Buffer.prototype.writeDoubleLE, 8, value, offset);
+        return this;
+    }
+    /**
+       * Inserts a DoubleLE value at the given offset value.
+       *
+       * @param value { Number } The value to insert.
+       * @param offset { Number } The offset to insert the value at.
+       *
+       * @return this
+       */
+    insertDoubleLE(value, offset) {
+        this._insertNumberValue(Buffer.prototype.writeDoubleLE, 8, value, offset);
         return this;
     }
     // Strings
     /**
-     * Reads a String from the current read position.
-     *
-     * @param length { Number } The number of bytes to read as a String.
-     * @param encoding { String } The BufferEncoding to use for the string (Defaults to instance level encoding).
-     *
-     * @return { String }
-     */
-    readString(length, encoding) {
-        const lengthVal = (typeof length === 'number') ? Math.min(length, this.length - this.readOffset) : this.length - this.readOffset;
-        const value = this.buff.slice(this.readOffset, this.readOffset + lengthVal).toString(encoding || this.encoding);
-        this.readOffset += lengthVal;
+       * Reads a String from the current read position.
+       *
+       * @param arg1 { Number | String } The number of bytes to read as a String, or the BufferEncoding to use for
+       *             the string (Defaults to instance level encoding).
+       * @param encoding { String } The BufferEncoding to use for the string (Defaults to instance level encoding).
+       *
+       * @return { String }
+       */
+    readString(arg1, encoding) {
+        let lengthVal;
+        // Length provided
+        if (typeof arg1 === 'number') {
+            utils_1.checkLengthValue(arg1);
+            lengthVal = Math.min(arg1, this.length - this._readOffset);
+        }
+        else {
+            encoding = arg1;
+            lengthVal = this.length - this._readOffset;
+        }
+        // Check encoding
+        if (typeof encoding !== 'undefined') {
+            utils_1.checkEncoding(encoding);
+        }
+        const value = this._buff.slice(this._readOffset, this._readOffset + lengthVal).toString(encoding || this._encoding);
+        this._readOffset += lengthVal;
         return value;
     }
     /**
-     * Writes a String to the current write position.
-     *
-     * @param value { String } The String value to write.
-     * @param arg2 { Number | String } The offset to write the string to, or the BufferEncoding to use.
-     * @param encoding { String } The BufferEncoding to use for writing strings (defaults to instance encoding).
-     */
-    writeString(value, arg2, encoding) {
-        let offsetVal = this.writeOffset;
-        let encodingVal = this.encoding;
-        // Check for offset
-        if (typeof arg2 === 'number') {
-            offsetVal = arg2;
-        }
-        else if (typeof arg2 === 'string') {
-            if (Buffer.isEncoding(arg2)) {
-                encodingVal = arg2;
-            }
-            else {
-                throw new Error('Invalid encoding provided. Please specify a valid encoding the internal Node.js Buffer supports.');
-            }
-        }
-        // Check for encoding (third param)
-        if (typeof encoding === 'string') {
-            if (Buffer.isEncoding(encoding)) {
-                encodingVal = encoding;
-            }
-            else {
-                throw new Error('Invalid encoding provided. Please specify a valid encoding the internal Node.js Buffer supports.');
-            }
-        }
-        // Calculate bytelength of string.
-        const byteLength = Buffer.byteLength(value, encodingVal);
-        // Ensure there is enough internal Buffer capacity.
-        this.ensureWriteable(byteLength, offsetVal);
-        // Write value
-        this.buff.write(value, offsetVal, byteLength, encodingVal);
-        // Increment internal Buffer write offset;
-        this.writeOffset += byteLength;
-        return this;
+       * Inserts a String
+       *
+       * @param value { String } The String value to insert.
+       * @param offset { Number } The offset to insert the string at.
+       * @param encoding { String } The BufferEncoding to use for writing strings (defaults to instance encoding).
+       */
+    insertString(value, offset, encoding) {
+        utils_1.checkOffsetValue(offset);
+        return this._handleString(value, true, offset, encoding);
     }
     /**
-     * Reads a null-terminated String from the current read position.
-     *
-     * @param encoding { String } The BufferEncoding to use for the string (Defaults to instance level encoding).
-     *
-     * @return { String }
-     */
+       * Writes a String
+       *
+       * @param value { String } The String value to write.
+       * @param arg2 { Number | String } The offset to write the string at, or the BufferEncoding to use.
+       * @param encoding { String } The BufferEncoding to use for writing strings (defaults to instance encoding).
+       */
+    writeString(value, arg2, encoding) {
+        return this._handleString(value, false, arg2, encoding);
+    }
+    /**
+       * Reads a null-terminated String from the current read position.
+       *
+       * @param encoding { String } The BufferEncoding to use for the string (Defaults to instance level encoding).
+       *
+       * @return { String }
+       */
     readStringNT(encoding) {
+        if (typeof encoding !== 'undefined') {
+            utils_1.checkEncoding(encoding);
+        }
         // Set null character position to the end SmartBuffer instance.
         let nullPos = this.length;
         // Find next null character (if one is not found, default from above is used)
-        for (let i = this.readOffset; i < this.length; i++) {
-            if (this.buff[i] === 0x00) {
+        for (let i = this._readOffset; i < this.length; i++) {
+            if (this._buff[i] === 0x00) {
                 nullPos = i;
                 break;
             }
         }
         // Read string value
-        const value = this.buff.slice(this.readOffset, nullPos);
+        const value = this._buff.slice(this._readOffset, nullPos);
         // Increment internal Buffer read offset
-        this.readOffset = nullPos + 1;
-        return value.toString(encoding || this.encoding);
+        this._readOffset = nullPos + 1;
+        return value.toString(encoding || this._encoding);
     }
     /**
-     * Writes a null-terminated String to the current write position.
-     *
-     * @param value { String } The String value to write.
-     * @param arg2 { Number | String } The offset to write the string to, or the BufferEncoding to use.
-     * @param encoding { String } The BufferEncoding to use for writing strings (defaults to instance encoding).
-     */
-    writeStringNT(value, offset, encoding) {
+       * Inserts a null-terminated String.
+       *
+       * @param value { String } The String value to write.
+       * @param arg2 { Number | String } The offset to write the string to, or the BufferEncoding to use.
+       * @param encoding { String } The BufferEncoding to use for writing strings (defaults to instance encoding).
+       */
+    insertStringNT(value, offset, encoding) {
+        utils_1.checkOffsetValue(offset);
         // Write Values
-        this.writeString(value, offset, encoding);
-        this.writeUInt8(0x00, (typeof offset === 'number' ? offset + value.length : this.writeOffset));
+        this.insertString(value, offset, encoding);
+        this.insertUInt8(0x00, offset + value.length);
+    }
+    /**
+       * Writes a null-terminated String.
+       *
+       * @param value { String } The String value to write.
+       * @param arg2 { Number | String } The offset to write the string to, or the BufferEncoding to use.
+       * @param encoding { String } The BufferEncoding to use for writing strings (defaults to instance encoding).
+       */
+    writeStringNT(value, arg2, encoding) {
+        // Write Values
+        this.writeString(value, arg2, encoding);
+        this.writeUInt8(0x00, typeof arg2 === 'number' ? arg2 + value.length : this.writeOffset);
     }
     // Buffers
     /**
-     * Reads a Buffer from the internal read position.
-     *
-     * @param length { Number } The length of data to read as a Buffer.
-     *
-     * @return { Buffer }
-     */
+       * Reads a Buffer from the internal read position.
+       *
+       * @param length { Number } The length of data to read as a Buffer.
+       *
+       * @return { Buffer }
+       */
     readBuffer(length) {
+        if (typeof length !== 'undefined') {
+            utils_1.checkLengthValue(length);
+        }
         const lengthVal = typeof length === 'number' ? length : this.length;
-        const endPoint = Math.min(this.length, this.readOffset + lengthVal);
+        const endPoint = Math.min(this.length, this._readOffset + lengthVal);
         // Read buffer value
-        const value = this.buff.slice(this.readOffset, endPoint);
+        const value = this._buff.slice(this._readOffset, endPoint);
         // Increment internal Buffer read offset
-        this.readOffset = endPoint;
+        this._readOffset = endPoint;
         return value;
     }
     /**
-     * Writes a Buffer to the current write position.
-     *
-     * @param value { Buffer } The Buffer to write.
-     * @param offset { Number } The offset to write the Buffer to.
-     */
-    writeBuffer(value, offset) {
-        const offsetVal = typeof offset === 'number' ? offset : this.writeOffset;
-        // Ensure there is enough internal Buffer capacity.
-        this.ensureWriteable(value.length, offsetVal);
-        // Write buffer value
-        value.copy(this.buff, offsetVal);
-        // Increment internal Buffer write offset
-        this.writeOffset += value.length;
-        return this;
+       * Writes a Buffer to the current write position.
+       *
+       * @param value { Buffer } The Buffer to write.
+       * @param offset { Number } The offset to write the Buffer to.
+       */
+    insertBuffer(value, offset) {
+        utils_1.checkOffsetValue(offset);
+        return this._handleBuffer(value, true, offset);
     }
     /**
-     * Reads a null-terminated Buffer from the current read poisiton.
-     *
-     * @return { Buffer }
-     */
+       * Writes a Buffer to the current write position.
+       *
+       * @param value { Buffer } The Buffer to write.
+       * @param offset { Number } The offset to write the Buffer to.
+       */
+    writeBuffer(value, offset) {
+        return this._handleBuffer(value, false, offset);
+    }
+    /**
+       * Reads a null-terminated Buffer from the current read poisiton.
+       *
+       * @return { Buffer }
+       */
     readBufferNT() {
         // Set null character position to the end SmartBuffer instance.
         let nullPos = this.length;
         // Find next null character (if one is not found, default from above is used)
-        for (let i = this.readOffset; i < this.length; i++) {
-            if (this.buff[i] === 0x00) {
+        for (let i = this._readOffset; i < this.length; i++) {
+            if (this._buff[i] === 0x00) {
                 nullPos = i;
                 break;
             }
         }
         // Read value
-        const value = this.buff.slice(this.readOffset, nullPos);
+        const value = this._buff.slice(this._readOffset, nullPos);
         // Increment internal Buffer read offset
-        this.readOffset = nullPos + 1;
+        this._readOffset = nullPos + 1;
         return value;
     }
     /**
-     * Writes a null-terminated Buffer to the current write position.
-     *
-     * @param value { Buffer } The Buffer to write.
-     * @param offset { Number } The offset to write the Buffer to.
-     */
-    writeBufferNT(value, offset) {
+       * Inserts a null-terminated Buffer.
+       *
+       * @param value { Buffer } The Buffer to write.
+       * @param offset { Number } The offset to write the Buffer to.
+       */
+    insertBufferNT(value, offset) {
+        utils_1.checkOffsetValue(offset);
         // Write Values
-        this.writeBuffer(value, offset);
-        this.writeUInt8(0, (typeof offset === 'number' ? offset + value.length : this.writeOffset));
+        this.insertBuffer(value, offset);
+        this.insertUInt8(0x00, offset + value.length);
         return this;
     }
     /**
-     * Clears the SmartBuffer instance to its original empty state.
-     */
+       * Writes a null-terminated Buffer.
+       *
+       * @param value { Buffer } The Buffer to write.
+       * @param offset { Number } The offset to write the Buffer to.
+       */
+    writeBufferNT(value, offset) {
+        // Checks for valid numberic value;
+        if (typeof offset !== 'undefined') {
+            utils_1.checkOffsetValue(offset);
+        }
+        // Write Values
+        this.writeBuffer(value, offset);
+        this.writeUInt8(0x00, typeof offset === 'number' ? offset + value.length : this._writeOffset);
+        return this;
+    }
+    /**
+       * Clears the SmartBuffer instance to its original empty state.
+       */
     clear() {
-        this.writeOffset = 0;
-        this.readOffset = 0;
+        this._writeOffset = 0;
+        this._readOffset = 0;
         this.length = 0;
+        return this;
     }
     /**
-     * Gets the remaining data left to be read from the SmartBuffer instance.
-     *
-     * @return { Number }
-     */
+       * Gets the remaining data left to be read from the SmartBuffer instance.
+       *
+       * @return { Number }
+       */
     remaining() {
-        return this.length - this.readOffset;
+        return this.length - this._readOffset;
     }
     /**
-     * Moves the read offset forward.
-     *
-     * @param amount { Number } The amount to move the read offset forward by.
-     */
-    skip(amount) {
-        if (this.readOffset + amount > this.length) {
-            throw new Error('Target position is beyond the bounds of the SmartBuffer size.');
-        }
-        this.readOffset += amount;
+       * Gets the current read offset value of the SmartBuffer instance.
+       *
+       * @return { Number }
+       */
+    get readOffset() {
+        return this._readOffset;
     }
     /**
-     * Moves the read offset backwards.
-     *
-     * @param amount { Number } The amount to move the read offset backwards by.
-     */
-    rewind(amount) {
-        if (this.readOffset - amount < 0) {
-            throw new Error('Target position is beyond the bounds of the SmartBuffer size.');
-        }
-        this.readOffset -= amount;
+       * Sets the read offset value of the SmartBuffer instance.
+       *
+       * @param offset { Number } - The offset value to set.
+       */
+    set readOffset(offset) {
+        utils_1.checkOffsetValue(offset);
+        // Check for bounds.
+        utils_1.checkTargetOffset(offset, this);
+        this._readOffset = offset;
     }
     /**
-     * Moves the read offset to a specific position.
-     *
-     * @param position { Number } The position to move the read offset to.
-     */
-    skipTo(position) {
-        this.moveTo(position);
+       * Gets the current write offset value of the SmartBuffer instance.
+       *
+       * @return { Number }
+       */
+    get writeOffset() {
+        return this._writeOffset;
     }
     /**
-     * Moves the read offset to a specific position.
-     *
-     * @param position { Number } The position to move the read offset to.
-     */
-    moveTo(position) {
-        if (position > this.length) {
-            throw new Error('Target position is beyond the bounds of the SmartBuffer size.');
-        }
-        this.readOffset = position;
+       * Sets the write offset value of the SmartBuffer instance.
+       *
+       * @param offset { Number } - The offset value to set.
+       */
+    set writeOffset(offset) {
+        utils_1.checkOffsetValue(offset);
+        // Check for bounds.
+        utils_1.checkTargetOffset(offset, this);
+        this._writeOffset = offset;
     }
     /**
-     * Gets the value of the internal managed Buffer
-     *
-     * @param { Buffer }
-     */
+       * Gets the currently set string encoding of the SmartBuffer instance.
+       *
+       * @return { BufferEncoding } The string Buffer encoding currently set.
+       */
+    get encoding() {
+        return this._encoding;
+    }
+    /**
+       * Sets the string encoding of the SmartBuffer instance.
+       *
+       * @param encoding { BufferEncoding } The string Buffer encoding to set.
+       */
+    set encoding(encoding) {
+        utils_1.checkEncoding(encoding);
+        this._encoding = encoding;
+    }
+    /**
+       * Gets the underlying internal Buffer. (This includes unmanaged data in the Buffer)
+       *
+       * @return { Buffer } The Buffer value.
+       */
+    get internalBuffer() {
+        return this._buff;
+    }
+    /**
+       * Gets the value of the internal managed Buffer (Includes managed data only)
+       *
+       * @param { Buffer }
+       */
     toBuffer() {
-        return this.buff.slice(0, this.length);
+        return this._buff.slice(0, this.length);
     }
     /**
-     * Gets the String value of the internal managed Buffer
-     *
-     * @param encoding { String } The BufferEncoding to display the Buffer as (defaults to instance level encoding).
-     */
+       * Gets the String value of the internal managed Buffer
+       *
+       * @param encoding { String } The BufferEncoding to display the Buffer as (defaults to instance level encoding).
+       */
     toString(encoding) {
-        const encodingVal = typeof encoding === 'string' ? encoding : this.encoding;
-        if (Buffer.isEncoding(encodingVal)) {
-            return this.buff.toString(encodingVal, 0, this.length);
-        }
-        else {
-            throw new Error('Invalid encoding provided. Please specify a valid encoding the internal Node.js Buffer supports.');
-        }
+        const encodingVal = typeof encoding === 'string' ? encoding : this._encoding;
+        // Check for invalid encoding.
+        utils_1.checkEncoding(encodingVal);
+        return this._buff.toString(encodingVal, 0, this.length);
     }
     /**
-     * Destroys the SmartBuffer instance.
-     */
+       * Destroys the SmartBuffer instance.
+       */
     destroy() {
         this.clear();
+        return this;
     }
     /**
-     * Ensures that the internal Buffer is large enough to read data.
-     *
-     * @param length { Number } The length of the data that needs to be read.
-     */
-    ensureReadable(length) {
-        if (this.remaining() < length) {
-            throw new Error('Reading beyond the bounds of the data.');
+       * Handles inserting and writing strings.
+       *
+       * @param value { String } The String value to insert.
+       * @param isInsert { Boolean } True if inserting a string, false if writing.
+       * @param arg2 { Number | String } The offset to insert the string at, or the BufferEncoding to use.
+       * @param encoding { String } The BufferEncoding to use for writing strings (defaults to instance encoding).
+       */
+    _handleString(value, isInsert, arg3, encoding) {
+        let offsetVal = this._writeOffset;
+        let encodingVal = this._encoding;
+        // Check for offset
+        if (typeof arg3 === 'number') {
+            offsetVal = arg3;
+            // Check for encoding
         }
-    }
-    /**
-     * Ensures that the internal Buffer is large enough to write data.
-     *
-     * @param minLength { Number } The minimum length of the data that needs to be written.
-     * @param offset { Number } The offset of the data to be written.
-     */
-    ensureWriteable(minLength, offset) {
-        const offsetVal = typeof offset === 'number' ? offset : 0;
+        else if (typeof arg3 === 'string') {
+            utils_1.checkEncoding(arg3);
+            encodingVal = arg3;
+        }
+        // Check for encoding (third param)
+        if (typeof encoding === 'string') {
+            utils_1.checkEncoding(encoding);
+            encodingVal = encoding;
+        }
+        // Calculate bytelength of string.
+        const byteLength = Buffer.byteLength(value, encodingVal);
         // Ensure there is enough internal Buffer capacity.
-        this.ensureCapacity(this.length + minLength + offsetVal);
-        // If offset is provided, copy data into appropriate location in regards to the offset.
-        if (typeof offset === 'number') {
-            this.buff.copy(this.buff, offsetVal + minLength, offsetVal, this.buff.length);
+        if (isInsert) {
+            this.ensureInsertable(byteLength, offsetVal);
         }
-        // Adjust instance length.
-        this.length = Math.max(this.length + minLength, offsetVal + minLength);
+        else {
+            this._ensureWriteable(byteLength, offsetVal);
+        }
+        // Write value
+        this._buff.write(value, offsetVal, byteLength, encodingVal);
+        // Increment internal Buffer write offset;
+        if (isInsert) {
+            this._writeOffset += byteLength;
+        }
+        else {
+            // If an offset was given, check to see if we wrote beyond the current writeOffset.
+            if (typeof arg3 === 'number') {
+                this._writeOffset = Math.max(this._writeOffset, offsetVal + byteLength);
+            }
+            else {
+                // If no offset was given, we wrote to the end of the SmartBuffer so increment writeOffset.
+                this._writeOffset += byteLength;
+            }
+        }
+        return this;
     }
     /**
-     * Ensures that the internal Buffer is large enough to write at least the given amount of data.
-     *
-     * @param minLength { Number } The minimum length of the data needs to be written.
-     */
-    ensureCapacity(minLength) {
-        const oldLength = this.buff.length;
+       * Handles writing or insert of a Buffer.
+       *
+       * @param value { Buffer } The Buffer to write.
+       * @param offset { Number } The offset to write the Buffer to.
+       */
+    _handleBuffer(value, isInsert, offset) {
+        const offsetVal = typeof offset === 'number' ? offset : this._writeOffset;
+        // Ensure there is enough internal Buffer capacity.
+        if (isInsert) {
+            this.ensureInsertable(value.length, offsetVal);
+        }
+        else {
+            this._ensureWriteable(value.length, offsetVal);
+        }
+        // Write buffer value
+        value.copy(this._buff, offsetVal);
+        // Increment internal Buffer write offset;
+        if (isInsert) {
+            this._writeOffset += value.length;
+        }
+        else {
+            // If an offset was given, check to see if we wrote beyond the current writeOffset.
+            if (typeof offset === 'number') {
+                this._writeOffset = Math.max(this._writeOffset, offsetVal + value.length);
+            }
+            else {
+                // If no offset was given, we wrote to the end of the SmartBuffer so increment writeOffset.
+                this._writeOffset += value.length;
+            }
+        }
+        return this;
+    }
+    /**
+       * Ensures that the internal Buffer is large enough to read data.
+       *
+       * @param length { Number } The length of the data that needs to be read.
+       * @param offset { Number } The offset of the data that needs to be read.
+       */
+    ensureReadable(length, offset) {
+        // Offset value defaults to managed read offset.
+        let offsetVal = this._readOffset;
+        // If an offset was provided, use it.
+        if (typeof offset !== 'undefined') {
+            // Checks for valid numberic value;
+            utils_1.checkOffsetValue(offset);
+            // Overide with custom offset.
+            offsetVal = offset;
+        }
+        // Checks if offset is below zero, or the offset+length offset is beyond the total length of the managed data.
+        if (offsetVal < 0 || offsetVal + length > this.length) {
+            throw new Error(utils_1.ERRORS.INVALID_READ_BEYOND_BOUNDS);
+        }
+    }
+    /**
+       * Ensures that the internal Buffer is large enough to insert data.
+       *
+       * @param dataLength { Number } The length of the data that needs to be written.
+       * @param offset { Number } The offset of the data to be written.
+       */
+    ensureInsertable(dataLength, offset) {
+        // Checks for valid numberic value;
+        utils_1.checkOffsetValue(offset);
+        // Ensure there is enough internal Buffer capacity.
+        this._ensureCapacity(this.length + dataLength);
+        // If an offset was provided and its not the very end of the buffer, copy data into appropriate location in regards to the offset.
+        if (offset < this.length) {
+            this._buff.copy(this._buff, offset + dataLength, offset, this._buff.length);
+        }
+        // Adjust tracked smart buffer length
+        if (offset + dataLength > this.length) {
+            this.length = offset + dataLength;
+        }
+        else {
+            this.length += dataLength;
+        }
+    }
+    /**
+       * Ensures that the internal Buffer is large enough to write data.
+       *
+       * @param dataLength { Number } The length of the data that needs to be written.
+       * @param offset { Number } The offset of the data to be written (defaults to writeOffset).
+       */
+    _ensureWriteable(dataLength, offset) {
+        const offsetVal = typeof offset === 'number' ? offset : this._writeOffset;
+        // Ensure enough capacity to write data.
+        this._ensureCapacity(offsetVal + dataLength);
+        // Adjust SmartBuffer length (if offset + length is larger than managed length, adjust length)
+        if (offsetVal + dataLength > this.length) {
+            this.length = offsetVal + dataLength;
+        }
+    }
+    /**
+       * Ensures that the internal Buffer is large enough to write at least the given amount of data.
+       *
+       * @param minLength { Number } The minimum length of the data needs to be written.
+       */
+    _ensureCapacity(minLength) {
+        const oldLength = this._buff.length;
         if (minLength > oldLength) {
-            let data = this.buff;
-            let newLength = (oldLength * 3) / 2 + 1;
+            let data = this._buff;
+            let newLength = oldLength * 3 / 2 + 1;
             if (newLength < minLength) {
                 newLength = minLength;
             }
-            this.buff = Buffer.allocUnsafe(newLength);
-            data.copy(this.buff, 0, 0, oldLength);
+            this._buff = Buffer.allocUnsafe(newLength);
+            data.copy(this._buff, 0, 0, oldLength);
         }
     }
     /**
-     * Reads a numeric number value using the provided function.
-     *
-     * @param func { Function(offset: number) => number } The function to read data on the internal Buffer with.
-     * @param byteSize { Number } The number of bytes read.
-     *
-     * @param { Number }
-     */
-    readNumberValue(func, byteSize) {
-        this.ensureReadable(byteSize);
+       * Reads a numeric number value using the provided function.
+       *
+       * @param func { Function(offset: number) => number } The function to read data on the internal Buffer with.
+       * @param byteSize { Number } The number of bytes read.
+       * @param offset { Number } The offset to read from (optional). When this is not provided, the managed readOffset is used instead.
+       *
+       * @param { Number }
+       */
+    _readNumberValue(func, byteSize, offset) {
+        this.ensureReadable(byteSize, offset);
         // Call Buffer.readXXXX();
-        const value = func.call(this.buff, this.readOffset);
-        // Adjust internal read offset
-        this.readOffset += byteSize;
+        const value = func.call(this._buff, typeof offset === 'number' ? offset : this._readOffset);
+        // Adjust internal read offset if an optional read offset was not provided.
+        if (typeof offset === 'undefined') {
+            this._readOffset += byteSize;
+        }
         return value;
     }
     /**
-     * Writes a numeric number value using the provided function.
-     *
-     * @param func { Function(offset: number, offset?) => number} The function to write data on the internal Buffer with.
-     * @param byteSize { Number } The number of bytes written.
-     * @param value { Number } The number value to write.
-     * @param offset { Number } the offset to write the number at.
-     *
-     */
-    writeNumberValue(func, byteSize, value, offset) {
-        const offsetVal = typeof offset === 'number' ? offset : this.writeOffset;
+       * Inserts a numeric number value based on the given offset and value.
+       *
+       * @param func { Function(offset: number, offset?) => number} The function to write data on the internal Buffer with.
+       * @param byteSize { Number } The number of bytes written.
+       * @param value { Number } The number value to write.
+       * @param offset { Number } the offset to write the number at (REQUIRED).
+       *
+       */
+    _insertNumberValue(func, byteSize, value, offset) {
+        // Check for invalid offset values.
+        utils_1.checkOffsetValue(offset);
         // Ensure there is enough internal Buffer capacity. (raw offset is passed)
-        this.ensureWriteable(byteSize, offset);
+        this.ensureInsertable(byteSize, offset);
         // Call buffer.writeXXXX();
-        func.call(this.buff, value, offsetVal);
-        // Adjusts internal write offset
-        this.writeOffset += byteSize;
+        func.call(this._buff, value, offset);
+        // Adjusts internally managed write offset.
+        this._writeOffset += byteSize;
+    }
+    /**
+       * Writes a numeric number value based on the given offset and value.
+       *
+       * @param func { Function(offset: number, offset?) => number} The function to write data on the internal Buffer with.
+       * @param byteSize { Number } The number of bytes written.
+       * @param value { Number } The number value to write.
+       * @param offset { Number } the offset to write the number at (REQUIRED).
+       *
+       */
+    _writeNumberValue(func, byteSize, value, offset) {
+        // If an offset was provided, validate it.
+        if (typeof offset === 'number') {
+            // Check if we're writing beyond the bounds of the managed data.
+            if (offset < 0) {
+                throw new Error(utils_1.ERRORS.INVALID_WRITE_BEYOND_BOUNDS);
+            }
+            utils_1.checkOffsetValue(offset);
+        }
+        // Default to writeOffset if no offset value was given.
+        const offsetVal = typeof offset === 'number' ? offset : this._writeOffset;
+        // Ensure there is enough internal Buffer capacity. (raw offset is passed)
+        this._ensureWriteable(byteSize, offsetVal);
+        func.call(this._buff, value, offsetVal);
+        // If an offset was given, check to see if we wrote beyond the current writeOffset.
+        if (typeof offset === 'number') {
+            this._writeOffset = Math.max(this._writeOffset, offsetVal + byteSize);
+        }
+        else {
+            // If no numeric offset was given, we wrote to the end of the SmartBuffer so increment writeOffset.
+            this._writeOffset += byteSize;
+        }
     }
 }
 exports.SmartBuffer = SmartBuffer;
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":722}],682:[function(require,module,exports){
+},{"./utils":674,"buffer":715}],674:[function(require,module,exports){
+(function (Buffer){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+/**
+ * Error strings
+ */
+const ERRORS = {
+    INVALID_ENCODING: 'Invalid encoding provided. Please specify a valid encoding the internal Node.js Buffer supports.',
+    INVALID_SMARTBUFFER_SIZE: 'Invalid size provided. Size must be a valid integer greater than zero.',
+    INVALID_SMARTBUFFER_BUFFER: 'Invalid Buffer provided in SmartBufferOptions.',
+    INVALID_SMARTBUFFER_OBJECT: 'Invalid SmartBufferOptions object supplied to SmartBuffer constructor or factory methods.',
+    INVALID_OFFSET: 'An invalid offset value was provided.',
+    INVALID_OFFSET_NON_NUMBER: 'An invalid offset value was provided. A numeric value is required.',
+    INVALID_LENGTH: 'An invalid length value was provided.',
+    INVALID_LENGTH_NON_NUMBER: 'An invalid length value was provived. A numeric value is required.',
+    INVALID_TARGET_OFFSET: 'Target offset is beyond the bounds of the internal SmartBuffer data.',
+    INVALID_TARGET_LENGTH: 'Specified length value moves cursor beyong the bounds of the internal SmartBuffer data.',
+    INVALID_READ_BEYOND_BOUNDS: 'Attempted to read beyond the bounds of the managed data.',
+    INVALID_WRITE_BEYOND_BOUNDS: 'Attempted to write beyond the bounds of the managed data.'
+};
+exports.ERRORS = ERRORS;
+/**
+ * Checks if a given encoding is a valid Buffer encoding. (Throws an exception if check fails)
+ *
+ * @param { String } encoding The encoding string to check.
+ */
+function checkEncoding(encoding) {
+    if (!Buffer.isEncoding(encoding)) {
+        throw new Error(ERRORS.INVALID_ENCODING);
+    }
+}
+exports.checkEncoding = checkEncoding;
+/**
+ * Checks if a given number is a finite integer. (Throws an exception if check fails)
+ *
+ * @param { Number } value The number value to check.
+ */
+function isFiniteInteger(value) {
+    return typeof value === 'number' && isFinite(value) && isInteger(value);
+}
+exports.isFiniteInteger = isFiniteInteger;
+/**
+ * Checks if an offset/length value is valid. (Throws an exception if check fails)
+ *
+ * @param value The value to check.
+ * @param offset True if checking an offset, false if checking a length.
+ */
+function checkOffsetOrLengthValue(value, offset) {
+    if (typeof value === 'number') {
+        // Check for non finite/non integers
+        if (!isFiniteInteger(value) || value < 0) {
+            throw new Error(offset ? ERRORS.INVALID_OFFSET : ERRORS.INVALID_LENGTH);
+        }
+    }
+    else {
+        throw new Error(offset ? ERRORS.INVALID_OFFSET_NON_NUMBER : ERRORS.INVALID_LENGTH_NON_NUMBER);
+    }
+}
+/**
+ * Checks if a length value is valid. (Throws an exception if check fails)
+ *
+ * @param { Number } length The value to check.
+ */
+function checkLengthValue(length) {
+    checkOffsetOrLengthValue(length, false);
+}
+exports.checkLengthValue = checkLengthValue;
+/**
+ * Checks if a offset value is valid. (Throws an exception if check fails)
+ *
+ * @param { Number } offset The value to check.
+ */
+function checkOffsetValue(offset) {
+    checkOffsetOrLengthValue(offset, true);
+}
+exports.checkOffsetValue = checkOffsetValue;
+/**
+ * Checks if a target offset value is out of bounds. (Throws an exception if check fails)
+ *
+ * @param { Number } offset The offset value to check.
+ * @param { SmartBuffer } buff The SmartBuffer instance to check against.
+ */
+function checkTargetOffset(offset, buff) {
+    if (offset < 0 || offset > buff.length) {
+        throw new Error(ERRORS.INVALID_TARGET_OFFSET);
+    }
+}
+exports.checkTargetOffset = checkTargetOffset;
+/**
+ * Determines whether a given number is a integer.
+ * @param value The number to check.
+ */
+function isInteger(value) {
+    return typeof value === 'number' && isFinite(value) && Math.floor(value) === value;
+}
+
+}).call(this,require("buffer").Buffer)
+},{"buffer":715}],675:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -98208,7 +98506,7 @@ exports.connect = lookup;
 exports.Manager = require('./manager');
 exports.Socket = require('./socket');
 
-},{"./manager":683,"./socket":685,"./url":686,"debug":687,"socket.io-parser":690}],683:[function(require,module,exports){
+},{"./manager":676,"./socket":678,"./url":679,"debug":680,"socket.io-parser":683}],676:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -98783,7 +99081,7 @@ Manager.prototype.onreconnect = function () {
   this.emitAll('reconnect', attempt);
 };
 
-},{"./on":684,"./socket":685,"backo2":59,"component-bind":105,"component-emitter":106,"debug":687,"engine.io-client":153,"indexof":202,"socket.io-parser":690}],684:[function(require,module,exports){
+},{"./on":677,"./socket":678,"backo2":59,"component-bind":105,"component-emitter":106,"debug":680,"engine.io-client":143,"indexof":192,"socket.io-parser":683}],677:[function(require,module,exports){
 
 /**
  * Module exports.
@@ -98809,7 +99107,7 @@ function on (obj, ev, fn) {
   };
 }
 
-},{}],685:[function(require,module,exports){
+},{}],678:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -99229,7 +99527,7 @@ Socket.prototype.compress = function (compress) {
   return this;
 };
 
-},{"./on":684,"component-bind":105,"component-emitter":106,"debug":687,"parseqs":553,"socket.io-parser":690,"to-array":702}],686:[function(require,module,exports){
+},{"./on":677,"component-bind":105,"component-emitter":106,"debug":680,"parseqs":545,"socket.io-parser":683,"to-array":695}],679:[function(require,module,exports){
 (function (global){
 
 /**
@@ -99308,11 +99606,11 @@ function url (uri, loc) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"debug":687,"parseuri":554}],687:[function(require,module,exports){
-arguments[4][162][0].apply(exports,arguments)
-},{"./debug":688,"_process":733,"dup":162}],688:[function(require,module,exports){
-arguments[4][163][0].apply(exports,arguments)
-},{"dup":163,"ms":508}],689:[function(require,module,exports){
+},{"debug":680,"parseuri":546}],680:[function(require,module,exports){
+arguments[4][152][0].apply(exports,arguments)
+},{"./debug":681,"_process":726,"dup":152}],681:[function(require,module,exports){
+arguments[4][153][0].apply(exports,arguments)
+},{"dup":153,"ms":512}],682:[function(require,module,exports){
 (function (global){
 /*global Blob,File*/
 
@@ -99457,7 +99755,7 @@ exports.removeBlobs = function(data, callback) {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./is-buffer":691,"isarray":694}],690:[function(require,module,exports){
+},{"./is-buffer":684,"isarray":687}],683:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -99859,7 +100157,7 @@ function error() {
   };
 }
 
-},{"./binary":689,"./is-buffer":691,"component-emitter":106,"debug":692,"has-binary2":183}],691:[function(require,module,exports){
+},{"./binary":682,"./is-buffer":684,"component-emitter":106,"debug":685,"has-binary2":173}],684:[function(require,module,exports){
 (function (global){
 
 module.exports = isBuf;
@@ -99876,13 +100174,13 @@ function isBuf(obj) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],692:[function(require,module,exports){
-arguments[4][162][0].apply(exports,arguments)
-},{"./debug":693,"_process":733,"dup":162}],693:[function(require,module,exports){
-arguments[4][163][0].apply(exports,arguments)
-},{"dup":163,"ms":508}],694:[function(require,module,exports){
-arguments[4][184][0].apply(exports,arguments)
-},{"dup":184}],695:[function(require,module,exports){
+},{}],685:[function(require,module,exports){
+arguments[4][152][0].apply(exports,arguments)
+},{"./debug":686,"_process":726,"dup":152}],686:[function(require,module,exports){
+arguments[4][153][0].apply(exports,arguments)
+},{"dup":153,"ms":512}],687:[function(require,module,exports){
+arguments[4][174][0].apply(exports,arguments)
+},{"dup":174}],688:[function(require,module,exports){
 'use strict'
 
 // JS treats subjects of bitwise operators as SIGNED 32 bit numbers,
@@ -100131,7 +100429,7 @@ function sortInternal (a, b) {
 function valueOnly (elem) {
   return elem[1]
 }
-},{}],696:[function(require,module,exports){
+},{}],689:[function(require,module,exports){
 //! stable.js 0.1.6, https://github.com/Two-Screen/stable
 //! © 2017 Angry Bytes and contributors. MIT licensed.
 
@@ -100244,7 +100542,7 @@ else {
 
 })();
 
-},{}],697:[function(require,module,exports){
+},{}],690:[function(require,module,exports){
 module.exports = shift
 
 function shift (stream) {
@@ -100266,7 +100564,7 @@ function getStateLength (state) {
   return state.length
 }
 
-},{}],698:[function(require,module,exports){
+},{}],691:[function(require,module,exports){
 (function (process){
 var pull = require('pull-stream/pull')
 var looper = require('looper')
@@ -100507,7 +100805,7 @@ exports.transform = function (stream) {
 
 
 }).call(this,require('_process'))
-},{"_process":733,"looper":500,"pull-stream/pull":599}],699:[function(require,module,exports){
+},{"_process":726,"looper":504,"pull-stream/pull":591}],692:[function(require,module,exports){
 'use strict';
 
 var Buffer = require('safe-buffer').Buffer;
@@ -100780,7 +101078,7 @@ function simpleWrite(buf) {
 function simpleEnd(buf) {
   return buf && buf.length ? this.write(buf) : '';
 }
-},{"safe-buffer":654}],700:[function(require,module,exports){
+},{"safe-buffer":646}],693:[function(require,module,exports){
 var isHexPrefixed = require('is-hex-prefixed');
 
 /**
@@ -100796,7 +101094,7 @@ module.exports = function stripHexPrefix(str) {
   return isHexPrefixed(str) ? str.slice(2) : str;
 }
 
-},{"is-hex-prefixed":346}],701:[function(require,module,exports){
+},{"is-hex-prefixed":360}],694:[function(require,module,exports){
 'use strict'
 
 const throttle = require('lodash.throttle')
@@ -100855,7 +101153,7 @@ function getTimeElapsed (prevTime) {
   return Math.floor(a / 1000)
 }
 
-},{"lodash.throttle":460}],702:[function(require,module,exports){
+},{"lodash.throttle":464}],695:[function(require,module,exports){
 module.exports = toArray
 
 function toArray(list, index) {
@@ -100870,7 +101168,7 @@ function toArray(list, index) {
     return array
 }
 
-},{}],703:[function(require,module,exports){
+},{}],696:[function(require,module,exports){
 var traverse = module.exports = function (obj) {
     return new Traverse(obj);
 };
@@ -101186,7 +101484,7 @@ var hasOwnProperty = Object.hasOwnProperty || function (obj, key) {
     return key in obj;
 };
 
-},{}],704:[function(require,module,exports){
+},{}],697:[function(require,module,exports){
 (function(nacl) {
 'use strict';
 
@@ -103565,7 +103863,7 @@ nacl.setPRNG = function(fn) {
 
 })(typeof module !== 'undefined' && module.exports ? module.exports : (self.nacl = self.nacl || {}));
 
-},{"crypto":721}],705:[function(require,module,exports){
+},{"crypto":714}],698:[function(require,module,exports){
 (function (global){
 
 /**
@@ -103636,7 +103934,7 @@ function config (name) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],706:[function(require,module,exports){
+},{}],699:[function(require,module,exports){
 /**
  * Convert array of 16 byte values to UUID string format of the form:
  * XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
@@ -103661,7 +103959,7 @@ function bytesToUuid(buf, offset) {
 
 module.exports = bytesToUuid;
 
-},{}],707:[function(require,module,exports){
+},{}],700:[function(require,module,exports){
 (function (global){
 // Unique ID creation requires a high quality random # generator.  In the
 // browser this is a little complicated due to unknown quality of Math.random()
@@ -103698,7 +103996,7 @@ if (!rng) {
 module.exports = rng;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],708:[function(require,module,exports){
+},{}],701:[function(require,module,exports){
 var rng = require('./lib/rng');
 var bytesToUuid = require('./lib/bytesToUuid');
 
@@ -103729,7 +104027,7 @@ function v4(options, buf, offset) {
 
 module.exports = v4;
 
-},{"./lib/bytesToUuid":706,"./lib/rng":707}],709:[function(require,module,exports){
+},{"./lib/bytesToUuid":699,"./lib/rng":700}],702:[function(require,module,exports){
 (function (Buffer){
 'use strict'
 
@@ -103752,7 +104050,7 @@ module.exports = (buf) => {
 }
 
 }).call(this,{"isBuffer":require("../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":728,"varint":712}],710:[function(require,module,exports){
+},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/is-buffer/index.js":721,"varint":705}],703:[function(require,module,exports){
 module.exports = read
 
 var MSB = 0x80
@@ -103783,13 +104081,13 @@ function read(buf, offset) {
   return res
 }
 
-},{}],711:[function(require,module,exports){
-arguments[4][532][0].apply(exports,arguments)
-},{"dup":532}],712:[function(require,module,exports){
-arguments[4][533][0].apply(exports,arguments)
-},{"./decode.js":710,"./encode.js":711,"./length.js":713,"dup":533}],713:[function(require,module,exports){
-arguments[4][534][0].apply(exports,arguments)
-},{"dup":534}],714:[function(require,module,exports){
+},{}],704:[function(require,module,exports){
+arguments[4][536][0].apply(exports,arguments)
+},{"dup":536}],705:[function(require,module,exports){
+arguments[4][537][0].apply(exports,arguments)
+},{"./decode.js":703,"./encode.js":704,"./length.js":706,"dup":537}],706:[function(require,module,exports){
+arguments[4][538][0].apply(exports,arguments)
+},{"dup":538}],707:[function(require,module,exports){
 /**
  * @file Web Cryptography API shim
  * @author Artem S Vybornov <vybornov@gmail.com>
@@ -104389,7 +104687,7 @@ module.exports = function webcryptoShim (global) {
     }
 }
 
-},{}],715:[function(require,module,exports){
+},{}],708:[function(require,module,exports){
 /* global self */
 
 // created by @HenrikJoreteg
@@ -104438,7 +104736,7 @@ module.exports = {
   getUserMedia: getUserMedia
 }
 
-},{}],716:[function(require,module,exports){
+},{}],709:[function(require,module,exports){
 // Returns a wrapper function that returns a wrapped callback
 // The wrapper function should do some stuff, and return a
 // presumably different callback function.
@@ -104473,7 +104771,7 @@ function wrappy (fn, cb) {
   }
 }
 
-},{}],717:[function(require,module,exports){
+},{}],710:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -104494,7 +104792,7 @@ function extend() {
     return target
 }
 
-},{}],718:[function(require,module,exports){
+},{}],711:[function(require,module,exports){
 'use strict';
 
 var alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_'.split('')
@@ -104564,7 +104862,7 @@ yeast.encode = encode;
 yeast.decode = decode;
 module.exports = yeast;
 
-},{}],719:[function(require,module,exports){
+},{}],712:[function(require,module,exports){
 (function (global){
 'use strict';
 
@@ -105058,7 +105356,7 @@ var objectKeys = Object.keys || function (obj) {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"util/":759}],720:[function(require,module,exports){
+},{"util/":752}],713:[function(require,module,exports){
 'use strict'
 
 exports.byteLength = byteLength
@@ -105174,9 +105472,9 @@ function fromByteArray (uint8) {
   return parts.join('')
 }
 
-},{}],721:[function(require,module,exports){
+},{}],714:[function(require,module,exports){
 
-},{}],722:[function(require,module,exports){
+},{}],715:[function(require,module,exports){
 /*!
  * The buffer module from node.js, for the browser.
  *
@@ -106884,7 +107182,7 @@ function numberIsNaN (obj) {
   return obj !== obj // eslint-disable-line no-self-compare
 }
 
-},{"base64-js":720,"ieee754":725}],723:[function(require,module,exports){
+},{"base64-js":713,"ieee754":718}],716:[function(require,module,exports){
 (function (Buffer){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -106995,7 +107293,7 @@ function objectToString(o) {
 }
 
 }).call(this,{"isBuffer":require("../../is-buffer/index.js")})
-},{"../../is-buffer/index.js":728}],724:[function(require,module,exports){
+},{"../../is-buffer/index.js":721}],717:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -107299,13 +107597,13 @@ function isUndefined(arg) {
   return arg === void 0;
 }
 
-},{}],725:[function(require,module,exports){
-arguments[4][201][0].apply(exports,arguments)
-},{"dup":201}],726:[function(require,module,exports){
-arguments[4][202][0].apply(exports,arguments)
-},{"dup":202}],727:[function(require,module,exports){
-arguments[4][203][0].apply(exports,arguments)
-},{"dup":203}],728:[function(require,module,exports){
+},{}],718:[function(require,module,exports){
+arguments[4][191][0].apply(exports,arguments)
+},{"dup":191}],719:[function(require,module,exports){
+arguments[4][192][0].apply(exports,arguments)
+},{"dup":192}],720:[function(require,module,exports){
+arguments[4][193][0].apply(exports,arguments)
+},{"dup":193}],721:[function(require,module,exports){
 /*!
  * Determine if an object is a Buffer
  *
@@ -107328,9 +107626,9 @@ function isSlowBuffer (obj) {
   return typeof obj.readFloatLE === 'function' && typeof obj.slice === 'function' && isBuffer(obj.slice(0, 0))
 }
 
-},{}],729:[function(require,module,exports){
-arguments[4][184][0].apply(exports,arguments)
-},{"dup":184}],730:[function(require,module,exports){
+},{}],722:[function(require,module,exports){
+arguments[4][174][0].apply(exports,arguments)
+},{"dup":174}],723:[function(require,module,exports){
 exports.endianness = function () { return 'LE' };
 
 exports.hostname = function () {
@@ -107377,7 +107675,7 @@ exports.tmpdir = exports.tmpDir = function () {
 
 exports.EOL = '\n';
 
-},{}],731:[function(require,module,exports){
+},{}],724:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -107605,9 +107903,9 @@ var substr = 'ab'.substr(-1) === 'b'
 ;
 
 }).call(this,require('_process'))
-},{"_process":733}],732:[function(require,module,exports){
-arguments[4][560][0].apply(exports,arguments)
-},{"_process":733,"dup":560}],733:[function(require,module,exports){
+},{"_process":726}],725:[function(require,module,exports){
+arguments[4][552][0].apply(exports,arguments)
+},{"_process":726,"dup":552}],726:[function(require,module,exports){
 // shim for using process in browser
 var process = module.exports = {};
 
@@ -107793,7 +108091,7 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],734:[function(require,module,exports){
+},{}],727:[function(require,module,exports){
 (function (global){
 /*! https://mths.be/punycode v1.4.1 by @mathias */
 ;(function(root) {
@@ -108330,7 +108628,7 @@ process.umask = function() { return 0; };
 }(this));
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],735:[function(require,module,exports){
+},{}],728:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -108416,7 +108714,7 @@ var isArray = Array.isArray || function (xs) {
   return Object.prototype.toString.call(xs) === '[object Array]';
 };
 
-},{}],736:[function(require,module,exports){
+},{}],729:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -108503,45 +108801,45 @@ var objectKeys = Object.keys || function (obj) {
   return res;
 };
 
-},{}],737:[function(require,module,exports){
+},{}],730:[function(require,module,exports){
 'use strict';
 
 exports.decode = exports.parse = require('./decode');
 exports.encode = exports.stringify = require('./encode');
 
-},{"./decode":735,"./encode":736}],738:[function(require,module,exports){
+},{"./decode":728,"./encode":729}],731:[function(require,module,exports){
 module.exports = require('./lib/_stream_duplex.js');
 
-},{"./lib/_stream_duplex.js":739}],739:[function(require,module,exports){
-arguments[4][642][0].apply(exports,arguments)
-},{"./_stream_readable":741,"./_stream_writable":743,"core-util-is":723,"dup":642,"inherits":727,"process-nextick-args":732}],740:[function(require,module,exports){
-arguments[4][643][0].apply(exports,arguments)
-},{"./_stream_transform":742,"core-util-is":723,"dup":643,"inherits":727}],741:[function(require,module,exports){
-arguments[4][644][0].apply(exports,arguments)
-},{"./_stream_duplex":739,"./internal/streams/BufferList":744,"./internal/streams/destroy":745,"./internal/streams/stream":746,"_process":733,"core-util-is":723,"dup":644,"events":724,"inherits":727,"isarray":729,"process-nextick-args":732,"safe-buffer":751,"string_decoder/":753,"util":721}],742:[function(require,module,exports){
-arguments[4][645][0].apply(exports,arguments)
-},{"./_stream_duplex":739,"core-util-is":723,"dup":645,"inherits":727}],743:[function(require,module,exports){
-arguments[4][646][0].apply(exports,arguments)
-},{"./_stream_duplex":739,"./internal/streams/destroy":745,"./internal/streams/stream":746,"_process":733,"core-util-is":723,"dup":646,"inherits":727,"process-nextick-args":732,"safe-buffer":751,"util-deprecate":756}],744:[function(require,module,exports){
-arguments[4][647][0].apply(exports,arguments)
-},{"dup":647,"safe-buffer":751}],745:[function(require,module,exports){
-arguments[4][648][0].apply(exports,arguments)
-},{"dup":648,"process-nextick-args":732}],746:[function(require,module,exports){
-arguments[4][649][0].apply(exports,arguments)
-},{"dup":649,"events":724}],747:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":732}],732:[function(require,module,exports){
+arguments[4][634][0].apply(exports,arguments)
+},{"./_stream_readable":734,"./_stream_writable":736,"core-util-is":716,"dup":634,"inherits":720,"process-nextick-args":725}],733:[function(require,module,exports){
+arguments[4][635][0].apply(exports,arguments)
+},{"./_stream_transform":735,"core-util-is":716,"dup":635,"inherits":720}],734:[function(require,module,exports){
+arguments[4][636][0].apply(exports,arguments)
+},{"./_stream_duplex":732,"./internal/streams/BufferList":737,"./internal/streams/destroy":738,"./internal/streams/stream":739,"_process":726,"core-util-is":716,"dup":636,"events":717,"inherits":720,"isarray":722,"process-nextick-args":725,"safe-buffer":744,"string_decoder/":746,"util":714}],735:[function(require,module,exports){
+arguments[4][637][0].apply(exports,arguments)
+},{"./_stream_duplex":732,"core-util-is":716,"dup":637,"inherits":720}],736:[function(require,module,exports){
+arguments[4][638][0].apply(exports,arguments)
+},{"./_stream_duplex":732,"./internal/streams/destroy":738,"./internal/streams/stream":739,"_process":726,"core-util-is":716,"dup":638,"inherits":720,"process-nextick-args":725,"safe-buffer":744,"util-deprecate":749}],737:[function(require,module,exports){
+arguments[4][639][0].apply(exports,arguments)
+},{"dup":639,"safe-buffer":744}],738:[function(require,module,exports){
+arguments[4][640][0].apply(exports,arguments)
+},{"dup":640,"process-nextick-args":725}],739:[function(require,module,exports){
+arguments[4][641][0].apply(exports,arguments)
+},{"dup":641,"events":717}],740:[function(require,module,exports){
 module.exports = require('./readable').PassThrough
 
-},{"./readable":748}],748:[function(require,module,exports){
-arguments[4][650][0].apply(exports,arguments)
-},{"./lib/_stream_duplex.js":739,"./lib/_stream_passthrough.js":740,"./lib/_stream_readable.js":741,"./lib/_stream_transform.js":742,"./lib/_stream_writable.js":743,"dup":650}],749:[function(require,module,exports){
+},{"./readable":741}],741:[function(require,module,exports){
+arguments[4][642][0].apply(exports,arguments)
+},{"./lib/_stream_duplex.js":732,"./lib/_stream_passthrough.js":733,"./lib/_stream_readable.js":734,"./lib/_stream_transform.js":735,"./lib/_stream_writable.js":736,"dup":642}],742:[function(require,module,exports){
 module.exports = require('./readable').Transform
 
-},{"./readable":748}],750:[function(require,module,exports){
+},{"./readable":741}],743:[function(require,module,exports){
 module.exports = require('./lib/_stream_writable.js');
 
-},{"./lib/_stream_writable.js":743}],751:[function(require,module,exports){
-arguments[4][654][0].apply(exports,arguments)
-},{"buffer":722,"dup":654}],752:[function(require,module,exports){
+},{"./lib/_stream_writable.js":736}],744:[function(require,module,exports){
+arguments[4][646][0].apply(exports,arguments)
+},{"buffer":715,"dup":646}],745:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -108670,9 +108968,9 @@ Stream.prototype.pipe = function(dest, options) {
   return dest;
 };
 
-},{"events":724,"inherits":727,"readable-stream/duplex.js":738,"readable-stream/passthrough.js":747,"readable-stream/readable.js":748,"readable-stream/transform.js":749,"readable-stream/writable.js":750}],753:[function(require,module,exports){
-arguments[4][699][0].apply(exports,arguments)
-},{"dup":699,"safe-buffer":751}],754:[function(require,module,exports){
+},{"events":717,"inherits":720,"readable-stream/duplex.js":731,"readable-stream/passthrough.js":740,"readable-stream/readable.js":741,"readable-stream/transform.js":742,"readable-stream/writable.js":743}],746:[function(require,module,exports){
+arguments[4][692][0].apply(exports,arguments)
+},{"dup":692,"safe-buffer":744}],747:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -109406,7 +109704,7 @@ Url.prototype.parseHost = function() {
   if (host) this.hostname = host;
 };
 
-},{"./util":755,"punycode":734,"querystring":737}],755:[function(require,module,exports){
+},{"./util":748,"punycode":727,"querystring":730}],748:[function(require,module,exports){
 'use strict';
 
 module.exports = {
@@ -109424,18 +109722,18 @@ module.exports = {
   }
 };
 
-},{}],756:[function(require,module,exports){
-arguments[4][705][0].apply(exports,arguments)
-},{"dup":705}],757:[function(require,module,exports){
-arguments[4][203][0].apply(exports,arguments)
-},{"dup":203}],758:[function(require,module,exports){
+},{}],749:[function(require,module,exports){
+arguments[4][698][0].apply(exports,arguments)
+},{"dup":698}],750:[function(require,module,exports){
+arguments[4][193][0].apply(exports,arguments)
+},{"dup":193}],751:[function(require,module,exports){
 module.exports = function isBuffer(arg) {
   return arg && typeof arg === 'object'
     && typeof arg.copy === 'function'
     && typeof arg.fill === 'function'
     && typeof arg.readUInt8 === 'function';
 }
-},{}],759:[function(require,module,exports){
+},{}],752:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -110025,7 +110323,7 @@ function hasOwnProperty(obj, prop) {
 }
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./support/isBuffer":758,"_process":733,"inherits":757}],760:[function(require,module,exports){
+},{"./support/isBuffer":751,"_process":726,"inherits":750}],753:[function(require,module,exports){
 var indexOf = require('indexof');
 
 var Object_keys = function (obj) {
@@ -110165,4 +110463,4 @@ exports.createContext = Script.createContext = function (context) {
     return copy;
 };
 
-},{"indexof":726}]},{},[1]);
+},{"indexof":719}]},{},[1]);

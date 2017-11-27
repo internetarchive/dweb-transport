@@ -200,7 +200,7 @@ async function p_connect(options) {
     try {
         options = options || {};
         let setupoptions = {};
-        let transpparm = (searchparams.get("transport") || options.defaulttransport || "LOCAL,IPFS").toUpperCase(); //TODO-MULTI switch to HTTP by default
+        let transpparm = (searchparams.get("transport") || options.defaulttransport || "HTTP,IPFS").toUpperCase(); //TODO-MULTI switch to HTTP by default
         let transports = Dweb.Transports.setup0(transpparm);
         replacetexts("transportstatuses", Dweb.Transports._transports);
         await Promise.all(transports.map((t) => {

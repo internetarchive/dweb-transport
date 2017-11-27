@@ -5,8 +5,9 @@
   "dependencies": {
     "cids": "^0.5.2",
     "crypto": ">=0.0.3",
+    "custom-event": "~1.0.1",
     "ipfs": "^0.26.0",
-    "jsdom": "^11.3.0",
+    "jsdom": "^11.5.1",
     "leveldown": "^1.7.0-0",
     "levelup": "^1.0.0-4",
     "libsodium-wrappers": "git+https://git@github.com/mitra42/libsodium.js.git",
@@ -19,12 +20,11 @@
     "xmlhttprequest": "^1.8.0",
     "y-array": "^10.1.4",
     "y-indexeddb": "^8.1.9",
-    "y-ipfs-connector": "^1.5.0",
+    "y-ipfs-connector": "^1.6.0",
     "y-leveldb": "0.0.1",
     "y-memory": "^8.0.9",
     "y-text": "^9.5.1",
-    "yjs": "^12.3.3",
-    "custom-event": "~1.0.1"
+    "yjs": "^12.3.3"
   },
   "keywords": [],
   "license": "MIT",
