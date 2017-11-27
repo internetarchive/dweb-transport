@@ -94,6 +94,24 @@
 </form>
 
 <div class="displayedblock" id="retrievaldestn">retrieved data will go here</div>
+<hr>
+<h2>Explanation</h2>
+<h4>Note a IPFS bug means your Chrome tab, will probably crash after about 15 minutes, and Firefox may slow down and need restarting</h4>
+
+<p>
+    This is our simplest demo.
+</p>
+<ul>
+    <li>As you open the page it tries to connect to the transports, which by default are HTTP and IPFS.</li>
+    <li>These should change to Yellow as they try, and then Green when connected.</li>
+    <li>If it goes Red, it means it failed to connect - e.g. to get an "info" response from HTTP, or to conenct to IPFS.</li>
+    <li>You can edit text, which is happening entirely locally on your machine.</li>
+    <li>When you hit Save, its stored on the connected transports</li>
+    <li>A link to this is put in the Retrieval box</li>
+    <li>You can click on the Retrieve button and it will be retrieved and displayed for editing.</li>
+    <li>You can also paste that link into a different browser.</li>
+</ul>
+<b><a href="../index.html">See more demos</a></b>
 
 <script type="text/javascript">
     var searchparams = new URL(window.location.href).searchParams;

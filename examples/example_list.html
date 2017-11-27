@@ -177,13 +177,27 @@
     </tr>
 </table>
 
-<hr>
-<div class="container">
-    <h4>Object browser <span class="hoverclue">....</span></h4>
-    <div class="hoveronly">
-        <ul class="hoveronly" id="ObjBrowser"></ul>
-    </div>
-</div>
+<<h2>Explanation</h2>
+<h4>Note a IPFS bug means your Chrome tab, will probably crash after about 15 minutes, and Firefox may slow down and need restarting</h4>
+<p>
+    This is our third demo, it shows how lists are handled and builds on the <a href="../example_smartdict.html">SmartDict</a> demo.
+</p>
+<ul>
+    <li>As you open the page it tries to connect to the transports, which by default are HTTP and IPFS.</li>
+    <li>These should change to Green when connected.</li>
+    <li>If it goes Red, it means it failed to connect - e.g. to get an "info" response from HTTP, or to conenct to IPFS.</li>
+    <li>Click on New and pick a name for your list, and click Create</li>
+    <li>You should see a Private and public URL</li>
+    <li>Either of these links could be pasted into the fetch box at the top, or on a new browser window or machine
+        <ul>
+            <li>(click "New" once more if it still says "Create")</li>
+            <li>Paste the private URL or Public URL and click "Fetch"</li>
+        </ul></li>
+    <li>You can also click the link icon (but last I tried, it didn't work)</li><!--TODO BUG fix-->
+    <li>The Private link allows you to add to the list, the Public link just allows viewing.</li>
+    <li>Add something in the chat box and click Send</li>
+    <li>It should appear in the box above, AND should show up on any other connected browser.</li>
+</ul>
 
 <script type="text/javascript">
     // This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed

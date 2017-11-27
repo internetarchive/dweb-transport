@@ -76,21 +76,32 @@
 <div class="displayedblock" id="retrievaldestn">retrieved data will go here</div>
 
 <hr>
-<div class="container">
-    <h4>Object browser <span class="hoverclue">....</span></h4>
-    <div class="hoveronly">
-        <ul class="hoveronly" id="ObjBrowser"></ul>
-    </div>
-</div>
+<h2>Explanation</h2>
+<h4>Note a IPFS bug means your Chrome tab, will probably crash after about 15 minutes, and Firefox may slow down and need restarting</h4>
 
+<p>
+    This is our second demo, it shows how structured data is handled.
+</p>
+<ul>
+    <li>As you open the page it tries to connect to the transports, which by default are HTTP and IPFS.</li>
+    <li>These should change to Green when connected.</li>
+    <li>If it goes Red, it means it failed to connect - e.g. to get an "info" response from HTTP, or to conenct to IPFS.</li>
+
+    <li>You can edit the Name and color field (color is any HTML color, the obvious ones all work).</li>
+    <li>This is happening entirely locally on your machine.</li>
+    <li>When you hit Store, its stored on the connected transports as a "SmartDict" - arbitrarily structured data</li>
+    <li>A link to this is put in the Retrieval box</li>
+    <li>You can click on the Fetch button and it will be retrieved and displayed.</li>
+    <li>The color is patched into the HTML style locally</li>
+    <li>You can also paste that link into a different browser.</li>
+</ul>
+<b><a href="../index.html">See more demos</a></b>
 
 <script type="text/javascript">
     // This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
-    var searchparms = new URL(window.location.href).searchParams;
-    var url = searchparms.get("url");
-    let transportclass = Dweb["Transport"+(searchparms.get("transport") || "IPFS").toUpperCase()]; // e.g. Dweb["TransportHTTP"]
-
-    var verbose = searchparms.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)
+    var searchparams = new URL(window.location.href).searchParams;
+    var url = searchparams.get("url");
+    var verbose = searchparams.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)
     main();
 </script>
 </body>

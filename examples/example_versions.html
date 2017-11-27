@@ -247,8 +247,37 @@
 TODO click lock to select a lock to lock it with
 TODO  click locked key to edit that lock ?
 TODO Favorites
-TODO Listmonitor on versions-
+TODO Listmonitor on versions, and on locks, and existing lists
+TODO allow turning off HTTP or IPFS
 -->
+<h2>Explanation</h2>
+<h4>Note a IPFS bug means your Chrome tab, will probably crash after about 15 minutes, and Firefox may slow down and need restarting</h4>
+<p>
+    This is demo, shows how VersionLists work, and builds on the
+    <a href="../example_block.html">Block</a>, <a href="../example_smartdict.html">SmartDict</a>,
+    <a href="../example_list.html">List</a>, and <a href="../example_keys.html">Keys</a> demos.
+</p>
+<ul>
+    <li>As you open the page it tries to connect to the transports, which by default are HTTP and IPFS.</li>
+    <li>These should change to Green when connected.</li>
+    <li>If it goes Red, it means it failed to connect - e.g. to get an "info" response from HTTP, or to conenct to IPFS.</li>
+</ul>
+<ul>
+    <li>Click on the Keys, and login with the id you created in the <a href="../example_keys.html">Keys</a> Demo.</li>
+    <li>The "Create new list" drop down should populate with the Locks you defined there.</li>
+    <li>If not, then click on your name, and "new lock" and pick a name for one.</li>
+    <li>(Until a minor issue is fixed, you might need to log out and back in again for the locks drop-down to repopulate)</li><!--TODO BUG Fix-->
+    <li>Pick a lock from the drop down, and a name for the list and click Create.</li>
+    <li>Now edit the first post - and click Save</li>
+    <li>A timestamp should appear below, showing a saved version.</li>
+    <li>Edit again and Save and another version should show up</li>
+    <li>Click on any version to restore it to the editor.</li>
+    <li>- you'll need to click Save to make tht the current version</li>
+    <li>Log out and back in again (to repopulate the "Open Existing" drop-down (same bug as with list of locks)</li><!-- TODO BUG-->
+    <li>Select your previous list, and it should repopulate.</li>
+    <li>You should be able to login on any browser to do this</li>
+</ul>
+
 
 <script type="text/javascript">
     // These have to be at global level so they can be found anywhere.

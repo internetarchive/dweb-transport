@@ -207,6 +207,7 @@ class TransportIPFS extends Transport {
         if (this.options.listmethod !== "yarrays")
             throw new Dweb.errors.CodingError("Only support yarrays for list"); // There used to be an IIIF and Yarray (singular connection) support
         try {
+            this.status = Dweb.Transport.STATUS_STARTING;   // Should display, but probably not refreshed in most case
             await this.p_yarraysstart(verbose);    // Only listmethod supported currently, throws Error("websocket error") and possibly others.
         } catch(err) {
             console.error("IPFS failed to connect",err);
