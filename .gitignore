@@ -3,3 +3,4 @@ node_modules
 Icon?
 npm-debug.log
 dbtestjs
+.cache

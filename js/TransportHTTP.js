@@ -30,30 +30,35 @@ class TransportHTTP extends Transport {
         this.options = options;
         this.urlbase = options.http.urlbase;
         this.supportURLs = ['http','https'];
-        this.supportFunctions = ['fetch', 'store', 'add', 'list', 'reverse']; //Does not support: listmonitor
+        this.supportFunctions = ['fetch', 'store', 'add', 'list', 'reverse']; //Does not support: listmonitor - reverse is disabled somewhere not sure if here or caller
         this.name = "HTTP";             // For console log etc
+        this.status = Dweb.Transport.STATUS_LOADED;
     }
 
-    static async p_setup(options, verbose) {
-    /*
-    Setup the resource and open any P2P connections etc required to be done just once.
-    In almost all cases this will call the constructor of the subclass
-    Should return a new Promise that resolves to a instance of the subclass
-
-    :param obj transportoptions: Data structure required by underlying transport layer (format determined by that layer)
-    :param boolean verbose: True for debugging output
-    :param options: Data structure stored on the .options field of the instance returned.
-    :resolve Transport: Instance of subclass of Transport
-     */
+    static setup0(options, verbose) {
         let combinedoptions = Transport.mergeoptions({ http: defaulthttpoptions },options);
         try {
             let t = new TransportHTTP(combinedoptions, verbose);
             Transport.addtransport(t);
             return t;
         } catch (err) {
-            console.log("Exception thrown in TransportHTTP.p_setup");
+            console.log("Exception thrown in TransportHTTP.p_setup", err.message);
             throw err;
         }
+    }
+    async p_setup1(verbose) {
+        return this;
+    }
+    static async p_setup(options, verbose) {
+        /*
+        Setup the resource and open any P2P connections etc required to be done just once.
+
+        :param boolean verbose: True for debugging output
+        :param options: Options to override defaulthttpoptions of form  {http: {urlbase: "http://localhost:4244"}};
+        :resolve Transport: Instance of subclass of Transport
+         */
+        return await Transport.setup0(options, verbose) // Sync version that doesnt connect
+            .p_setup1(verbose);     // And connect
     }
 
     async p_status() {    //TODO-BACKPORT
@@ -63,11 +68,12 @@ class TransportHTTP extends Transport {
          */
         try {
             this.info = await this.p_info();
-            return this.info.type.toUpperCase() + " online"
+            this.status = Dweb.Transport.STATUS_CONNECTED;
         } catch(err) {
             console.log("Error in p_status.info",err);
-            return "OFFLINE ERROR";
+            this.status = Dweb.Transport.STATUS_FAILED;
         }
+        return this.status;
     }
 
     async p_httpfetch(command, url, init, verbose) { // Embrace and extend "fetch" to check result etc.

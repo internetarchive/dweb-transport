@@ -107,21 +107,21 @@ async function kcitem_click(el) { //!SEE-OTHER-KC-CLASSES
 
 // Clicked on a key, display a prompt to copy it for sharing
 function locklink_click(el) {
-    window.prompt("Copy to clipboard for locking (Ctrl-C + OK)", resolve(el).source._urls); //TODO-MULTI confirm shows as array
+    window.prompt("Copy to clipboard for locking (Ctrl-C + OK)", elementFrom(el).source._urls); //TODO-MULTI confirm shows as array
 }
 function key_click(el) {
-    window.prompt("Copy to clipboard for sharing (Ctrl-C + OK)", resolve(el).source._publicurls); //TODO-MULTI confirm shows as array
+    window.prompt("Copy to clipboard for sharing (Ctrl-C + OK)", elementFrom(el).source._publicurls); //TODO-MULTI confirm shows as array
 }
 function token_click(el) {
-    window.prompt("Copy to clipboard for sharing (Ctrl-C + OK)", resolve(el).source.viewer); //TODO-MULTI confirm shows as array and that "viewer" works
+    window.prompt("Copy to clipboard for sharing (Ctrl-C + OK)", elementFrom(el).source.viewer); //TODO-MULTI confirm shows as array and that "viewer" works
 }
 async function p_versionlist_click(el) {
     // If there is a vl_target element then use it - e.g. for editing a VersionList, otherwise offer dialog to copy the URL
-    let target = resolve("vl_target");
+    let target = elementFrom("vl_target");
     if (target) {
-        await p_vl_target_display(target, resolve(el).source);    // Application dependent
+        await p_vl_target_display(target, elementFrom(el).source);    // Application dependent
     } else {
-        window.prompt("Copy to clipboard for sharing (Ctrl-C + OK)", resolve(el).source._urls);  // In some cases should load form //TODO-MULTI confirm shows as array
+        window.prompt("Copy to clipboard for sharing (Ctrl-C + OK)", elementFrom(el).source._urls);  // In some cases should load form //TODO-MULTI confirm shows as array
     }
 }
 
@@ -181,6 +181,16 @@ async function tokennew_click() { //Called by "Add" button on new token dialog
     if (verbose) console.groupEnd("tokennew_click ---");
 }
 
+function refresh_transportstatuses(el) {
+    statusclasses = ["transportstatus0","transportstatus1","transportstatus2","transportstatus3","transportstatus4"];
+    el = Array.prototype.slice.call(elementFrom(el).children) // Find all children of the main element, convert to array
+        .map((el_t) => {
+            if (el_t.source) {  // Set class to e.g. transportstatus0
+                el_t.classList.remove(...statusclasses);
+                el_t.classList.add("transportstatus" + el_t.source.status);
+            }
+        })
+}
 async function p_connect(options) {
     /*
         This is a standardish starting process, feel free to copy and reuse !
@@ -190,22 +200,14 @@ async function p_connect(options) {
     try {
         options = options || {};
         let setupoptions = {};
-        let transpparm = (searchparams.get("transport") || options.defaulttransport || "LOCAL,IPFS").toUpperCase(); //TODO-MULTI connect to multiple
-        let transparr = transpparm.split(',');
-        console.log("XXX transpparm=", transpparm);
-        for(let transp of transparr) { //TODO-MULTI connect in parallel
-            if (transp === "LOCAL") {
-                transp = "HTTP";
-                setupoptions = {http: {urlbase: "http://localhost:4244"}}
-            }
-            console.log("XXX setupoptions=", setupoptions);
-            let transportclass = Dweb["Transport" + transp]; // e.g. Dweb["TransportHTTP"]
-            let t = await transportclass.p_setup(setupoptions, verbose); //TODO may take some options
-            setstatus(await t.p_status()); //TODO-MULTI need multi status
-            console.log("XXX@205 finishing",transp)
-        }
+        let transpparm = (searchparams.get("transport") || options.defaulttransport || "LOCAL,IPFS").toUpperCase(); //TODO-MULTI switch to HTTP by default
+        let transports = Dweb.Transport.setup0(transpparm);
+        replacetexts("transportstatuses", Dweb.Transport._transports);
+        await Promise.all(transports.map((t) => {
+            t.p_setup1(verbose).then(() => t.p_status()).then(()=>refresh_transportstatuses("transportstatuses"));
+        }));  // Try and connect each of the transports
     } catch(err) {
-        console.log("ERROR in p_connect:",err);
+        console.error("ERROR in p_connect:",err.message);
         throw(err);
     }
     if (verbose) console.groupEnd("p_connect ---");

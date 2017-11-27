@@ -19,7 +19,7 @@ function urlsFrom(url) {
     return url;
 }
 
-function resolve(el) {
+function elementFrom(el) {
     /* Make sure we have an element, if passed a string then find the element with that id.
       el:       Element or string being the id of an element.
       returns:  element.
@@ -70,7 +70,7 @@ function togglevis(el, displayvis) {
     if (Array.isArray(el)) {
         el.map((e) => togglevis(e, displayvis))
     } else {
-        el = resolve(el);
+        el = elementFrom(el);
         el.style.display = (el.style && el.style.display === "none" ? displayvis : "none");
     }
 }
@@ -99,7 +99,7 @@ function replacetext(el, text) {
     /* Replace the text of el with text, removing all other children
     :param el:  An HTML element, or a string with id of an HTML element
     */
-    el = resolve(el);
+    el = elementFrom(el);
     //console.log("replacetext",text,el.constructor.name) // Uncomment to get class name of different things want to edit
     if (el instanceof HTMLImageElement) {
         el.src = text;
@@ -126,10 +126,10 @@ function replacetexts(el, ...dict) {
     This is intended to be easy to use, not necessarily bomb-proof, odd structures of HTML or oo may cause unpredictable results.
 
     :param el:  An HTML element, or a string with id of an HTML element
-    :param dict: A dictionary, object, or array of them
+    :param dict: Multiple arguments, each a dictionary or object,  or a single array argument
      */
     // First combine with a raw dict so that "prop" doesnt get functions and handles dict like things
-    el = resolve(el);
+    el = elementFrom(el);
     if (Array.isArray(dict[0])) {
         _replacetexts("", el, dict[0])
     } else {
@@ -144,32 +144,37 @@ function _replacetexts(prefix, el, oo) {
      */
     if (Array.isArray(oo)) {    // Add a templated element for each member of array
         deletechildren(el);
-        console.log("XXX@_replacetexts",el);
         oo.map((f) => addtemplatedchild(el, f))
     } else {
         for (let prop in oo) {
-            let p = prefix + prop;
-            let val = oo[prop];
-            if (val instanceof Date) {  // Convert here because otherwise treated as an object
-                val = val.toString();
-            }
-            if (typeof val === "object" && !Array.isArray(val)) {
-                // Look for current level, longer names e.g. prefixprop_xyz
-                _replacetexts(`${p}_`, el, val);
-                // And nowif found any prefixprop look at xyz under it
-                Array.prototype.slice.call(el.querySelectorAll(`[name=${p}]`)).map((i) => _replacetexts("", i, val));
-            }
-            else if (typeof val === "object" && Array.isArray(val)) {   // Exand an array into sub tags
-                if (el.getAttribute("value") === p) el.value = JSON.stringify(val); //Do the parent as well if its e.g. an option, convert to something that urlsFrom will understand
-                let dests = el.querySelectorAll(`[name=${p}]`);
-                Array.prototype.slice.call(dests).map((i) => replacetexts(i, val));
-            } else {
-                if (el.getAttribute("name") === p) replacetext(el, val); //Do the parent as well
-                if (el.getAttribute("value") === p) el.value = val; //Do the parent as well
-                Array.prototype.slice.call(el.querySelectorAll(`[name=${p}]`)).map((i) => replacetext(i, val));
-                if (el.getAttribute("href") === p) el.href = val;
-                Array.prototype.slice.call(el.querySelectorAll(`[href=${p}]`)).map((i) => i.href = val);
-                Array.prototype.slice.call(el.querySelectorAll(`[value=${p}]`)).map((i) => i.value = val);
+            try {
+                let p = prefix + prop;
+                let val = oo[prop];
+                if (val instanceof Date) {  // Convert here because otherwise treated as an object
+                    val = val.toString();
+                }
+                if (typeof val === "object" && !Array.isArray(val)) {
+                    // Look for current level, longer names e.g. prefixprop_xyz
+                    Array.prototype.slice.call(el.querySelectorAll(`[name=${p}]`)).map((i) => replacetexts(i, val) );
+                    //Commented out prefix version since runs into problems with complex nested objects such as "ipfs" in transports
+                    //_replacetexts(`${p}_`, el, val);
+                    // And nowif found any prefixprop look at xyz under it
+                    Array.prototype.slice.call(el.querySelectorAll(`[name=${p}]`)).map((i) => _replacetexts("", i, val));
+                }
+                else if (typeof val === "object" && Array.isArray(val)) {   // Exand an array into sub tags
+                    if (el.getAttribute("value") === p) el.value = JSON.stringify(val); //Do the parent as well if its e.g. an option, convert to something that urlsFrom will understand
+                    let dests = el.querySelectorAll(`[name=${p}]`);
+                    Array.prototype.slice.call(dests).map((i) => replacetexts(i, val));
+                } else {
+                    if (el.getAttribute("name") === p) replacetext(el, val); //Do the parent as well
+                    if (el.getAttribute("value") === p) el.value = val; //Do the parent as well
+                    Array.prototype.slice.call(el.querySelectorAll(`[name=${p}]`)).map((i) => replacetext(i, val));  // <span name="text">...val...</span>
+                    if (el.getAttribute("href") === p) el.href = val;
+                    Array.prototype.slice.call(el.querySelectorAll(`[href=${p}]`)).map((i) => i.href = val);
+                    Array.prototype.slice.call(el.querySelectorAll(`[value=${p}]`)).map((i) => i.value = val);
+                }
+            } catch(err) {
+                if (verbose) console.log("Unable to _replacetexts on",prefix,prop,err.message); // Continue loop its probably just some property of some nested object
             }
         }
     }
@@ -185,7 +190,7 @@ function addtemplatedchild(el, ...dict) {
     html: html to add under outerelement
     dict: Dictionary with parameters to replace in html, it looks for nodes with name="xyz" and replaces text inside it with dict[xyz]
     */
-    el = resolve(el);
+    el = elementFrom(el);
     let el_li = el.getElementsByClassName("template")[0].cloneNode(true);   // Copy first child with class=Template
     el_li.classList.remove("template");                                 // Remove the "template" class so it displays
     replacetexts(el_li, ...dict);                          // Safe since only replace text - sets el_li.source to dict
@@ -196,12 +201,12 @@ function addtemplatedchild(el, ...dict) {
 function show(el, displayvalue) {
     displayvalue = displayvalue || "";
     if (Array.isArray(el)) el.map((e) => show(e, displayvalue));
-    resolve(el).style.display = displayvalue;
+    elementFrom(el).style.display = displayvalue;
 }
 
 function hide(el) {
     if (Array.isArray(el)) el.map((e) => hide(e));
-    resolve(el).style.display = "none";
+    elementFrom(el).style.display = "none";
 }
 
 async function p_httpget(url, headers) {
@@ -237,7 +242,7 @@ function display_blob(bb, options) {//TODO-STREAMS figure out how to pass stream
     if (!(bb instanceof Blob)) {
         bb = new Blob([bb], {type: options.type})
     }
-    console.log("display_object",typeof bb);
+    console.log("display_blob:",typeof bb);
     // This next code is bizarre combination needed to open a blob from within an HTML window.
     let a = window.document.createElement('a');
     //bb = new Blob([datapdf], {type: 'application/pdf'});    //TODO-STREAMS make this work on streams

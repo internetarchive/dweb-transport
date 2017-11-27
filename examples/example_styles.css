@@ -80,4 +80,7 @@
 .examplesversions #lock_div {position: absolute; top: 0.5em; right: 1em; z-index:7; background-color: #f0f0ff; border: 1px #e0e0e0 solid; padding: 5px; width: 450px;}/*z > keychain*/
 .examplesversions #tokennew_form {position: absolute; top: 0.5em; right: 1em; z-index:10; background-color: #f0f0ff; border: 1px #e0e0e0 solid; padding: 5px; width: 450px; text-align:left;}/*z > lock_div*/
 
-tokennew_form
+.transportstatus0 {color: lawngreen}
+.transportstatus1 {color: red}
+.transportstatus2 {color: yellow}
+.transportstatus3 {color: black}

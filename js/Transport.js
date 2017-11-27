@@ -169,7 +169,35 @@ class Transport {
          */
         Transport._transports.push(t);
     }
+
+    static setup0(transports, options, verbose) {
+        /*
+        Setup Transports for a range of classes
+
+        returns array of transport instances
+         */
+        // "IPFS" or "IPFS,LOCAL,HTTP"
+        transports = transports.split(','); // [ "IPFS", "LOCAL", "HTTP" ]
+        let localoptions = {http: {urlbase: "http://localhost:4244"}};
+        return transports.map((tabbrev) => {
+            let transportclass;
+            if (tabbrev === "LOCAL") {
+                transportclass = Dweb["TransportHTTP"];
+            } else {
+                transportclass = Dweb["Transport" + tabbrev];
+            }
+            return transportclass.setup0(tabbrev === "LOCAL" ? localoptions : options, verbose);
+            });
+    }
+    static async p_setup1(verbose) {
+        /* Second stage of setup, connect if possible */
+        return await Promise.all(Transport._transports.map((t) = t.p_setup1(verbose)))
+    }
 }
 Transport._transports = [];    // Array of transport instances connected
+Transport.STATUS_CONNECTED = 0; // Connected - all other numbers are some version of not ok to use
+Transport.STATUS_FAILED = 1;    // Failed to connect
+Transport.STATUS_STARTING = 2;  // In the process of connecting
+Transport.STATUS_LOADED = 3;    // Code loaded, but haven't tried to connect. (this is typically hard coded in subclasses constructor)
 
 exports = module.exports = Transport;

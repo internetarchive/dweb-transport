@@ -94,6 +94,7 @@ class TransportIPFS extends Transport {
         this.name = "IPFS";             // For console log etc
         this.supportURLs = ['ipfs'];
         this.supportFunctions = ['fetch', 'store', 'add', 'list', 'listmonitor'];   // Does not support reverse
+        this.status = Dweb.Transport.STATUS_LOADED;
     }
 
 
@@ -109,10 +110,10 @@ class TransportIPFS extends Transport {
     }
 
     p_ipfsstart(verbose) { //TODO-API
-    /*
-    Just start IPFS - not Y (note used with "yarrays" and will be used for non-IPFS list management)
-    Note - can't figure out how to use async with this, as we resolve the promise based on the event callback
-     */
+        /*
+        Just start IPFS - not Y (note used with "yarrays" and will be used for non-IPFS list management)
+        Note - can't figure out how to use async with this, as we resolve the promise based on the event callback
+         */
         let self = this;
         return new Promise((resolve, reject) => {
             this.ipfs = new IPFS(this.options.ipfs);
@@ -122,12 +123,12 @@ class TransportIPFS extends Transport {
             });
             this.ipfs.on('error', (err) => reject(err));
         })
-        .then(() => self.ipfs.version())
-        .then((version) => console.log('IPFS READY',version))
-        .catch((err) => {
-            console.log("Error caught in p_ipfsstart");
-            throw(err);
-        })
+            .then(() => self.ipfs.version())
+            .then((version) => console.log('IPFS READY',version))
+            .catch((err) => {
+                console.log("Error caught in p_ipfsstart");
+                throw(err);
+            });
     }
 
     /* OBS Aug2017 - using "yarrays" now to support multiple connections, leave code here for month or two in case go back.
@@ -151,16 +152,18 @@ class TransportIPFS extends Transport {
         //Lots of issues with "init" not knowing state before it//  this.ipfs.init({emptyRepo: true, bits: 2048})     //.then((unused) => ipfs.init({emptyRepo: true, bits: 2048}))
     }
     */
+
     async p_yarraysstart(verbose) { //TODO-API
         /*
         This starts IPFS, but only sets up for Y connections, which are opened each time a resource is listed, added to, or listmonitored.
-         */
+            Throws: Error("websocket error") if WiFi off, probably other errors if fails to connect
+        */
         try {
             let self = this;
-            await this.p_ipfsstart(verbose);
             self.yarrays = {};
+            await this.p_ipfsstart(verbose); // Throws Error("websocket error") if Wifi is off
         } catch(err) {
-            console.log("Error caught in p_yarraysstart");
+            console.log("p_yarraysstart: Error caught:", err.message);
             throw(err);
         }
         //Lots of issues with "init" not knowing state before it//  this.ipfs.init({emptyRepo: true, bits: 2048})     //.then((unused) => ipfs.init({emptyRepo: true, bits: 2048}))
@@ -189,6 +192,28 @@ class TransportIPFS extends Transport {
         }
     }
 
+    static setup0(options, verbose) {
+        /*
+            First part of setup, create obj, add to Transport but dont attempt to connect, typically called instead of p_setup if want to parallelize connections.
+        */
+        let combinedoptions = Transport.mergeoptions(defaultoptions, options);
+        console.log("IPFS options %o", combinedoptions);
+        let t = new TransportIPFS(combinedoptions, verbose);   // Note doesnt start IPFS or Y
+        Transport.addtransport(t);
+        return t;
+    }
+
+    async p_setup1(verbose) {
+        if (this.options.listmethod !== "yarrays")
+            throw new Dweb.errors.CodingError("Only support yarrays for list"); // There used to be an IIIF and Yarray (singular connection) support
+        try {
+            await this.p_yarraysstart(verbose);    // Only listmethod supported currently, throws Error("websocket error") and possibly others.
+        } catch(err) {
+            console.error("IPFS failed to connect",err);
+            this.status = Dweb.Transport.STATUS_FAILED;
+        }
+        return this;
+    }
 
     static async p_setup(options, verbose ) {
         /*
@@ -201,21 +226,16 @@ class TransportIPFS extends Transport {
         :param options: Data structure stored on the .options field of the instance returned.
         :resolve Transport: Instance of subclass of Transport
          */
-        let combinedoptions = Transport.mergeoptions(defaultoptions, options);
-        console.log("IPFS options", JSON.stringify(combinedoptions));
-        let t = new TransportIPFS(combinedoptions, verbose);   // Note doesnt start IPFS or Y
-        Transport.addtransport(t);
-        //Switch the comments on the next two lines to switch back and forth between Yarray (one connection) or Yarrays (one per list) for testing
-        //(t.options.listmethod === "yarray")  ? t.p_yarraystart(verbose) : // Not currently supported
-        if (t.options.listmethod === "yarrays") await t.p_yarraysstart(verbose);    // Only listmethod supported currently
-        return t;
+        return await Transport.setup0(options, verbose) // Create instance but dont connect
+            .p_setup1(verbose);             // Connect
     }
 
-    p_status() {
+    async p_status() {
         /*
         Return a string for the status of a transport. No particular format, but keep it short as it will probably be in a small area of the screen.
          */
-        return new Promise(resolve => resolve(this.ipfs.isOnline() ? "IPFS Online" : "IPFS Offline"));
+        this.status =  (await this.ipfs.isOnline()) ? Dweb.Transport.STATUS_CONNECTED : Dweb.Transport.STATUS_FAILED;
+        return this.status;
     }
 
     // Everything else - unless documented here - should be opaque to the actual structure of a CID
@@ -238,7 +258,7 @@ class TransportIPFS extends Transport {
         if (typeof(url) === "string") url = Url.parse(url);
         if (url && url["pathname"]) { // On browser "instanceof Url" isn't valid)
             let patharr = url.pathname.split('/');
-            if ((url.protocol !== "ipfs:") || (patharr[1] != 'ipfs') || (patharr.length < 3))
+            if ((url.protocol !== "ipfs:") || (patharr[1] !== 'ipfs') || (patharr.length < 3))
                 throw new Dweb.errors.TransportError("TransportIPFS.cidFrom bad format for url should be ipfs:/ipfs/...: " + url.href);
             if (patharr.length > 3)
                 throw new Dweb.errors.TransportError("TransportIPFS.cidFrom not supporting paths in url yet, should be ipfs:/ipfs/...: " + url.href);
