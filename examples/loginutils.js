@@ -107,13 +107,13 @@ async function kcitem_click(el) { //!SEE-OTHER-KC-CLASSES
 
 // Clicked on a key, display a prompt to copy it for sharing
 function locklink_click(el) {
-    window.prompt("Copy to clipboard for locking (Ctrl-C + OK)", elementFrom(el).source._urls); //TODO-MULTI confirm shows as array
+    window.prompt("Copy to clipboard for locking (Ctrl-C + OK)", elementFrom(el).source._urls);
 }
 function key_click(el) {
-    window.prompt("Copy to clipboard for sharing (Ctrl-C + OK)", elementFrom(el).source._publicurls); //TODO-MULTI confirm shows as array
+    window.prompt("Copy to clipboard for sharing (Ctrl-C + OK)", elementFrom(el).source._publicurls);
 }
 function token_click(el) {
-    window.prompt("Copy to clipboard for sharing (Ctrl-C + OK)", elementFrom(el).source.viewer); //TODO-MULTI confirm shows as array and that "viewer" works
+    window.prompt("Copy to clipboard for sharing (Ctrl-C + OK)", elementFrom(el).source.viewer);
 }
 async function p_versionlist_click(el) {
     // If there is a vl_target element then use it - e.g. for editing a VersionList, otherwise offer dialog to copy the URL
@@ -121,7 +121,7 @@ async function p_versionlist_click(el) {
     if (target) {
         await p_vl_target_display(target, elementFrom(el).source);    // Application dependent
     } else {
-        window.prompt("Copy to clipboard for sharing (Ctrl-C + OK)", elementFrom(el).source._urls);  // In some cases should load form //TODO-MULTI confirm shows as array
+        window.prompt("Copy to clipboard for sharing (Ctrl-C + OK)", elementFrom(el).source._urls);  // In some cases should load form
     }
 }
 
@@ -201,8 +201,8 @@ async function p_connect(options) {
         options = options || {};
         let setupoptions = {};
         let transpparm = (searchparams.get("transport") || options.defaulttransport || "LOCAL,IPFS").toUpperCase(); //TODO-MULTI switch to HTTP by default
-        let transports = Dweb.Transport.setup0(transpparm);
-        replacetexts("transportstatuses", Dweb.Transport._transports);
+        let transports = Dweb.Transports.setup0(transpparm);
+        replacetexts("transportstatuses", Dweb.Transports._transports);
         await Promise.all(transports.map((t) => {
             t.p_setup1(verbose).then(() => t.p_status()).then(()=>refresh_transportstatuses("transportstatuses"));
         }));  // Try and connect each of the transports

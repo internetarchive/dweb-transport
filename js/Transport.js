@@ -8,6 +8,7 @@ class Transport {
         Superclass should merge with default options, call super
         */
     }
+
     p_setup(options, verbose) {
         /*
         Setup the resource and open any P2P connections etc required to be done just once.
@@ -19,6 +20,7 @@ class Transport {
          */
         throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally undefined function Transport.p_setup should have been subclassed");
     }
+
     supports(url, func) {
         /*
         Determine if this transport supports a certain set of URLs
@@ -27,14 +29,18 @@ class Transport {
         :return:    True if this protocol supports these URLs
         :throw:     TransportError if invalid URL
          */
-        if (!url) { return true; }  // By default, can handle default URLs
+        if (!url) {
+            return true;
+        }  // By default, can handle default URLs
         if (typeof url === "string") {
             url = Url.parse(url);    // For efficiency, only parse once.
         }
-        if (!url.protocol) { throw new Error("URL failed to specific a scheme (before :) "+url.href)} //Should be TransportError but out of scope here
+        if (!url.protocol) {
+            throw new Error("URL failed to specific a scheme (before :) " + url.href)
+        } //Should be TransportError but out of scope here
         // noinspection Annotator  supportURLs is defined in subclasses
-        return (    (!url || this.supportURLs.includes(url.protocol.slice(0,-1)))
-                &&  (!func || this.supportFunctions.includes(func)))
+        return (    (!url || this.supportURLs.includes(url.protocol.slice(0, -1)))
+            && (!func || this.supportFunctions.includes(func)))
     }
 
     p_rawstore(data, verbose) {
@@ -48,7 +54,18 @@ class Transport {
          */
         throw new Dweb.errors.ToBeImplementedError("Intentionally undefined function Transport.p_rawstore should have been subclassed");
     }
-    p_store() { throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_store - may define higher level semantics here (see Python)"); }
+
+    async p_rawstoreCaught(data, verbose) {
+        try {
+            return await this.p_rawstore(data, verbose);
+        } catch (err) {
+
+        }
+    }
+    p_store() {
+        throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_store - may define higher level semantics here (see Python)");
+    }
+
     //noinspection JSUnusedLocalSymbols
 
     p_rawfetch(url, verbose) {
@@ -65,7 +82,10 @@ class Transport {
          */
         console.assert(false, "Intentionally undefined  function Transport.p_rawfetch should have been subclassed");
     }
-    p_fetch() { throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_fetch - may define higher level semantics here (see Python)"); }
+
+    p_fetch() {
+        throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_fetch - may define higher level semantics here (see Python)");
+    }
 
     p_rawadd(url, sig, verbose) { //TODO-API-MULTI
         /*
@@ -82,6 +102,7 @@ class Transport {
          */
         throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_rawadd");
     }
+
     p_rawlist(url, verbose) {
         /*
         Fetch all the objects in a list, these are identified by the url of the public key used for signing.
@@ -96,7 +117,11 @@ class Transport {
          */
         throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_rawlist");
     }
-    p_list() { throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_list"); }
+
+    p_list() {
+        throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_list");
+    }
+
     //noinspection JSUnusedGlobalSymbols
     p_rawreverse(url, verbose) {
         /*
@@ -130,7 +155,7 @@ class Transport {
         let c = Object.assign(a);
         for (let key in b) {
             let val = b[key];
-            if ((typeof val === "object") && ! Array.isArray(val) && a[key]) {
+            if ((typeof val === "object") && !Array.isArray(val) && a[key]) {
                 c[key] = Transport.mergeoptions(a[key], b[key]);
             } else {
                 c[key] = b[key];
@@ -139,62 +164,7 @@ class Transport {
         return c;
     }
 
-    static validFor(urls, func) { //TODO-API
-        /*
-        Finds an array or Transports that can support this URL.  url => [TransportInstanceA, TransportInstanceB]
-
-        If passed an array of urls, returns a dict; [url1,url2] => {url1: [TransportInstanceA], url2: [TransportInstanceA, TransportInstanceB]}
-        (note replaces old Dweb.transport() )
-
-        urls:       Array of urls
-        func:       Function to check support for: fetch, store, add, list, listmonitor, reverse - see supportFunctions on each Transport class
-        returns:    Array of pairs of url & transport instance [ [ u1, t1], [u1, t2], [u2, t1]]
-         */
-        console.assert((urls && urls[0]) || ["store"].includes(func), "T.validFor failed - coding error - url=", urls, "func=", func) // FOr debugging old calling patterns with [ undefined ]
-        if (!(urls && urls.length > 0)) {
-            return Transport._transports.filter((t) => t.supports(undefined, func))
-                .map((t) => [undefined, t]);
-        } else {
-            return [].concat(
-                ...urls.map((url) => typeof url === 'string' ? Url.parse(url) : url) // parse URLs once
-                    .map((url) =>
-                        Transport._transports.filter((t) => t.supports(url, func)) // [ t1, t2 ]
-                            .map((t) => [url, t]))); // [[ u, t1], [u, t2]]
-        }
-    }
-
-    static addtransport(t) {
-        /*
-        Add a transport to _transports,
-         */
-        Transport._transports.push(t);
-    }
-
-    static setup0(transports, options, verbose) {
-        /*
-        Setup Transports for a range of classes
-
-        returns array of transport instances
-         */
-        // "IPFS" or "IPFS,LOCAL,HTTP"
-        transports = transports.split(','); // [ "IPFS", "LOCAL", "HTTP" ]
-        let localoptions = {http: {urlbase: "http://localhost:4244"}};
-        return transports.map((tabbrev) => {
-            let transportclass;
-            if (tabbrev === "LOCAL") {
-                transportclass = Dweb["TransportHTTP"];
-            } else {
-                transportclass = Dweb["Transport" + tabbrev];
-            }
-            return transportclass.setup0(tabbrev === "LOCAL" ? localoptions : options, verbose);
-            });
-    }
-    static async p_setup1(verbose) {
-        /* Second stage of setup, connect if possible */
-        return await Promise.all(Transport._transports.map((t) = t.p_setup1(verbose)))
-    }
 }
-Transport._transports = [];    // Array of transport instances connected
 Transport.STATUS_CONNECTED = 0; // Connected - all other numbers are some version of not ok to use
 Transport.STATUS_FAILED = 1;    // Failed to connect
 Transport.STATUS_STARTING = 2;  // In the process of connecting

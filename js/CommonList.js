@@ -127,14 +127,6 @@ class CommonList extends SmartDict {
         return dd;
     }
 
-    _transportsexpand(ttobj) {
-        /*
-        ttobj:         { url: [t1, t2], url2: [t3, t4] }
-        returns     [[ url t1] [ url t2] [url2 t3], [url2 t4]]
-         */
-        return [].concat(...Object.entries(ttobj).map(([url, tt]) => tt.map((t) => [ url, t])));
-    }
-
     async p_fetchlist(verbose) {
         /*
         Load the list from the Dweb,
@@ -142,13 +134,7 @@ class CommonList extends SmartDict {
         */
         if (!this.storedpublic())
             await this._p_storepublic(verbose);
-        let ttlines = await Promise.all(  // Wait for all the p_rawlist to return array of lines
-            Dweb.Transport.validFor(this._publicurls, "list") //[[ url t1] [ url t2] [url2 t3], [url2 t4]]
-            .map(([url,t]) => t.p_rawlist(url, verbose))
-        ); // [[sig,sig],[sig,sig]]
-        let uniques = {}; // Used to filter duplicates
-        let lines = [].concat(...ttlines)
-            .filter((x) => (!uniques[x.signature] && (uniques[x.signature] = true)));
+        let lines = await Dweb.Transports.p_rawlist(this._publicurls, verbose); // [[sig,sig],[sig,sig]]
         //TODO-MULTI should probably sort results, in case get some from each
         //TODO-MULTI-ERRORS will need to handle errors, in particular one transport failing while others succeed.
         if (verbose) console.log("CommonList:p_fetchlist.success", this._urls, "len=", lines.length);
@@ -265,8 +251,7 @@ class CommonList extends SmartDict {
          */
         if (!sig) throw new Dweb.errors.CodingError("CommonList.p_add is meaningless without a sig");
         if (! Dweb.utils.intersects(sig.signedby, this._publicurls)) throw new Dweb.errors.CodingError(`CL.p_add: sig.signedby ${sig.signedby} should overlap with this._publicurls ${this._publicurls}`)
-        return Promise.all(Dweb.Transport.validFor(this._publicurls, "add") //[[ Url t1] [ Url t2] [Url2 t3], [Url2 t4]]
-            .map(([u, t]) => t.p_rawadd(u, sig, verbose)) )
+        return Dweb.Transports.p_rawadd(this._publicurls, sig, verbose);
     }
 
     verify(sig, verbose) {
@@ -322,8 +307,7 @@ class CommonList extends SmartDict {
         /*
         Add a listmonitor for each transport - note this means if multiple transports support it, then will get duplicate events back if everyone else is notifying all of them.
          */
-        Dweb.Transport.validFor(this._publicurls, "listmonitor")
-            .map(([u, t]) => t.listmonitor(u,
+        Dweb.Transports.listmonitor(this._publicurls,
                 (obj) => {
                     if (verbose) console.log("listmonitor added",obj,"to",this._publicurls);
                     let sig = new Dweb.Signature(obj, verbose);
@@ -337,8 +321,7 @@ class CommonList extends SmartDict {
                     } else {
                         console.log("Rejected signature: ",sig);
                     }
-                },
-                verbose));
+                });
     }
 }
 exports = module.exports = CommonList;

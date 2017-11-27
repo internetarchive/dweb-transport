@@ -199,7 +199,7 @@ class TransportIPFS extends Transport {
         let combinedoptions = Transport.mergeoptions(defaultoptions, options);
         console.log("IPFS options %o", combinedoptions);
         let t = new TransportIPFS(combinedoptions, verbose);   // Note doesnt start IPFS or Y
-        Transport.addtransport(t);
+        Dweb.Transports.addtransport(t);
         return t;
     }
 
@@ -226,7 +226,7 @@ class TransportIPFS extends Transport {
         :param options: Data structure stored on the .options field of the instance returned.
         :resolve Transport: Instance of subclass of Transport
          */
-        return await Transport.setup0(options, verbose) // Create instance but dont connect
+        return await TransportIPFS.setup0(options, verbose) // Create instance but dont connect
             .p_setup1(verbose);             // Connect
     }
 

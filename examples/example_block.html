@@ -9,8 +9,8 @@
     <!--<script src='/dweb/tinymce/tinymce.min.js'></script><!-- TinyMCE -->
     <script type="text/javascript" src='https://cloud.tinymce.com/stable/tinymce.min.js'></script><!-- TinyMCE -->
     <script type="text/javascript" src="htmlutils.js"></script><!--objectbrowser functionality for debugging-->
+    <script type="text/javascript" src="loginutils.js"></script><!--Login tools (used for p_connect) -->
     <script type="text/javascript">
-        //TODO-MULTI-needs-scanning
 
     tinymce.init({
         selector: '#mytextarea',
@@ -56,6 +56,20 @@
             throw err;
         }
     }
+    async function main() {
+        //This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
+        try {
+            await p_connect(); // Default startup beavior from loginutils.js // {http: {urlbase: "http://localhost:4244"}} for local
+            // Any code you want to run once online goes here.
+            if (url) fetchanddisplay(url);
+            //Setup a callback so once logged in it will populate drop-downs (comment out if not using logins or defining onlogin)
+            //Dweb.eventHandler.addEventListener((event) => { if (event.type === "login") { onlogin(event.values); } });
+        } catch(err) {
+            console.log("App Error:", err);
+            alert(err.message);
+        }
+    }
+
 
     </script>
     <script type="text/css">
@@ -63,9 +77,10 @@
     </script>
 </head>
 <body>
-<div class="floatright">
-    <div id="status">Starting</div>
-</div>
+<!--Ntwork status box - this is standard for any app requiring logging in -- if edit, change on at least example_list, example_keys, eample_smartdict -->
+<div class="floatright" style="position:relative;">
+    <ul id="transportstatuses"><li class='template vertical_li'><span name='name'></span></li></ul><!--Add onclick to statuses-->
+</div><!--End of standard network status and login panel-->
 <h1>Dweb - Block Example</h1>
 <h4>Create something here, and when its saved its urls will appear below</h4>
 <form method="post">
@@ -81,20 +96,11 @@
 <div class="displayedblock" id="retrievaldestn">retrieved data will go here</div>
 
 <script type="text/javascript">
-    // This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
-    var searchparms = new URL(window.location.href).searchParams;
-    var url = searchparms.get("url");
-    var verbose = searchparms.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)
-    let transportclass = Dweb["Transport"+(searchparms.get("transport") || "IPFS").toUpperCase()]; // e.g. Dweb["TransportHTTP"]
+    var searchparams = new URL(window.location.href).searchParams;
+    var url = searchparams.get("url");
+    var verbose = searchparams.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)
+    main(); //starts a transport, checks its status, and if appropriate to app opens a URL passed
 
-    transportclass.p_setup({}, verbose)
-        .then((t) => t.p_status())
-        .then((msg) => setstatus(msg))
-        .then(() => {
-            // Any code you want to run once online goes here.
-            if(url) fetchanddisplay(urlsFrom(url));
-        })
-        .catch((err) => { console.log("ERROR:",err); alert(err.message); });
 </script>
 
 </body>

@@ -39,7 +39,7 @@ class TransportHTTP extends Transport {
         let combinedoptions = Transport.mergeoptions({ http: defaulthttpoptions },options);
         try {
             let t = new TransportHTTP(combinedoptions, verbose);
-            Transport.addtransport(t);
+            Dweb.Transports.addtransport(t);
             return t;
         } catch (err) {
             console.log("Exception thrown in TransportHTTP.p_setup", err.message);
@@ -57,7 +57,7 @@ class TransportHTTP extends Transport {
         :param options: Options to override defaulthttpoptions of form  {http: {urlbase: "http://localhost:4244"}};
         :resolve Transport: Instance of subclass of Transport
          */
-        return await Transport.setup0(options, verbose) // Sync version that doesnt connect
+        return await TransportHTTP.setup0(options, verbose) // Sync version that doesnt connect
             .p_setup1(verbose);     // And connect
     }
 
@@ -70,7 +70,7 @@ class TransportHTTP extends Transport {
             this.info = await this.p_info();
             this.status = Dweb.Transport.STATUS_CONNECTED;
         } catch(err) {
-            console.log("Error in p_status.info",err);
+            console.log("Error in p_status.info",err.message);
             this.status = Dweb.Transport.STATUS_FAILED;
         }
         return this.status;
@@ -92,8 +92,7 @@ class TransportHTTP extends Transport {
                 let multihash = parsedurl.pathname.split('/').slice(-1);
                 if (multihash) httpurl += "/" + multihash;
             }
-            if (verbose) console.log(command, "httpurl=", httpurl);
-            if (verbose) console.log(command, "init=", init);
+            if (verbose) console.log(command, "httpurl=%s init=%o", httpurl, init);
             //console.log('CTX=',init["headers"].get('Content-Type'))
             // Using window.fetch, because it doesn't appear to be in scope otherwise in the browser.
             let response = await fetch(new Request(httpurl, init));
@@ -106,10 +105,10 @@ class TransportHTTP extends Transport {
                 }
             }   // TODO-HTTP may need to handle binary as a buffer instead of text
             // noinspection ExceptionCaughtLocallyJS
-            throw new Dweb.errors.TransportError(`Transport Error ${response.status}: ${response.statusText}`); // Should be TransportError but out of scope
+            throw new Dweb.errors.TransportError(`Transport Error ${response.status}: ${response.statusText}`);
         } catch (err) {
             // Error here is particularly unhelpful - if rejected during the COrs process it throws a TypeError
-            console.log("Probably misleading error from fetch:",httpurl);
+            console.log("Note error from fetch might be misleading especially TypeError can be Cors issue:",httpurl);
             if (err instanceof Dweb.errors.TransportError) {
                 throw err;
             } else {
@@ -151,6 +150,11 @@ class TransportHTTP extends Transport {
     }
 
     p_rawfetch(url, verbose) {
+        /*
+        Fetch from underlying transport,
+        url: Of resource - which is turned into the HTTP url in p_httpfetch
+        throws: TransportError if fails
+         */
         //if (!(url && url.includes(':') ))
         //    throw new Dweb.errors.CodingError("TransportHTTP.p_rawfetch bad url: "+url);
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
@@ -166,9 +170,15 @@ class TransportHTTP extends Transport {
     rawreverse() { throw new Dweb.errors.ToBeImplementedError("Undefined function TransportHTTP.rawreverse"); }
 
     p_rawstore(data, verbose) {
+        /*
+        Store data on http server,
+        data:   string
+        returns {string}: url
+        throws: TransportError on failure in p_post > p_httpfetch
+         */
         //PY: res = self._sendGetPost(True, "rawstore", headers={"Content-Type": "application/octet-stream"}, urlargs=[], data=data, verbose=verbose)
         console.assert(data, "TransportHttp.p_rawstore: requires data");
-        return this.p_post("contenturl/rawstore", null, "application/octet-stream", data, verbose) // Returns immediately with a promise
+        return this.p_post("contenturl/rawstore", null, "application/octet-stream", data, verbose); // resolves to URL
     }
 
     p_rawadd(url, sig, verbose) { //TODO-BACKPORT turn date into ISO before adding //TODO-API-MULTI note url is now that of list

@@ -28,7 +28,11 @@ class KeyChain extends CommonList {
         resolves to:    KeyChain created
          */
             let kc = new KeyChain(data, true, key, verbose);
-            await kc.p_store(verbose);
+            try {
+                await kc.p_store(verbose);
+            } catch(err) { // Should be a Transport Error
+                throw new Dweb.errors.AuthenticationError("Unable to login as transport failed")
+            }
             // The order here is important - kc has to be on keychains to decrypt the elements, and eventhandler has to be
             // after elements are loaded so cant be inside addkeychains()
             KeyChain.addkeychains(kc);  // Add after fetching elements as triggers events

@@ -1,5 +1,6 @@
 exports.Transport = require('./Transport');
 exports.TransportHTTP = require('./TransportHTTP'); // Note this used to cause a problem in bundle I believe
+exports.Transports = require('./Transports'); // Handles multiple transports
 exports.Transportable = require('./Transportable');
 exports.Block = require('./Block');
 exports.SmartDict = require("./SmartDict");
