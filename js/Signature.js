@@ -19,7 +19,7 @@ class Signature extends SmartDict {
         :param data: data to initialize - see Fields above
          */
         super(dic, verbose);
-        //TODO-DATE turn s.date into java date
+        //TODO-DATE turn s.date into javascript date
         //if isinstance(s.date, basestring):
         //    s.date = dateutil.parser.parse(s.date)
         this.table = "sig";

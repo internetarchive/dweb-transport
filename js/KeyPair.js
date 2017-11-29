@@ -176,7 +176,7 @@ class KeyPair extends SmartDict {
          */
         //First tackle standard formats created by exporting functionality on keys
         // Call route is ... data.setter > ...> key.setter > _importkey
-        //TODO - Note fingerprint different from Python - this stores the key, change the Python
+        //TODO-BACKPORT - Note fingerprint different from Python - this stores the key, change the Python
         if (typeof value === "object") {    // Should be array, not dict
             value.map((k) => this._importkey(k));
         } else {
@@ -195,7 +195,7 @@ class KeyPair extends SmartDict {
         }
     }
 
-    publicexport() {    // TODO probably change this on Python version as well
+    publicexport() {    // TODO-BACKPORT probably change this on Python version as well
         /*
         :return: an array include one or more "NACL PUBLIC:abc123", or "NACL VERIFY:abc123" urlsafebase64 string.
          */
@@ -211,7 +211,7 @@ class KeyPair extends SmartDict {
         /*
         :return: an array include one or more "NACL SEED:abc123" urlsafebase64 string.
          */
-        //TODO note this doesnt match the current Python implementation
+        //TODO-BACKPORT note this doesnt match the current Python implementation
         let key = this._key;
         if (key.seed) {
             return "NACL SEED:" + (typeof(key.seed) === "string" ? key.seed : sodium.to_urlsafebase64(key.seed));

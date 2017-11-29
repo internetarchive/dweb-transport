@@ -136,7 +136,6 @@ class CommonList extends SmartDict {
             await this._p_storepublic(verbose);
         let lines = await Dweb.Transports.p_rawlist(this._publicurls, verbose); // [[sig,sig],[sig,sig]]
         //TODO-MULTI should probably sort results, in case get some from each
-        //TODO-MULTI-ERRORS will need to handle errors, in particular one transport failing while others succeed.
         if (verbose) console.log("CommonList:p_fetchlist.success", this._urls, "len=", lines.length);
         this._list = lines.map((l) => new Dweb.Signature(l, verbose));    // Turn each line into a Signature
     }
