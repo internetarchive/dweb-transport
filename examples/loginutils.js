@@ -191,6 +191,13 @@ function refresh_transportstatuses(el) {
             }
         })
 }
+async function _p_connecteach(t) {
+    /* Sub call for p_connect to fix some async issues, makes sure this is a single promise resolving to undefined */
+    await t.p_setup1(verbose);
+    await t.p_status(); // Set the status field of t, may make async enquiry of server etc
+    refresh_transportstatuses("transportstatuses"); // Update status for anything,
+    return undefined;
+}
 async function p_connect(options) {
     /*
         This is a standardish starting process, feel free to copy and reuse !
@@ -203,9 +210,7 @@ async function p_connect(options) {
         let transpparm = (searchparams.get("transport") || options.defaulttransport || "HTTP,IPFS").toUpperCase(); //TODO-MULTI switch to HTTP by default
         let transports = Dweb.Transports.setup0(transpparm);
         replacetexts("transportstatuses", Dweb.Transports._transports);
-        await Promise.all(transports.map((t) => {
-            t.p_setup1(verbose).then(() => t.p_status()).then(()=>refresh_transportstatuses("transportstatuses"));
-        }));  // Try and connect each of the transports
+        await Promise.all(transports.map((t) => _p_connecteach(t)));  // Try and connect each of the transports
     } catch(err) {
         console.error("ERROR in p_connect:",err.message);
         throw(err);
