@@ -124,7 +124,7 @@ class Transports {
         throws: TransportError with message being concatenated messages of transports if NONE of them succeed.
          */
         //TODO-MULTI might be smarter about not waiting but Promise.race is inappropriate as returns after a failure as well.
-        let tt = Dweb.Transports.validFor(undefined, "add"); // Valid connected transports that support "store"
+        let tt = Dweb.Transports.validFor(urls, "add"); // Valid connected transports that support "store"
         if (!tt.length) {
             throw new Dweb.errors.TransportError('Transports.p_rawstore: Cant find transport for urls:'+urls.join(','));
         }
@@ -134,7 +134,7 @@ class Transports {
                 await t.p_rawadd(u, sig, verbose); //undefined
                 return undefined;
             } catch(err) {
-                console.log("Could not rawlist ", url, "from", t.name, err.message);
+                console.log("Could not rawlist ", u, "from", t.name, err.message);
                 errs.push(err)
                 return undefined;
             }
