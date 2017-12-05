@@ -8,19 +8,22 @@ VERBOSE
 The examples can run either from the [dweb.me/examples](https://dweb.me/examples) server, 
 or once the source is checked out, locally from your file system.
 
-- Simple text creation and retrieval: example_block.html: [IPFS](https://dweb.me/examples/example_block.html)
+By default each of these examples runs both IPFS and HTTP transports, and is smart if it cannot connect to one or the other.
+Links below allow selecting to use ONLY IPFS, or the Archive's contenthash server.
+
+- Simple text creation and retrieval: example_block.html: [Default](https://dweb.me/examples/example_block.html) [IPFS](https://dweb.me/examples/example_block.html&transport=IPFS)
     or [HTTP](https://dweb.me/examples/example_block.html?transport=HTTP)
-- Simple dict creation and retrieval: example_smartdict.html: [IPFS](https://dweb.me/examples/example_smartdict.html)
+- Simple dict creation and retrieval: example_smartdict.html: [Default](https://dweb.me/examples/example_smartdict.html) [IPFS](https://dweb.me/examples/example_smartdict.html&transport=IPFS)
     or [HTTP](https://dweb.me/examples/example_smartdict.html?transport=HTTP); 
-- List creation and retrieval: example_list.html: [IPFS](https://dweb.me/examples/example_list.html)
+- List creation and retrieval: example_list.html: [Default](https://dweb.me/examples/example_list.html) [IPFS](https://dweb.me/examples/example_list.html&transport=IPFS)
     or [HTTP](https://dweb.me/examples/example_list.html?transport=HTTP)
-- UI for Academic docs - centralised search; decentralized retrieval: example_academic.html: [IPFS](https://dweb.me/examples/example_academic.html)
+- UI for Academic docs - centralised search; decentralized retrieval: example_academic.html: [Default](https://dweb.me/examples/example_academic.html) [IPFS](https://dweb.me/examples/example_academic.html&transport=IPFS)
     or [HTTP](https://dweb.me/examples/example_academic.html?transport=HTTP)
-- Authentication: Managing locks and keys example_keys.html: [IPFS](https://dweb.me/examples/example_keys.html)
+- Authentication: Managing locks and keys example_keys.html: [Default](https://dweb.me/examples/example_keys.html) [IPFS](https://dweb.me/examples/example_keys.html&transport=IPFS)
     or [HTTP](https://dweb.me/examples/example_keys.html?transport=HTTP); 
-- Versions of a single document: example_versions.html: [IPFS](https://dweb.me/examples/example_versions.html)
+- Versions of a single document: example_versions.html: [Default](https://dweb.me/examples/example_versions.html) [IPFS](https://dweb.me/examples/example_versions.html&transport=IPFS)
     or [HTTP](https://dweb.me/examples/example_versions.html?transport=HTTP); 
-- [objbrowser.html](https://dweb.me/examples/objbrowser.html); 
+- [objbrowser.html](https://dweb.me/examples/objbrowser.html);  ((Not currently working))
 
 **Browser Support**: This should work on Chrome and Firefox (Safari doesn't support many newer features), 
 see below for IPFS bugs, 
@@ -32,7 +35,7 @@ this shows up in your console and also (for HTTP) in our server logs.
 
 ###BLOCK example
 - In your browser, open examples/example_block.html: 
-[IPFS](https://dweb.me/examples/example_block.html) 
+[Default](https://dweb.me/examples/example_block.html) [IPFS](https://dweb.me/examples/example_block.html&transport=IPFS)
 or [HTTP](https://dweb.me/examples/example_block.html?transport=HTTP)
 - Type some text into the editor and hit Save  
 - A hash should appear below.  
@@ -44,7 +47,7 @@ and open the browser console (e.g. Firefox/tools/Web Developer/Web Console)
 
 ###SMART DICT example
 - In your browser, open example_smartdict.html
-[IPFS](https://dweb.me/examples/example_smartdict.html)
+[Default](https://dweb.me/examples/example_smartdict.html) [IPFS](https://dweb.me/examples/example_smartdict.html&transport=IPFS)
 or [HTTP](https://dweb.me/examples/example_smartdict.html?transport=HTTP);
 - Type some text into the name, and a HTML color nmae into the color (e.g. "red") and hit Save  
 - A hash should appear below.  
@@ -53,7 +56,7 @@ or [HTTP](https://dweb.me/examples/example_smartdict.html?transport=HTTP);
 
 ###COMMON LIST example
 - In your browser, open the file:  example_list.html:
-[IPFS](https://dweb.me/examples/example_list.html)
+[Default](https://dweb.me/examples/example_list.html) [IPFS](https://dweb.me/examples/example_list.html&transport=IPFS)
 or [HTTP](https://dweb.me/examples/example_list.html?transport=HTTP)
 - Click New and enter a name for your list  
 - A blank list should appear along with the name and hashes (retrieved from Dweb)  
@@ -70,7 +73,7 @@ This is a work in progress, dependent on the incompleteness of both the Academic
 the bugs/issues in IPFS.
 
 - In your browser, open the file:  example_academic.html:
-[IPFS](https://dweb.me/examples/example_academic.html) (recommended)
+[Default](https://dweb.me/examples/example_academic.html) [IPFS](https://dweb.me/examples/example_academic.html&transport=IPFS)
 or [HTTP](https://dweb.me/examples/example_academic.html?transport=HTTP)
 - Enter a search term 
 - A list of papers should be returned, along with their DOI.
@@ -83,22 +86,15 @@ or [HTTP](https://dweb.me/examples/example_academic.html?transport=HTTP)
 
 ###AUTHENTICATION example
 - In your browser, open the file:  examples/example_keys.html:
-[IPFS](https://dweb.me/examples/example_keys.html)
+[Default](https://dweb.me/examples/example_keys.html) [IPFS](https://dweb.me/examples/example_keys.html&transport=IPFS)
 or [HTTP](https://dweb.me/examples/example_keys.html?transport=HTTP)
-- Click on the "KeyChain icon"  
-- Click on Register  
-- Choose a name for your first keychain, remember exactly how you spelled and capitalised it.  
-- Choose a long and complex passphrase that is easy for you to remember and hard for others to guess, ideally include numbers and punctuation, but you'll need to remember this exactly.  
-Note there is no way to change a name or password later, since there is no central authority to change them with.  
-- Your name should appear next to the keyhain icon, click on it.
-- A box should appear showing that you have no keys.  
-- Click on New Key, give it a name (which you dont have to remember) and click Generate  
-- The new key should show up, Click on it. 
-- Copy and Paste the "url" of the hash (including the full string from http: or ipfs:)
-- Click on "New Access Control List", give it a name (which you dont have to remember) and click Generate
-- Click on "new key"
-- Give it a name (you don't have to remember it); and `paste the URL
-- You have now created a Lock, and given yourself access to it. 
+- follow the instructions on the page.
+
+###VERSIONS exampe
+- In your browser, open the file examples/example_versions.html
+[Default](https://dweb.me/examples/example_versions.html) [IPFS](https://dweb.me/examples/example_versions.html&transport=IPFS)
+or [HTTP](https://dweb.me/examples/example_versions.html?transport=HTTP);
+- follow the instructions on the page.
 
 Further examples will demonstrate using the lock.
 
