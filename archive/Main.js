@@ -10,7 +10,7 @@
 // TODO
 //
 const hostname = '127.0.0.1';
-const port = 80; //3000 // use 3000 if out of docker/nonroot
+const port = 3000; // use 80 if root/docker, 3000 if out of docker/nonroot
 
 var express = require('express');
 var app = express();
@@ -45,14 +45,14 @@ app.get('/*', (req, res) => {
   //res.setHeader('Content-Type', 'text/html');
   res.statusCode = 200;
 
-
+  //ARCHIVE-BROWSER Note in the browser version, this is moved to the .html file
   var htm = `
-<script src="/includes/jquery-1.10.2.min.js" type="text/javascript"></script>
-<script src="/includes/bootstrap.min.js" type="text/javascript"></script>
+<script src="//archive.org/includes/jquery-1.10.2.min.js" type="text/javascript"></script>
+<script src="//archive.org/includes/bootstrap.min.js" type="text/javascript"></script>
 <link href="//archive.org/includes/archive.min.css?v=503df4f" rel="stylesheet" type="text/css">
 <script>var archive_setup=[]</script>
-<script src="/includes/node_modules/react/dist/react.js?v=503df4f" type="text/javascript"></script>
-<script src="/includes/node_modules/react-dom/dist/react-dom.js?v=503df4f" type="text/javascript"></script>
+<script src="//archive.org/includes/node_modules/react/dist/react.js?v=503df4f" type="text/javascript"></script>
+<script src="//archive.org/includes/node_modules/react-dom/dist/react-dom.js?v=503df4f" type="text/javascript"></script>
 <script src="//archive.org/includes/archive.min.js" type="text/javascript"></script>
 
 <body class="navia ia-module tiles">
@@ -74,13 +74,14 @@ app.get('/*', (req, res) => {
   var query = req.url.match(/^\/search.php\?query=(.*)/);
   if (query){
     var Search = require('./Search').default;
-    return new Search(res, htm, {query:query[1]});
+    return new Search(res, htm, {query:query[1]}); //TODO-DETAILS note doesnt send banner, check works when banner empty
   }
 
 
   var id = req.url.match(/^\/details\/(.*)/);
   if (id){
     var Details = require('./Details').default;
+    //ARCHIVE-BROWSER Note the return value appears to be irrelevant the result is sent direct to "res"
     return new Details(res, htm, id[1]);
   }
 

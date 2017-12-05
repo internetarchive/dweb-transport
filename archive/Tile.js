@@ -5,7 +5,7 @@ import Util from './Util';
 
 
 export default class {
-  render(item){
+  render(item, onbrowser){
     //xxx shorten/safify certain title usages (compared to Lists.inc)
 
     const collections = (Array.isArray(item.collection) ? item.collection : (typeof(item.collection)=='string' ? [item.collection] : []));
@@ -13,16 +13,26 @@ export default class {
     const nFavorites = collections.filter(e => e.startsWith('fav-')).length;
     const is_collection = (item.mediatype=='collection');
     const classes = 'item-ia' + (is_collection ? ' collection-ia' : '');
-
-    return (
-      <div className={classes} data-id={item.identifier}>
-        <a className="stealth" tabIndex="-1" href={'/details/'+collection}>
+    //ARCHIVE-BROWSER ntoe href and src urls made //archive.org so can run remote
+      //TODO-DETAILS need to intercept links to /details somehow
+      //ARCHIVE-BROWSER added key= to keep react happy (I hope)
+      return (
+      <div className={classes} data-id={item.identifier}  key={item.identifier}>
+        {onbrowser ? (
+        <a className="stealth" tabIndex="-1" onClick={() => Nav.nav_details(collection)}>
           <div className="item-parent">
             <div className="item-parent-img"><img src={'//archive.org/services/img/'+collection}/></div>
             <div className="item-parent-ttl">xxx parent title</div>
           </div>{/*.item-parent*/}
         </a>
-
+        ) : (
+        <a className="stealth" tabIndex="-1" href={'/details/'+collection}>
+            <div className="item-parent">
+            <div className="item-parent-img"><img src={'//archive.org/services/img/'+collection}/></div>
+        <div className="item-parent-ttl">xxx parent title</div>
+        </div>{/*.item-parent*/}
+        </a>
+        ) }
 
         <div className="hidden-tiles views C C1">
           <nobr className="hidden-xs">{Util.number_format(item.downloads)}</nobr>
@@ -32,6 +42,16 @@ export default class {
 
         <div className="C234">
           <div className="item-ttl C C2">
+          { onbrowser ? (
+            <a onClick={() => Nav.nav_details(item.identifier)} title={item.title}>
+              <div className="tile-img">
+                <img className="item-img" xxxstyle="height:180px" src={'//archive.org/services/img/'+item.identifier}/>
+              </div>{/*.tile-img*/}
+              <div className="ttl">
+                {item.title}
+              </div>
+            </a>
+          ) : (
             <a href={'/details/'+item.identifier} title={item.title}>
               <div className="tile-img">
                 <img className="item-img" xxxstyle="height:180px" src={'//archive.org/services/img/'+item.identifier}/>
@@ -40,6 +60,7 @@ export default class {
                 {item.title}
               </div>
             </a>
+            )}
           </div>
 
           <div className="hidden-tiles pubdate C C3">
@@ -75,15 +96,15 @@ export default class {
 
   collection_stats(item){
     return (
-      <div class="collection-stats">
+      <div className="collection-stats">
         {Util.glyph({name:'collection', classes:'topinblock hidden-lists'})}
-        <div class="num-items topinblock">
+        <div className="num-items topinblock">
           0
-          <div class="micro-label">ITEMS</div>
+          <div className="micro-label">ITEMS</div>
         </div>
-        <div class="num-items hidden-tiles">
+        <div className="num-items hidden-tiles">
           {Util.number_format(item.downloads)}
-          <div class="micro-label">VIEWS</div>
+          <div className="micro-label">VIEWS</div>
         </div>
       </div>
     );

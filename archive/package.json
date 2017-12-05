@@ -1,20 +1,32 @@
 {
-  "name":"petaboxJS",
-  "description": "archive.org nodejs experiment needed modules",
-  "author": "tracey",
-  "license": "AGPL-3.0",
-  "engines": {
-    "node": ">=4.3.1"
+  "name": "archive_browser",
+  "version": "1.0.0",
+  "description": "Archive UI to run in Browser based on Tracey's version",
+  "main": "Details.js",
+  "author": {
+    "name": "Mitra Ardron",
+    "email": "mitra@archive.org",
+    "url": "http://www.mitra.biz"
   },
+  "license": "AGPL-3.0",
   "dependencies": {
-    "babel": "",
-    "babel-core": "",
     "babel-preset-es2015": "",
-    "babel-preset-react": "",
-    "express": "",
-    "express-handlebars": "",
-    "react": "15.2.0",
-    "react-dom": "15.2.0",
-    "supervisor": ""
+    "react": "^16.2.0",
+    "react-dom": "^16.2.0"
+  },
+  "devDependencies": {
+    "babel-core": "^6.26.0",
+    "babel-loader": "^7.1.2",
+    "babel-preset-react": "^6.24.1",
+    "browserify": "^14.5.0",
+    "html-webpack-plugin": "^2.30.1",
+    "watchify": "^3.9.0",
+    "webpack": "^3.8.1",
+    "webpack-dev-server": "^2.9.5"
+  },
+  "scripts": {
+    "test": "cd js; node ./test.js",
+    "webpack": "webpack",
+    "server": "webpack-dev-server"
   }
 }
