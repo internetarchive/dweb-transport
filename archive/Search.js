@@ -10,6 +10,7 @@ import ReactDOMServer from 'react-dom/server';
 
 import Nav from './Nav';
 import Tile from './Tile';
+import XXXcollections from './temp_collections'; //TODO-DETAILS just temporary till cors working
 
 export default class {
   constructor(res, htm, {query='*:*', sort='', limit=75, banner=''}={}) {
@@ -19,13 +20,19 @@ export default class {
     this.banner = banner || `<h1>Search: ${query}</h1>`;  // Can be HTML or elements (as returned from JSX compile
     console.log('search for:','http://archive.org/advancedsearch.php?output=json&q='+query+'&rows='+limit+'&sort[]='+sort)
 
-    // talk to SE
-    http.get('http://archive.org/advancedsearch.php?output=json&q='+query+'&rows='+limit+'&sort[]='+sort, (json) => {
+          // talk to SE
+      /*  TODO-DETAILS-CORS just temporary till cors working */
+    http.get('https://archive.org/advancedsearch.php?output=json&q='+query+'&rows='+limit+'&sort[]='+sort, (json) => {
       var body='';
       json.on('data', function(chunk) {
         body += chunk;
       }).on('end', function(){
-        body = JSON.parse(body);
+        body = JSON.parse(body);  //TODO-DETAILS uncomment this line
+      /*
+        let body = XXXcollections[query];
+        if (!body) { console.log("No faked entry for query="+query);}
+        */
+      //End of TODO-DETAILS-CORS temporary cruft
         //console.log(body.response.docs);
 
         _this.items = body.response.docs;
@@ -54,10 +61,10 @@ export default class {
         } else {
             htm += ReactDOMServer.renderToStaticMarkup(els);
               //htm += ReactDOMServer.renderToStaticMarkup(React.createFactory(Nav)(wrap));
-        htm += `
+              htm += `
 <script type="text/javascript">
  $('body').addClass('bgEEE');//xxx
- archive_setup.push(function(){
+  archive_setup.push(function(){
    AJS.lists_v_tiles_setup('search');
    AJS.popState('search');
 
@@ -72,15 +79,17 @@ export default class {
 
    // register for scroll updates (for infinite search results)
    $(window).scroll(AJS.scrolled);
- });
+  });
 </script>
 `;
 
-        res.end(htm);
+            res.end(htm);
           }
         return;
+        /* TODO-DETAILS-CORS uncomment this when cors fixed */
       });
     });
+        /**/
   }
 
 
@@ -88,7 +97,7 @@ export default class {
       if (typeof this.banner === "string") {
           this.banner = ( <div dangerouslySetInnerHTML={{__html: this.banner}}></div> );
       }
-    return (
+      return (
       <div>
           {this.banner}
 

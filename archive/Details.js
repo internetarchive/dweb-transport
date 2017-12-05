@@ -25,7 +25,7 @@ export default class {
     const onbrowser =  res.constructor.name != "ServerResponse"; // For a browser we render to an element, for server feed to a response stream
 
     //TODO-DETAILS would be good to switch to "fetch"
-    http.get('http://archive.org/metadata/'+id, (json) => {
+    http.get('https://archive.org/metadata/'+id, (json) => {
       var body='';
       json.on('data', function(chunk) {
         body += chunk;
@@ -58,7 +58,7 @@ export default class {
                   <div className="col-xs-11 col-sm-10 welcome-left">
                     <div id="file-dropper-wrap">
                       <div id="file-dropper"></div>
-                      <img id="file-dropper-img" className="img-responsive" style={{'maxWidth':350, margin:'0 10px 5px 0'}} src={'//archive.org/services/img/'+id}/>
+                      <img id="file-dropper-img" className="img-responsive" style={{'maxWidth':350, margin:'0 10px 5px 0'}} src={'https://archive.org/services/img/'+id}/>
                     </div>
                     <h1>{item.metadata.title}</h1>
                     <h4>{creator}</h4>
@@ -124,7 +124,7 @@ export default class {
             }
         }
         else if (item.metadata.mediatype=='texts'){
-          wrap += `<iframe width="100%" height="480" src="http://archive.org/stream/${id}?ui=embed#mode/2up"></iframe><br/>`;
+          wrap += `<iframe width="100%" height="480" src="https://archive.org/stream/${id}?ui=embed#mode/2up"></iframe><br/>`;
         }
         //TODO-DETAILS Note both node version and this version handle relative links embedded in the description to other resources badly, but shouldnt html in the description be considered dangerous anyway ?
         wrap += `${item.metadata.description}`; //TODO-DETAILS note this is set dangerously as innerHTML in Nav and since description comes from user could be really bad, should be turned into text node

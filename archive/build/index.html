@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sandbox - subject to change</title>
+    <!-- static html snippet from Main.js, but expanding urls to archive.org-->
+    <!--TODO-DETAILS need to make sure can run from file-->
+    <!--TODO-DETAILS-STAGE2 links should refer to content addressable files-->
+    <script src="https://archive.org//includes/jquery-1.10.2.min.js" type="text/javascript"></script>
+    <script src="https://archive.org//includes/bootstrap.min.js" type="text/javascript"></script>
+    <link href="https://archive.org/includes/archive.min.css?v=503df4f" rel="stylesheet" type="text/css">
+    <script>var archive_setup=[]</script>
+    <script src="https://archive.org//includes/node_modules/react/dist/react.js?v=503df4f" type="text/javascript"></script><!--TODO-DETAIL can prob remove as in packed -->
+    <script src="https://archive.org//includes/node_modules/react-dom/dist/react-dom.js?v=503df4f" type="text/javascript"></script><!--TODO-DETAIL can prob remove as in packed -->
+    <script src="https://archive.org/includes/archive.min.js" type="text/javascript"></script>
+    <!-- sandbox_webpacked.js is the test version of the JS TODO-DETAIL replace with live webpacked version-->
+    <!-- not for serving with webpack server doesnt need build/ but for direct file access it does -->
+    <script type="application/javascript" src="build/sandbox_webpacked.js"></script><!-- packed version of sandbox.js -->
+    <!-- script and style inclusions cant be in body, pulled these from Detail.js TODO-DETAIL could replace with npm modules but will prob use WebTorrent-->
+    <script src="https://archive.org/jw/6.8/jwplayer.js" type="text/javascript"></script>
+    <script src="https://archive.org/includes/play.js" type="text/javascript"></script>
+    <style>
+        #jw6, #jw6__list { backgroundColor:black; }
+    </style>
+    <!-- end of stuff pulled from Detail.js-->
+
+</head>
+<body class="navia ia-module tiles">
+<a href="#maincontent" class="hidden-for-screen-readers">Skip to main content</a>
+<script>
+    $(function(){ $('.navbar [data-toggle="tooltip"]').tooltip({}); });
+</script>
+<!-- End of minimimally edited static html from Main.js-->
+
+<div id="main"></div><!-- destination for part accumulated by Details.js etc as html-->
+<script>
+    //Nav.nav_details("commute");
+    //Nav.nav_details("prelinger"); //TODO-DETAILS fails in advanced-search no cors
+    Nav.nav_details("zandvoort.newspapers.1992.zandvoorts.nieuwsblad"); //Text through book reader
+    //Nav.nav_home();
+</script>
+<script type="text/javascript" src="sandbox_webpacked.js"></script></body>
+</html>
+<!--TODO-DETAILS
+    Handle navigation
+    Have to handle:
+    / or /index -> Home.js 2x in Nav                --- no args
+    /details -> Details.js  3x in Tlles 1x in Nav   --- passes item number after /
+    /search -> Search.js twice in Nav               --- query= parameter
+-->

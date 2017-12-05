@@ -46,14 +46,15 @@ app.get('/*', (req, res) => {
   res.statusCode = 200;
 
   //ARCHIVE-BROWSER Note in the browser version, this is moved to the .html file
+    //TODO-DETAILS-STAGE2 each of the https links becomes a link to a content addressable
   var htm = `
-<script src="//archive.org/includes/jquery-1.10.2.min.js" type="text/javascript"></script>
-<script src="//archive.org/includes/bootstrap.min.js" type="text/javascript"></script>
-<link href="//archive.org/includes/archive.min.css?v=503df4f" rel="stylesheet" type="text/css">
+<script src="https://archive.org/includes/jquery-1.10.2.min.js" type="text/javascript"></script>
+<script src="https://archive.org/includes/bootstrap.min.js" type="text/javascript"></script>
+<link href="https://archive.org/includes/archive.min.css?v=503df4f" rel="stylesheet" type="text/css">
 <script>var archive_setup=[]</script>
-<script src="//archive.org/includes/node_modules/react/dist/react.js?v=503df4f" type="text/javascript"></script>
-<script src="//archive.org/includes/node_modules/react-dom/dist/react-dom.js?v=503df4f" type="text/javascript"></script>
-<script src="//archive.org/includes/archive.min.js" type="text/javascript"></script>
+<script src="https://archive.org/includes/node_modules/react/dist/react.js?v=503df4f" type="text/javascript"></script>
+<script src="https://archive.org/includes/node_modules/react-dom/dist/react-dom.js?v=503df4f" type="text/javascript"></script>
+<script src="https://archive.org/includes/archive.min.js" type="text/javascript"></script>
 
 <body class="navia ia-module tiles">
   <a href="#maincontent" class="hidden-for-screen-readers">Skip to main content</a>

@@ -56,30 +56,52 @@ export default class Nav extends React.Component {
                  })}
 
                 <li className="navbar-brand-li">
+          { onbrowser ? (
+                  <a className="navbar-brand" onClick={()=>Nav.nav_home()} target="_top">
+                    <span className="iconochive-logo"  aria-hidden="true"></span>
+                    <span className="sr-only">logo</span>
+                  </a>
+            ) : (
                   <a className="navbar-brand" href="/" target="_top">
                     <span className="iconochive-logo"  aria-hidden="true"></span>
                     <span className="sr-only">logo</span>
                   </a>
+            ) }
                 </li>
 
                 <li id="nav-search" className="dropdown dropdown-ia pull-right">
+            { onbrowser ? (
+                  <a onClick={() => Nav.nav_search()} >
+                    <span className="iconochive-search" aria-hidden="true"></span>
+                    <span className="sr-only">search</span>
+                  </a>
+            ) : (
                   <a href="/search.php">
                     <span className="iconochive-search" aria-hidden="true"></span>
                     <span className="sr-only">search</span>
                   </a>
+            ) }
                   <div>
+            { onbrowser ? (
+                    <form role="search" onSubmit={() => Nav.nav_search()} target="_top">
+                      <label htmlFor="search-bar-2" className="sr-only">Search the Archive</label>
+                      <input id="search-bar-2" placeholder="Search" type="text" name="query" value=""/>
+                      <input type="submit" value="Search"/>
+                    </form>
+            ) : (
                     <form role="search" action="/search.php" target="_top">
                       <label htmlFor="search-bar-2" className="sr-only">Search the Archive</label>
                       <input id="search-bar-2" placeholder="Search" type="text" name="query" value=""/>
                       <input type="submit" value="Search"/>
                     </form>
+            )}
                   </div>
                 </li>
 
                 <li className="dropdown dropdown-ia pull-right">
                   <a id="glyphme" href="https://archive.org/donate" _target="top"
                      data-toggle="tooltip" data-placement="bottom" title="Donate">
-                    <img src="//archive.org/images/gift.png"/>
+                    <img src="https://archive.org/images/gift.png"/>
                   </a>
                 </li>
 
@@ -113,7 +135,7 @@ export default class Nav extends React.Component {
 
   static nav_search(q) {
         console.log("Navigating to Search");
-        new Search(document.getElementById('main'), htm, {query:q})
+        new Search(document.getElementById('main'), htm, g ? {query:q} : undefined)
   }
     static AJS_on_dom_loaded() {
         /*
