@@ -13,7 +13,7 @@ import Nav from './Nav';
 import Search from './Search';
 
 export default class {
-  constructor(res, htm){
+  constructor(res, htm){ //TODO-DETAILS-FETCH make async Search
     var NOT = ['what_cd','cd','vinyl','librarygenesis','bibalex',  // per alexis
                'movies','audio','texts','software','image','data','web', // per alexis/tracey
                'additional_collections','animationandcartoons','artsandmusicvideos','audio_bookspoetry',
@@ -26,7 +26,7 @@ export default class {
     var Search = require('./Search').default;
     return new Search(res, htm, {sort:'-downloads', banner:'<center style="margin:35px;"><span style="font-size:125px" class="iconochive-logo"></span></center>',
                                  query:'mediatype:collection AND NOT noindex:true AND NOT collection:web AND NOT identifier:fav-* AND NOT identifier:' +
-                                       NOT.join(' AND NOT identifier:')}); //TODO-DETAILS pass banner as JSX
+                                       NOT.join(' AND NOT identifier:')}).fetch(res, htm); //TODO-DETAILS pass banner as JSX
 
   }
 }

@@ -127,15 +127,18 @@ export default class Nav extends React.Component {
         return new Home(document.getElementById('main'), "");
   }
 
-  static nav_details(id) {
+  static async nav_details(id) {
     console.log("Navigating to Details",id);
-    new Details(document.getElementById('main'), "", id); // Gets back a react tree
+    let d = await new Details(id).fetch(); // Gets back a react tree
+    d.render(document.getElementById('main'), "");
     return false; // Dont follow anchor link - unfortunately React ignores this
   }
 
-  static nav_search(q) {
+  static async nav_search(q) {
         console.log("Navigating to Search");
-        new Search(document.getElementById('main'), htm, g ? {query:q} : undefined)
+        let s = await new Search( g ? {query:q} : undefined).fetch();
+        s.render(document.getElementById('main'), "");
+
   }
     static AJS_on_dom_loaded() {
         /*

@@ -7,7 +7,6 @@ import Util from './Util';
 export default class {
   render(item, onbrowser){
     //xxx shorten/safify certain title usages (compared to Lists.inc)
-
     const collections = (Array.isArray(item.collection) ? item.collection : (typeof(item.collection)=='string' ? [item.collection] : []));
     const collection = collections[0];
     const nFavorites = collections.filter(e => e.startsWith('fav-')).length;

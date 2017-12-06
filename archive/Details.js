@@ -13,26 +13,40 @@ import Nav from './Nav';
 import Util from './Util';
 
 
-export default class {
-  constructor(res, htm, id, {}={}){
-    console.log('get metadata for '+id);
-    // talk to Metadata API
-
-    //var http = require('http'); //ARCHIVE-BROWSER These duplicate the imports above
-    //var async = require('async'); //ARCHIVE-BROWSER These duplicate the imports above
+export default class {  //TODO-DETAILS-FETCH expand this and calls to it
+  constructor(id, {}={}) {
+      this.id = id;
+  }
+  async fetch() { // Note almost identical to code on Search.fetch()
+      console.log('get metadata for '+this.id);
+      // talk to Metadata API
+          const _this = this;
+          let response = await fetch(new Request(
+              'https://archive.org/metadata/'+this.id,
+              {
+                  method: 'GET',
+                  headers: new Headers(),
+                  mode: 'cors',
+                  cache: 'default',
+                  redirect: 'follow',  // Chrome defaults to manual
+              }
+          ));
+          if (response.ok) {
+              if (response.headers.get('Content-Type') === "application/json") {
+                  this.item = await response.json(); // response.json is a promise resolving to JSON already parsed
+              } else {
+                  t = response.text(); // promise resolving to text
+                  console.log("Expecting JSON but got",t);
+              }
+          }   // TODO-HTTP may need to handle binary as a buffer instead of text
+          return this; // For chaining, but note will need to do an "await fetch"
+  }
+  async render(res, htm) {
 
     // If res is an HTMLElement we can reasonably assume we are on the browser, but HTMLElement not defined in node, so check if its a ServerResponse
     const onbrowser =  res.constructor.name != "ServerResponse"; // For a browser we render to an element, for server feed to a response stream
 
-    //TODO-DETAILS would be good to switch to "fetch"
-    http.get('https://archive.org/metadata/'+id, (json) => {
-      var body='';
-      json.on('data', function(chunk) {
-        body += chunk;
-      }).on('end', function(){
-        var item = JSON.parse(body);
-        //console.log(item.metadata);
-
+      let item = this.item;
         if (!item.metadata){
 
           els = new Nav('item cannot be found or does not have metadata').render(onbrowser);
@@ -47,8 +61,8 @@ export default class {
         }
 
         if (item.metadata.mediatype=='collection'){
-          var Search = require('./Search').default;
-
+          var Search = require('./Search').default; //TODO-DETAILS move up top
+          //TODO-DETAILS probably move this to the Search class
           const creator = (item.metadata.creator  &&  (item.metadata.creator != item.metadata.title) ? item.metadata.creator : '');
           //ARCHIVE-BROWSER note the elements below were converted to HTML 3 times in original version
           const banner = (
@@ -58,7 +72,7 @@ export default class {
                   <div className="col-xs-11 col-sm-10 welcome-left">
                     <div id="file-dropper-wrap">
                       <div id="file-dropper"></div>
-                      <img id="file-dropper-img" className="img-responsive" style={{'maxWidth':350, margin:'0 10px 5px 0'}} src={'https://archive.org/services/img/'+id}/>
+                      <img id="file-dropper-img" className="img-responsive" style={{'maxWidth':350, margin:'0 10px 5px 0'}} src={'https://archive.org/services/img/'+this.id}/>
                     </div>
                     <h1>{item.metadata.title}</h1>
                     <h4>{creator}</h4>
@@ -74,13 +88,9 @@ export default class {
             </div>
           );
           //ARCHIVE-BROWSER note htm is empty at this point on browser
-          let s = new Search(res, htm, {query:'collection:'+id, sort:'-downloads', banner:banner});
-          if (onbrowser) {
-              Nav.AJS_on_dom_loaded();
-              return undefined;
-          } else {
-              return s;
-          }
+          let s = await new Search({query:'collection:'+this.id, sort:'-downloads', banner:banner}).fetch();
+            s.render(res, htm);
+          return s;
         }
 
         var wrap =`<h1>${item.metadata.title}</h1>`;
@@ -101,8 +111,8 @@ export default class {
           avs.sort((a,b) => Util.natcompare(a.name, b.name));
 
           for (var fi of avs)
-            playlist.push({title:(fi.title ? fi.title : fi.name), sources:[{file:'//archive.org/download/'+id+'/'+fi.name}]});
-          playlist[0].image = '//archive.org/services/img/'+id;
+            playlist.push({title:(fi.title ? fi.title : fi.name), sources:[{file:'//archive.org/download/'+this.id+'/'+fi.name}]});
+          playlist[0].image = 'https://archive.org/services/img/'+this.id;
 
           if (!onbrowser) {
               playlist = JSON.stringify(playlist);
@@ -124,7 +134,7 @@ export default class {
             }
         }
         else if (item.metadata.mediatype=='texts'){
-          wrap += `<iframe width="100%" height="480" src="https://archive.org/stream/${id}?ui=embed#mode/2up"></iframe><br/>`;
+          wrap += `<iframe width="100%" height="480" src="https://archive.org/stream/${this.id}?ui=embed#mode/2up"></iframe><br/>`;
         }
         //TODO-DETAILS Note both node version and this version handle relative links embedded in the description to other resources badly, but shouldnt html in the description be considered dangerous anyway ?
         wrap += `${item.metadata.description}`; //TODO-DETAILS note this is set dangerously as innerHTML in Nav and since description comes from user could be really bad, should be turned into text node
@@ -139,8 +149,6 @@ export default class {
           res.end(htm);
         }
         return; // Note cant return the content here, as its in an event - might be better replacing http.get with fetch and using async promises.
-      });
-    });
   }
 }
 
