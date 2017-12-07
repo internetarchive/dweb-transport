@@ -7,7 +7,6 @@
 // To setup, build, and run -- from this same subdir:
 //   ./run.sh;
 
-// TODO
 //
 const hostname = '127.0.0.1';
 const port = 3000; // use 80 if root/docker, 3000 if out of docker/nonroot
@@ -39,6 +38,7 @@ var ReactDOMServer = require('react-dom/server');
 var React = require('react');
 var ReactDOM = require('react-dom');
 var Nav = require('./Nav').default;
+var Search = require('./Search').default;
 
 
 app.get('/*', (req, res) => {
@@ -46,7 +46,6 @@ app.get('/*', (req, res) => {
   res.statusCode = 200;
 
   //ARCHIVE-BROWSER Note in the browser version, this is moved to the .html file
-    //TODO-DETAILS-STAGE2 each of the https links becomes a link to a content addressable
   var htm = `
 <script src="https://archive.org/includes/jquery-1.10.2.min.js" type="text/javascript"></script>
 <script src="https://archive.org/includes/bootstrap.min.js" type="text/javascript"></script>
@@ -67,14 +66,13 @@ app.get('/*', (req, res) => {
 
 
   if (req.url===''  ||  req.url==='/'  ||  req.url.startsWith('/index.php')){
-    var Home = require('./Home').default;
-    return new Home(res, htm);
+    s = Search.home();
+    s.fetch().then(() => s.render(res, htm));
   }
 
 
   var query = req.url.match(/^\/search.php\?query=(.*)/);
   if (query){
-    var Search = require('./Search').default;
     s = new Search({query:query[1]});
     s.fetch().then(() => s.render(res, htm)); //TODO-DETAILS note doesnt send banner, check works when banner empty
   }

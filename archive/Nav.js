@@ -1,3 +1,4 @@
+import ReactDOM from "react-dom";
 
 require('babel-core/register')({ presets: ['es2015', 'react']}); // ES6 JS below!
 
@@ -6,7 +7,6 @@ require('babel-core/register')({ presets: ['es2015', 'react']}); // ES6 JS below
 import React from 'react';
 import Util from './Util';
 import Search from './Search';
-import Home from './Home';
 import Details from './Details';
 
 
@@ -24,8 +24,6 @@ export default class Nav extends React.Component {
       // TODO-DETAILS removed this from search button as generates error - come back and fix
       //onClick="$(this).parents('#nav-search').find('form').submit(); return false"
       //TODO-DETAILS is putting the description (in 'htm' in as raw html which would be a nasty security hole since that comes from user !
-      //TODO-DETAILS check links to search.php, intersept somehow on browser
-      //TODO-DETAILS need to intercept links to /detail /search etc to nav functions
       return (
       <div id="wrap">
         <div id="navwrap1">
@@ -122,22 +120,34 @@ export default class Nav extends React.Component {
     );
   }
 
-  static nav_home() {
-        console.log("Navigating to Home");
-        return new Home(document.getElementById('main'), "");
+  static clear(destn) {
+      // Clear the screen to give confidence that action under way
+      // Leaves Nav, clears rest
+      ReactDOM.render(new Nav("Loading").render(true), destn);
+  }
+  static async nav_home() {
+    console.log("Navigating to Home");
+      let destn = document.getElementById('main'); // Blank window (except Nav) as loading
+      Nav.clear(destn);
+    let s = await Search.home().fetch();
+    s.render(destn, "");
   }
 
   static async nav_details(id) {
     console.log("Navigating to Details",id);
+    let destn = document.getElementById('main'); // Blank window (except Nav) as loading
+      Nav.clear(destn);
     let d = await new Details(id).fetch(); // Gets back a react tree
-    d.render(document.getElementById('main'), "");
+    d.render(destn, "");
     return false; // Dont follow anchor link - unfortunately React ignores this
   }
 
   static async nav_search(q) {
         console.log("Navigating to Search");
+      let destn = document.getElementById('main'); // Blank window (except Nav) as loading
+      Nav.clear(destn);
         let s = await new Search( g ? {query:q} : undefined).fetch();
-        s.render(document.getElementById('main'), "");
+        s.render(destn, "");
 
   }
     static AJS_on_dom_loaded() {

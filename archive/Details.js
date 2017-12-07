@@ -11,9 +11,10 @@ import ReactDOM from 'react-dom';
 
 import Nav from './Nav';
 import Util from './Util';
+import Search from './Search';
 
 
-export default class {  //TODO-DETAILS-FETCH expand this and calls to it
+export default class Details {
   constructor(id, {}={}) {
       this.id = id;
   }
@@ -61,7 +62,6 @@ export default class {  //TODO-DETAILS-FETCH expand this and calls to it
         }
 
         if (item.metadata.mediatype=='collection'){
-          var Search = require('./Search').default; //TODO-DETAILS move up top
           //TODO-DETAILS probably move this to the Search class
           const creator = (item.metadata.creator  &&  (item.metadata.creator != item.metadata.title) ? item.metadata.creator : '');
           //ARCHIVE-BROWSER note the elements below were converted to HTML 3 times in original version

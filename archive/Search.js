@@ -26,7 +26,7 @@ if (typeof(Window) === "undefined") {
     Request = window.Request;
 }
 
-export default class {
+export default class Search {
   constructor({query='*:*', sort='', limit=75, banner=''}={}) {
       this.query = query;
       this.limit= limit;
@@ -75,7 +75,7 @@ export default class {
         //ARCHIVE-BROWSER - this is run at the end of archive_min.js in node, on browser it has to be run after doing a search 
           if (onbrowser) {
               $('body').addClass('bgEEE');
-              archive_setup.push(function(){
+              archive_setup.push(function(){ //TODO-DETAILS check not pushing on top of existing (it probably is)
                   AJS.lists_v_tiles_setup('search');
                   AJS.popState('search');
 
@@ -136,13 +136,26 @@ export default class {
           <div className="col-xs-12">
             <div id="ikind-search" className="ikind in">
               {this.items.map(function(item, n){
-                 let xxx = new Tile().render(item, onbrowser);
-                  return xxx;
+                 return new Tile().render(item, onbrowser);
                })}
             </div>
           </div>
         </div>
       </div>
     );
+  }
+  static home() {
+      let NOT = ['what_cd','cd','vinyl','librarygenesis','bibalex',  // per alexis
+          'movies','audio','texts','software','image','data','web', // per alexis/tracey
+          'additional_collections','animationandcartoons','artsandmusicvideos','audio_bookspoetry',
+          'audio_foreign','audio_music','audio_news','audio_podcast','audio_religion','audio_tech',
+          'computersandtechvideos','coverartarchive','culturalandacademicfilms','ephemera',
+          'gamevideos','inlibrary','moviesandfilms','newsandpublicaffairs','ourmedia',
+          'radioprograms','samples_only','spiritualityandreligion','stream_only',
+          'television','test_collection','usgovfilms','vlogs','youth_media'];
+
+      return new Search({sort:'-downloads', banner:'<center style="margin:35px;"><span style="font-size:125px" class="iconochive-logo"></span></center>',
+          query:'mediatype:collection AND NOT noindex:true AND NOT collection:web AND NOT identifier:fav-* AND NOT identifier:' +
+          NOT.join(' AND NOT identifier:')}); //TODO-DETAILS pass banner as JSX
   }
 }
