@@ -2,12 +2,12 @@
 //ARCHIVE-BROWSER the HTMLWebPackPlugin seems to be what configures what webpack serves on localhost:8080
 var HTMLWebpackPlugin = require('html-webpack-plugin');
 var HTMLWebpackPluginConfig = new HTMLWebpackPlugin({
-    template: __dirname + '/sandbox.html',
+    template: __dirname + '/archive.html',
     inject: 'body'
 });
 
 module.exports = {
-    entry: __dirname + '/sandbox.js',
+    entry: __dirname + '/archive.js',
     module: {
         loaders: [
             {
@@ -18,7 +18,7 @@ module.exports = {
         ]
     },
     output: {
-        filename: 'sandbox_webpacked.js',
+        filename: 'archive_webpacked.js',
         path: __dirname + '/build'
     },
     plugins: [HTMLWebpackPluginConfig]

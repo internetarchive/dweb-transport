@@ -6895,7 +6895,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 
 var React = __webpack_require__(2);
 var ReactDOM = __webpack_require__(13);
-//TODO-DETAILS these could be 'var Home' but need to be able to find in sandbox.html for now
+//TODO-DETAILS these could be 'var Home' but need to be able to find in index.html for now
 var Details = __webpack_require__(28).default;
 var Search = __webpack_require__(20).default;
 var Nav = __webpack_require__(18).default;

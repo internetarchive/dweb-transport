@@ -1,6 +1,6 @@
 var React = require('react');
 var ReactDOM = require('react-dom');
-//TODO-DETAILS these could be 'var Home' but need to be able to find in sandbox.html for now
+//TODO-DETAILS these could be 'var Home' but need to be able to find in index.html for now
 var Details = require('./Details').default;
 var Search = require('./Search').default;
 var Nav = require('./Nav').default;

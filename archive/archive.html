@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Sandbox - subject to change</title>
+    <title>Internet Archive - in the browser</title>
     <!-- static html snippet from Main.js, but expanding urls to archive.org-->
     <!--TODO-DETAILS-STAGE2 links should refer to content addressable files-->
     <script src="https://archive.org//includes/jquery-1.10.2.min.js" type="text/javascript"></script>
@@ -13,10 +13,10 @@
     <script src="https://archive.org//includes/node_modules/react/dist/react.js?v=503df4f" type="text/javascript"></script>
     <!--<script src="https://archive.org//includes/node_modules/react-dom/dist/react-dom.js?v=503df4f" type="text/javascript"></script><!--removed as in packed -->
     <script src="https://archive.org/includes/archive.min.js" type="text/javascript"></script>
-    <!-- sandbox_webpacked.js is the test version of the JS TODO-DETAIL replace with live webpacked version-->
+    <!-- archive_webpacked.js is the test version of the JS TODO-DETAIL replace with live webpacked version-->
     <!-- not for serving with webpack server doesnt need build/ but for direct file access it does -->
     <!-- script and style inclusions cant be in body, pulled these from Detail.js TODO-DETAIL could replace with npm modules but will prob use WebTorrent-->
-    <script type="application/javascript" src="build/sandbox_webpacked.js"></script><!-- packed version of sandbox.js -->
+    <script type="application/javascript" src="build/archive_webpacked.js"></script><!-- packed version of archive.js -->
     <script src="https://archive.org/jw/6.8/jwplayer.js" type="text/javascript"></script>
     <script src="https://archive.org/includes/play.js" type="text/javascript"></script>
     <style>
@@ -35,9 +35,18 @@
 <div id="main"></div><!-- destination for part accumulated by Details.js etc as html-->
 <script>
     //Nav.nav_details("commute");
-    Nav.nav_details("prelinger"); //TODO-DETAILS fails in advanced-search no cors
+    //Nav.nav_details("prelinger"); //TODO-DETAILS fails in advanced-search no cors
     //Nav.nav_details("zandvoort.newspapers.1992.zandvoorts.nieuwsblad"); //Text through book reader
     //Nav.nav_home();
+    var searchparams = new URL(window.location.href).searchParams;
+    var item = searchparams.get("item");
+    var verbose = searchparams.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)
+    if (item) {
+        Nav.nav_details(item);
+    } else {
+        Nav.nav_home();
+    }
+
 </script>
 </body>
 </html>
