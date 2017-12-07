@@ -2588,8 +2588,12 @@ if (typeof Window === "undefined") {
         this.banner = banner || `<h1>Search: ${query}</h1>`; // Can be HTML or elements (as returned from JSX compile //TODO-DETAILS-FETCH banner could move to render via fetch
         console.log('search for:', 'http://archive.org/advancedsearch.php?output=json&q=' + query + '&rows=' + limit + '&sort[]=' + sort);
     }
-    async xxxfetch() {
-        let response = await fetch(new Request('https://archive.org/advancedsearch.php?output=json&q=' + this.query + '&rows=' + this.limit + '&sort[]=' + this.sort, {
+    async fetch() {
+        let response = await fetch(new Request( // Note almost identical code on Details.js and Search.js
+        //'https://archive.org/advancedsearch.php?output=json&q='
+        'https://gateway.dweb.me/metadata/advancedsearch?output=json&q=' // Go through gateway at dweb.me because of CORS issues (approved by Sam!)
+        //'http://localhost:4244/metadata/advancedsearch?output=json&q='    // When testing
+        + this.query + '&rows=' + this.limit + '&sort[]=' + this.sort, {
             method: 'GET',
             headers: new Headers(),
             mode: 'cors',
@@ -2598,16 +2602,16 @@ if (typeof Window === "undefined") {
         }));
         if (response.ok) {
             if (response.headers.get('Content-Type') === "application/json") {
-                j = await response.json(); // response.json is a promise resolving to JSON already parsed
+                let j = await response.json(); // response.json is a promise resolving to JSON already parsed
                 this.items = j.response.docs;
             } else {
-                t = response.text(); // promise resolving to text
+                let t = response.text(); // promise resolving to text
                 console.log("Expecting JSON but got", t);
             }
         } // TODO-HTTP may need to handle binary as a buffer instead of text
         return this; // For chaining, but note will need to do an "await fetch"
     }
-    async fetch() {
+    async xxxfetch() {
         //TODO-DETAIL-CORS replace with above when CORS fixed
         this.items = __WEBPACK_IMPORTED_MODULE_5__temp_collections__["default"][this.query].response.docs;
         if (!this.items) {
@@ -3885,7 +3889,8 @@ __webpack_require__(7)({ presets: ['es2015', 'react'] }); // ES6 JS below!
     console.log('get metadata for ' + this.id);
     // talk to Metadata API
     const _this = this;
-    let response = await fetch(new Request('https://archive.org/metadata/' + this.id, {
+    let response = await fetch(new Request( // Note almost identical code on Details.js and Search.js
+    'https://archive.org/metadata/' + this.id, {
       method: 'GET',
       headers: new Headers(),
       mode: 'cors',
@@ -4028,7 +4033,7 @@ __webpack_require__(7)({ presets: ['es2015', 'react'] }); // ES6 JS below!
       //htm += ReactDOMServer.renderToStaticMarkup(React.createFactory(Nav)(wrap));
       res.end(htm);
     }
-    return; // Note cant return the content here, as its in an event - might be better replacing http.get with fetch and using async promises.
+    return; // Note cant return the content here, as its in an event
   }
 });
 

@@ -21,7 +21,7 @@ export default class {  //TODO-DETAILS-FETCH expand this and calls to it
       console.log('get metadata for '+this.id);
       // talk to Metadata API
           const _this = this;
-          let response = await fetch(new Request(
+          let response = await fetch(new Request(  // Note almost identical code on Details.js and Search.js
               'https://archive.org/metadata/'+this.id,
               {
                   method: 'GET',
@@ -148,7 +148,7 @@ export default class {  //TODO-DETAILS-FETCH expand this and calls to it
           //htm += ReactDOMServer.renderToStaticMarkup(React.createFactory(Nav)(wrap));
           res.end(htm);
         }
-        return; // Note cant return the content here, as its in an event - might be better replacing http.get with fetch and using async promises.
+        return; // Note cant return the content here, as its in an event
   }
 }
 

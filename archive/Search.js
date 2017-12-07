@@ -34,9 +34,12 @@ export default class {
       this.banner = banner || `<h1>Search: ${query}</h1>`;  // Can be HTML or elements (as returned from JSX compile //TODO-DETAILS-FETCH banner could move to render via fetch
       console.log('search for:', 'http://archive.org/advancedsearch.php?output=json&q=' + query + '&rows=' + limit + '&sort[]=' + sort)
   }
-  async xxxfetch() {
-      let response = await fetch(new Request(
-          'https://archive.org/advancedsearch.php?output=json&q=' + this.query + '&rows=' + this.limit + '&sort[]=' + this.sort,
+  async fetch() {
+      let response = await fetch(new Request(   // Note almost identical code on Details.js and Search.js
+          //'https://archive.org/advancedsearch.php?output=json&q='
+          'https://gateway.dweb.me/metadata/advancedsearch?output=json&q='          // Go through gateway at dweb.me because of CORS issues (approved by Sam!)
+          //'http://localhost:4244/metadata/advancedsearch?output=json&q='    // When testing
+          + this.query + '&rows=' + this.limit + '&sort[]=' + this.sort,
           {
               method: 'GET',
               headers: new Headers(),
@@ -47,16 +50,16 @@ export default class {
       ));
       if (response.ok) {
           if (response.headers.get('Content-Type') === "application/json") {
-              j = await response.json(); // response.json is a promise resolving to JSON already parsed
+              let j = await response.json(); // response.json is a promise resolving to JSON already parsed
               this.items = j.response.docs;
           } else {
-              t = response.text(); // promise resolving to text
+              let t = response.text(); // promise resolving to text
               console.log("Expecting JSON but got",t);
           }
       }   // TODO-HTTP may need to handle binary as a buffer instead of text
       return this; // For chaining, but note will need to do an "await fetch"
   }
-  async fetch() { //TODO-DETAIL-CORS replace with above when CORS fixed
+  async xxxfetch() { //TODO-DETAIL-CORS replace with above when CORS fixed
       this.items = XXXcollections[this.query].response.docs;
       if (!this.items) {
           console.log("No faked entry for query=" + this.query);
