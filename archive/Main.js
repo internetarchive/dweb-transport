@@ -40,6 +40,7 @@ var ReactDOM = require('react-dom');
 var Nav = require('./Nav').default;
 var Search = require('./Search').default;
 
+var verbose = false;
 
 app.get('/*', (req, res) => {
   //res.setHeader('Content-Type', 'text/html');

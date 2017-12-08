@@ -7,7 +7,6 @@ import ReactDOMServer from 'react-dom/server';
 
 import Nav from './Nav';
 import Tile from './Tile';
-import XXXcollections from './temp_collections'; //TODO-DETAILS-FETCH just temporary till cors working
 
 /* Section to ensure node and browser able to use Headers, Request and Fetch */
 var fetch,Headers,Request;
@@ -31,7 +30,7 @@ export default class Search {
       this.query = query;
       this.limit= limit;
       this.sort = sort;
-      this.banner = banner || `<h1>Search: ${query}</h1>`;  // Can be HTML or elements (as returned from JSX compile //TODO-DETAILS-FETCH banner could move to render via fetch
+      this.banner = banner || `<h1>Search: ${query}</h1>`;  // Can be HTML or elements (as returned from JSX compile
       console.log('search for:', 'http://archive.org/advancedsearch.php?output=json&q=' + query + '&rows=' + limit + '&sort[]=' + sort)
   }
   async fetch() {
@@ -58,13 +57,6 @@ export default class Search {
           }
       }   // TODO-HTTP may need to handle binary as a buffer instead of text
       return this; // For chaining, but note will need to do an "await fetch"
-  }
-  async xxxfetch() { //TODO-DETAIL-CORS replace with above when CORS fixed
-      this.items = XXXcollections[this.query].response.docs;
-      if (!this.items) {
-          console.log("No faked entry for query=" + this.query);
-      }
-      return this;
   }
   render(res, htm) {
       const onbrowser = res.constructor.name != "ServerResponse"; // For a browser we render to an element, for server feed to a response stream
@@ -119,8 +111,6 @@ export default class Search {
             res.end(htm);
           }
           return;
-        /* TODO-DETAILS-FETCH uncomment this when cors fixed */
-        /**/
   }
 
 
@@ -135,7 +125,7 @@ export default class Search {
         <div className="row">
           <div className="col-xs-12">
             <div id="ikind-search" className="ikind in">
-              {this.items.map(function(item, n){
+              {this.items.map(function(item, n){ // Note rendering tiles is quick, its the fetch of the img (async) which is slow.
                  return new Tile().render(item, onbrowser);
                })}
             </div>

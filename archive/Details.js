@@ -12,6 +12,7 @@ import ReactDOM from 'react-dom';
 import Nav from './Nav';
 import Util from './Util';
 import Search from './Search';
+import template_image from './template_image';
 
 
 export default class Details {
@@ -45,9 +46,9 @@ export default class Details {
   async render(res, htm) {
 
     // If res is an HTMLElement we can reasonably assume we are on the browser, but HTMLElement not defined in node, so check if its a ServerResponse
-    const onbrowser =  res.constructor.name != "ServerResponse"; // For a browser we render to an element, for server feed to a response stream
-
+    const onbrowser =  res.constructor.name !== "ServerResponse"; // For a browser we render to an element, for server feed to a response stream
       let item = this.item;
+      if (verbose) console.log(`render mediatype = ${item.metadata.mediatype}`)
         if (!item.metadata){
 
           els = new Nav('item cannot be found or does not have metadata').render(onbrowser);
@@ -62,7 +63,7 @@ export default class Details {
         }
 
         if (item.metadata.mediatype=='collection'){
-          //TODO-DETAILS probably move this to the Search class
+          //TODO-DETAILS probably move this to the Search class but leave till use the approach taken in template_image.js
           const creator = (item.metadata.creator  &&  (item.metadata.creator != item.metadata.title) ? item.metadata.creator : '');
           //ARCHIVE-BROWSER note the elements below were converted to HTML 3 times in original version
           const banner = (
@@ -119,7 +120,7 @@ export default class Details {
               cfg = JSON.stringify(cfg);
           }
 
-          wrap += `<div id="jw6"></div>`;
+          wrap += `<div id="jw6"></div>`;   //TODO-FETCH try building this as JSX for consistency.
           //ARCHIVE-BROWSER made urls absolute
             if (!onbrowser) { // onbrowser its statically included in the html and Play will be run later
                 htm += `
@@ -136,13 +137,21 @@ export default class Details {
         else if (item.metadata.mediatype=='texts'){
           wrap += `<iframe width="100%" height="480" src="https://archive.org/stream/${this.id}?ui=embed#mode/2up"></iframe><br/>`;
         }
-        //TODO-DETAILS Note both node version and this version handle relative links embedded in the description to other resources badly, but shouldnt html in the description be considered dangerous anyway ?
-        wrap += `${item.metadata.description}`; //TODO-DETAILS note this is set dangerously as innerHTML in Nav and since description comes from user could be really bad, should be turned into text node
-
+        else if (item.metadata.mediatype === 'image') {
+            wrap = template_image(item);
+            archive_setup.push(function () {
+                AJS.theatresize();
+                AJS.carouselsize('#ia-carousel', true);
+            });
+        } else {
+            //TODO-DETAILS Note both node version and this version handle relative links embedded in the description to other resources badly, but shouldnt html in the description be considered dangerous anyway ?
+            wrap += `${item.metadata.description}`; //TODO-DETAILS note this is set dangerously as innerHTML in Nav and since description comes from user could be really bad, should be turned into text node
+        }
         let els = new Nav(wrap).render(onbrowser); // temp store for debugging
         if(onbrowser) {
             ReactDOM.render(els, res); // Client - put in node supplies
             Play('jw6', playlist, cfg);
+            Nav.AJS_on_dom_loaded(); // Runs code pushed archive_setup - needed for image
         } else { // Presume its the HTMLResponse, could explicitly check class if new what it was?
           htm += ReactDOMServer.renderToStaticMarkup(els);
           //htm += ReactDOMServer.renderToStaticMarkup(React.createFactory(Nav)(wrap));
@@ -151,26 +160,3 @@ export default class Details {
         return; // Note cant return the content here, as its in an event
   }
 }
-
-
-
-
-
-    /*
-    exports.handler = function(req, res) {
-      async.parallel([
-        function(callback) {
-          var url = 'http://archive.org/metadata/'+id;
-          request(url, function(err, response, body) {
-            if(err) { console.log(err); callback(true); return; }
-            obj = JSON.parse(body);
-            callback(false, obj);
-          });
-        }],
-        // get results
-        function(err, results) {
-          if(err) { console.log(err); res.send(500,"Server Error"); return; }
-          res.send({api1:results[0], api2:results[1]});
-        });
-    };
-*/
