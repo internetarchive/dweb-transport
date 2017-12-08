@@ -63,7 +63,7 @@ export default class Details {
         }
 
         if (item.metadata.mediatype=='collection'){
-          //TODO-DETAILS probably move this to the Search class but leave till use the approach taken in template_image.js
+          //TODO-DETAILS probably move this to the Search class after move to use the approach taken in template_image.js
           const creator = (item.metadata.creator  &&  (item.metadata.creator != item.metadata.title) ? item.metadata.creator : '');
           //ARCHIVE-BROWSER note the elements below were converted to HTML 3 times in original version
           const banner = (
@@ -109,7 +109,7 @@ export default class Details {
           // reduce array down to array of just filenames
           //avs = avs.map(val => val.name);
 
-          avs.sort((a,b) => Util.natcompare(a.name, b.name));
+          avs.sort((a,b) => Util.natcompare(a.name, b.name));   //Unsure why sorting names, presumably tracks are named alphabetically ?
 
           for (var fi of avs)
             playlist.push({title:(fi.title ? fi.title : fi.name), sources:[{file:'//archive.org/download/'+this.id+'/'+fi.name}]});
@@ -122,7 +122,7 @@ export default class Details {
 
           wrap += `<div id="jw6"></div>`;   //TODO-FETCH try building this as JSX for consistency.
           //ARCHIVE-BROWSER made urls absolute
-            if (!onbrowser) { // onbrowser its statically included in the html and Play will be run later
+            if (!onbrowser) { // onbrowser its statically included in the html and Play will be run later  //TODO-DETAILS-NODE move to seperate function?
                 htm += `
           <script src="//archive.org/jw/6.8/jwplayer.js" type="text/javascript"></script>
           <script src="//archive.org/includes/play.js" type="text/javascript"></script>
@@ -137,9 +137,9 @@ export default class Details {
         else if (item.metadata.mediatype=='texts'){
           wrap += `<iframe width="100%" height="480" src="https://archive.org/stream/${this.id}?ui=embed#mode/2up"></iframe><br/>`;
         }
-        else if (item.metadata.mediatype === 'image') {
-            wrap = template_image(item);
-            archive_setup.push(function () {
+        else if (item.metadata.mediatype === 'image') { //TODO-DETAILS this is the new approach to embedding a mediatype - to gradually replace inline way in this file.
+            wrap = template_image(item);    // Apply the item to a template, returns a JSX tree suitable for wrapping in Nav
+            archive_setup.push(function () {    //TODO-DETAILS check this isn't being left on archive_setup for next image etc
                 AJS.theatresize();
                 AJS.carouselsize('#ia-carousel', true);
             });
@@ -157,6 +157,6 @@ export default class Details {
           //htm += ReactDOMServer.renderToStaticMarkup(React.createFactory(Nav)(wrap));
           res.end(htm);
         }
-        return; // Note cant return the content here, as its in an event
+        return; // Note cant return the content here, as content loaded asynchronously
   }
 }
