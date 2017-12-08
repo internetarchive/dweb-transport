@@ -3414,63 +3414,76 @@ class Search {
         } // TODO-HTTP may need to handle binary as a buffer instead of text
         return this; // For chaining, but note will need to do an "await fetch"
     }
+    nodehtm_before() {
+        /* Return htm to insert before Nav wrapped part for use in node*/
+        return "";
+    }
+    nodehtm_after() {
+        /* Return htm to insert before Nav wrapped part for use in node*/
+        return `
+            <script type="text/javascript">
+             $('body').addClass('bgEEE');//xxx
+              archive_setup.push(function(){
+               AJS.lists_v_tiles_setup('search');
+               AJS.popState('search');
+            
+               $('div.ikind').css({visibility:'visible'});
+            
+               AJS.tiler('#ikind-search');
+            
+               $(window).on('resize  orientationchange', function(evt){
+                 clearTimeout(AJS.node_search_throttler);
+                 AJS.node_search_throttler = setTimeout(AJS.tiler, 250);
+               });
+            
+               // register for scroll updates (for infinite search results)
+               $(window).scroll(AJS.scrolled);
+              });
+            </script>
+        `;
+    }
+    browser_before() {
+        $('body').addClass('bgEEE');
+        archive_setup.push(function () {
+            //TODO-DETAILS check not pushing on top of existing (it probably is)
+            AJS.lists_v_tiles_setup('search');
+            AJS.popState('search');
+
+            $('div.ikind').css({ visibility: 'visible' });
+
+            AJS.tiler('#ikind-search');
+
+            $(window).on('resize  orientationchange', function (evt) {
+                clearTimeout(AJS.node_search_throttler);
+                AJS.node_search_throttler = setTimeout(AJS.tiler, 250);
+            });
+        });
+    }
+    browser_after() {
+        __WEBPACK_IMPORTED_MODULE_3__Nav__["default"].AJS_on_dom_loaded(); // Runs code pushed archive_setup
+    }
     render(res, htm) {
         const onbrowser = res.constructor.name != "ServerResponse"; // For a browser we render to an element, for server feed to a response stream
-        var wrap = this.renderinnav(onbrowser); //ARCHIVE-BROWSER remove unneccessary convert back to HTML and reconversion inside Nav.render
+        var els = this.navwrapped(onbrowser); //ARCHIVE-BROWSER remove unneccessary convert back to HTML and reconversion inside Nav.render
 
-
-        let els = new __WEBPACK_IMPORTED_MODULE_3__Nav__["default"](wrap).render(onbrowser);
-        //ARCHIVE-BROWSER - this is run at the end of archive_min.js in node, on browser it has to be run after doing a search 
+        //ARCHIVE-BROWSER - this is run at the end of archive_min.js in node, on browser it has to be run after doing a search
         if (onbrowser) {
-            $('body').addClass('bgEEE');
-            archive_setup.push(function () {
-                //TODO-DETAILS check not pushing on top of existing (it probably is)
-                AJS.lists_v_tiles_setup('search');
-                AJS.popState('search');
-
-                $('div.ikind').css({ visibility: 'visible' });
-
-                AJS.tiler('#ikind-search');
-
-                $(window).on('resize  orientationchange', function (evt) {
-                    clearTimeout(AJS.node_search_throttler);
-                    AJS.node_search_throttler = setTimeout(AJS.tiler, 250);
-                });
-            });
+            this.browser_before();
             __WEBPACK_IMPORTED_MODULE_0_react_dom___default.a.render(els, res); // Client - put in node supplies
-            __WEBPACK_IMPORTED_MODULE_3__Nav__["default"].AJS_on_dom_loaded(); // Runs code pushed archive_setup
+            this.browser_after();
         } else {
+            htm += this.nodehtm_before();
             htm += __WEBPACK_IMPORTED_MODULE_2_react_dom_server___default.a.renderToStaticMarkup(els);
-            //htm += ReactDOMServer.renderToStaticMarkup(React.createFactory(Nav)(wrap));
-            htm += `
-<script type="text/javascript">
- $('body').addClass('bgEEE');//xxx
-  archive_setup.push(function(){
-   AJS.lists_v_tiles_setup('search');
-   AJS.popState('search');
-
-   $('div.ikind').css({visibility:'visible'});
-
-   AJS.tiler('#ikind-search');
-
-   $(window).on('resize  orientationchange', function(evt){
-     clearTimeout(AJS.node_search_throttler);
-     AJS.node_search_throttler = setTimeout(AJS.tiler, 250);
-   });
-
-   // register for scroll updates (for infinite search results)
-   $(window).scroll(AJS.scrolled);
-  });
-</script>
-`;
-
+            htm += this.nodehtm_after();
             res.end(htm);
         }
-        return;
     }
 
-    renderinnav(onbrowser) {
-        // Intended for the inner part of a Nav() call.
+    jsxInNav(onbrowser) {
+        /* The main part of the details or search page containing the content
+        onbrowser:    true if rendering in browser, false if in node on server
+        returns:      JSX elements tree suitable for passing to new Nav(wrap)
+         */
         if (typeof this.banner === "string") {
             this.banner = __WEBPACK_IMPORTED_MODULE_1_react___default.a.createElement('div', { dangerouslySetInnerHTML: { __html: this.banner } });
         }
@@ -3495,6 +3508,13 @@ class Search {
                 )
             )
         );
+    }
+    navwrapped(onbrowser) {
+        /* Wrap the content up in a Nav
+        onbrowser:    true if rendering in browser, false if in node on server
+        returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
+         */
+        return new __WEBPACK_IMPORTED_MODULE_3__Nav__["default"](this.jsxInNav(onbrowser)).render(onbrowser);
     }
     static home() {
         let NOT = ['what_cd', 'cd', 'vinyl', 'librarygenesis', 'bibalex', // per alexis
@@ -3940,7 +3960,7 @@ class Details {
     }
 
     if (item.metadata.mediatype == 'collection') {
-      //TODO-DETAILS probably move this to the Search class but leave till use the approach taken in template_image.js
+      //TODO-DETAILS probably move this to the Search class after move to use the approach taken in template_image.js
       const creator = item.metadata.creator && item.metadata.creator != item.metadata.title ? item.metadata.creator : '';
       //ARCHIVE-BROWSER note the elements below were converted to HTML 3 times in original version
       const banner = __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
@@ -3986,7 +4006,7 @@ class Details {
         )
       );
       //ARCHIVE-BROWSER note htm is empty at this point on browser
-      let s = await new __WEBPACK_IMPORTED_MODULE_7__Search__["default"]({ query: 'collection:' + this.id, sort: '-downloads', banner: banner }).fetch();
+      let s = await new __WEBPACK_IMPORTED_MODULE_7__Search__["default"]({ query: 'collection:' + this.id, sort: '-downloads', banner: banner }).fetch(); //TODO-DETAILS banner should probably pass to render, not to constructor.
       s.render(res, htm);
       return s;
     }
@@ -4005,7 +4025,7 @@ class Details {
       // reduce array down to array of just filenames
       //avs = avs.map(val => val.name);
 
-      avs.sort((a, b) => __WEBPACK_IMPORTED_MODULE_6__Util__["a" /* default */].natcompare(a.name, b.name));
+      avs.sort((a, b) => __WEBPACK_IMPORTED_MODULE_6__Util__["a" /* default */].natcompare(a.name, b.name)); //Unsure why sorting names, presumably tracks are named alphabetically ?
 
       for (var fi of avs) playlist.push({ title: fi.title ? fi.title : fi.name, sources: [{ file: '//archive.org/download/' + this.id + '/' + fi.name }] });
       playlist[0].image = 'https://archive.org/services/img/' + this.id;
@@ -4018,7 +4038,7 @@ class Details {
       wrap += `<div id="jw6"></div>`; //TODO-FETCH try building this as JSX for consistency.
       //ARCHIVE-BROWSER made urls absolute
       if (!onbrowser) {
-        // onbrowser its statically included in the html and Play will be run later
+        // onbrowser its statically included in the html and Play will be run later  //TODO-DETAILS-NODE move to seperate function?
         htm += `
           <script src="//archive.org/jw/6.8/jwplayer.js" type="text/javascript"></script>
           <script src="//archive.org/includes/play.js" type="text/javascript"></script>
@@ -4032,8 +4052,10 @@ class Details {
     } else if (item.metadata.mediatype == 'texts') {
       wrap += `<iframe width="100%" height="480" src="https://archive.org/stream/${this.id}?ui=embed#mode/2up"></iframe><br/>`;
     } else if (item.metadata.mediatype === 'image') {
-      wrap = Object(__WEBPACK_IMPORTED_MODULE_8__template_image__["a" /* default */])(item);
+      //TODO-DETAILS this is the new approach to embedding a mediatype - to gradually replace inline way in this file.
+      wrap = Object(__WEBPACK_IMPORTED_MODULE_8__template_image__["a" /* default */])(item); // Apply the item to a template, returns a JSX tree suitable for wrapping in Nav
       archive_setup.push(function () {
+        //TODO-DETAILS check this isn't being left on archive_setup for next image etc
         AJS.theatresize();
         AJS.carouselsize('#ia-carousel', true);
       });
@@ -4052,7 +4074,7 @@ class Details {
       //htm += ReactDOMServer.renderToStaticMarkup(React.createFactory(Nav)(wrap));
       res.end(htm);
     }
-    return; // Note cant return the content here, as its in an event
+    return; // Note cant return the content here, as content loaded asynchronously
   }
 }
 /* harmony export (immutable) */ __webpack_exports__["default"] = Details;

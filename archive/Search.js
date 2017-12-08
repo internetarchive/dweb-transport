@@ -58,81 +58,101 @@ export default class Search {
       }   // TODO-HTTP may need to handle binary as a buffer instead of text
       return this; // For chaining, but note will need to do an "await fetch"
   }
-  render(res, htm) {
-      const onbrowser = res.constructor.name != "ServerResponse"; // For a browser we render to an element, for server feed to a response stream
-        var wrap = this.renderinnav(onbrowser);  //ARCHIVE-BROWSER remove unneccessary convert back to HTML and reconversion inside Nav.render
-
-
-        let els = new Nav(wrap).render(onbrowser);
-        //ARCHIVE-BROWSER - this is run at the end of archive_min.js in node, on browser it has to be run after doing a search 
-          if (onbrowser) {
-              $('body').addClass('bgEEE');
-              archive_setup.push(function(){ //TODO-DETAILS check not pushing on top of existing (it probably is)
-                  AJS.lists_v_tiles_setup('search');
-                  AJS.popState('search');
-
-                  $('div.ikind').css({visibility:'visible'});
-
-                  AJS.tiler('#ikind-search');
-
-                  $(window).on('resize  orientationchange', function(evt){
-                      clearTimeout(AJS.node_search_throttler);
-                      AJS.node_search_throttler = setTimeout(AJS.tiler, 250);
-                  });
-
+  nodehtm_before() {
+      /* Return htm to insert before Nav wrapped part for use in node*/
+      return ""
+  }
+  nodehtm_after() {
+      /* Return htm to insert before Nav wrapped part for use in node*/
+      return `
+            <script type="text/javascript">
+             $('body').addClass('bgEEE');//xxx
+              archive_setup.push(function(){
+               AJS.lists_v_tiles_setup('search');
+               AJS.popState('search');
+            
+               $('div.ikind').css({visibility:'visible'});
+            
+               AJS.tiler('#ikind-search');
+            
+               $(window).on('resize  orientationchange', function(evt){
+                 clearTimeout(AJS.node_search_throttler);
+                 AJS.node_search_throttler = setTimeout(AJS.tiler, 250);
+               });
+            
+               // register for scroll updates (for infinite search results)
+               $(window).scroll(AJS.scrolled);
               });
-            ReactDOM.render(els, res); // Client - put in node supplies
-            Nav.AJS_on_dom_loaded(); // Runs code pushed archive_setup
-          } else {
-            htm += ReactDOMServer.renderToStaticMarkup(els);
-              //htm += ReactDOMServer.renderToStaticMarkup(React.createFactory(Nav)(wrap));
-              htm += `
-<script type="text/javascript">
- $('body').addClass('bgEEE');//xxx
-  archive_setup.push(function(){
-   AJS.lists_v_tiles_setup('search');
-   AJS.popState('search');
+            </script>
+        `
+  }
+  browser_before() {
+      $('body').addClass('bgEEE');
+      archive_setup.push(function(){ //TODO-DETAILS check not pushing on top of existing (it probably is)
+          AJS.lists_v_tiles_setup('search');
+          AJS.popState('search');
 
-   $('div.ikind').css({visibility:'visible'});
+          $('div.ikind').css({visibility:'visible'});
 
-   AJS.tiler('#ikind-search');
+          AJS.tiler('#ikind-search');
 
-   $(window).on('resize  orientationchange', function(evt){
-     clearTimeout(AJS.node_search_throttler);
-     AJS.node_search_throttler = setTimeout(AJS.tiler, 250);
-   });
+          $(window).on('resize  orientationchange', function(evt){
+              clearTimeout(AJS.node_search_throttler);
+              AJS.node_search_throttler = setTimeout(AJS.tiler, 250);
+          });
+      });
+  }
+  browser_after() {
+      Nav.AJS_on_dom_loaded(); // Runs code pushed archive_setup
+  }
+  render(res, htm) {
+    const onbrowser = res.constructor.name != "ServerResponse"; // For a browser we render to an element, for server feed to a response stream
+    var els = this.navwrapped(onbrowser);  //ARCHIVE-BROWSER remove unneccessary convert back to HTML and reconversion inside Nav.render
 
-   // register for scroll updates (for infinite search results)
-   $(window).scroll(AJS.scrolled);
-  });
-</script>
-`;
-
-            res.end(htm);
-          }
-          return;
+    //ARCHIVE-BROWSER - this is run at the end of archive_min.js in node, on browser it has to be run after doing a search
+    if (onbrowser) {
+        this.browser_before();
+        ReactDOM.render(els, res);
+        this.browser_after();
+    } else {
+        htm += this.nodehtm_before();
+        htm += ReactDOMServer.renderToStaticMarkup(els);
+        htm += this.nodehtm_after();
+        res.end(htm);
+    }
   }
 
 
-  renderinnav(onbrowser){ // Intended for the inner part of a Nav() call.
+  jsxInNav(onbrowser){
+      /* The main part of the details or search page containing the content
+      onbrowser:    true if rendering in browser, false if in node on server
+      returns:      JSX elements tree suitable for passing to new Nav(wrap)
+       */
       if (typeof this.banner === "string") {
-          this.banner = ( <div dangerouslySetInnerHTML={{__html: this.banner}}></div> );
+          this.banner = ( <div dangerouslySetInnerHTML={{__html: this.banner}}></div> ); //TODO-DETAILS probably a security issue inherited from Tracys code as banner could contain user-generated html
       }
       return (
-      <div>
-          {this.banner}
+          <div>
+              {this.banner}
 
-        <div className="row">
-          <div className="col-xs-12">
-            <div id="ikind-search" className="ikind in">
-              {this.items.map(function(item, n){ // Note rendering tiles is quick, its the fetch of the img (async) which is slow.
-                 return new Tile().render(item, onbrowser);
-               })}
+            <div className="row">
+              <div className="col-xs-12">
+                <div id="ikind-search" className="ikind in">
+                  {this.items.map(function(item, n){ // Note rendering tiles is quick, its the fetch of the img (async) which is slow.
+                     return new Tile().render(item, onbrowser);
+                   })}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-    );
+        );
+  }
+  navwrapped(onbrowser) {
+      /* Wrap the content up in a Nav
+      onbrowser:    true if rendering in browser, false if in node on server
+      returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
+       */
+      return new Nav(this.jsxInNav(onbrowser)).render(onbrowser);
   }
   static home() {
       let NOT = ['what_cd','cd','vinyl','librarygenesis','bibalex',  // per alexis

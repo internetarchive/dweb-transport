@@ -89,7 +89,7 @@ export default class Details {
             </div>
           );
           //ARCHIVE-BROWSER note htm is empty at this point on browser
-          let s = await new Search({query:'collection:'+this.id, sort:'-downloads', banner:banner}).fetch();
+          let s = await new Search({query:'collection:'+this.id, sort:'-downloads', banner:banner}).fetch();  //TODO-DETAILS banner should probably pass to render, not to constructor.
             s.render(res, htm);
           return s;
         }
