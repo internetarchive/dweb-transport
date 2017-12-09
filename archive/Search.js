@@ -5,6 +5,7 @@ import React from 'react';
 require('babel-core/register')({ presets: ['es2015', 'react']}); // ES6 JS below!
 import ReactDOMServer from 'react-dom/server';
 
+import ArchiveBase from './Details'
 import Nav from './Nav';
 import Tile from './Tile';
 
@@ -30,7 +31,6 @@ export default class Search {
       this.query = query;
       this.limit= limit;
       this.sort = sort;
-      this.banner = banner || `<h1>Search: ${query}</h1>`;  // Can be HTML or elements (as returned from JSX compile
       console.log('search for:', 'http://archive.org/advancedsearch.php?output=json&q=' + query + '&rows=' + limit + '&sort[]=' + sort)
   }
   async fetch() {
@@ -58,11 +58,11 @@ export default class Search {
       }   // TODO-HTTP may need to handle binary as a buffer instead of text
       return this; // For chaining, but note will need to do an "await fetch"
   }
-  nodehtm_before() {
+  nodeHtmlBefore() {
       /* Return htm to insert before Nav wrapped part for use in node*/
       return ""
   }
-  nodehtm_after() {
+  nodeHtmlAfter() {
       /* Return htm to insert before Nav wrapped part for use in node*/
       return `
             <script type="text/javascript">
@@ -86,7 +86,7 @@ export default class Search {
             </script>
         `
   }
-  browser_before() {
+  browserBefore() {
       $('body').addClass('bgEEE');
       archive_setup.push(function(){ //TODO-DETAILS check not pushing on top of existing (it probably is)
           AJS.lists_v_tiles_setup('search');
@@ -102,7 +102,7 @@ export default class Search {
           });
       });
   }
-  browser_after() {
+  browserAfter() {
       Nav.AJS_on_dom_loaded(); // Runs code pushed archive_setup
   }
   render(res, htm) {
@@ -111,29 +111,31 @@ export default class Search {
 
     //ARCHIVE-BROWSER - this is run at the end of archive_min.js in node, on browser it has to be run after doing a search
     if (onbrowser) {
-        this.browser_before();
+        this.browserBefore();
         ReactDOM.render(els, res);
-        this.browser_after();
+        this.browserAfter();
     } else {
-        htm += this.nodehtm_before();
+        htm += this.nodeHtmlBefore();
         htm += ReactDOMServer.renderToStaticMarkup(els);
-        htm += this.nodehtm_after();
+        htm += this.nodeHtmlAfter();
         res.end(htm);
     }
   }
 
+  banner() {
+      return (
+          <h1>Search: {query}</h1>
+      );
+  }
 
   jsxInNav(onbrowser){
       /* The main part of the details or search page containing the content
       onbrowser:    true if rendering in browser, false if in node on server
       returns:      JSX elements tree suitable for passing to new Nav(wrap)
        */
-      if (typeof this.banner === "string") {
-          this.banner = ( <div dangerouslySetInnerHTML={{__html: this.banner}}></div> ); //TODO-DETAILS probably a security issue inherited from Tracys code as banner could contain user-generated html
-      }
       return (
           <div>
-              {this.banner}
+              {this.banner()}
 
             <div className="row">
               <div className="col-xs-12">
@@ -153,19 +155,5 @@ export default class Search {
       returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
        */
       return new Nav(this.jsxInNav(onbrowser)).render(onbrowser);
-  }
-  static home() {
-      let NOT = ['what_cd','cd','vinyl','librarygenesis','bibalex',  // per alexis
-          'movies','audio','texts','software','image','data','web', // per alexis/tracey
-          'additional_collections','animationandcartoons','artsandmusicvideos','audio_bookspoetry',
-          'audio_foreign','audio_music','audio_news','audio_podcast','audio_religion','audio_tech',
-          'computersandtechvideos','coverartarchive','culturalandacademicfilms','ephemera',
-          'gamevideos','inlibrary','moviesandfilms','newsandpublicaffairs','ourmedia',
-          'radioprograms','samples_only','spiritualityandreligion','stream_only',
-          'television','test_collection','usgovfilms','vlogs','youth_media'];
-
-      return new Search({sort:'-downloads', banner:'<center style="margin:35px;"><span style="font-size:125px" class="iconochive-logo"></span></center>',
-          query:'mediatype:collection AND NOT noindex:true AND NOT collection:web AND NOT identifier:fav-* AND NOT identifier:' +
-          NOT.join(' AND NOT identifier:')}); //TODO-DETAILS pass banner as JSX
   }
 }

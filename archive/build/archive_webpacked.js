@@ -2946,13 +2946,353 @@ module.exports = hyphenateStyleName;
 
 "use strict";
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_http__ = __webpack_require__(53);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_http___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_http__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_async__ = __webpack_require__(74);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_async___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1_async__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_react__ = __webpack_require__(2);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_react___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_2_react__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_react_dom_server__ = __webpack_require__(40);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_react_dom_server___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_3_react_dom_server__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_react_dom__ = __webpack_require__(13);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_react_dom___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_4_react_dom__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__Nav__ = __webpack_require__(19);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__Util__ = __webpack_require__(20);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__Search__ = __webpack_require__(21);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__template_image__ = __webpack_require__(78);
+
+__webpack_require__(8)({ presets: ['es2015', 'react'] }); // ES6 JS below!
+
+
+
+
+//Not needed on client - kept so script can run in both cases
+
+//Next line is for client, not needed on server but doesnt hurt
+
+
+
+
+
+
+
+//TODO-DETAILS-REFACTOR
+//- Details (minimal factory)
+//   factory to create, does the item fetch then checks mediatype and creates one of the others.
+// -- Movie
+// -- Search
+// --- Collection
+
+class Details {
+    constructor(id, {} = {}) {
+        this.id = id;
+    }
+    async fetch() {
+        // Note almost identical to code on Search.fetch()
+        console.log('get metadata for ' + this.id);
+        // talk to Metadata API
+        const _this = this;
+        let response = await fetch(new Request( // Note almost identical code on Details.js and Search.js
+        'https://archive.org/metadata/' + this.id, {
+            method: 'GET',
+            headers: new Headers(),
+            mode: 'cors',
+            cache: 'default',
+            redirect: 'follow' // Chrome defaults to manual
+        }));
+        if (response.ok) {
+            if (response.headers.get('Content-Type') === "application/json") {
+                this.item = await response.json(); // response.json is a promise resolving to JSON already parsed
+            } else {
+                t = response.text(); // promise resolving to text
+                console.log("Expecting JSON but got", t); //TODO-DETAILS-REFACTOR throw error here
+            }
+        } // TODO-HTTP may need to handle binary as a buffer instead of text
+        return this; // For chaining, but note will need to do an "await fetch"
+    }
+    static async factory(itemid, res, htm) {
+        if (!itemid) {
+            (await new Home(itemid, undefined).fetch()).render(res, htm);
+        } else {
+            let obj = await new Details(itemid).fetch();
+            item = obj.item;
+            if (!item.metadata) {
+                new DetailsError(itemid, item, `item ${itemid} cannot be found or does not have metadata`).render(res, htm); //TODO-DETAILS test
+            } else {
+                if (verbose) console.log("Found mediatype", item.metadata.mediatype);
+                switch (item.metadata.mediatype) {
+                    case "collection":
+                        //TODO-DETAILS-REFACTOR
+                        return (await new Collection(itemid, item).fetch()).render(res, htm);
+                        break;
+                    case "texts":
+                        new Texts(itemid, item).render(res, htm);
+                        break;
+                    case "image":
+                        new Image(itemid, item).render(res, htm);
+                        break;
+                    case "movies":
+                        new AV(itemid, item).render(res, htm);
+                        break;
+                    default:
+                        new DetailsError(itemid, item, `Unsupported mediatype: ${item.metadata.mediatype}`).render(res, htm); //TODO-DETAILS test
+                    //    return new Nav(")
+                }
+            }
+        }
+    }
+
+    jsxInNav(onbrowser) {}
+
+    navwrapped(onbrowser) {
+        /* Wrap the content up in a Nav
+        onbrowser:    true if rendering in browser, false if in node on server
+        returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
+         */
+        return new __WEBPACK_IMPORTED_MODULE_5__Nav__["default"](this.jsxInNav(onbrowser)).render(onbrowser);
+    }
+
+    browserBefore() {
+        // Nothing to do by default
+    }
+    browserAfter() {
+        __WEBPACK_IMPORTED_MODULE_5__Nav__["default"].AJS_on_dom_loaded(); // Runs code pushed archive_setup - needed for image
+    }
+    nodeHtmlBefore() {
+        return "";
+    }
+    nodeHtmlAfter() {
+        return "";
+    }
+    render(res, htm) {
+        const onbrowser = res.constructor.name != "ServerResponse"; // For a browser we render to an element, for server feed to a response stream
+        var els = this.navwrapped(onbrowser); //ARCHIVE-BROWSER remove unneccessary convert back to HTML and reconversion inside Nav.render
+
+        //ARCHIVE-BROWSER - this is run at the end of archive_min.js in node, on browser it has to be run after doing a search
+        if (onbrowser) {
+            this.browserBefore();
+            __WEBPACK_IMPORTED_MODULE_4_react_dom___default.a.render(els, res);
+            this.browserAfter();
+        } else {
+            htm += this.nodeHtmlBefore();
+            htm += __WEBPACK_IMPORTED_MODULE_3_react_dom_server___default.a.renderToStaticMarkup(els);
+            htm += this.nodeHtmlAfter();
+            res.end(htm);
+        }
+    }
+}
+/* harmony export (immutable) */ __webpack_exports__["default"] = Details;
+
+
+class DetailsError extends Details {
+    constructor(itemid, item, message) {
+        super(itemid);
+        this.item = item;
+        this.message = message;
+    }
+    jsxInNav(onbrowser) {
+        return this.message;
+    }
+    render(res, htm) {
+        const onbrowser = res.constructor.name != "ServerResponse"; // For a browser we render to an element, for server feed to a response stream
+        if (!onbrowser) {
+            res.statusCode = 500;
+        }
+        super.render(res, htm);
+    }
+}
+
+class Image extends Details {
+    //TODO-DETAILS this is the new approach to embedding a mediatype - to gradually replace inline way in this file.
+    //TODO-REFACTOR merge this into the template_image.js file
+    constructor(itemid, item) {
+        super(itemid);
+        this.item = item;
+    }
+
+    jsxInNav(onbrowser) {
+        return Object(__WEBPACK_IMPORTED_MODULE_8__template_image__["a" /* default */])(item); // Apply the item to a template, returns a JSX tree suitable for wrapping in Nav
+    }
+    browserAfter() {
+        archive_setup.push(function () {
+            //TODO-DETAILS check this isn't being left on archive_setup for next image etc
+            AJS.theatresize();
+            AJS.carouselsize('#ia-carousel', true);
+        });
+        super.browserAfter();
+    }
+}
+class Texts extends Details {
+    constructor(itemid, item) {
+        super(itemid);
+        this.item = item;
+    }
+    jsxInNav(onbrowser) {
+        //TODO-DETAILS redo this to use a template, note div outside iframe is just to keep JSX happy
+        let item = this.item;
+        return __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
+            'div',
+            null,
+            __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement('iframe', { width: '100%', height: '480', src: `https://archive.org/stream/${this.id}?ui=embed#mode/2up` }),
+            __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement('br', null),
+            __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement('div', { dangerouslySetInnerHTML: { __html: item.metadata.description } }),
+            ' '
+        );
+    }
+}
+
+class AV extends Details {
+    constructor(itemid, item) {
+        super(itemid);
+        this.item = item;
+    }
+    nodeHtmlBefore() {
+        playlist = JSON.stringify(this.playlist);
+        cfg = JSON.stringify(this.cfg);
+        return `
+          <script src="//archive.org/jw/6.8/jwplayer.js" type="text/javascript"></script>
+          <script src="//archive.org/includes/play.js" type="text/javascript"></script>
+          <script>
+            $(function(){ Play('jw6', ${playlist}, ${cfg}); });
+          </script>
+          <style>
+            #jw6, #jw6__list { backgroundColor:black; }
+          </style>`;
+    }
+    browserAfter() {
+        super.browserAfter();
+        Play('jw6', this.playlist, this.cfg);
+    }
+    jsxInNav(onbrowser) {
+        let item = this.item;
+        this.playlist = [];
+        let cfg = {};
+        let avs = item.files.filter(fi => fi.format == 'h.264' || fi.format == '512Kb MPEG4');
+        if (!avs.length) avs = item.files.filter(fi => fi.format == 'VBR MP3');
+        cfg.aspectratio = 4 / 3;
+
+        if (avs.length) {
+
+            // reduce array down to array of just filenames
+            //avs = avs.map(val => val.name);
+
+            avs.sort((a, b) => __WEBPACK_IMPORTED_MODULE_6__Util__["a" /* default */].natcompare(a.name, b.name)); //Unsure why sorting names, presumably tracks are named alphabetically ?
+            for (var fi of avs) //TODO-DETAILS make this a map (note its tougher than it looks!)
+            this.playlist.push({ title: fi.title ? fi.title : fi.name, sources: [{ file: 'https://archive.org/download/' + this.id + '/' + fi.name }] });
+            this.playlist[0].image = 'https://archive.org/services/img/' + this.id;
+        }
+        //TODO-DETAILS redo using a template - note outer div just to keep JSX happy
+        return __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
+            'div',
+            null,
+            __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
+                'h1',
+                null,
+                item.metadata.title
+            ),
+            avs.length ? __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement('div', { id: 'jw6' }) : undefined,
+            __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement('div', { dangerouslySetInnerHTML: { __html: item.metadata.description } }),
+            ' '
+        );
+    }
+
+}
+class Collection extends __WEBPACK_IMPORTED_MODULE_7__Search__["default"] {
+    constructor(itemid, item) {
+        super({
+            query: 'collection:' + itemid,
+            sort: '-downloads'
+        });
+        this.item = item;
+        this.itemid = itemid;
+    }
+
+    banner() {
+        item = this.item;
+        //TODO-DETAILS probably move this to the Search class after move to use the approach taken in template_image.js
+        const creator = item.metadata.creator && item.metadata.creator != item.metadata.title ? item.metadata.creator : '';
+        //ARCHIVE-BROWSER note the elements below were converted to HTML 3 times in original version
+        //TODO-DETAILS on prelinger, banner description is getting truncated.
+        return __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
+            'div',
+            { className: 'welcome container container-ia width-max', style: { 'backgroundColor': 'white' } },
+            __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
+                'div',
+                { className: 'container' },
+                __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
+                    'div',
+                    { className: 'row' },
+                    __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
+                        'div',
+                        { className: 'col-xs-11 col-sm-10 welcome-left' },
+                        __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
+                            'div',
+                            { id: 'file-dropper-wrap' },
+                            __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement('div', { id: 'file-dropper' }),
+                            __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement('img', { id: 'file-dropper-img', className: 'img-responsive', style: { 'maxWidth': 350, margin: '0 10px 5px 0' }, src: 'https://archive.org/services/img/' + this.id })
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
+                            'h1',
+                            null,
+                            item.metadata.title
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
+                            'h4',
+                            null,
+                            creator
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
+                            'div',
+                            { id: 'descript', style: { 'maxHeight': 43, cursor: 'pointer' } },
+                            item.metadata.description
+                        )
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
+                        'div',
+                        { className: 'col-xs-1 col-sm-2 welcome-right' },
+                        'xxx'
+                    )
+                )
+            )
+        );
+    }
+}
+class Home extends __WEBPACK_IMPORTED_MODULE_7__Search__["default"] {
+    constructor(itemid, item) {
+        const NOT = ['what_cd', 'cd', 'vinyl', 'librarygenesis', 'bibalex', // per alexis
+        'movies', 'audio', 'texts', 'software', 'image', 'data', 'web', // per alexis/tracey
+        'additional_collections', 'animationandcartoons', 'artsandmusicvideos', 'audio_bookspoetry', 'audio_foreign', 'audio_music', 'audio_news', 'audio_podcast', 'audio_religion', 'audio_tech', 'computersandtechvideos', 'coverartarchive', 'culturalandacademicfilms', 'ephemera', 'gamevideos', 'inlibrary', 'moviesandfilms', 'newsandpublicaffairs', 'ourmedia', 'radioprograms', 'samples_only', 'spiritualityandreligion', 'stream_only', 'television', 'test_collection', 'usgovfilms', 'vlogs', 'youth_media'];
+
+        const query = 'mediatype:collection AND NOT noindex:true AND NOT collection:web AND NOT identifier:fav-* AND NOT identifier:' + NOT.join(' AND NOT identifier:');
+        super({
+            query: query,
+            sort: '-downloads'
+        });
+        this.item = item;
+        this.itemid = itemid;
+    }
+    banner() {
+        return __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
+            'center',
+            { style: { margin: "35px" } },
+            __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement('span', { style: { fontSize: "125px" }, className: 'iconochive-logo' })
+        );
+    }
+}
+
+/***/ }),
+/* 19 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_react_dom__ = __webpack_require__(13);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_react_dom___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_react_dom__);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_react__ = __webpack_require__(2);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_react___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1_react__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Util__ = __webpack_require__(19);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Search__ = __webpack_require__(20);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__Details__ = __webpack_require__(28);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Util__ = __webpack_require__(20);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Search__ = __webpack_require__(21);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__Details__ = __webpack_require__(18);
 
 
 __webpack_require__(8)({ presets: ['es2015', 'react'] }); // ES6 JS below!
@@ -3137,18 +3477,15 @@ class Nav extends __WEBPACK_IMPORTED_MODULE_1_react___default.a.Component {
   }
   static async nav_home() {
     console.log("Navigating to Home");
-    let destn = document.getElementById('main'); // Blank window (except Nav) as loading
-    Nav.clear(destn);
-    let s = await __WEBPACK_IMPORTED_MODULE_3__Search__["default"].home().fetch();
-    s.render(destn, "");
+    return await Nav.nav_details(undefined);
   }
 
   static async nav_details(id) {
     console.log("Navigating to Details", id);
     let destn = document.getElementById('main'); // Blank window (except Nav) as loading
     Nav.clear(destn);
-    let d = await new __WEBPACK_IMPORTED_MODULE_4__Details__["default"](id).fetch(); // Gets back a react tree
-    d.render(destn, "");
+    //let d = await new Details(id).fetch(); // Gets back a obj fetched and ready to render
+    await __WEBPACK_IMPORTED_MODULE_4__Details__["default"].factory(id, destn, ""); // Not sure what returning ....
     return false; // Dont follow anchor link - unfortunately React ignores this
   }
 
@@ -3191,7 +3528,7 @@ class Nav extends __WEBPACK_IMPORTED_MODULE_1_react___default.a.Component {
 
 
 /***/ }),
-/* 19 */
+/* 20 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -3343,7 +3680,7 @@ function isWhitespaceChar(B) {
 };
 
 /***/ }),
-/* 20 */
+/* 21 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -3354,13 +3691,15 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_react___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1_react__);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_react_dom_server__ = __webpack_require__(40);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_react_dom_server___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_2_react_dom_server__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Nav__ = __webpack_require__(18);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__Tile__ = __webpack_require__(77);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Details__ = __webpack_require__(18);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__Nav__ = __webpack_require__(19);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__Tile__ = __webpack_require__(77);
 
 
 //ARCHIVE-BROWSER ReactDOMServer Not needed for browser, left in to allow use in both browser & Node/Server
 
 __webpack_require__(8)({ presets: ['es2015', 'react'] }); // ES6 JS below!
+
 
 
 
@@ -3388,7 +3727,6 @@ class Search {
         this.query = query;
         this.limit = limit;
         this.sort = sort;
-        this.banner = banner || `<h1>Search: ${query}</h1>`; // Can be HTML or elements (as returned from JSX compile
         console.log('search for:', 'http://archive.org/advancedsearch.php?output=json&q=' + query + '&rows=' + limit + '&sort[]=' + sort);
     }
     async fetch() {
@@ -3414,11 +3752,11 @@ class Search {
         } // TODO-HTTP may need to handle binary as a buffer instead of text
         return this; // For chaining, but note will need to do an "await fetch"
     }
-    nodehtm_before() {
+    nodeHtmlBefore() {
         /* Return htm to insert before Nav wrapped part for use in node*/
         return "";
     }
-    nodehtm_after() {
+    nodeHtmlAfter() {
         /* Return htm to insert before Nav wrapped part for use in node*/
         return `
             <script type="text/javascript">
@@ -3442,7 +3780,7 @@ class Search {
             </script>
         `;
     }
-    browser_before() {
+    browserBefore() {
         $('body').addClass('bgEEE');
         archive_setup.push(function () {
             //TODO-DETAILS check not pushing on top of existing (it probably is)
@@ -3459,8 +3797,8 @@ class Search {
             });
         });
     }
-    browser_after() {
-        __WEBPACK_IMPORTED_MODULE_3__Nav__["default"].AJS_on_dom_loaded(); // Runs code pushed archive_setup
+    browserAfter() {
+        __WEBPACK_IMPORTED_MODULE_4__Nav__["default"].AJS_on_dom_loaded(); // Runs code pushed archive_setup
     }
     render(res, htm) {
         const onbrowser = res.constructor.name != "ServerResponse"; // For a browser we render to an element, for server feed to a response stream
@@ -3468,15 +3806,24 @@ class Search {
 
         //ARCHIVE-BROWSER - this is run at the end of archive_min.js in node, on browser it has to be run after doing a search
         if (onbrowser) {
-            this.browser_before();
-            __WEBPACK_IMPORTED_MODULE_0_react_dom___default.a.render(els, res); // Client - put in node supplies
-            this.browser_after();
+            this.browserBefore();
+            __WEBPACK_IMPORTED_MODULE_0_react_dom___default.a.render(els, res);
+            this.browserAfter();
         } else {
-            htm += this.nodehtm_before();
+            htm += this.nodeHtmlBefore();
             htm += __WEBPACK_IMPORTED_MODULE_2_react_dom_server___default.a.renderToStaticMarkup(els);
-            htm += this.nodehtm_after();
+            htm += this.nodeHtmlAfter();
             res.end(htm);
         }
+    }
+
+    banner() {
+        return __WEBPACK_IMPORTED_MODULE_1_react___default.a.createElement(
+            'h1',
+            null,
+            'Search: ',
+            query
+        );
     }
 
     jsxInNav(onbrowser) {
@@ -3484,13 +3831,10 @@ class Search {
         onbrowser:    true if rendering in browser, false if in node on server
         returns:      JSX elements tree suitable for passing to new Nav(wrap)
          */
-        if (typeof this.banner === "string") {
-            this.banner = __WEBPACK_IMPORTED_MODULE_1_react___default.a.createElement('div', { dangerouslySetInnerHTML: { __html: this.banner } });
-        }
         return __WEBPACK_IMPORTED_MODULE_1_react___default.a.createElement(
             'div',
             null,
-            this.banner,
+            this.banner(),
             __WEBPACK_IMPORTED_MODULE_1_react___default.a.createElement(
                 'div',
                 { className: 'row' },
@@ -3502,7 +3846,7 @@ class Search {
                         { id: 'ikind-search', className: 'ikind in' },
                         this.items.map(function (item, n) {
                             // Note rendering tiles is quick, its the fetch of the img (async) which is slow.
-                            return new __WEBPACK_IMPORTED_MODULE_4__Tile__["a" /* default */]().render(item, onbrowser);
+                            return new __WEBPACK_IMPORTED_MODULE_5__Tile__["a" /* default */]().render(item, onbrowser);
                         })
                     )
                 )
@@ -3514,22 +3858,14 @@ class Search {
         onbrowser:    true if rendering in browser, false if in node on server
         returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
          */
-        return new __WEBPACK_IMPORTED_MODULE_3__Nav__["default"](this.jsxInNav(onbrowser)).render(onbrowser);
-    }
-    static home() {
-        let NOT = ['what_cd', 'cd', 'vinyl', 'librarygenesis', 'bibalex', // per alexis
-        'movies', 'audio', 'texts', 'software', 'image', 'data', 'web', // per alexis/tracey
-        'additional_collections', 'animationandcartoons', 'artsandmusicvideos', 'audio_bookspoetry', 'audio_foreign', 'audio_music', 'audio_news', 'audio_podcast', 'audio_religion', 'audio_tech', 'computersandtechvideos', 'coverartarchive', 'culturalandacademicfilms', 'ephemera', 'gamevideos', 'inlibrary', 'moviesandfilms', 'newsandpublicaffairs', 'ourmedia', 'radioprograms', 'samples_only', 'spiritualityandreligion', 'stream_only', 'television', 'test_collection', 'usgovfilms', 'vlogs', 'youth_media'];
-
-        return new Search({ sort: '-downloads', banner: '<center style="margin:35px;"><span style="font-size:125px" class="iconochive-logo"></span></center>',
-            query: 'mediatype:collection AND NOT noindex:true AND NOT collection:web AND NOT identifier:fav-* AND NOT identifier:' + NOT.join(' AND NOT identifier:') }); //TODO-DETAILS pass banner as JSX
+        return new __WEBPACK_IMPORTED_MODULE_4__Nav__["default"](this.jsxInNav(onbrowser)).render(onbrowser);
     }
 }
 /* harmony export (immutable) */ __webpack_exports__["default"] = Search;
 
 
 /***/ }),
-/* 21 */
+/* 22 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3568,7 +3904,7 @@ var ExecutionEnvironment = {
 module.exports = ExecutionEnvironment;
 
 /***/ }),
-/* 22 */
+/* 23 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3649,7 +3985,7 @@ module.exports = EventListener;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 23 */
+/* 24 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3691,7 +4027,7 @@ function getActiveElement(doc) /*?DOMElement*/{
 module.exports = getActiveElement;
 
 /***/ }),
-/* 24 */
+/* 25 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3762,7 +4098,7 @@ function shallowEqual(objA, objB) {
 module.exports = shallowEqual;
 
 /***/ }),
-/* 25 */
+/* 26 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3805,7 +4141,7 @@ function containsNode(outerNode, innerNode) {
 module.exports = containsNode;
 
 /***/ }),
-/* 26 */
+/* 27 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3835,7 +4171,7 @@ function focusNode(node) {
 module.exports = focusNode;
 
 /***/ }),
-/* 27 */
+/* 28 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3876,209 +4212,6 @@ function camelizeStyleName(string) {
 }
 
 module.exports = camelizeStyleName;
-
-/***/ }),
-/* 28 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_http__ = __webpack_require__(53);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_http___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_http__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_async__ = __webpack_require__(74);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_async___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1_async__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_react__ = __webpack_require__(2);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_react___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_2_react__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_react_dom_server__ = __webpack_require__(40);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_react_dom_server___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_3_react_dom_server__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_react_dom__ = __webpack_require__(13);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_react_dom___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_4_react_dom__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__Nav__ = __webpack_require__(18);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__Util__ = __webpack_require__(19);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__Search__ = __webpack_require__(20);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__template_image__ = __webpack_require__(78);
-
-__webpack_require__(8)({ presets: ['es2015', 'react'] }); // ES6 JS below!
-
-
-
-
-//Not needed on client - kept so script can run in both cases
-
-//Next line is for client, not needed on server but doesnt hurt
-
-
-
-
-
-
-
-class Details {
-  constructor(id, {} = {}) {
-    this.id = id;
-  }
-  async fetch() {
-    // Note almost identical to code on Search.fetch()
-    console.log('get metadata for ' + this.id);
-    // talk to Metadata API
-    const _this = this;
-    let response = await fetch(new Request( // Note almost identical code on Details.js and Search.js
-    'https://archive.org/metadata/' + this.id, {
-      method: 'GET',
-      headers: new Headers(),
-      mode: 'cors',
-      cache: 'default',
-      redirect: 'follow' // Chrome defaults to manual
-    }));
-    if (response.ok) {
-      if (response.headers.get('Content-Type') === "application/json") {
-        this.item = await response.json(); // response.json is a promise resolving to JSON already parsed
-      } else {
-        t = response.text(); // promise resolving to text
-        console.log("Expecting JSON but got", t);
-      }
-    } // TODO-HTTP may need to handle binary as a buffer instead of text
-    return this; // For chaining, but note will need to do an "await fetch"
-  }
-  async render(res, htm) {
-
-    // If res is an HTMLElement we can reasonably assume we are on the browser, but HTMLElement not defined in node, so check if its a ServerResponse
-    const onbrowser = res.constructor.name !== "ServerResponse"; // For a browser we render to an element, for server feed to a response stream
-    let item = this.item;
-    if (verbose) console.log(`render mediatype = ${item.metadata.mediatype}`);
-    if (!item.metadata) {
-
-      els = new __WEBPACK_IMPORTED_MODULE_5__Nav__["default"]('item cannot be found or does not have metadata').render(onbrowser);
-      if (onbrowser) {
-        __WEBPACK_IMPORTED_MODULE_4_react_dom___default.a.render(els, res); // Client - put in node supplied
-      } else {
-        res.statusCode = 500;
-        htm += __WEBPACK_IMPORTED_MODULE_3_react_dom_server___default.a.renderToStaticMarkup(els);
-        res.end(htm);
-      }
-      return;
-    }
-
-    if (item.metadata.mediatype == 'collection') {
-      //TODO-DETAILS probably move this to the Search class after move to use the approach taken in template_image.js
-      const creator = item.metadata.creator && item.metadata.creator != item.metadata.title ? item.metadata.creator : '';
-      //ARCHIVE-BROWSER note the elements below were converted to HTML 3 times in original version
-      const banner = __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
-        'div',
-        { className: 'welcome container container-ia width-max', style: { 'backgroundColor': 'white' } },
-        __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
-          'div',
-          { className: 'container' },
-          __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
-            'div',
-            { className: 'row' },
-            __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
-              'div',
-              { className: 'col-xs-11 col-sm-10 welcome-left' },
-              __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
-                'div',
-                { id: 'file-dropper-wrap' },
-                __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement('div', { id: 'file-dropper' }),
-                __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement('img', { id: 'file-dropper-img', className: 'img-responsive', style: { 'maxWidth': 350, margin: '0 10px 5px 0' }, src: 'https://archive.org/services/img/' + this.id })
-              ),
-              __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
-                'h1',
-                null,
-                item.metadata.title
-              ),
-              __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
-                'h4',
-                null,
-                creator
-              ),
-              __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
-                'div',
-                { id: 'descript', style: { 'maxHeight': 43, cursor: 'pointer' } },
-                item.metadata.description
-              )
-            ),
-            __WEBPACK_IMPORTED_MODULE_2_react___default.a.createElement(
-              'div',
-              { className: 'col-xs-1 col-sm-2 welcome-right' },
-              'xxx'
-            )
-          )
-        )
-      );
-      //ARCHIVE-BROWSER note htm is empty at this point on browser
-      let s = await new __WEBPACK_IMPORTED_MODULE_7__Search__["default"]({ query: 'collection:' + this.id, sort: '-downloads', banner: banner }).fetch(); //TODO-DETAILS banner should probably pass to render, not to constructor.
-      s.render(res, htm);
-      return s;
-    }
-
-    var wrap = `<h1>${item.metadata.title}</h1>`;
-
-    var avs = [];
-    var cfg = {};
-    avs = item.files.filter(fi => fi.format == 'h.264' || fi.format == '512Kb MPEG4');
-    if (!avs.length) avs = item.files.filter(fi => fi.format == 'VBR MP3');
-    cfg.aspectratio = 4 / 3;
-
-    if (avs.length) {
-      var playlist = [];
-
-      // reduce array down to array of just filenames
-      //avs = avs.map(val => val.name);
-
-      avs.sort((a, b) => __WEBPACK_IMPORTED_MODULE_6__Util__["a" /* default */].natcompare(a.name, b.name)); //Unsure why sorting names, presumably tracks are named alphabetically ?
-
-      for (var fi of avs) playlist.push({ title: fi.title ? fi.title : fi.name, sources: [{ file: '//archive.org/download/' + this.id + '/' + fi.name }] });
-      playlist[0].image = 'https://archive.org/services/img/' + this.id;
-
-      if (!onbrowser) {
-        playlist = JSON.stringify(playlist);
-        cfg = JSON.stringify(cfg);
-      }
-
-      wrap += `<div id="jw6"></div>`; //TODO-FETCH try building this as JSX for consistency.
-      //ARCHIVE-BROWSER made urls absolute
-      if (!onbrowser) {
-        // onbrowser its statically included in the html and Play will be run later  //TODO-DETAILS-NODE move to seperate function?
-        htm += `
-          <script src="//archive.org/jw/6.8/jwplayer.js" type="text/javascript"></script>
-          <script src="//archive.org/includes/play.js" type="text/javascript"></script>
-          <script>
-            $(function(){ Play('jw6', ${playlist}, ${cfg}); });
-          </script>
-          <style>
-            #jw6, #jw6__list { backgroundColor:black; }
-          </style>`;
-      }
-    } else if (item.metadata.mediatype == 'texts') {
-      wrap += `<iframe width="100%" height="480" src="https://archive.org/stream/${this.id}?ui=embed#mode/2up"></iframe><br/>`;
-    } else if (item.metadata.mediatype === 'image') {
-      //TODO-DETAILS this is the new approach to embedding a mediatype - to gradually replace inline way in this file.
-      wrap = Object(__WEBPACK_IMPORTED_MODULE_8__template_image__["a" /* default */])(item); // Apply the item to a template, returns a JSX tree suitable for wrapping in Nav
-      archive_setup.push(function () {
-        //TODO-DETAILS check this isn't being left on archive_setup for next image etc
-        AJS.theatresize();
-        AJS.carouselsize('#ia-carousel', true);
-      });
-    } else {
-      //TODO-DETAILS Note both node version and this version handle relative links embedded in the description to other resources badly, but shouldnt html in the description be considered dangerous anyway ?
-      wrap += `${item.metadata.description}`; //TODO-DETAILS note this is set dangerously as innerHTML in Nav and since description comes from user could be really bad, should be turned into text node
-    }
-    let els = new __WEBPACK_IMPORTED_MODULE_5__Nav__["default"](wrap).render(onbrowser); // temp store for debugging
-    if (onbrowser) {
-      __WEBPACK_IMPORTED_MODULE_4_react_dom___default.a.render(els, res); // Client - put in node supplies
-      Play('jw6', playlist, cfg);
-      __WEBPACK_IMPORTED_MODULE_5__Nav__["default"].AJS_on_dom_loaded(); // Runs code pushed archive_setup - needed for image
-    } else {
-      // Presume its the HTMLResponse, could explicitly check class if new what it was?
-      htm += __WEBPACK_IMPORTED_MODULE_3_react_dom_server___default.a.renderToStaticMarkup(els);
-      //htm += ReactDOMServer.renderToStaticMarkup(React.createFactory(Nav)(wrap));
-      res.end(htm);
-    }
-    return; // Note cant return the content here, as content loaded asynchronously
-  }
-}
-/* harmony export (immutable) */ __webpack_exports__["default"] = Details;
-
 
 /***/ }),
 /* 29 */
@@ -6886,9 +7019,9 @@ module.exports = memoizeStringOnly;
 
 var React = __webpack_require__(2);
 var ReactDOM = __webpack_require__(13);
-var Details = __webpack_require__(28).default;
-var Search = __webpack_require__(20).default;
-var Nav = __webpack_require__(18).default;
+var Details = __webpack_require__(18).default;
+var Search = __webpack_require__(21).default;
+var Nav = __webpack_require__(19).default;
 window.Nav = Nav;
 
 /***/ }),
@@ -8320,7 +8453,7 @@ module.exports = ReactPropTypesSecret;
 /*
  Modernizr 3.0.0pre (Custom Build) | MIT
 */
-var aa=__webpack_require__(2),l=__webpack_require__(21),B=__webpack_require__(5),C=__webpack_require__(3),ba=__webpack_require__(22),da=__webpack_require__(23),ea=__webpack_require__(24),fa=__webpack_require__(25),ia=__webpack_require__(26),D=__webpack_require__(6);
+var aa=__webpack_require__(2),l=__webpack_require__(22),B=__webpack_require__(5),C=__webpack_require__(3),ba=__webpack_require__(23),da=__webpack_require__(24),ea=__webpack_require__(25),fa=__webpack_require__(26),ia=__webpack_require__(27),D=__webpack_require__(6);
 function E(a){for(var b=arguments.length-1,c="Minified React error #"+a+"; visit http://facebook.github.io/react/docs/error-decoder.html?invariant\x3d"+a,d=0;d<b;d++)c+="\x26args[]\x3d"+encodeURIComponent(arguments[d+1]);b=Error(c+" for the full message or use the non-minified dev environment for full errors and additional helpful warnings.");b.name="Invariant Violation";b.framesToPop=1;throw b;}aa?void 0:E("227");
 var oa={children:!0,dangerouslySetInnerHTML:!0,defaultValue:!0,defaultChecked:!0,innerHTML:!0,suppressContentEditableWarning:!0,suppressHydrationWarning:!0,style:!0};function pa(a,b){return(a&b)===b}
 var ta={MUST_USE_PROPERTY:1,HAS_BOOLEAN_VALUE:4,HAS_NUMERIC_VALUE:8,HAS_POSITIVE_NUMERIC_VALUE:24,HAS_OVERLOADED_BOOLEAN_VALUE:32,HAS_STRING_BOOLEAN_VALUE:64,injectDOMPropertyConfig:function(a){var b=ta,c=a.Properties||{},d=a.DOMAttributeNamespaces||{},e=a.DOMAttributeNames||{};a=a.DOMMutationMethods||{};for(var f in c){ua.hasOwnProperty(f)?E("48",f):void 0;var g=f.toLowerCase(),h=c[f];g={attributeName:g,attributeNamespace:null,propertyName:f,mutationMethod:null,mustUseProperty:pa(h,b.MUST_USE_PROPERTY),
@@ -8620,18 +8753,18 @@ if (process.env.NODE_ENV !== "production") {
 var React = __webpack_require__(2);
 var invariant = __webpack_require__(11);
 var warning = __webpack_require__(12);
-var ExecutionEnvironment = __webpack_require__(21);
+var ExecutionEnvironment = __webpack_require__(22);
 var _assign = __webpack_require__(5);
 var emptyFunction = __webpack_require__(3);
-var EventListener = __webpack_require__(22);
-var getActiveElement = __webpack_require__(23);
-var shallowEqual = __webpack_require__(24);
-var containsNode = __webpack_require__(25);
-var focusNode = __webpack_require__(26);
+var EventListener = __webpack_require__(23);
+var getActiveElement = __webpack_require__(24);
+var shallowEqual = __webpack_require__(25);
+var containsNode = __webpack_require__(26);
+var focusNode = __webpack_require__(27);
 var emptyObject = __webpack_require__(6);
 var checkPropTypes = __webpack_require__(16);
 var hyphenateStyleName = __webpack_require__(17);
-var camelizeStyleName = __webpack_require__(27);
+var camelizeStyleName = __webpack_require__(28);
 
 /**
  * WARNING: DO NOT manually require this module.
@@ -32612,7 +32745,7 @@ var hyphenateStyleName = __webpack_require__(17);
 var memoizeStringOnly = __webpack_require__(41);
 var warning = __webpack_require__(12);
 var checkPropTypes = __webpack_require__(16);
-var camelizeStyleName = __webpack_require__(27);
+var camelizeStyleName = __webpack_require__(28);
 
 /**
  * WARNING: DO NOT manually require this module.
@@ -35140,7 +35273,7 @@ module.exports = server_browser;
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_react__ = __webpack_require__(2);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_react___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_react__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(19);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(20);
 __webpack_require__(8)({ presets: ['es2015', 'react'] }); // ES6 JS below!
 
 

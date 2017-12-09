@@ -127,18 +127,15 @@ export default class Nav extends React.Component {
   }
   static async nav_home() {
     console.log("Navigating to Home");
-      let destn = document.getElementById('main'); // Blank window (except Nav) as loading
-      Nav.clear(destn);
-    let s = await Search.home().fetch();
-    s.render(destn, "");
+    return await Nav.nav_details(undefined);
   }
 
   static async nav_details(id) {
     console.log("Navigating to Details",id);
     let destn = document.getElementById('main'); // Blank window (except Nav) as loading
-      Nav.clear(destn);
-    let d = await new Details(id).fetch(); // Gets back a react tree
-    d.render(destn, "");
+    Nav.clear(destn);
+    //let d = await new Details(id).fetch(); // Gets back a obj fetched and ready to render
+    await Details.factory(id, destn, ""); // Not sure what returning ....
     return false; // Dont follow anchor link - unfortunately React ignores this
   }
 
