@@ -1,13 +1,14 @@
 
 require('babel-core/register')({ presets: ['es2015', 'react']}); // ES6 JS below!
 
-import http from 'http';
-import async from 'async';
-import React from 'react';
+//import http from 'http';
+//import async from 'async';
+//import React from 'react';
+import React from './ReactFake';
 //Not needed on client - kept so script can run in both cases
-import ReactDOMServer from 'react-dom/server';
+//import ReactDOMServer from 'react-dom/server';
 //Next line is for client, not needed on server but doesnt hurt
-import ReactDOM from 'react-dom';
+//import ReactDOM from 'react-dom';
 
 import Nav from './Nav';
 import Util from './Util';
@@ -27,6 +28,7 @@ export default class Details {
       this.id = id;
   }
   async fetch() { // Note almost identical to code on Search.fetch()
+      //TODO-DETAILS-FETCH add trap of error here
       console.log('get metadata for '+this.id);
       // talk to Metadata API
           const _this = this;
@@ -111,7 +113,7 @@ export default class Details {
         //ARCHIVE-BROWSER - this is run at the end of archive_min.js in node, on browser it has to be run after doing a search
         if (onbrowser) {
             this.browserBefore();
-            ReactDOM.render(els, res);
+            React.domrender(els, res);
             this.browserAfter();
         } else {
             htm += this.nodeHtmlBefore();
@@ -252,11 +254,11 @@ class Collection extends Search {
                         <div className="col-xs-11 col-sm-10 welcome-left">
                             <div id="file-dropper-wrap">
                                 <div id="file-dropper"></div>
-                                <img id="file-dropper-img" className="img-responsive" style={{'maxWidth':350, margin:'0 10px 5px 0'}} src={'https://archive.org/services/img/'+this.id}/>
+                                <img id="file-dropper-img" className="img-responsive" style={{'maxWidth':"350px", margin:'0 10px 5px 0'}} src={'https://archive.org/services/img/'+this.id}/>
                             </div>
                             <h1>{item.metadata.title}</h1>
                             <h4>{creator}</h4>
-                            <div id="descript" style={{'maxHeight':43, cursor:'pointer'}}>
+                            <div id="descript" style={{maxHeight:"43px", cursor:'pointer'}}>
                                 {item.metadata.description}
                             </div>
                         </div>

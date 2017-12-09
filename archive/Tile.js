@@ -1,10 +1,11 @@
 require('babel-core/register')({ presets: ['es2015', 'react']}); // ES6 JS below!
 
-import React from 'react';
+//import React from 'react';
+import React from './ReactFake';
 import Util from './Util';
 
 
-export default class {
+export default class Tile {
   render(item, onbrowser){
     //xxx shorten/safify certain title usages (compared to Lists.inc)
     const collections = (Array.isArray(item.collection) ? item.collection : (typeof(item.collection)=='string' ? [item.collection] : []));
@@ -17,7 +18,7 @@ export default class {
       return (
       <div className={classes} data-id={item.identifier}  key={item.identifier}>
         {onbrowser ? (
-        <a className="stealth" tabIndex="-1" onClick={() => Nav.nav_details(collection)}>
+        <a className="stealth" tabIndex="-1" onClick={`Nav.nav_details("${collection}");`}>
           <div className="item-parent">
             <div className="item-parent-img"><img src={'https://archive.org/services/img/'+collection}/></div>
             <div className="item-parent-ttl">xxx parent title</div>
@@ -41,7 +42,7 @@ export default class {
         <div className="C234">
           <div className="item-ttl C C2">
           { onbrowser ? (
-            <a onClick={() => Nav.nav_details(item.identifier)} title={item.title}>
+            <a onClick={`Nav.nav_details("${item.identifier}");`} title={item.title}>
               <div className="tile-img">
                 <img className="item-img" xxxstyle="height:180px" src={'https://archive.org/services/img/'+item.identifier}/>
               </div>{/*.tile-img*/}
@@ -68,7 +69,7 @@ export default class {
 
           <div className="by C C4">
             <span className="hidden-lists">{item.creator && 'by '}</span>
-            <span title={item.creator}>{item.creator}</span>
+            <span title={Array.isArray(item.creator) ? item.creator.join(',') : item.creator}>{item.creator}</span>
           </div>{/*.C4*/}
         </div>{/*.C234*/}
 

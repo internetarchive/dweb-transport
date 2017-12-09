@@ -1,13 +1,15 @@
-import ReactDOM from "react-dom";
-import React from 'react';
+//import ReactDOM from "react-dom";
+//import React from 'react';
 //ARCHIVE-BROWSER ReactDOMServer Not needed for browser, left in to allow use in both browser & Node/Server
+import React from './ReactFake';
 
 require('babel-core/register')({ presets: ['es2015', 'react']}); // ES6 JS below!
-import ReactDOMServer from 'react-dom/server';
+//import ReactDOMServer from 'react-dom/server';
 
 import ArchiveBase from './Details'
 import Nav from './Nav';
 import Tile from './Tile';
+
 
 /* Section to ensure node and browser able to use Headers, Request and Fetch */
 var fetch,Headers,Request;
@@ -112,7 +114,7 @@ export default class Search {
     //ARCHIVE-BROWSER - this is run at the end of archive_min.js in node, on browser it has to be run after doing a search
     if (onbrowser) {
         this.browserBefore();
-        ReactDOM.render(els, res);
+        React.domrender(els, res);
         this.browserAfter();
     } else {
         htm += this.nodeHtmlBefore();

@@ -1,18 +1,18 @@
-import ReactDOM from "react-dom";
+//import ReactDOM from "react-dom";
 
 require('babel-core/register')({ presets: ['es2015', 'react']}); // ES6 JS below!
 
 // https://ponyfoo.com/articles/universal-react-babel
 
-import React from 'react';
+import React from './ReactFake';
 import Util from './Util';
 import Search from './Search';
 import Details from './Details';
 
 
-export default class Nav extends React.Component {
+export default class Nav { //extends React.Component
   constructor(htm) {
-    super();
+    //super();
     this.mts = ['web', 'texts', 'movies', 'audio', 'software', 'image'];
     this.htm = htm; //ARCHIVE-BROWSER could be string or nodes (not sure what class that is, but whatever the JSX compiler gives
   }
@@ -37,7 +37,7 @@ export default class Nav extends React.Component {
                      <li key={'mikey'+n} className="dropdown dropdown-ia pull-left">
                         { onbrowser ? (
                        <a title={mt} className={'navia-link '+mt}
-                          onClick={() => Nav.nav_details(mt)}
+                          onClick={`Nav.nav_details("${mt}")`}
                           data-top-kind={mt} data-toggle="tooltip" target="_top" data-placement="bottom">
                          <span className={'iconochive-'+mt} aria-hidden="true"></span>
                          <span className="sr-only">{mt}</span>
@@ -55,7 +55,7 @@ export default class Nav extends React.Component {
 
                 <li className="navbar-brand-li">
           { onbrowser ? (
-                  <a className="navbar-brand" onClick={()=>Nav.nav_home()} target="_top">
+                  <a className="navbar-brand" onClick="Nav.nav_home();" target="_top">
                     <span className="iconochive-logo"  aria-hidden="true"></span>
                     <span className="sr-only">logo</span>
                   </a>
@@ -69,7 +69,7 @@ export default class Nav extends React.Component {
 
                 <li id="nav-search" className="dropdown dropdown-ia pull-right">
             { onbrowser ? (
-                  <a onClick={() => Nav.nav_search()} >
+                  <a onClick="Nav.nav_search();" >
                     <span className="iconochive-search" aria-hidden="true"></span>
                     <span className="sr-only">search</span>
                   </a>
@@ -123,7 +123,7 @@ export default class Nav extends React.Component {
   static clear(destn) {
       // Clear the screen to give confidence that action under way
       // Leaves Nav, clears rest
-      ReactDOM.render(new Nav("Loading").render(true), destn);
+      React.domrender(new Nav("Loading").render(true), destn);
   }
   static async nav_home() {
     console.log("Navigating to Home");

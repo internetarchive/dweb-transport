@@ -1,6 +1,7 @@
 require('babel-core/register')({ presets: ['es2015', 'react']}); // ES6 JS below!
 
-import React from 'react';
+//import React from 'react';
+import React from './ReactFake';
 
 
 export default class {
