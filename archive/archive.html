@@ -38,8 +38,11 @@
     //Nav.nav_home();
     var searchparams = new URL(window.location.href).searchParams;
     var item = searchparams.get("item");
+    var query = searchparams.get("query");
     var verbose = searchparams.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)
-    if (item) {
+    if (query) {
+        Nav.nav_search(query)
+    } else if (item) {
         Nav.nav_details(item);
     } else {
         Nav.nav_home();

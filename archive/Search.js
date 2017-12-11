@@ -8,6 +8,7 @@ require('babel-core/register')({ presets: ['es2015', 'react']}); // ES6 JS below
 
 import ArchiveBase from './Details'
 import Nav from './Nav';
+import Util from './Util';
 import Tile from './Tile';
 
 
@@ -105,7 +106,7 @@ export default class Search {
       });
   }
   browserAfter() {
-      Nav.AJS_on_dom_loaded(); // Runs code pushed archive_setup
+      Util.AJS_on_dom_loaded(); // Runs code pushed archive_setup
   }
   render(res, htm) {
     const onbrowser = res.constructor.name != "ServerResponse"; // For a browser we render to an element, for server feed to a response stream
@@ -126,7 +127,7 @@ export default class Search {
 
   banner() {
       return (
-          <h1>Search: {query}</h1>
+          <h1>Search: {this.query}</h1>
       );
   }
 

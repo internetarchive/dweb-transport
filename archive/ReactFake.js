@@ -21,19 +21,15 @@ function deletechildren(el, keeptemplate) { //TODO-DETAILS-REACT copied from htm
 export default class React  {
     static createElement(tag, attrs, children) {        // Note arguments is set to tag, attrs, child1, child2 etc
         var element = document.createElement(tag);
-        //console.log("XXX@24",tag)
         for (let name in attrs) {
-            //console.log("XXX@26",name)
             let attrname = (name.toLowerCase() === "classname" ? "class" : name);
             if (name === "dangerouslySetInnerHTML") {
-                console.log("XXX@29",attrs)
                 element.innerHTML = attrs[name]["__html"];
             } else if (name && attrs.hasOwnProperty(name)) {
                 let value = attrs[name];
                 if (value === true) {
                     element.setAttribute(attrname, name);
                 } else if (typeof value === "object") { // e.g. style: {{fontSize: "124px"}}
-                    console.log("XXX@36", attrname, value);
                     for (let k in value) {
                         element[attrname][k] = value[k];
                     }
@@ -45,7 +41,6 @@ export default class React  {
             for (let i = 2; i < arguments.length; i++) {
                 let child = arguments[i];
                 if (!child) {
-                    //console.log("XXX@38 Bad child")
                 } else if (Array.isArray(child)) {
                     child.map((c) => element.appendChild(c.nodeType == null ?
                         document.createTextNode(c.toString()) : c))
