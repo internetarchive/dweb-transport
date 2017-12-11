@@ -9,6 +9,13 @@ class Transport {
         */
     }
 
+    setup0(options, verbose) {
+        /*
+        First part of setup, create obj, add to Transports but dont attempt to connect, typically called instead of p_setup if want to parallelize connections.
+        */
+        throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally undefined function Transport.setup0 should have been subclassed");
+        }
+
     p_setup(options, verbose) {
         /*
         Setup the resource and open any P2P connections etc required to be done just once.
@@ -87,16 +94,14 @@ class Transport {
         throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_fetch - may define higher level semantics here (see Python)");
     }
 
-    p_rawadd(url, sig, verbose) { //TODO-API-MULTI
+    p_rawadd(url, sig, verbose) {
         /*
-        Store a new list item, it should be stored so that it can be retrieved either by "signedby" (using p_rawlist) or
+        Store a new list item, ideally it should be stored so that it can be retrieved either by "signedby" (using p_rawlist) or
         by "url" (with p_rawreverse). The underlying transport does not need to guarantee the signature,
         an invalid item on a list should be rejected on higher layers.
 
         :param string url: String identifying an object being added to the list.
-        :param string date: Date (as returned by new Data.now() )
-        :param string signature: Signature of url+date
-        :param string signedby: url of the public key used for the signature.
+        :param Signature sig: A signature data structure.
         :param boolean verbose: True for debugging output
         :resolve undefined:
          */

@@ -288,8 +288,7 @@ class KeyPair extends SmartDict {
         Sign and date a url using public key function.
         Pair of "verify()"
 
-        :param date: Date that signing (usually now)
-        :param url: URL being signed, it could really be any data,
+        :param signable: A signable string
         :return: signature that can be verified with verify
         */
         if (!signable) throw new Dweb.errors.CodingError("Needs signable");

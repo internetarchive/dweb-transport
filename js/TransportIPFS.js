@@ -8,8 +8,6 @@ Y Lists have listeners and generate events - see docs at ...
 // Library packages other than IPFS
 // IPFS components
 
-//TODO-API scan this file and add documentation
-
 const IPFS = require('ipfs');
 const CID = require('cids');
 
@@ -110,7 +108,7 @@ class TransportIPFS extends Transport {
         }}}
     }
 
-    p_ipfsstart(verbose) { //TODO-API
+    p_ipfsstart(verbose) {
         /*
         Just start IPFS - not Y (note used with "yarrays" and will be used for non-IPFS list management)
         Note - can't figure out how to use async with this, as we resolve the promise based on the event callback
@@ -133,7 +131,7 @@ class TransportIPFS extends Transport {
     }
 
     /* OBS Aug2017 - using "yarrays" now to support multiple connections, leave code here for month or two in case go back.
-    p_yarraystart(verbose) { //TODO-API
+    p_yarraystart(verbose) {
         // Singular version - one Yarray, on one IPFS connection, monitoring everything.
         let yarrayoptions = this.options.yarray;
         let self = this;
@@ -154,7 +152,7 @@ class TransportIPFS extends Transport {
     }
     */
 
-    async p_yarraysstart(verbose) { //TODO-API
+    async p_yarraysstart(verbose) {
         /*
         This starts IPFS, but only sets up for Y connections, which are opened each time a resource is listed, added to, or listmonitored.
             Throws: Error("websocket error") if WiFi off, probably other errors if fails to connect
@@ -195,7 +193,7 @@ class TransportIPFS extends Transport {
 
     static setup0(options, verbose) {
         /*
-            First part of setup, create obj, add to Transport but dont attempt to connect, typically called instead of p_setup if want to parallelize connections.
+            First part of setup, create obj, add to Transports but dont attempt to connect, typically called instead of p_setup if want to parallelize connections.
         */
         let combinedoptions = Transport.mergeoptions(defaultoptions, options);
         console.log("IPFS options %o", combinedoptions);
@@ -249,7 +247,7 @@ class TransportIPFS extends Transport {
         return "ipfs:/ipfs/"+cid.toBaseEncodedString()
     }
 
-    static cidFrom(url) { //TODO-API
+    static cidFrom(url) {
         /*
         Convert a URL e.g. ipfs:/ipfs/abc123 into a CID structure suitable for retrieval
         url: String of form "ipfs://ipfs/<hash>" or parsed URL or CID
@@ -413,7 +411,7 @@ class TransportIPFS extends Transport {
         //return this.ipfs.files.put(buf).then((block) => TransportIPFS.cid2url(block.cid));
     }
 
-    async p_rawadd(url, sig, verbose) { //TODO-API-MULTI
+    async p_rawadd(url, sig, verbose) {
         /*
         Store a new list item, it should be stored so that it can be retrieved either by "signedby" (using p_rawlist) or
         by "url" (with p_rawreverse). The underlying transport does not need to guarrantee the signature,

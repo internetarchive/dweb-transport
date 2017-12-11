@@ -137,8 +137,7 @@ class SmartDict extends Transportable {
 
         :resolves: New object - e.g. StructuredBlock or MutableBlock
         :catch: TransportError - can probably, or should throw TransportError if transport fails
-        :throws: TransportError if url invalid
-        :errors: Authentication Error
+        :throws: TransportError if url invalid, ForbiddenError if cant decrypt
 
          */
         try {

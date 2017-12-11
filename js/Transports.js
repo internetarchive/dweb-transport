@@ -3,7 +3,6 @@ const Dweb = require('./Dweb.js');
 
 /*
 Handles multiple transports, API should be (almost) the same as for an individual transport)
-TODO-API-MULTI document this file
  */
 
 
@@ -12,12 +11,9 @@ class Transports {
         if (verbose) console.log("Transports(%o)",options);
     }
 
-    static validFor(urls, func) { //TODO-API
+    static validFor(urls, func) {
         /*
-        Finds an array or Transports that can support this URL.  url => [TransportInstanceA, TransportInstanceB]
-
-        If passed an array of urls, returns a dict; [url1,url2] => {url1: [TransportInstanceA], url2: [TransportInstanceA, TransportInstanceB]}
-        (note replaces old Dweb.transport() )
+        Finds an array or Transports that can support this URL.
 
         Excludes any transports whose status != 0 as they aren't connected
 

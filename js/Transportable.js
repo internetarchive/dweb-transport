@@ -6,7 +6,7 @@ class Transportable {
     Based on Transportable class in python - generic base for anything transportable.
 
     Fields
-    _urls   Array of URLs of data stored //TODO-API-MULTI
+    _urls   Array of URLs of data stored
     _data   Data (if its opaque)
      */
 
@@ -39,7 +39,7 @@ class Transportable {
     async p_store(verbose) {
         /*
         Store the data on Dweb, if it has not already been, stores any urls in _url field
-        Resolves to	obj //TODO-API
+        Resolves to	obj
         Throws TransportError if no transports or unable to fetch, leaves in !stored state (empty _urls field)
          */
         try {
@@ -64,7 +64,7 @@ class Transportable {
         this._urls = [];
     }
 
-    static async p_fetch(urls, verbose) { //TODO-API-MULTI
+    static async p_fetch(urls, verbose) {
         /*
         Fetch the data for a url, subclasses act on the data, typically storing it.
         urls:	array of urls to retrieve (any are valid)

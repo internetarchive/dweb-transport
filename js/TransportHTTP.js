@@ -181,7 +181,7 @@ class TransportHTTP extends Transport {
         return this.p_post("contenturl/rawstore", null, "application/octet-stream", data, verbose); // resolves to URL
     }
 
-    p_rawadd(url, sig, verbose) { //TODO-BACKPORT turn date into ISO before adding //TODO-API-MULTI note url is now that of list
+    p_rawadd(url, sig, verbose) { //TODO-BACKPORT turn date into ISO before adding
         //verbose=true;
         if (!url || !sig) throw new Dweb.errors.CodingError("TransportHTTP.p_rawadd: invalid parms",url, sig);
         if (verbose) console.log("rawadd", url, sig);

@@ -8,9 +8,9 @@ class Signature extends SmartDict {
 
     Fields:
     date:       Date stamp (according to browser) when item signed
-    urls:       URLs of object signed - note this is intentionally "urls" not "_urls" since its a stored field. //TODO-API-MULTI
+    urls:       URLs of object signed - note this is intentionally "urls" not "_urls" since its a stored field.
     signature:  Signature of the date and url
-    signedby:   Public URLs of list signing this (list should have a public key) //TODO-API-MULTI
+    signedby:   Public URLs of list signing this (list should have a public key)
      */
     constructor(dic, verbose) {
         /*
