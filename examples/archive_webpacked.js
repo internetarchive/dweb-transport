@@ -555,6 +555,7 @@ class ArchiveBase {
     }
 
     browserBefore() {
+        //Anything that is needed in the browser before the Nav - TODO-DETAILS will have the stuff above the Nav banner
         // Nothing to do by default
     }
     browserAfter() {

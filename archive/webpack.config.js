@@ -3,7 +3,8 @@
 var HTMLWebpackPlugin = require('html-webpack-plugin');
 var HTMLWebpackPluginConfig = new HTMLWebpackPlugin({
     template: __dirname + '/archive.html',
-    inject: 'body'
+    inject: 'head',
+    filename: __dirname + '/../examples/archive.html',
 });
 
 module.exports = {
@@ -19,7 +20,7 @@ module.exports = {
     },
     output: {
         filename: 'archive_webpacked.js',
-        path: __dirname + '/build'
+        path: __dirname + '/../examples'
     },
     plugins: [HTMLWebpackPluginConfig]
 };
