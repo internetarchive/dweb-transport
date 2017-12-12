@@ -5,7 +5,6 @@ import Details from './Details'
 
 export default class Image extends Details {
     //TODO-DETAILS this is the new approach to embedding a mediatype - to gradually replace inline way in this file.
-    //TODO-REFACTOR merge this into the template_image.js file
     constructor(itemid, item) {
         super(itemid);
         this.item = item;

@@ -75,7 +75,7 @@ app.get('/*', (req, res) => {
   var query = req.url.match(/^\/search.php\?query=(.*)/);
   if (query){
     s = new Search({query:query[1]});
-    s.fetch().then(() => s.render(res, htm)); //TODO-DETAILS note doesnt send banner, check works when banner empty
+    s.fetch().then(() => s.render(res, htm));
   }
 
 

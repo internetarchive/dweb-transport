@@ -21,7 +21,6 @@ export default class Nav { //extends React.Component
       if (typeof this.htm === "string") {
           this.htm = ( <div dangerouslySetInnerHTML={{__html: this.htm}}></div> );
       }
-      // TODO-DETAILS removed this from search button as generates error - come back and fix
       //TODO-DETAILS is putting the description (in 'htm' in as raw html which would be a nasty security hole since that comes from user !
       return (
       <div id="wrap">

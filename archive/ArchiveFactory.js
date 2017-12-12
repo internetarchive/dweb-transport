@@ -16,11 +16,11 @@ export default class ArchiveFactory {
             let obj = await new Details(itemid).fetch();
             item = obj.item;
             if (!item.metadata) {
-                new DetailsError(itemid, item, `item ${itemid} cannot be found or does not have metadata`).render(res, htm); //TODO-DETAILS test
+                new DetailsError(itemid, item, `item ${itemid} cannot be found or does not have metadata`).render(res, htm);
             } else {
                 if (verbose) console.log("Found mediatype", item.metadata.mediatype);
                 switch (item.metadata.mediatype) {
-                    case "collection": //TODO-DETAILS-REFACTOR
+                    case "collection":
                         return (await new Collection(itemid, item).fetch()).render(res, htm);
                         break;
                     case "texts":
@@ -34,7 +34,7 @@ export default class ArchiveFactory {
                         new AV(itemid, item).render(res, htm);
                         break;
                     default:
-                        new DetailsError(itemid, item, `Unsupported mediatype: ${item.metadata.mediatype}`).render(res, htm); //TODO-DETAILS test
+                        new DetailsError(itemid, item, `Unsupported mediatype: ${item.metadata.mediatype}`).render(res, htm);
                     //    return new Nav(")
                 }
             }
