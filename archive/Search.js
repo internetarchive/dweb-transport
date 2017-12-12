@@ -6,13 +6,13 @@ import React from './ReactFake';
 require('babel-core/register')({ presets: ['es2015', 'react']}); // ES6 JS below!
 //import ReactDOMServer from 'react-dom/server';
 
-import ArchiveBase from './Details'
-import Nav from './Nav';
 import Util from './Util';
+import ArchiveBase from './ArchiveBase';
 import Tile from './Tile';
 
 
 /* Section to ensure node and browser able to use Headers, Request and Fetch */
+/*
 var fetch,Headers,Request;
 if (typeof(Window) === "undefined") {
     //var fetch = require('whatwg-fetch').fetch; //Not as good as node-fetch-npm, but might be the polyfill needed for browser.safari
@@ -28,9 +28,11 @@ if (typeof(Window) === "undefined") {
     Headers = window.Headers;
     Request = window.Request;
 }
+*/
 
-export default class Search {
-  constructor({query='*:*', sort='', limit=75, banner=''}={}) {
+export default class Search extends ArchiveBase {
+  constructor({query='*:*', sort='', limit=75, banner='', id=undefined}={}) {
+      super(id);
       this.query = query;
       this.limit= limit;
       this.sort = sort;
@@ -60,10 +62,6 @@ export default class Search {
           }
       }   // TODO-HTTP may need to handle binary as a buffer instead of text
       return this; // For chaining, but note will need to do an "await fetch"
-  }
-  nodeHtmlBefore() {
-      /* Return htm to insert before Nav wrapped part for use in node*/
-      return ""
   }
   nodeHtmlAfter() {
       /* Return htm to insert before Nav wrapped part for use in node*/
@@ -105,26 +103,6 @@ export default class Search {
           });
       });
   }
-  browserAfter() {
-      Util.AJS_on_dom_loaded(); // Runs code pushed archive_setup
-  }
-  render(res, htm) {
-    const onbrowser = res.constructor.name != "ServerResponse"; // For a browser we render to an element, for server feed to a response stream
-    var els = this.navwrapped(onbrowser);  //ARCHIVE-BROWSER remove unneccessary convert back to HTML and reconversion inside Nav.render
-
-    //ARCHIVE-BROWSER - this is run at the end of archive_min.js in node, on browser it has to be run after doing a search
-    if (onbrowser) {
-        this.browserBefore();
-        React.domrender(els, res);
-        this.browserAfter();
-    } else {
-        htm += this.nodeHtmlBefore();
-        htm += ReactDOMServer.renderToStaticMarkup(els);
-        htm += this.nodeHtmlAfter();
-        res.end(htm);
-    }
-  }
-
   banner() {
       return (
           <h1>Search: {this.query}</h1>
@@ -151,12 +129,5 @@ export default class Search {
             </div>
           </div>
         );
-  }
-  navwrapped(onbrowser) {
-      /* Wrap the content up in a Nav
-      onbrowser:    true if rendering in browser, false if in node on server
-      returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
-       */
-      return new Nav(this.jsxInNav(onbrowser)).render(onbrowser);
   }
 }

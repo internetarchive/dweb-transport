@@ -29,7 +29,7 @@ export default class React  {
                 let value = attrs[name];
                 if (value === true) {
                     element.setAttribute(attrname, name);
-                } else if (typeof value === "object") { // e.g. style: {{fontSize: "124px"}}
+                } else if (typeof value === "object" && !Array.isArray(value)) { // e.g. style: {{fontSize: "124px"}}
                     for (let k in value) {
                         element[attrname][k] = value[k];
                     }

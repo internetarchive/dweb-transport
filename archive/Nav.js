@@ -7,7 +7,7 @@ require('babel-core/register')({ presets: ['es2015', 'react']}); // ES6 JS below
 import React from './ReactFake';
 import Util from './Util';
 import Search from './Search';
-import Details from './Details';
+import ArchiveFactory from './ArchiveFactory';
 
 
 export default class Nav { //extends React.Component
@@ -80,7 +80,7 @@ export default class Nav { //extends React.Component
             ) }
                   <div>
             { onbrowser ? (
-                    <form role="search" onSubmit="Nav.nav_search(this.elements[0].value)" target="_top">
+                    <form role="search" onSubmit="Nav.nav_search(this.elements[0].value); return 0;" target="_top">
                       <label htmlFor="search-bar-2" className="sr-only">Search the Archive</label>
                       <input id="search-bar-2" placeholder="Search" type="text" name="query" value=""/>
                       <input type="submit" value="Search"/>
@@ -134,7 +134,7 @@ export default class Nav { //extends React.Component
     let destn = document.getElementById('main'); // Blank window (except Nav) as loading
     Nav.clear(destn);
     //let d = await new Details(id).fetch(); // Gets back a obj fetched and ready to render
-    await Details.factory(id, destn, ""); // Not sure what returning ....
+    await ArchiveFactory.factory(id, destn, ""); // Not sure what returning ....
     return false; // Dont follow anchor link - unfortunately React ignores this
   }
 
