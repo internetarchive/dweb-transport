@@ -23,6 +23,13 @@ defaulthttpoptions = {
     urlbase: 'https://gateway.dweb.me:443'
 };
 
+servercommands = {
+    rawfetch: "content/rawfetch",
+    rawstore: "contenturl/rawstore",
+    rawadd: "void/rawadd",
+    rawlist: "metadata/rawlist"
+}
+
 class TransportHTTP extends Transport {
 
     constructor(options, verbose) {
@@ -95,6 +102,8 @@ class TransportHTTP extends Transport {
                     multihash = pathparts.slice(-1);
                 } else if (parsedurl.protocol === "contenthash:" && pathparts[1] === "contenthash") {
                     multihash = pathparts[2]; // 0 is before the / and is always empty
+                } else if (["https","http"].includes(parsedurl.protocol) && (command == servercommands.rawfetch)) {
+                    httpurl = url;  // Support just the raw URL, but only for fetch
                 } else {
                     // noinspection ExceptionCaughtLocallyJS
                     throw new Dweb.errors.TransportError(`Malformed URL: ${url}`);
@@ -168,14 +177,14 @@ class TransportHTTP extends Transport {
         //if (!(url && url.includes(':') ))
         //    throw new Dweb.errors.CodingError("TransportHTTP.p_rawfetch bad url: "+url);
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
-        return this.p_get("content/rawfetch", url, verbose)
+        return this.p_get(servercommands.rawfetch, url, verbose)
     }
 
     p_rawlist(url, verbose) {
         // obj being loaded
         // Locate and return a block, based on its url
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
-        return this.p_get("metadata/rawlist", url, verbose);
+        return this.p_get(servercommands.rawlist, url, verbose);
     }
     rawreverse() { throw new Dweb.errors.ToBeImplementedError("Undefined function TransportHTTP.rawreverse"); }
 
@@ -188,7 +197,7 @@ class TransportHTTP extends Transport {
          */
         //PY: res = self._sendGetPost(True, "rawstore", headers={"Content-Type": "application/octet-stream"}, urlargs=[], data=data, verbose=verbose)
         console.assert(data, "TransportHttp.p_rawstore: requires data");
-        let res = await this.p_post("contenturl/rawstore", null, "application/octet-stream", data, verbose); // resolves to URL
+        let res = await this.p_post(servercommands.rawstore, null, "application/octet-stream", data, verbose); // resolves to URL
         let parsedurl = Url.parse(res);
         let pathparts = parsedurl.pathname.split('/');
         return `contenthash:/contenthash/${pathparts.slice(-1)}`
@@ -200,7 +209,7 @@ class TransportHTTP extends Transport {
         if (!url || !sig) throw new Dweb.errors.CodingError("TransportHTTP.p_rawadd: invalid parms",url, sig);
         if (verbose) console.log("rawadd", url, sig);
         let value = JSON.stringify(sig.preflight(Object.assign({},sig)))+"\n";
-        return this.p_post("void/rawadd", url, "application/json", value, verbose); // Returns immediately
+        return this.p_post(servercommands.rawadd, url, "application/json", value, verbose); // Returns immediately
     }
 
     static async test() {
