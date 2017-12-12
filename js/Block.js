@@ -4,6 +4,13 @@ const Dweb = require("./Dweb");
 // ######### Parallel development to Block.py ########
 
 class Block extends Transportable {
+    /*
+    Class for opaque bytes, its mostly not used. Usually a SmartDict will be a better way to hold an object.
+
+    Fields:
+    inherits from Transportable: _urls _data
+     */
+
     constructor(data) {
         /*
         data	opaque data to store (byte string or Buffer) - should always convert it to what you want.

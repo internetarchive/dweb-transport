@@ -62,11 +62,12 @@ class AccessControlList extends CommonList {
         return super.preflight(dd);
     }
 
-    async p_add_acle(viewerpublicurls, data, verbose) { // TODO-API-MULTI
+    async p_add_acle(viewerpublicurls, data, verbose) {
         /*
         Add a new ACL entry - that gives a viewer the ability to see the accesskey of this URL
 
         :param viewerpublicurls: KeyPair object (contains a publickey) or array of urls of that publickey
+        :data other fields to store on ACLE - currently only supports name, but could support any field
         :resolves to: this for chaining
         */
         if (verbose) console.log("ACL.p_add_acle viewerpublicurls=",viewerpublicurls);
@@ -139,7 +140,6 @@ class AccessControlList extends CommonList {
             Chain is SD.p_fetch > SD.p_decryptdata > ACL|KC.decrypt, then SD.setdata
 
             :param data: string from json of encrypted data - b64 encrypted
-            :param viewerkeypair:   Keypair of viewer wanting to decrypt, or array, defaults to all KeyPair in Dweb.keychains
             :return:                Decrypted data
             :throw:                 AuthenticationError if there are no tokens for our ViewerKeyPair that can decrypt the data
         */

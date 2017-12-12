@@ -12,10 +12,10 @@ class CommonList extends SmartDict {
     keypair         Holds a KeyPair used to sign items
     _list           Holds an array of signatures of items put on the list
     _master         True if this is a master list, i.e. can add things
-    _publicurls     Holds the urls of publicly available version of the list. //TODO-API-MULTI
+    _publicurls     Holds the urls of publicly available version of the list.
     _allowunsafestore True if should override protection against storing unencrypted private keys (usually only during testing)
     dontstoremaster True if should not store master key
-    _listeners      Any event listeners
+    _listeners      Any event listeners  //TODO-LISTENER - maybe move to SmartDict as generically useful
     */
 
     //TODO extend to cover array functions, but carefully as the semantics require signing and storing.
@@ -167,7 +167,7 @@ class CommonList extends SmartDict {
         this._publicurls = ee._urls;
     }
 
-    storedpublic() {    //TODO-API
+    storedpublic() {
         return this._publicurls.length > 0
     }
     stored() {
@@ -230,7 +230,7 @@ class CommonList extends SmartDict {
         Create a signature -
         Normally better to use p_push as stores signature and puts on _list and on Dweb
 
-        :param urls:    URL of object to sign    //TODO-API-MULTI
+        :param urls:    URL of object to sign
         :returns:       Signature
         */
         if (!urls || !urls.length) throw new Dweb.errors.CodingError("Empty url is a coding error");
@@ -266,7 +266,7 @@ class CommonList extends SmartDict {
     }
     // ----- Listener interface ----- see https://developer.mozilla.org/en-US/docs/Web/API/EventTarget for the pattern
 
-    addEventListener(type, callback) { //TODO-API
+    addEventListener(type, callback) {
         /*
         Add an event monitor for this list, for example if the UI wants to monitor when things are added.
         type:  Currently supports "insert"
@@ -276,7 +276,7 @@ class CommonList extends SmartDict {
         this._listeners[type].push(callback);
     }
 
-    removeEventListener(type, callback) { //TODO-API
+    removeEventListener(type, callback) {
         /*
         Remove an eventListener,
         type, callback should be as supplied to addEventListener
@@ -290,7 +290,7 @@ class CommonList extends SmartDict {
             }
         }
     }
-    dispatchEvent(event) { //TODO-API
+    dispatchEvent(event) {
         console.log("CL.dispatchEvent",event);
         if (!(event.type in this._listeners)) return true;
         let stack = this._listeners[event.type];
@@ -302,7 +302,7 @@ class CommonList extends SmartDict {
         return !event.defaultPrevented;
     }
 
-    listmonitor(verbose) { //TODO-API
+    listmonitor(verbose) {
         /*
         Add a listmonitor for each transport - note this means if multiple transports support it, then will get duplicate events back if everyone else is notifying all of them.
          */
@@ -310,7 +310,7 @@ class CommonList extends SmartDict {
                 (obj) => {
                     if (verbose) console.log("listmonitor added",obj,"to",this._publicurls);
                     let sig = new Dweb.Signature(obj, verbose);
-                    if (this.verify(sig)) { // Ignore if not signed by this node, and verifies thows Signing Error if correct list, but not verified
+                    if (this.verify(sig)) { // Ignore if not signed by this node, and verify throws Signing Error if correct list, but not verified
                         if (!this._list.some((othersig) => othersig.signature === sig.signature)) {    // Check not duplicate (esp of locally pushed one
                             this._list.push(sig);
                             this.dispatchEvent(new CustomEvent("insert", {target: this, detail: sig}));   // Note target doesnt get set here.

@@ -11,6 +11,7 @@ class Signature extends SmartDict {
     urls:       URLs of object signed - note this is intentionally "urls" not "_urls" since its a stored field.
     signature:  Signature of the date and url
     signedby:   Public URLs of list signing this (list should have a public key)
+    Inherits from SmartDict: _acl and from Transportable: _urls, _data
      */
     constructor(dic, verbose) {
         /*
@@ -48,9 +49,9 @@ class Signature extends SmartDict {
         return this.date.toISOString() + " "+this.urls;
     }
 
-    static async p_sign(commonlist, urls, verbose) { //TODO-API-MULTI
+    static async p_sign(commonlist, urls, verbose) {
         /*
-        Sign and date a url, returning a new Signature
+        Sign and date an array of urls, returning a new Signature
 
         :param commonlist: Subclass of CommonList containing a private key to sign with.
         :param urls: of item being signed
