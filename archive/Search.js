@@ -38,31 +38,23 @@ export default class Search extends ArchiveBase {
       this.sort = sort;
       console.log('search for:', 'http://archive.org/advancedsearch.php?output=json&q=' + query + '&rows=' + limit + '&sort[]=' + sort)
   }
-  async fetch() {
-      let response = await fetch(new Request(   // Note almost identical code on Details.js and Search.js
-          //'https://archive.org/advancedsearch.php?output=json&q='
-          'https://gateway.dweb.me/metadata/advancedsearch?output=json&q='          // Go through gateway at dweb.me because of CORS issues (approved by Sam!)
-          //'http://localhost:4244/metadata/advancedsearch?output=json&q='    // When testing
-          + this.query + '&rows=' + this.limit + '&sort[]=' + this.sort,
-          {
-              method: 'GET',
-              headers: new Headers(),
-              mode: 'cors',
-              cache: 'default',
-              redirect: 'follow',  // Chrome defaults to manual
-          }
-      ));
-      if (response.ok) {
-          if (response.headers.get('Content-Type') === "application/json") {
-              let j = await response.json(); // response.json is a promise resolving to JSON already parsed
-              this.items = j.response.docs;
-          } else {
-              let t = response.text(); // promise resolving to text
-              console.log("Expecting JSON but got",t);
-          }
-      }   // TODO-HTTP may need to handle binary as a buffer instead of text
-      return this; // For chaining, but note will need to do an "await fetch"
-  }
+    async fetch() {
+        /* Do an advanced search.
+            Goes through gateway.dweb.me so that we can work around a CORS issue (general approach & security questions confirmed with Sam!)
+
+            this.id Archive Item identifier
+            throws: TypeError or Error if fails
+            resolves to: this
+         */
+        let j = await Util.fetch_json(
+            //`https://archive.org/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`, // Archive (CORS fail)
+            `https://gateway.dweb.me/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`,
+            //`http://localhost:4244/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`, //Testing
+        );
+        this.items = j.response.docs;
+        return this; // For chaining, but note will need to do an "await fetch"
+    }
+
   nodeHtmlAfter() {
       /* Return htm to insert before Nav wrapped part for use in node*/
       return `

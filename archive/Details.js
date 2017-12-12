@@ -13,31 +13,15 @@ export default class Details extends ArchiveBase {
   constructor(id, {}={}) {
       super(id);
   }
-  async fetch() { // Note almost identical to code on Search.fetch()
-      //TODO-DETAILS-FETCH add trap of error here
-      console.log('get metadata for '+this.id);
-      // talk to Metadata API
-          const _this = this;
-          let response = await fetch(new Request(  // Note almost identical code on Details.js and Search.js
-              'https://archive.org/metadata/'+this.id,
-              {
-                  method: 'GET',
-                  headers: new Headers(),
-                  mode: 'cors',
-                  cache: 'default',
-                  redirect: 'follow',  // Chrome defaults to manual
-              }
-          ));
-          if (response.ok) {
-              if (response.headers.get('Content-Type') === "application/json") {
-                  this.item = await response.json(); // response.json is a promise resolving to JSON already parsed
-              } else {
-                  t = response.text(); // promise resolving to text
-                  console.log("Expecting JSON but got",t); //TODO-DETAILS-REFACTOR throw error here
-              }
-          }   // TODO-HTTP may need to handle binary as a buffer instead of text
-          return this; // For chaining, but note will need to do an "await fetch"
-  }
-
+    async fetch() {
+        /* Fetch JSON by talking to Metadata API
+            this.id Archive Item identifier
+            throws: TypeError or Error if fails
+            resolves to: this
+         */
+        console.log('get metadata for '+this.id);
+        this.item = await Util.fetch_json(`https://archive.org/metadata/${this.id}`);
+        return this; // For chaining, but note will need to do an "await fetch"
+    }
 }
 
