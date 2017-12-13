@@ -20,7 +20,7 @@ export default class Image extends Details {
     jsxInNav(onbrowser) {
         let item = this.item;
         let itemid = item.metadata.identifier; // Shortcut as used a lot
-        let mainfile = item.files.find((fi) => ['JPEG'].includes(fi.format)); //TODO-DETAILS-IMAGE probably add other formats
+        let mainfile = item.files.find((fi) => ['JPEG','PNG'].includes(fi.format)); //TODO-DETAILS-IMAGE probably add other formats
         let detailsurl = `https://archive.org/details/${itemid}`; //TODO-DETAILS-DWEB will move to this decentralized page, but check usages (like tweet) below
         let embedurl = `https://archive.org/embed/${itemid}`;
         return (

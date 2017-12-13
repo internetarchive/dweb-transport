@@ -4,7 +4,7 @@ import React from './ReactFake';
 //import ReactDOMServer from 'react-dom/server';
 //Next line is for client, not needed on server but doesnt hurt
 //import ReactDOM from 'react-dom';
-
+//TODO-DETAILS add a config file, load at compile and make overridable - server etc go there
 import Util from './Util';
 
 export default class ArchiveBase {
