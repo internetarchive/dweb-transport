@@ -147,7 +147,6 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(3);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__ = __webpack_require__(5);
-
 __webpack_require__(0)({ presets: ['es2015', 'react'] }); // ES6 JS below!
 
 //Not needed on client - kept so script can run in both cases
@@ -162,29 +161,94 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
     constructor(id, {} = {}) {
         super(id);
     }
+
     async fetch() {
-        // Note almost identical to code on Search.fetch()
-        //TODO-DETAILS-FETCH add trap of error here
+        /* Fetch JSON by talking to Metadata API
+            this.id Archive Item identifier
+            throws: TypeError or Error if fails
+            resolves to: this
+         */
         console.log('get metadata for ' + this.id);
-        // talk to Metadata API
-        const _this = this;
-        let response = await fetch(new Request( // Note almost identical code on Details.js and Search.js
-        'https://archive.org/metadata/' + this.id, {
-            method: 'GET',
-            headers: new Headers(),
-            mode: 'cors',
-            cache: 'default',
-            redirect: 'follow' // Chrome defaults to manual
-        }));
-        if (response.ok) {
-            if (response.headers.get('Content-Type') === "application/json") {
-                this.item = await response.json(); // response.json is a promise resolving to JSON already parsed
-            } else {
-                t = response.text(); // promise resolving to text
-                console.log("Expecting JSON but got", t); //TODO-DETAILS-REFACTOR throw error here
-            }
-        } // TODO-HTTP may need to handle binary as a buffer instead of text
+        this.item = await __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].fetch_json(`https://archive.org/metadata/${this.id}`);
         return this; // For chaining, but note will need to do an "await fetch"
+    }
+    sharing(onbrowser) {
+        //Common text across Image and Text and possibly other subclasses
+        let item = this.item;
+        let itemid = item.metadata.identifier; // Shortcut as used a lot
+        let metadata = item.metadata; // Shortcut as used a lot
+        let detailsURL = `https://archive.org/details/${itemid}`; //TODO-DETAILS-DWEB will move to this decentralized page, but check usages (like tweet) below
+        let sharingText = `${metadata.title} : ${metadata.creator}`; //String used
+        let sharingTextUriEncoded = encodeURIComponent(sharingText);
+
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            { style: { textAlign: "center", margin: "50px auto" } },
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'div',
+                { className: 'topinblock' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { id: 'sharer' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `https://twitter.com/intent/tweet?url=${detailsURL}&amp;via=internetarchive&amp;text=${sharingTextUriEncoded}+%3A+${metadata.creator}+%3A+Free+Download+%26+Streaming+%3A+Internet+Archive`,
+                            target: '_blank' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-twitter', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share to Twitter' })
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `https://www.facebook.com/sharer/sharer.php?u=${detailsURL}`,
+                            target: '_blank' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-facebook', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share to Facebook' })
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `https://plus.google.com/share?url=${detailsURL}`,
+                            target: '_blank' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-googleplus', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share to Google+' })
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `http://www.reddit.com/submit?url=${detailsURL}&amp;title=${sharingTextUriEncoded}+%3A+${metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`,
+                            target: '_blank' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-reddit', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share to Reddit' })
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `https://www.tumblr.com/share/video?embed=%3Ciframe+width%3D%22640%22+height%3D%22480%22+frameborder%3D%220%22+allowfullscreen+src%3D%22https%3A%2F%2Farchive.org%2Fembed%2F%22+webkitallowfullscreen%3D%22true%22+mozallowfullscreen%3D%22true%22%26gt%3B%26lt%3B%2Fiframe%3E&;name=${item.metadata.title}+%3A+${item.metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`,
+                            target: '_blank' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-tumblr', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share to Tumblr' })
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `http://www.pinterest.com/pin/create/button/?url=${detailsURL}&amp;description=${sharingTextUriEncoded}+%3A+${metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`,
+                            target: '_blank' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-pinterest', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share to Pinterest' })
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `mailto:?body=${detailsURL}&amp;subject=${sharingText} : ${metadata.creator} : Free Download &amp; Streaming : Internet Archive` },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-email', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share via email' })
+                    )
+                ),
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', { clear: 'all', className: 'clearfix' })
+            )
+        );
     }
 
 }
@@ -200,175 +264,201 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
 __webpack_require__(0)({ presets: ['es2015', 'react'] }); // ES6 JS below!
 
 //import React from 'react';
+ // Note React is used by the JSX compiler that handles the HTML below this fakes the React.createElement
 
 
 /* harmony default export */ __webpack_exports__["a"] = (class {
-  static number_format(nStr) //xxx this is just addCommas now
-  {
-    //http://www.mredkj.com/javascript/numberFormat.html
-    nStr += '';
+    static number_format(nStr) //xxx this is just addCommas now
+    {
+        //http://www.mredkj.com/javascript/numberFormat.html
+        nStr += '';
 
-    var x = nStr.split('.');
-    var x1 = x[0];
-    var x2 = x.length > 1 ? '.' + x[1] : '';
-    var rgx = /(\d+)(\d{3})/;
-    while (rgx.test(x1)) x1 = x1.replace(rgx, '$1' + ',' + '$2');
-    return x1 + x2;
-  }
-
-  static glyph({ name = 'question', classes = '' } = {}) {
-    return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-      'span',
-      { className: classes },
-      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-' + name, 'aria-hidden': 'true' }),
-      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-        'span',
-        { className: 'sr-only' },
-        name
-      )
-    );
-  }
-
-  // pass in a <mediatype> value
-  static mediatype_icon(mediatype) {
-    const ICONS = {
-      "audio": "audio",
-      "collection": "collection",
-      "etree": "etree",
-      "image": "image",
-      "data": "data",
-      "movies": "movies",
-      "movingimage": "movies",
-      "other": "question",
-      "software": "software",
-      "sound": "audio",
-      "stillimages": "image",
-      "text": "texts",
-      "texts": "texts",
-      "tv": "tv",
-      "unknown": "question",
-      "video": "movies",
-      "search": "search",
-      "forum": "comments",
-      "web": "web",
-      "article": "article",
-      "account": "person",
-      "quote": "quote",
-      "ad": "tv-commercial"
-    };
-
-    var icon = ICONS[mediatype];
-    if (!icon) icon = 'question';
-
-    return this.glyph({ name: icon });
-  }
-
-  static natcompare(a, b) {
-    return natcompare(a, b);
-  }
-
-  static AJS_on_dom_loaded() {
-    /*
-    This function is copied from archive.min.js because
-    a) its run there on DOMLoaded, which is before we've got anything on the page
-    b) Its anonymous in archive.min.js so can't call it
-     */
-    // Use this global hack, by adding class 'accessible-link' to any mouse-only element div/img
-    AJS.makeMouseElementAccessible('.accessible-link');
-
-    AJS.setUpActionTracking(); // Must be before other form submit handlers are assigned
-    AJS.setupPopupLink();
-    AJS.nav_tophat_setup();
-    AJS.nav_tophat_wb_setup();
-    AJS.setUpCreativeCommonsLicenseLink();
-    AJS.setUpSearchForms();
-
-    /* global  archive_setup */
-    if (typeof archive_setup !== 'undefined') {
-      // when DOM loaded/stable, do some setup
-      $(() => {
-        for (const fn of archive_setup) fn();
-      });
+        let x = nStr.split('.');
+        let x1 = x[0];
+        let x2 = x.length > 1 ? '.' + x[1] : '';
+        let rgx = /(\d+)(\d{3})/;
+        while (rgx.test(x1)) x1 = x1.replace(rgx, '$1' + ',' + '$2');
+        return x1 + x2;
     }
 
-    AJS.footer();
-  }
+    static glyph({ name = 'question', classes = '' } = {}) {
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'span',
+            { className: classes },
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-' + name, 'aria-hidden': 'true' }),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'span',
+                { className: 'sr-only' },
+                name
+            )
+        );
+    }
 
+    // pass in a <mediatype> value
+    static mediatype_icon(mediatype) {
+        const ICONS = {
+            "audio": "audio",
+            "collection": "collection",
+            "etree": "etree",
+            "image": "image",
+            "data": "data",
+            "movies": "movies",
+            "movingimage": "movies",
+            "other": "question",
+            "software": "software",
+            "sound": "audio",
+            "stillimages": "image",
+            "text": "texts",
+            "texts": "texts",
+            "tv": "tv",
+            "unknown": "question",
+            "video": "movies",
+            "search": "search",
+            "forum": "comments",
+            "web": "web",
+            "article": "article",
+            "account": "person",
+            "quote": "quote",
+            "ad": "tv-commercial"
+        };
+
+        let icon = ICONS[mediatype];
+        if (!icon) icon = 'question';
+
+        return this.glyph({ name: icon });
+    }
+
+    static natcompare(a, b) {
+        return natcompare(a, b);
+    }
+
+    static AJS_on_dom_loaded() {
+        /*
+        This function is copied from archive.min.js because
+        a) its run there on DOMLoaded, which is before we've got anything on the page
+        b) Its anonymous in archive.min.js so can't call it
+         */
+        // Use this global hack, by adding class 'accessible-link' to any mouse-only element div/img
+        // Note AJS is defined in archive_min.js
+        AJS.makeMouseElementAccessible('.accessible-link');
+
+        AJS.setUpActionTracking(); // Must be before other form submit handlers are assigned
+        AJS.setupPopupLink();
+        AJS.nav_tophat_setup();
+        AJS.nav_tophat_wb_setup();
+        AJS.setUpCreativeCommonsLicenseLink();
+        AJS.setUpSearchForms();
+
+        /* global  archive_setup */
+        if (typeof archive_setup !== 'undefined') {
+            // when DOM loaded/stable, do some setup
+            $(() => {
+                for (const fn of archive_setup) fn();
+            });
+        }
+
+        AJS.footer();
+    }
+
+    static async fetch_json(url) {
+        /*
+        url:   to be fetched - construct CORS safe JSON enquiry.
+        throws: TypeError if cant fetch
+        throws: Error if fetch doesnt return JSON.
+        resolves to: Decoded json response
+         */
+        let response = await fetch(new Request(url, // Throws TypeError on failed fetch
+        {
+            method: 'GET',
+            headers: new Headers(),
+            mode: 'cors',
+            cache: 'default',
+            redirect: 'follow' // Chrome defaults to manual
+        }));
+        if (response.ok) {
+            if (response.headers.get('Content-Type') === "application/json") {
+                return await response.json(); // response.json is a promise resolving to JSON already parsed
+            } else {
+                let t = response.text(); // promise resolving to text
+                throw new Error(`Unable to fetch, return was not JSON - got: ${response.headers.get('Content-Type')} ${t}`);
+            }
+        } // TODO-HTTP may need to handle binary as a buffer instead of text if build binary version of this.
+    }
 });
 
 // minified FROM http://sourcefrog.net/projects/natsort/natcompare.js
 function isWhitespaceChar(B) {
-  var A;A = B.charCodeAt(0);if (A <= 32) {
-    return true;
-  } else {
-    return false;
-  }
-}function isDigitChar(B) {
-  var A;A = B.charCodeAt(0);if (A >= 48 && A <= 57) {
-    return true;
-  } else {
-    return false;
-  }
-}function compareRight(E, B) {
-  var G = 0;var F = 0;var D = 0;var C;var A;for (;; F++, D++) {
-    C = E.charAt(F);A = B.charAt(D);if (!isDigitChar(C) && !isDigitChar(A)) {
-      return G;
+    var A;A = B.charCodeAt(0);if (A <= 32) {
+        return true;
     } else {
-      if (!isDigitChar(C)) {
-        return -1;
-      } else {
-        if (!isDigitChar(A)) {
-          return +1;
-        } else {
-          if (C < A) {
-            if (G == 0) {
-              G = -1;
-            }
-          } else {
-            if (C > A) {
-              if (G == 0) {
-                G = +1;
-              }
-            } else {
-              if (C == 0 && A == 0) {
-                return G;
-              }
-            }
-          }
-        }
-      }
+        return false;
     }
-  }
-}function natcompare(I, H) {
-  var C = 0,
-      A = 0;var D = 0,
-      B = 0;var F, E;var G;while (true) {
-    D = B = 0;F = I.charAt(C);E = H.charAt(A);while (isWhitespaceChar(F) || F == "0") {
-      if (F == "0") {
-        D++;
-      } else {
-        D = 0;
-      }F = I.charAt(++C);
-    }while (isWhitespaceChar(E) || E == "0") {
-      if (E == "0") {
-        B++;
-      } else {
-        B = 0;
-      }E = H.charAt(++A);
-    }if (isDigitChar(F) && isDigitChar(E)) {
-      if ((G = compareRight(I.substring(C), H.substring(A))) != 0) {
-        return G;
-      }
-    }if (F == 0 && E == 0) {
-      return D - B;
-    }if (F < E) {
-      return -1;
+}function isDigitChar(B) {
+    var A;A = B.charCodeAt(0);if (A >= 48 && A <= 57) {
+        return true;
     } else {
-      if (F > E) {
-        return +1;
-      }
-    }++C;++A;
-  }
+        return false;
+    }
+}function compareRight(E, B) {
+    var G = 0;var F = 0;var D = 0;var C;var A;for (;; F++, D++) {
+        C = E.charAt(F);A = B.charAt(D);if (!isDigitChar(C) && !isDigitChar(A)) {
+            return G;
+        } else {
+            if (!isDigitChar(C)) {
+                return -1;
+            } else {
+                if (!isDigitChar(A)) {
+                    return +1;
+                } else {
+                    if (C < A) {
+                        if (G == 0) {
+                            G = -1;
+                        }
+                    } else {
+                        if (C > A) {
+                            if (G == 0) {
+                                G = +1;
+                            }
+                        } else {
+                            if (C == 0 && A == 0) {
+                                return G;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}function natcompare(I, H) {
+    var C = 0,
+        A = 0;var D = 0,
+        B = 0;var F, E;var G;while (true) {
+        D = B = 0;F = I.charAt(C);E = H.charAt(A);while (isWhitespaceChar(F) || F == "0") {
+            if (F == "0") {
+                D++;
+            } else {
+                D = 0;
+            }F = I.charAt(++C);
+        }while (isWhitespaceChar(E) || E == "0") {
+            if (E == "0") {
+                B++;
+            } else {
+                B = 0;
+            }E = H.charAt(++A);
+        }if (isDigitChar(F) && isDigitChar(E)) {
+            if ((G = compareRight(I.substring(C), H.substring(A))) != 0) {
+                return G;
+            }
+        }if (F == 0 && E == 0) {
+            return D - B;
+        }if (F < E) {
+            return -1;
+        } else {
+            if (F > E) {
+                return +1;
+            }
+        }++C;++A;
+    }
 };
 
 /***/ }),
@@ -421,28 +511,21 @@ class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default *
         console.log('search for:', 'http://archive.org/advancedsearch.php?output=json&q=' + query + '&rows=' + limit + '&sort[]=' + sort);
     }
     async fetch() {
-        let response = await fetch(new Request( // Note almost identical code on Details.js and Search.js
-        //'https://archive.org/advancedsearch.php?output=json&q='
-        'https://gateway.dweb.me/metadata/advancedsearch?output=json&q=' // Go through gateway at dweb.me because of CORS issues (approved by Sam!)
-        //'http://localhost:4244/metadata/advancedsearch?output=json&q='    // When testing
-        + this.query + '&rows=' + this.limit + '&sort[]=' + this.sort, {
-            method: 'GET',
-            headers: new Headers(),
-            mode: 'cors',
-            cache: 'default',
-            redirect: 'follow' // Chrome defaults to manual
-        }));
-        if (response.ok) {
-            if (response.headers.get('Content-Type') === "application/json") {
-                let j = await response.json(); // response.json is a promise resolving to JSON already parsed
-                this.items = j.response.docs;
-            } else {
-                let t = response.text(); // promise resolving to text
-                console.log("Expecting JSON but got", t);
-            }
-        } // TODO-HTTP may need to handle binary as a buffer instead of text
+        /* Do an advanced search.
+            Goes through gateway.dweb.me so that we can work around a CORS issue (general approach & security questions confirmed with Sam!)
+             this.id Archive Item identifier
+            throws: TypeError or Error if fails
+            resolves to: this
+         */
+        let j = await __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].fetch_json(
+        //`https://archive.org/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`, // Archive (CORS fail)
+        `https://gateway.dweb.me/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`
+        //`http://localhost:4244/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`, //Testing
+        );
+        this.items = j.response.docs;
         return this; // For chaining, but note will need to do an "await fetch"
     }
+
     nodeHtmlAfter() {
         /* Return htm to insert before Nav wrapped part for use in node*/
         return `
@@ -1233,15 +1316,175 @@ class Texts extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
         this.item = item;
     }
     jsxInNav(onbrowser) {
-        //TODO-DETAILS redo this to use a template, note div outside iframe is just to keep JSX happy
+        //TODO-DETAILS Description does not appear in this Navwrap section, its in the stuff underneath that which is not yet on a page.
         let item = this.item;
+        let metadata = item.metadata;
+        let detailsURL = `https://archive.org/details/${this.id}`;
+        let imageURL = `https://archive.org/services/img/${this.id}`;
+        //TODO-DETAILS-DWEB use alternative URLS via IPFS
+        //TODO-STREAM pass as stream
+        let streamURL = `https://archive.org/stream/${this.id}`; //{1992.Zandvoorts.Nieuwsblad}`; //TODO-TEXTS Cant find 2nd part of URL
+        //let streamURL = `https://archive.org/stream/${this.id}/1992.Zandvoorts.Nieuwsblad`;   // In archive.org but needs looking for this string in file names
+        //let iframeURL = `${streamURL}?ui=embed#mode/2up`;   //This comes from Traceys code and works
+        let iframeURL = `${streamURL}?ui=embed`; //This works and matches archive.org
+        let shortEmbedURL = `https://archive.org/stream/${this.id}?ui=embed`; //Note on archive.org/details this is different from iframeURL and not clear if that is intentional
+        let helpURL = `https://archive.org/help/audio.php?identifier=${this.id}`;
+        //TODO check if its Twitter share title= as on text page, or data-original-title as on image page
+        //TODO maybe merge sharing section with Image.js which is identical (first div under cher-body
         return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
             'div',
-            null,
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('iframe', { width: '100%', height: '480', src: `https://archive.org/stream/${this.id}?ui=embed#mode/2up` }),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { dangerouslySetInnerHTML: { __html: item.metadata.description } }),
-            ' '
+            { id: 'theatre-ia-wrap', 'class': 'container container-ia width-max ' },
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemprop: 'url', href: detailsURL }),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemprop: 'image', href: imageURL }),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'h1',
+                { 'class': 'sr-only' },
+                metadata.title
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'h2',
+                { 'class': 'sr-only' },
+                'Item Preview'
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'div',
+                { id: 'theatre-ia', 'class': 'container' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { 'class': 'row' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { 'class': 'xs-col-12' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { id: 'theatre-controls' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { href: streamURL },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { title: 'fullscreen view', 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left',
+                                    'class': 'iconochive-fullscreen' })
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { href: streamURL },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { title: 'search inside', 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left',
+                                    'class': 'iconochive-search' })
+                            )
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { id: 'texty', style: 'font-size:0px', 'class': '' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('iframe', { src: iframeURL,
+                                width: '100%', height: '480', frameborder: '0', webkitallowfullscreen: 'true',
+                                mozallowfullscreen: 'true', allowfullscreen: true })
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { id: 'cher-modal', 'class': 'modal fade', role: 'dialog', 'aria-hidden': 'true' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'div',
+                                { 'class': 'modal-dialog modal-lg' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'div',
+                                    { 'class': 'modal-content', style: 'padding:10px;' },
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'div',
+                                        { 'class': 'modal-header' },
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'button',
+                                            { type: 'button', 'class': 'close', 'data-dismiss': 'modal', 'aria-hidden': 'true' },
+                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', {
+                                                'class': 'iconochive-remove-circle', 'aria-hidden': 'true' }),
+                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                'span',
+                                                {
+                                                    'class': 'sr-only' },
+                                                'remove-circle'
+                                            )
+                                        ),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'h3',
+                                            { 'class': 'modal-title' },
+                                            'Share or Embed This Item'
+                                        )
+                                    ),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'div',
+                                        { id: 'cher-body' },
+                                        this.sharing(),
+                                        ' (/* Significant expansion here for all the sharing links*/}',
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'div',
+                                            null,
+                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                'form',
+                                                { 'class': 'form', role: 'form' },
+                                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                    'div',
+                                                    { 'class': 'form-group' },
+                                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                        'label',
+                                                        null,
+                                                        'EMBED'
+                                                    ),
+                                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                        'textarea',
+                                                        { id: 'embedcodehere', 'class': 'form-control textarea-invert-readonly',
+                                                            rows: '3', readonly: 'readonly' },
+                                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('iframe', {
+                                                            src: shortEmbedURL,
+                                                            width: '480', height: '430', frameborder: '0',
+                                                            webkitallowfullscreen: 'true', mozallowfullscreen: 'true',
+                                                            allowfullscreen: true })
+                                                    )
+                                                )
+                                            )
+                                        ),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'div',
+                                            null,
+                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                'form',
+                                                { 'class': 'form', role: 'form' },
+                                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                    'div',
+                                                    { 'class': 'form-group' },
+                                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                        'label',
+                                                        null,
+                                                        'EMBED (for wordpress.com hosted blogs)'
+                                                    ),
+                                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                        'textarea',
+                                                        { id: 'embedcodehereWP', 'class': 'form-control textarea-invert-readonly',
+                                                            rows: '3', readonly: 'readonly' },
+                                                        '[',
+                                                        this.id,
+                                                        ' width=560 height=384 frameborder=0 webkitallowfullscreen=true mozallowfullscreen=true]'
+                                                    )
+                                                )
+                                            )
+                                        ),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'div',
+                                            null,
+                                            'Want more?',
+                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                'a',
+                                                { href: helpURL },
+                                                'Advanced embedding details, examples, and help'
+                                            ),
+                                            '!'
+                                        )
+                                    )
+                                )
+                            )
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('center', { style: 'color:white;margin-bottom:10px' })
+                    )
+                )
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'flag-overlay', 'class': 'center-area ' })
         );
     }
 }
@@ -1280,12 +1523,13 @@ class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
         let item = this.item;
         let itemid = item.metadata.identifier; // Shortcut as used a lot
         let mainfile = item.files.find(fi => ['JPEG'].includes(fi.format)); //TODO-DETAILS-IMAGE probably add other formats
-        let detailsurl = `https://archive.org/details/${itemid}`; //TODO-DETAILS-DWEB will move to this decentralized page, but check usages (like tweet) below
+        let detailsURL = `https://archive.org/details/${itemid}`; //TODO-DETAILS-DWEB will move to this decentralized page, but check usages (like tweet) below
         let embedurl = `https://archive.org/embed/${itemid}`;
+        //TODO-DETAILS check if flag-overlay should include description
         return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
             'div',
             { id: 'theatre-ia-wrap', className: 'container container-ia width-max  resized', style: { height: "600px" } },
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemProp: 'url', href: detailsurl }),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemProp: 'url', href: detailsURL }),
             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemProp: 'thumbnailUrl', href: 'https://archive.org/services/img/{itemid}' }),
             item.files.filter(fi => fi.source !== "metadata").map(fi => __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemProp: 'associatedMedia', href: `https://archive.org/download/${itemid}/${fi.name}`, key: `${itemid}/${fi.name}` })),
             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
@@ -1408,74 +1652,8 @@ class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
                                     __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                                         'div',
                                         { id: 'cher-body' },
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'div',
-                                            { style: { textAlign: "center", margin: "50px auto" } },
-                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                                'div',
-                                                { className: 'topinblock' },
-                                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                                    'div',
-                                                    { id: 'sharer' },
-                                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                                        'a',
-                                                        { href: `https://twitter.com/intent/tweet?url=${detailsurl};via=internetarchive&amp;text=${item.metadata.title}+%3A+${item.metadata.creator}+%3A+Free+Download+%26+Streaming+%3A+Internet+Archive`,
-                                                            target: '_blank' },
-                                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-twitter', 'data-toggle': 'tooltip',
-                                                            'data-placement': 'bottom', title: '',
-                                                            'data-original-title': 'Share to Twitter' })
-                                                    ),
-                                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                                        'a',
-                                                        { href: `https://www.facebook.com/sharer/sharer.php?u=${detailsurl}`,
-                                                            target: '_blank' },
-                                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-facebook', 'data-toggle': 'tooltip',
-                                                            'data-placement': 'bottom', title: '',
-                                                            'data-original-title': 'Share to Facebook' })
-                                                    ),
-                                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                                        'a',
-                                                        { href: `https://plus.google.com/share?url=${detailsurl}`,
-                                                            target: '_blank' },
-                                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-googleplus', 'data-toggle': 'tooltip',
-                                                            'data-placement': 'bottom', title: '',
-                                                            'data-original-title': 'Share to Google+' })
-                                                    ),
-                                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                                        'a',
-                                                        { href: `http://www.reddit.com/submit?url=${detailsurl};title=${item.metadata.title}+%3A+${item.metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`,
-                                                            target: '_blank' },
-                                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-reddit', 'data-toggle': 'tooltip',
-                                                            'data-placement': 'bottom', title: '',
-                                                            'data-original-title': 'Share to Reddit' })
-                                                    ),
-                                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                                        'a',
-                                                        { href: `https://www.tumblr.com/share/video?embed=%3Ciframe+width%3D%22640%22+height%3D%22480%22+frameborder%3D%220%22+allowfullscreen+src%3D%22https%3A%2F%2Farchive.org%2Fembed%2F%22+webkitallowfullscreen%3D%22true%22+mozallowfullscreen%3D%22true%22%26gt%3B%26lt%3B%2Fiframe%3E&;name=${item.metadata.title}+%3A+${item.metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`,
-                                                            target: '_blank' },
-                                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-tumblr', 'data-toggle': 'tooltip',
-                                                            'data-placement': 'bottom', title: '',
-                                                            'data-original-title': 'Share to Tumblr' })
-                                                    ),
-                                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                                        'a',
-                                                        { href: `http://www.pinterest.com/pin/create/button/?url=${detailsurl}&;description=${item.metadata.title}+%3A+${item.metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`,
-                                                            target: '_blank' },
-                                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-pinterest', 'data-toggle': 'tooltip',
-                                                            'data-placement': 'bottom', title: '',
-                                                            'data-original-title': 'Share to Pinterest' })
-                                                    ),
-                                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                                        'a',
-                                                        { href: `mailto:?body=${detailsurl}&;subject=${item.metadata.title} : ${item.metadata.creator} : Free Download &amp; Streaming : Internet Archive` },
-                                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-email', 'data-toggle': 'tooltip',
-                                                            'data-placement': 'bottom', title: '',
-                                                            'data-original-title': 'Share via email' })
-                                                    )
-                                                ),
-                                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', { clear: 'all', className: 'clearfix' })
-                                            )
-                                        ),
+                                        this.sharing(),
+                                        ' ',
                                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                                             'div',
                                             null,
