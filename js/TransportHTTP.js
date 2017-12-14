@@ -29,7 +29,7 @@ class TransportHTTP extends Transport {
         super(options, verbose);
         this.options = options;
         this.urlbase = options.http.urlbase;
-        this.supportURLs = ['http','https'];
+        this.supportURLs = ['contenthash', 'http','https']; // http and https are legacy
         this.supportFunctions = ['fetch', 'store', 'add', 'list', 'reverse']; //Does not support: listmonitor - reverse is disabled somewhere not sure if here or caller
         this.name = "HTTP";             // For console log etc
         this.status = Dweb.Transport.STATUS_LOADED;
@@ -89,14 +89,23 @@ class TransportHTTP extends Transport {
         try {
             if (url) {
                 let parsedurl = Url.parse(url);
-                let multihash = parsedurl.pathname.split('/').slice(-1);
+                let pathparts = parsedurl.pathname.split('/');
+                let multihash;
+                if (parsedurl.protocol === "https" && parsedurl.host === "gateway.dweb.me" && parsedurl.pathname.includes('/content/rawfetch')) {
+                    multihash = pathparts.slice(-1);
+                } else if (parsedurl.protocol === "contenthash" && pathparts[1] === "contenthash") {
+                    multihash = pathparts.slice(1); // 0 is before the / and is always empty
+                } else {
+                    // noinspection ExceptionCaughtLocallyJS
+                    throw new Dweb.errors.TransportError(`Malformed URL: ${url}`);
+                }
                 if (multihash) httpurl += "/" + multihash;
             }
             if (verbose) console.log(command, "httpurl=%s init=%o", httpurl, init);
             //console.log('CTX=',init["headers"].get('Content-Type'))
             // Using window.fetch, because it doesn't appear to be in scope otherwise in the browser.
             let response = await fetch(new Request(httpurl, init));
-            // fetch throws (on Chrome, untested on Ffox or Node) TypeError: Failed to fetch)
+            // fetch throws (on Chrome, untested on Firefox or Node) TypeError: Failed to fetch)
             if (response.ok) {
                 if (response.headers.get('Content-Type') === "application/json") {
                     return response.json(); // promise resolving to JSON
@@ -127,7 +136,10 @@ class TransportHTTP extends Transport {
             cache: 'default',
             redirect: 'follow',  // Chrome defaults to manual
         };
-        return this.p_httpfetch(command, url, init, verbose);
+        url = this.p_httpfetch(command, url, init, verbose); // This s a real http url
+        let parsedurl = Url.parse(url);
+        let pathparts = parsedurl.pathname.split('/');
+        return `contenthash:/contenthash/${pathparts.slice[-1]}`
     }
 
     p_post(command, url, type, data, verbose) {
@@ -185,7 +197,7 @@ class TransportHTTP extends Transport {
         //verbose=true;
         if (!url || !sig) throw new Dweb.errors.CodingError("TransportHTTP.p_rawadd: invalid parms",url, sig);
         if (verbose) console.log("rawadd", url, sig);
-        let value = JSON.stringify(sig.preflight(Object.assign({},sig)))+"\n"
+        let value = JSON.stringify(sig.preflight(Object.assign({},sig)))+"\n";
         return this.p_post("void/rawadd", url, "application/json", value, verbose); // Returns immediately
     }
 
