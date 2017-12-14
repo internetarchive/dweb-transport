@@ -230,7 +230,7 @@ class TransportIPFS extends Transport {
             .p_setup1(verbose);             // Connect
     }
 
-    async p_status() {
+    async p_status(verbose) {
         /*
         Return a string for the status of a transport. No particular format, but keep it short as it will probably be in a small area of the screen.
          */

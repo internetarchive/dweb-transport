@@ -194,7 +194,7 @@ function refresh_transportstatuses(el) {
 async function _p_connecteach(t) {
     /* Sub call for p_connect to fix some async issues, makes sure this is a single promise resolving to undefined */
     await t.p_setup1(verbose);
-    await t.p_status(); // Set the status field of t, may make async enquiry of server etc
+    await t.p_status(verbose); // Set the status field of t, may make async enquiry of server etc
     refresh_transportstatuses("transportstatuses"); // Update status for anything,
     return undefined;
 }

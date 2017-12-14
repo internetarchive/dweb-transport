@@ -61,16 +61,16 @@ class TransportHTTP extends Transport {
             .p_setup1(verbose);     // And connect
     }
 
-    async p_status() {    //TODO-BACKPORT
+    async p_status(verbose) {    //TODO-BACKPORT
         /*
         Return a string for the status of a transport. No particular format, but keep it short as it will probably be in a small area of the screen.
         resolves to: String representing type connected (always HTTP) and online if online.
          */
         try {
-            this.info = await this.p_info();
+            this.info = await this.p_info(verbose);
             this.status = Dweb.Transport.STATUS_CONNECTED;
         } catch(err) {
-            console.log("Error in p_status.info",err.message);
+            console.log(this.name, ": Error in p_status.info",err.message);
             this.status = Dweb.Transport.STATUS_FAILED;
         }
         return this.status;
@@ -126,9 +126,10 @@ class TransportHTTP extends Transport {
         }
     }
 
-    p_get(command, url, verbose) {
+    async p_get(command, url, verbose) {
         // Locate and return a block, based on its url
         // Throws TransportError if fails
+        // resolves to: URL that can be used to fetch the resource, of form contenthash:/contenthash/Q123
         let init = {    //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
             method: 'GET',
             headers: new Headers(),
@@ -136,10 +137,7 @@ class TransportHTTP extends Transport {
             cache: 'default',
             redirect: 'follow',  // Chrome defaults to manual
         };
-        url = this.p_httpfetch(command, url, init, verbose); // This s a real http url
-        let parsedurl = Url.parse(url);
-        let pathparts = parsedurl.pathname.split('/');
-        return `contenthash:/contenthash/${pathparts.slice[-1]}`
+        return await this.p_httpfetch(command, url, init, verbose); // This s a real http url
     }
 
     p_post(command, url, type, data, verbose) {
@@ -181,16 +179,20 @@ class TransportHTTP extends Transport {
     }
     rawreverse() { throw new Dweb.errors.ToBeImplementedError("Undefined function TransportHTTP.rawreverse"); }
 
-    p_rawstore(data, verbose) {
+    async p_rawstore(data, verbose) {
         /*
         Store data on http server,
         data:   string
-        returns {string}: url
+        resolves to: {string}: url
         throws: TransportError on failure in p_post > p_httpfetch
          */
         //PY: res = self._sendGetPost(True, "rawstore", headers={"Content-Type": "application/octet-stream"}, urlargs=[], data=data, verbose=verbose)
         console.assert(data, "TransportHttp.p_rawstore: requires data");
-        return this.p_post("contenturl/rawstore", null, "application/octet-stream", data, verbose); // resolves to URL
+        let res = await this.p_post("contenturl/rawstore", null, "application/octet-stream", data, verbose); // resolves to URL
+        let parsedurl = Url.parse(res);
+        let pathparts = parsedurl.pathname.split('/');
+        return `contenthash:/contenthash/${pathparts.slice(-1)}`
+
     }
 
     p_rawadd(url, sig, verbose) { //TODO-BACKPORT turn date into ISO before adding
@@ -205,7 +207,7 @@ class TransportHTTP extends Transport {
         return this;  // I think this should be a noop - fetched already
     }
 
-    p_info() { return this.p_get("info"); } //TODO-BACKPORT
+    p_info(verbose) { return this.p_get("info", undefined, verbose); } //TODO-BACKPORT
 
 }
 exports = module.exports = TransportHTTP;

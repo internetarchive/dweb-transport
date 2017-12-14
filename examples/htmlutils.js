@@ -12,6 +12,8 @@ function urlsFrom(url) {
     if (typeof(url) === "string") {
         if (url[0] === '[')
             url = JSON.parse(url);
+        else if (url.includes(','))
+            url = url.split(',');
         else
             url = [ url ];
     }
