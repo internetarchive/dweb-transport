@@ -40,7 +40,7 @@ const Dweb = require('./Dweb');
 //Debugging only
 
 let defaultipfsoptions = {
-    repo: '/tmp/ipfs_dweb20171029', //TODO-IPFS think through where, esp for browser
+    repo: '/tmp/dweb_ipfsv2700', //TODO-IPFS think through where, esp for browser
     //init: false,
     //start: false,
     //TODO-IPFS-Q how is this decentralized - can it run offline? Does it depend on star-signal.cloud.ipfs.team

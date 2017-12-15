@@ -88,13 +88,13 @@ class TransportHTTP extends Transport {
         let httpurl = `${this.urlbase}/${command}`;
         try {
             if (url) {
-                let parsedurl = Url.parse(url);
+                let parsedurl = Url.parse(url);     // Note this works for both string andd already passed url.
                 let pathparts = parsedurl.pathname.split('/');
                 let multihash;
                 if (parsedurl.protocol === "https" && parsedurl.host === "gateway.dweb.me" && parsedurl.pathname.includes('/content/rawfetch')) {
                     multihash = pathparts.slice(-1);
-                } else if (parsedurl.protocol === "contenthash" && pathparts[1] === "contenthash") {
-                    multihash = pathparts.slice(1); // 0 is before the / and is always empty
+                } else if (parsedurl.protocol === "contenthash:" && pathparts[1] === "contenthash") {
+                    multihash = pathparts[2]; // 0 is before the / and is always empty
                 } else {
                     // noinspection ExceptionCaughtLocallyJS
                     throw new Dweb.errors.TransportError(`Malformed URL: ${url}`);
