@@ -102,8 +102,8 @@ class TransportHTTP extends Transport {
                     multihash = pathparts.slice(-1);
                 } else if (parsedurl.protocol === "contenthash:" && pathparts[1] === "contenthash") {
                     multihash = pathparts[2]; // 0 is before the / and is always empty
-                } else if (["https","http"].includes(parsedurl.protocol) && (command == servercommands.rawfetch)) {
-                    httpurl = url;  // Support just the raw URL, but only for fetch
+                } else if (["https:","http:"].includes(parsedurl.protocol) && (command == servercommands.rawfetch)) {
+                    httpurl = url.href;  // Support just the raw URL, but only for fetch
                 } else {
                     // noinspection ExceptionCaughtLocallyJS
                     throw new Dweb.errors.TransportError(`Malformed URL: ${url}`);
