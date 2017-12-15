@@ -60,7 +60,7 @@ async function registrationsubmit() {
 async function loginformsubmit() {
     /* Login button clicked - User has logged in */
     // At the moment this is identical behavior to p_registrationsubmit, but that could change
-    //TODO-REL4 - check if user already exists, require "registration if not
+    //TODO - check if user already exists, require "registration if not
     if (verbose) console.group("loginformsubmit ---");
     hide('loginform');                           // Hide after submission
     await p_login("loginform");    // { name, passphrase }
