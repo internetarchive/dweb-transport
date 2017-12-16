@@ -7,7 +7,13 @@ require('babel-core/register')({ presets: ['es2015', 'react']}); // ES6 JS below
 import React from './ReactFake';
 import Util from './Util';
 import Search from './Search';
-import ArchiveFactory from './ArchiveFactory';
+import Details from './Details'
+import Home from './Home'
+import Collection from './Collection'
+import Texts from './Texts'
+import Image from './Image'
+import AV from './AV'
+import DetailsError from './DetailsError'
 
 
 export default class Nav { //extends React.Component
@@ -133,7 +139,7 @@ export default class Nav { //extends React.Component
     let destn = document.getElementById('main'); // Blank window (except Nav) as loading
     Nav.clear(destn);
     //let d = await new Details(id).fetch(); // Gets back a obj fetched and ready to render
-    await ArchiveFactory.factory(id, destn, ""); // Not sure what returning ....
+    await Nav.factory(id, destn, ""); // Not sure what returning ....
     return false; // Dont follow anchor link - unfortunately React ignores this
   }
 
@@ -145,5 +151,37 @@ export default class Nav { //extends React.Component
         s.render(destn, "");
 
   }
+
+    static async factory(itemid, res, htm) {
+        if (!itemid) {
+            (await new Home(itemid, undefined).fetch()).render(res, htm);
+        } else {
+            let obj = await new Details(itemid).fetch();
+            item = obj.item;
+            if (!item.metadata) {
+                new DetailsError(itemid, item, `item ${itemid} cannot be found or does not have metadata`).render(res, htm);
+            } else {
+                if (verbose) console.log("Found mediatype", item.metadata.mediatype);
+                switch (item.metadata.mediatype) {
+                    case "collection":
+                        return (await new Collection(itemid, item).fetch()).render(res, htm);
+                        break;
+                    case "texts":
+                        new Texts(itemid, item).render(res, htm);
+                        break;
+                    case "image":
+                        new Image(itemid, item).render(res, htm);
+                        break;
+                    case "audio": // Intentionally drop thru to movies
+                    case "movies":
+                        new AV(itemid, item).render(res, htm);
+                        break;
+                    default:
+                        new DetailsError(itemid, item, `Unsupported mediatype: ${item.metadata.mediatype}`).render(res, htm);
+                    //    return new Nav(")
+                }
+            }
+        }
+    }
 
 }
