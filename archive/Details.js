@@ -23,6 +23,32 @@ export default class Details extends ArchiveBase {
         this.item = await Util.fetch_json(`https://archive.org/metadata/${this.id}`);
         return this; // For chaining, but note will need to do an "await fetch"
     }
+
+    cherModal(type, onbrowser) {
+        return(
+            <div id="cher-modal" className="modal fade" role="dialog" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content" style="padding:10px;">
+                        <div class="modal-header">
+                            <button type="button" class="close" data-dismiss="modal" aria-hidden="true"><span
+                                    class="iconochive-remove-circle" aria-hidden="true"></span><span class="sr-only">remove-circle</span>
+                            </button>
+                            <h3 class="modal-title">Share or Embed This Item</h3>
+                        </div>{/*--/.modal-header--*/}
+                        <div id="cher-body">
+                            {this.sharing(onbrowser)}
+                            {this.embed(onbrowser)}
+                            {this.embedWordpress(onbrowser)}
+                            {this.embedAdvanced(type, onbrowser)}
+                        </div>{/*--/#cher-body--*/}
+                    </div>{/*--/.modal-content--*/}
+                </div>{/*--/.modal-dialog--*/}
+            </div>
+        );
+    }
+
+
+
     sharing(onbrowser) {
         //Common text across Image and Text and possibly other subclasses
         let item = this.item;
@@ -73,6 +99,11 @@ export default class Details extends ArchiveBase {
                                  data-placement="bottom" title=""
                                  data-original-title="Share to Pinterest"></div>
                         </a>
+                        <a href={`https://archive.org/pop/editor.html?initialMedia=${detailsURL}`}
+                           target="_blank">
+                            <div class="sharee iconochive-popcorn" data-toggle="tooltip"
+                                 data-placement="bottom" title="Share to Popcorn Maker"></div>
+                        </a>
                         <a href={`mailto:?body=${detailsURL}&amp;subject=${sharingText} : ${metadata.creator} : Free Download &amp; Streaming : Internet Archive`}>
                             <div className="sharee iconochive-email" data-toggle="tooltip"
                                  data-placement="bottom" title=""
@@ -85,6 +116,51 @@ export default class Details extends ArchiveBase {
 
         );
     }
-
+    embedWordpress(onbrowser) {
+        // THis appeared on image and movie examples
+        let item = this.item;
+        let itemid = item.metadata.identifier; // Shortcut as used a lot
+        return (
+            <div>
+                <form className="form" role="form">
+                    <div className="form-group">
+                        <label>EMBED (for wordpress.com hosted blogs)</label>
+                        <textarea id="embedcodehereWP" className="form-control textarea-invert-readonly"
+                                  rows="3" readOnly="readonly">{`[archiveorg ${itemid} width=560 height=384 frameborder=0 webkitallowfullscreen=true mozallowfullscreen=true]`}</textarea>
+                    </div>
+                </form>
+            </div>
+        );
+    }
+    embedAdvanced(type, onbrowser) {
+        // From text, video, image
+        let item = this.item;
+        let itemid = item.metadata.identifier; // Shortcut as used a lot
+        return(
+            <div>
+                Want more?
+                <a href={`https://archive.org/help/${type}.php?identifier=${itemid}`}>Advanced embedding details, examples, and
+                    help</a>!
+            </div>
+        );
+    }
+    embed(onbrowser) {
+        // Same on text, video, image
+        let shortEmbedURL = `https://archive.org/stream/${this.id}?ui=embed`;    //Note on archive.org/details this is different from iframeURL and not clear if that is intentional
+        return(
+            <div>
+                <form class="form" role="form">
+                    <div class="form-group">
+                        <label>EMBED</label>
+                        <textarea id="embedcodehere" class="form-control textarea-invert-readonly"
+                                  rows="3" readonly="readonly"><iframe
+                                src={shortEmbedURL}
+                                width="480" height="430" frameborder="0"
+                                webkitallowfullscreen="true" mozallowfullscreen="true"
+                                allowfullscreen></iframe></textarea>
+                    </div>
+                </form>
+            </div>
+        );
+    }
 }
-

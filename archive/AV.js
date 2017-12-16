@@ -46,14 +46,56 @@ export default class AV extends Details {
                 this.playlist.push({title:(fi.title ? fi.title : fi.name), sources:[{file:'https://archive.org/download/'+this.id+'/'+fi.name}]});
             this.playlist[0].image = 'https://archive.org/services/img/' + this.id;
         }
-        //TODO-DETAILS redo using a template - note outer div just to keep JSX happy
+        //TODO - check where h1 title and dangerous description appear in archive.org/details/commute
+        /*
         return (
             <div>
             <h1>{item.metadata.title}</h1>
         { (avs.length) ?  ( <div id="jw6"></div> ) : undefined }
-            <div dangerouslySetInnerHTML={{__html: item.metadata.description}}></div> {/*TODO-DETAILS probably a security issue inherited from Tracys code as banner could contain user-generated html*/}
+            <div dangerouslySetInnerHTML={{__html: item.metadata.description}}></div>
         </div>
         );
-        }
+        */
+        return (
+            <div id="theatre-ia" class="container">
+                <div class="row">
+                    <div class="xs-col-12">
 
+                        <div id="theatre-controls">
+                            <a href="#" id="gofullscreen" onclick="jwplayer('jw6').setFullscreen()">
+                                <div data-toggle="tooltip" data-container="body" data-placement="left" class="iconochive-fullscreen"
+                                     title="fullscreen view"></div>
+                            </a>
+                            <a href="#" onclick="return AJS.flash_click(0)">
+                                <div data-toggle="tooltip" data-container="body" data-placement="left" class="iconochive-flash"
+                                     title="Click to have player try flash first, then HTML5 second"></div>
+                            </a>
+                            <a href="#" onclick="return AJS.mute_click()">
+                                <div data-toggle="tooltip" data-container="body" data-placement="left" class="iconochive-unmute"
+                                     title="sound is on.  click to mute sound."></div>
+                            </a>
+                            <a href="#" onclick="return AJS.mute_click()">
+                                <div data-toggle="tooltip" data-container="body" data-placement="left" class="iconochive-mute"
+                                     style="display:none" title="sound is off.  click for sound."></div>
+                            </a>
+                        </div>{/*--/#theatre-controls--*/}
+                        <noscript>
+                            <div class="alert alert-danger alert-dismissable" data-dismiss="alert">
+                                <button type="button" class="close" data-dismiss="alert" aria-hidden="true"><span
+                                        class="iconochive-remove-circle" aria-hidden="true"></span><span class="sr-only">remove-circle</span>
+                                </button>
+                                Internet Archive&apos;s in-browser
+                                video player requires JavaScript to be enabled.
+                                It appears your browser does not have it turned on.
+                                Please see your browser settings for this feature.
+                            </div>
+                        </noscript>
+
+                        <div id="jw6"></div>
+                        {this.cherModal("video", onbrowser)}
+                    </div> {/*--/.xs-col-12--*/}
+                </div>{/*--/.row--*/}
+            </div>
+        );
     }
+}

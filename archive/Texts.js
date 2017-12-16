@@ -55,51 +55,7 @@ export default class Texts extends Details {
                                         width="100%" height="480" frameborder="0" webkitallowfullscreen="true"
                                         mozallowfullscreen="true" allowfullscreen></iframe>
                             </div>
-
-                            <div id="cher-modal" class="modal fade" role="dialog" aria-hidden="true">
-                                <div class="modal-dialog modal-lg">
-                                    <div class="modal-content" style="padding:10px;">
-                                        <div class="modal-header">
-                                            <button type="button" class="close" data-dismiss="modal" aria-hidden="true"><span
-                                                    class="iconochive-remove-circle" aria-hidden="true"></span><span
-                                                    class="sr-only">remove-circle</span></button>
-                                            <h3 class="modal-title">Share or Embed This Item</h3>
-                                        </div>{/*/.modal-header*/}
-
-                                        <div id="cher-body">
-                                            {this.sharing()} (/* Significant expansion here for all the sharing links*/}
-                                            <div>
-                                                <form class="form" role="form">
-                                                    <div class="form-group">
-                                                        <label>EMBED</label>
-                                                        <textarea id="embedcodehere" class="form-control textarea-invert-readonly"
-                                                                  rows="3" readonly="readonly"><iframe
-                                                                src={shortEmbedURL}
-                                                                width="480" height="430" frameborder="0"
-                                                                webkitallowfullscreen="true" mozallowfullscreen="true"
-                                                                allowfullscreen></iframe></textarea>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                            <div>
-                                                <form class="form" role="form">
-                                                    <div class="form-group">
-                                                        <label>EMBED (for wordpress.com hosted blogs)</label>
-                                                        <textarea id="embedcodehereWP" class="form-control textarea-invert-readonly"
-                                                                  rows="3" readonly="readonly">[{this.id} width=560 height=384 frameborder=0 webkitallowfullscreen=true mozallowfullscreen=true]</textarea>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                            <div>
-                                                Want more?
-                                                <a href={helpURL}>Advanced embedding details, examples, and help</a>!
-                                            </div>
-                                        </div>{/*/#cher-body*/}
-                                    </div>{/*/.modal-content*/}
-                                </div>{/*/.modal-dialog*/}
-                            </div>{/*/#cher-modal*/}
-
-
+                            {this.cherModal("audio", onbrowser)}
                             <center style="color:white;margin-bottom:10px">
                             </center>
                         </div>{/*/.xs-col-12*/}

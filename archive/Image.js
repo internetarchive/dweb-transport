@@ -84,46 +84,7 @@ export default class Image extends Details {
                             </div>
                 ) }
                             {/* Script tags moved into the JS*/}
-                            <div id="cher-modal" className="modal fade" role="dialog" aria-hidden="true">
-                                <div className="modal-dialog modal-lg">
-                                    <div className="modal-content" style={{padding: "10px"}}>
-
-                                        <div className="modal-header">
-                                            <button type="button" className="close" data-dismiss="modal" aria-hidden="true"><span
-                                                    className="iconochive-remove-circle" aria-hidden="true"></span><span
-                                                    className="sr-only">remove-circle</span></button>
-                                            <h3 className="modal-title">Share or Embed This Item</h3>
-                                        </div>{/*.modal-header*/}
-                                        <div id="cher-body">
-                                            {this.sharing()} {/*All the links to share this file*/}
-                                            <div>
-                                                <form className="form" role="form">
-                                                    <div className="form-group">
-                                                        <label>EMBED</label>
-                                                        <textarea id="embedcodehere" className="form-control textarea-invert-readonly"
-                                                                  rows="3" readOnly="readonly"><iframe src={embedurl} width="560" height="384" frameborder="0" webkitallowfullscreen="true" mozallowfullscreen="true" allowfullscreen></iframe></textarea>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                            <div>
-                                                <form className="form" role="form">
-                                                    <div className="form-group">
-                                                        <label>EMBED (for wordpress.com hosted blogs)</label>
-                                                        <textarea id="embedcodehereWP" className="form-control textarea-invert-readonly"
-                                                                  rows="3" readOnly="readonly">{`[archiveorg ${itemid} width=560 height=384 frameborder=0 webkitallowfullscreen=true mozallowfullscreen=true]`}</textarea>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                            <div>
-                                                Want more?
-                                                <a href={`https://archive.org/help/audio.php?identifier=${itemid}`}>Advanced
-                                                    embedding details, examples, and help</a>!
-                                            </div>
-                                        </div>{/*--/#cher-body*/}
-                                    </div>{/*--/.modal-content*/}
-                                </div>{/*--/.modal-dialog*/}
-                            </div>{/*--/#cher-modal*/}
-
+                            {this.cherModal("audio", onbrowser)}
                         </div>{/*--/.xs-col-12*/}
                     </div>{/*--/.row*/}
 
