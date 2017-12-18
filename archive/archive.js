@@ -3,6 +3,7 @@
 var Details = require('./Details').default;
 var Search = require('./Search').default;
 var Nav = require('./Nav').default;
+//window.Dweb = require('../js/Dweb');
 window.Nav = Nav;
 /*
 TODO-DETAILS-DIST outline of work

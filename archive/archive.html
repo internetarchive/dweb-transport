@@ -18,6 +18,10 @@
     <script src="https://archive.org/jw/6.8/jwplayer.js" type="text/javascript"></script>
     <script src="https://archive.org/includes/play.js" type="text/javascript"></script>
     <script src="../examples/dweb_transport_ipfs_bundled.js" type="text/javascript"></script>
+    <!--TODO strip htmlutils nad loginutils and example_styles.css to only things needed with Archive details page-->
+    <script type="text/javascript" src="htmlutils.js"></script><!--objectbrowser functionality for debugging-->
+    <script type="text/javascript" src="loginutils.js"></script><!--Login tools (used for p_connect) -->
+    <link rel='stylesheet' href='example_styles.css'>
     <style>
         #jw6, #jw6__list { backgroundColor:black; }
     </style>
@@ -30,7 +34,7 @@
 <script>
     $(function(){ $('.navbar [data-toggle="tooltip"]').tooltip({}); });
 
-    async main() {
+    async function main() {
         await p_connect();
         if (query) {
             Nav.nav_search(query)

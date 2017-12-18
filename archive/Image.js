@@ -2,12 +2,14 @@ require('babel-core/register')({ presets: ['env', 'react']}); // ES6 JS below!
 import React from './ReactFake';
 
 import Details from './Details'
+import ArchiveFile from './ArchiveFile'
 
 export default class Image extends Details {
     //TODO-DETAILS this is the new approach to embedding a mediatype - to gradually replace inline way in this file.
     constructor(itemid, item) {
         super(itemid);
         this.item = item;
+        this._list = this.item.files.map((f) => new ArchiveFile({itemid: this.itemid, metadata: f})) // Allow methods on files of item
     }
 
     browserAfter() {
@@ -20,7 +22,9 @@ export default class Image extends Details {
     jsxInNav(onbrowser) {
         let item = this.item;
         let itemid = item.metadata.identifier; // Shortcut as used a lot
+        //TODO-DETAILS replace find and other files references below with methods on ArchiveFile and mainfile with mainArchiveFile
         let mainfile = item.files.find((fi) => ['JPEG','PNG'].includes(fi.format)); //TODO-DETAILS-IMAGE probably add other formats
+        let mainArchiveFile = this._list.find((fi) => ['JPEG','PNG'].includes(fi.metadata.format));
         let detailsURL = `https://archive.org/details/${itemid}`; //TODO-DETAILS-DWEB will move to this decentralized page, but check usages (like tweet) below
         let embedurl = `https://archive.org/embed/${itemid}`;
         //TODO-DETAILS check if flag-overlay should include description
@@ -59,8 +63,9 @@ export default class Image extends Details {
                                             <a className="carousel-image-wrapper"
                                                href={`http://archive.org/download/${itemid}/${mainfile.name}`}
                                                title="Open full sized image">
-                                                <img className="rot0 carousel-image" alt="item image #1"
-                                                     src={`http://archive.org/download/${itemid}/${mainfile.name}`}/> {/*Note archive.org details page erroneously doesnt close this tag*/}
+                                                   {mainArchiveFile.loadImg(
+                                                        <img className="rot0 carousel-image" alt="item image #1"/>
+                                                    )} {/*Note archive.org details page erroneously doesnt close this tag*/}
                                             </a>
                                             <div className="carousel-caption">
                                                 {mainfile.name}

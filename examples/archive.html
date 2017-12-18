@@ -16,6 +16,11 @@
     <!-- script and style inclusions cant be in body, pulled these from Detail.js TODO-DETAIL could replace with npm modules but will prob use WebTorrent-->
     <script src="https://archive.org/jw/6.8/jwplayer.js" type="text/javascript"></script>
     <script src="https://archive.org/includes/play.js" type="text/javascript"></script>
+    <script src="../examples/dweb_transport_ipfs_bundled.js" type="text/javascript"></script>
+    <!--TODO strip htmlutils nad loginutils and example_styles.css to only things needed with Archive details page-->
+    <script type="text/javascript" src="htmlutils.js"></script><!--objectbrowser functionality for debugging-->
+    <script type="text/javascript" src="loginutils.js"></script><!--Login tools (used for p_connect) -->
+    <link rel='stylesheet' href='example_styles.css'>
     <style>
         #jw6, #jw6__list { backgroundColor:black; }
     </style>
@@ -27,8 +32,23 @@
 <a href="#maincontent" class="hidden-for-screen-readers">Skip to main content</a>
 <script>
     $(function(){ $('.navbar [data-toggle="tooltip"]').tooltip({}); });
+
+    async function main() {
+        await p_connect();
+        if (query) {
+            Nav.nav_search(query)
+        } else if (item) {
+            Nav.nav_details(item);
+        } else {
+            Nav.nav_home();
+        }
+    }
+
 </script>
 <!-- End of minimimally edited static html from Main.js-->
+<div class="floatright" style="position:relative;">
+    <ul id="transportstatuses"><li class='template vertical_li'><span name='name'></span></li></ul><!--TODO Add onclick to statuses-->
+</div><!--End of standard network status and login panel-->
 
 <div id="main"></div><!-- destination for part accumulated by Details.js etc as html-->
 <script>
@@ -41,13 +61,8 @@
     var item = searchparams.get("item");
     var query = searchparams.get("query");
     var verbose = searchparams.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)
-    if (query) {
-        Nav.nav_search(query)
-    } else if (item) {
-        Nav.nav_details(item);
-    } else {
-        Nav.nav_home();
-    }
+    main();
+</script>
 
 </script>
 </body>
