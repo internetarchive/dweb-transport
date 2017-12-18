@@ -49,7 +49,7 @@
   "scripts": {
     "test": "cd js; node ./test.js",
     "webpack": "webpack",
-    "server": "webpack-dev-server"
+    "server": "webpack-dev-server",
     "help": "echo 'test (prob not working)'; echo 'webpack (packs into ../examples)'; echo 'server (serves at localhost:8080 prob not working)'"
   }
 }
