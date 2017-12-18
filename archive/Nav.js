@@ -112,7 +112,7 @@ export default class Nav { //extends React.Component
         console.log("Navigating to Search");
       let destn = document.getElementById('main'); // Blank window (except Nav) as loading
       Nav.clear(destn);
-        let s = await new Search( q ? {query:q} : undefined).fetch();
+        let s = await new Search( q ? {query:encodeURIComponent(q)} : undefined).fetch();
         s.render(destn, "");
 
   }
