@@ -291,7 +291,9 @@ class TransportIPFS extends Transport {
         let cid = TransportIPFS.cidFrom(url);  // Throws TransportError if url bad
 
         try {
+            console.log("XXX@p_rawfetch 294 going to dag.get %o",cid)
             let res = await this.ipfs.dag.get(cid);
+            console.log("XXX@p_rawfetch 296 back from dag.get")
             // noinspection Annotator
             if (res.remainderPath.length)
                 { // noinspection ExceptionCaughtLocallyJS
@@ -299,6 +301,7 @@ class TransportIPFS extends Transport {
                 } //TODO-PATH
             let buff;
             if (res.value instanceof DAGNode) { // Its file or something added with the HTTP API for example, TODO not yet handling multiple files
+                if (verbose) console.log("IPFS p_rawfetch looks like its a file", url);
                 //console.log("Case a or b" - we can tell the difference by looking at (res.value._links.length > 0) but dont need to
                 // as since we dont know if we are on node or browser best way is to try the files.cat and if it fails try the block to get an approximate file);
                 // Works on Node, but fails on Chrome, cant figure out how to get data from the DAGNode otherwise (its the wrong size)
