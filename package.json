@@ -27,7 +27,7 @@
     "yjs": "^12.3.3"
   },
   "keywords": [],
-  "license": "MIT",
+  "license": "AGPL-3.0",
   "author": {
     "name": "Mitra Ardron",
     "email": "mitra@archive.org",
@@ -40,6 +40,8 @@
   "scripts": {
     "bundle": "cd js; browserify ./browser.js > ../examples/dweb_transport_ipfs_bundled.js",
     "watch": "watchify js/browser.js -o examples/dweb_transport_ipfs_bundled.js --verbose",
-    "test": "cd js; node ./test.js"
+    "test": "cd js; node ./test.js",
+    "bundletest": "cd js; browserify ./test_ipfs.js > ../examples/test_ipfs_bundled.js",
+    "help": "echo 'test (prob not working)'; echo 'bundle (packs into ../examples)'; echo 'watch: continually bundles whenever files change'; echo 'bundletest: (pack for test.html)'"
   }
 }

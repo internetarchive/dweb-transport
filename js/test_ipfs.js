@@ -33,11 +33,11 @@ There are then a set of routines that upload with one method, and test retrieval
 
 let tryexpectedfailures = false; // Set to false if want to check the things we expect to fail.
 let defaultipfsoptions = {
-    repo: '/tmp/ipfs_testipfs', //TODO-IPFS think through where, esp for browser
+    repo: '/tmp/ipfs_testipfsv7', //TODO-IPFS think through where, esp for browser
     //init: true,
     //start: false,
     config: {
-        Addresses: { Swarm: [ '/dns4/star-signal.cloud.ipfs.team/wss/p2p-webrtc-star']},
+        Addresses: { Swarm: [ '/dns4/ws-star.discovery.libp2p.io/tcp/443/wss/p2p-websocket-star']},
     },
     EXPERIMENTAL: {
         pubsub: true
@@ -51,6 +51,9 @@ function _makepromises() {
     }}}
 }
 
+function reportcidstring(cid) {
+    console.log("Testing", "/ipfs/"+cid.toBaseEncodedString())
+}
 function p_streamToBuffer(stream, verbose) {
     // resolve to a promise that returns a stream.
     // Note this comes form one example ...
@@ -96,7 +99,7 @@ function check_result(name, buff, expected, expectfailure) {
         console.log(name, "Expected block length", expected, "but got", buff.length, expectfailure ? "Note this was expected to fail." : "");
         //console.log(buff); // Normally leave commented out - will be long if looking at 250k file !
     } else if ((typeof(expected) !== "number") && (JSON.stringify(expected) !== JSON.stringify(buff))) {
-        console.log(name, "Expected:", expected.constructor.name, expected, "got", buff.constructor.name, buff);
+        console.log(name, "Expected:", expected.constructor.name, expected, "got", buff.constructor.name, buff, expectfailure ? "Note this was expected to fail." : "");
     } else {
         console.log(name, "Retrieved successfully");
     }
@@ -125,7 +128,7 @@ function test_dag_get(cid, expected, expectfailure) {
         .then(() => delay(500))    // Allow error on other stream to appear
         .catch((err) => console.log("Error thrown in dag.cat", err))
 }
-function test_files_cat(cid, expected, expectfailure) {
+function test_files_catv026(cid, expected, expectfailure) {
     if (expectfailure && !tryexpectedfailures) return;
     return ipfs.files.cat(cid) //Error: Groups are not supported in the blocks case - never returns from this call.
     // BUT Thows an error on the IPFS thread, not catchable
@@ -133,6 +136,15 @@ function test_files_cat(cid, expected, expectfailure) {
         .then((buff) => check_result("files.cat",buff, expected, expectfailure))
         .then(() => delay(500))    // Allow error on other stream to appear
         .catch((err) => console.log("Error thrown in files.cat", err)) // Note the HTTP test doesn't throw here, but in separate thread
+}
+async function test_files_cat(cid, expected, expectfailure) {
+    try {
+        if (expectfailure && !tryexpectedfailures) return;
+        buff = await ipfs.files.cat(cid); //Error: Groups are not supported in the blocks case - never returns from this call.
+        check_result("files.cat", buff, expected, expectfailure);
+    } catch(err) {
+        console.log("Error thrown in files.cat", err);
+    }
 }
 async function test_universal_get(cid, expected, expectfailure) {
     if (expectfailure && !tryexpectedfailures) return;
@@ -142,13 +154,14 @@ async function test_universal_get(cid, expected, expectfailure) {
     // b) long file use files.cat
     // c) Not a file, value != DAGNode, return the value (works on strings or JSON)
     try {
+        let buff;
         let res = await ipfs.dag.get(cid);
         console.assert(!res.remainderPath.length);  // Unsupported remainderPath - TODO throw error
-        let buff;
         if (res.value instanceof DAGNode) {
             //console.log("Case a or b");
             //if (res.value._links.length > 0) { //b: Long file else short file but read stream anyway.
-            buff = await p_streamToBuffer(await ipfs.files.cat(cid), true);
+            //buff = await p_streamToBuffer(await ipfs.files.cat(cid), true); // js-ipfs v0.26 version,
+            buff = await ipfs.files.cat(cid);
             // Previously was going back to read as a block if got 0 bytes
             if (buff.length === 0) {    // Hit the Chrome bug
                 // This will get a file padded with ~14 bytes - 4 at front, 4 at end and cant find the other 6 !
@@ -190,26 +203,29 @@ async function test_dag_string() {
     let qbf = "the quick brown fox"; // String for testing
     //https://github.com/ipfs/interface-ipfs-core/blob/master/SPEC/DAG.md#dagput
     //let qbf = new Buffer(qbf);    // Uncomment to test storing as buffer (behavior same as for string)
-    console.log("--------testing dag.put:",qbf);
+    console.log("--------testing dag.put of string :",qbf);
     let cid = await ipfs.dag.put(qbf,{ format: 'dag-cbor', hashAlg: 'sha3-512' }); //TODO try different hash
+    reportcidstring(cid);
     let len = qbf.length;
     await test_block_get(cid,len, true);    // Gets 1 byte too long - expected since encoded by dag
     await test_dag_get(cid, len, false);     // Works
-    await test_files_cat(cid, len, true);   // Throws  Error: invalid node type as expected since its not a file
+    console.log("Commented out test_files_cat as crashes background thread and never returns")
+    //await test_files_cat(cid, len, true);   // Throws  Error: d.end in background thread is not a function as its not  file
     await test_universal_get(cid, len, false);
 }
 
 async function test_dag_json() {
     let j = { fox: "the quick brown"}; // String for testing
     //https://github.com/ipfs/interface-ipfs-core/blob/master/SPEC/DAG.md#dagput
-    console.log("--------Testing dag.put:",j);
+    console.log("--------Testing dag.put of JSON:",j);
     let cid = await ipfs.dag.put(j,{ format: 'dag-cbor', hashAlg: 'sha2-256' }); // Will hold CID of string stored with dag.put
     //console.log(cid);                                   // For debugging
     //console.log(multihash.toB58String(cid.multihash));  // Debugging QmehRkRt4xipvY6sj5X79SMmsCfpryEsUWxYqwddFEjsDr
     //console.log(cid.toBaseEncodedString());             // Debugging zdpuB2nDXFEoAMVCiKLLqrdHEqpdhvTD2qwtxymA3V9fAb68g
     await test_block_get(cid, j, true);                       // Wrong - gets buffer as expected since encoded as a dag.
     await test_dag_get(cid, j, false);                         // Works
-    await test_files_cat(cid, j, true);                     // Throws  Error: invalid node type - expected since its not a file
+    console.log("Commented out test_files_cat as crashes background thread and never returns")
+    // await test_files_cat(cid, j, true);                     // Throws  Error: invalid node type - expected since its not a file
     await test_universal_get(cid, j, false);
 }
 

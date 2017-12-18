@@ -45,7 +45,7 @@ let defaultipfsoptions = {
     //start: false,
     //TODO-IPFS-Q how is this decentralized - can it run offline? Does it depend on star-signal.cloud.ipfs.team
     config: {
-        Addresses: { Swarm: [ '/dns4/star-signal.cloud.ipfs.team/wss/p2p-webrtc-star']},  // For Y - same as defaults
+//      Addresses: { Swarm: [ '/dns4/star-signal.cloud.ipfs.team/wss/p2p-webrtc-star']},  // For Y - same as defaults
 //      Addresses: { Swarm: [ ] },   // Disable WebRTC to test browser crash, note disables Y so doesnt work.
         Addresses: { Swarm: [ '/dns4/ws-star.discovery.libp2p.io/tcp/443/wss/p2p-websocket-star']}, // from https://github.com/ipfs/js-ipfs#faq 2017-12-05 as alternative to webrtc
     },
@@ -300,9 +300,11 @@ class TransportIPFS extends Transport {
             let buff;
             if (res.value instanceof DAGNode) { // Its file or something added with the HTTP API for example, TODO not yet handling multiple files
                 //console.log("Case a or b" - we can tell the difference by looking at (res.value._links.length > 0) but dont need to
-                // as since we dont know if we are on node or browser best way is to try the file.get and if it fails try the block to get an approximate file);
+                // as since we dont know if we are on node or browser best way is to try the files.cat and if it fails try the block to get an approximate file);
                 // Works on Node, but fails on Chrome, cant figure out how to get data from the DAGNode otherwise (its the wrong size)
-                buff = await Dweb.utils.p_streamToBuffer(await this.ipfs.files.cat(cid), true);
+                //buff = await Dweb.utils.p_streamToBuffer(await this.ipfs.files.cat(cid), true); //js-ipfs v0.26 version
+                buff = await this.ipfs.files.cat(cid); //js-ipfs v0.27 version
+                /* Was only needed on v0.26
                 if (buff.length === 0) {    // Hit the Chrome bug
                     // This will get a file padded with ~14 bytes - 4 at front, 4 at end and cant find the other 6 !
                     // but it seems to work for PDFs which is what I'm testing on.
@@ -310,6 +312,7 @@ class TransportIPFS extends Transport {
                     let blk = await this.promisified.ipfs.block.get(cid);
                     buff = blk.data;
                 }
+                END of v0.26 version */
             } else { //c: not a file
                 buff = res.value;
             }
