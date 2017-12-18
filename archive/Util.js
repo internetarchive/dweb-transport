@@ -1,4 +1,4 @@
-require('babel-core/register')({presets: ['es2015', 'react']}); // ES6 JS below!
+require('babel-core/register')({presets: ['env', 'react']}); // ES6 JS below!
 
 //import React from 'react';
 import React from './ReactFake';    // Note React is used by the JSX compiler that handles the HTML below this fakes the React.createElement

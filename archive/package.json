@@ -1,8 +1,9 @@
 {
   "name": "archive_browser",
-  "version": "1.0.0",
-  "description": "Archive UI to run in Browser based on Tracey's version",
+  "version": "0.0.1",
+  "description": "Archive UI to run in Browser",
   "main": "Details.js",
+  "keywords": [],
   "author": {
     "name": "Mitra Ardron",
     "email": "mitra@archive.org",
@@ -10,9 +11,30 @@
   },
   "license": "AGPL-3.0",
   "dependencies": {
-    "babel-preset-es2015": "",
-    "react": "^16.2.0",
-    "react-dom": "^16.2.0"
+    "babel-preset-env": "^1.6.1",
+    "cids": "^0.5.2",
+    "crypto": "^1.0.1",
+    "custom-event": "^1.0.1",
+    "fs": "0.0.1-security",
+    "ipfs": "^0.27.4",
+    "jsdom": "^11.5.1",
+    "leveldown": "^1.9.0",
+    "levelup": "^1.3.9",
+    "libsodium-wrappers": "git+https://git@github.com/mitra42/libsodium.js.git",
+    "multihashes": "^0.4.12",
+    "node-fetch-npm": "^2.0.2",
+    "promisify-es6": "^1.0.3",
+    "request": "^2.83.0",
+    "sha3": "^1.2.0",
+    "whatwg-fetch": "^2.0.3",
+    "xmlhttprequest": "^1.8.0",
+    "y-array": "^10.1.4",
+    "y-indexeddb": "^8.1.9",
+    "y-ipfs-connector": "^1.6.0",
+    "y-leveldb": "0.0.1",
+    "y-memory": "^8.0.9",
+    "y-text": "^9.5.1",
+    "yjs": "^12.3.3"
   },
   "devDependencies": {
     "babel-core": "^6.26.0",
@@ -21,12 +43,13 @@
     "browserify": "^14.5.0",
     "html-webpack-plugin": "^2.30.1",
     "watchify": "^3.9.0",
-    "webpack": "^3.8.1",
-    "webpack-dev-server": "^2.9.5"
+    "webpack": "^3.10.0",
+    "webpack-dev-server": "^2.9.7"
   },
   "scripts": {
     "test": "cd js; node ./test.js",
     "webpack": "webpack",
     "server": "webpack-dev-server"
+    "help": "echo 'test (prob not working)'; echo 'webpack (packs into ../examples)'; echo 'server (serves at localhost:8080 prob not working)'"
   }
 }

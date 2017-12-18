@@ -30,7 +30,7 @@ app.listen(port);
 console.log(`Server running at http://${hostname}:${port}/`);
 
 require('babel-core/register')({
-  presets: ['es2015', 'react']  // so we can syntax parse Nav.js next!
+  presets: ['env', 'react']  // so we can syntax parse Nav.js next!
 });
 
 

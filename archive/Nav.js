@@ -1,6 +1,6 @@
 //import ReactDOM from "react-dom";
 
-require('babel-core/register')({ presets: ['es2015', 'react']}); // ES6 JS below!
+require('babel-core/register')({ presets: ['env', 'react']}); // ES6 JS below!
 
 // https://ponyfoo.com/articles/universal-react-babel
 

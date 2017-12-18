@@ -3,7 +3,7 @@
 //ARCHIVE-BROWSER ReactDOMServer Not needed for browser, left in to allow use in both browser & Node/Server
 import React from './ReactFake';
 
-require('babel-core/register')({ presets: ['es2015', 'react']}); // ES6 JS below!
+require('babel-core/register')({ presets: ['env', 'react']}); // ES6 JS below!
 //import ReactDOMServer from 'react-dom/server';
 
 import Util from './Util';
