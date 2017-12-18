@@ -8,8 +8,29 @@ import React from './ReactFake';
 import Util from './Util';
 
 export default class ArchiveBase {
-    constructor(id, {}={}) {
-        this.id = id;
+    /*
+    Base class for Archive application - base of Details = which includes single element items and Search which includes both searches and collections (which are actually items).
+    ArchiveBase
+    - Details
+    - - AV
+    - - Image
+    - - Text
+    - - Software (not implemented)
+    - Search
+    - - Home
+    - - Collection
+    Nav - knows about all the classes (includes factory() but doesnt subclass them
+    Util - just some utility functions
+    Tile - elements on a Search - each is a ArchiveItem
+    ReactFake - spoofs methods of React as otherwise hard to do onclick etc if use real React (note archive.min still uses react a little)
+
+    Fields:
+    item    Metadata for item, undefined for a search TODO-DETAILS-SD make this a SD
+    items   Metadata for items found if the item is a Collection,
+    query   query part of search to run (Search|Collection|Home only)
+     */
+    constructor(itemid, {}={}) {
+        this.itemid = itemid;
     }
     jsxInNav(onbrowser) {
     }

@@ -31,6 +31,13 @@ if (typeof(Window) === "undefined") {
 */
 
 export default class Search extends ArchiveBase {
+    /*
+    Superclass for Searches - including Collections & Home
+
+    Fields:
+    Inherited from ArchiveBase: item
+    items   List of items found
+     */
   constructor({query='*:*', sort='', limit=75, banner='', id=undefined}={}) {
       super(id);
       this.query = query;
@@ -42,7 +49,7 @@ export default class Search extends ArchiveBase {
         /* Do an advanced search.
             Goes through gateway.dweb.me so that we can work around a CORS issue (general approach & security questions confirmed with Sam!)
 
-            this.id Archive Item identifier
+            this.itemid Archive Item identifier
             throws: TypeError or Error if fails
             resolves to: this
          */

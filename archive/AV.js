@@ -43,8 +43,8 @@ export default class AV extends Details {
 
             avs.sort((a, b) => Util.natcompare(a.name, b.name));   //Unsure why sorting names, presumably tracks are named alphabetically ?
             for (var fi of avs) //TODO-DETAILS make this a map (note its tougher than it looks!)
-                this.playlist.push({title:(fi.title ? fi.title : fi.name), sources:[{file:'https://archive.org/download/'+this.id+'/'+fi.name}]});
-            this.playlist[0].image = 'https://archive.org/services/img/' + this.id;
+                this.playlist.push({title:(fi.title ? fi.title : fi.name), sources:[{file:'https://archive.org/download/'+this.itemid+'/'+fi.name}]});
+            this.playlist[0].image = 'https://archive.org/services/img/' + this.itemid;
         }
         //TODO - check where h1 title and dangerous description appear in archive.org/details/commute
         /*

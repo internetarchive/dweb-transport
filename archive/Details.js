@@ -15,12 +15,13 @@ export default class Details extends ArchiveBase {
 
     async fetch() {
         /* Fetch JSON by talking to Metadata API
-            this.id Archive Item identifier
+            this.itemid Archive Item identifier
             throws: TypeError or Error if fails
             resolves to: this
          */
-        console.log('get metadata for ' + this.id);
-        this.item = await Util.fetch_json(`https://archive.org/metadata/${this.id}`);
+        console.log('get metadata for ' + this.itemid);
+        //this.item = await Util.fetch_json(`https://archive.org/metadata/${this.itemid}`);
+        this.item = await Util.fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}`);
         return this; // For chaining, but note will need to do an "await fetch"
     }
 
@@ -146,7 +147,7 @@ export default class Details extends ArchiveBase {
     }
     embed(onbrowser) {
         // Same on text, video, image
-        let shortEmbedURL = `https://archive.org/stream/${this.id}?ui=embed`;    //Note on archive.org/details this is different from iframeURL and not clear if that is intentional
+        let shortEmbedURL = `https://archive.org/stream/${this.itemid}?ui=embed`;    //Note on archive.org/details this is different from iframeURL and not clear if that is intentional
         return(
             <div>
                 <form class="form" role="form">

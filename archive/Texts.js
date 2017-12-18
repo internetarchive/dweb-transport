@@ -12,16 +12,16 @@ export default class Texts extends Details {
         //TODO-DETAILS Description does not appear in this Navwrap section, its in the stuff underneath that which is not yet on a page.
         let item = this.item;
         let metadata = item.metadata;
-        let detailsURL = `https://archive.org/details/${this.id}`;
-        let imageURL = `https://archive.org/services/img/${this.id}`;
+        let detailsURL = `https://archive.org/details/${this.itemid}`;
+        let imageURL = `https://archive.org/services/img/${this.itemid}`;
         //TODO-DETAILS-DWEB use alternative URLS via IPFS
         //TODO-STREAM pass as stream
-        let streamURL = `https://archive.org/stream/${this.id}`; //{1992.Zandvoorts.Nieuwsblad}`; //TODO-TEXTS Cant find 2nd part of URL
-        //let streamURL = `https://archive.org/stream/${this.id}/1992.Zandvoorts.Nieuwsblad`;   // In archive.org but needs looking for this string in file names
+        let streamURL = `https://archive.org/stream/${this.itemid}`; //{1992.Zandvoorts.Nieuwsblad}`; //TODO-TEXTS Cant find 2nd part of URL
+        //let streamURL = `https://archive.org/stream/${this.itemid}/1992.Zandvoorts.Nieuwsblad`;   // In archive.org but needs looking for this string in file names
         //let iframeURL = `${streamURL}?ui=embed#mode/2up`;   //This comes from Traceys code and works
         let iframeURL = `${streamURL}?ui=embed`;   //This works and matches archive.org
-        let shortEmbedURL = `https://archive.org/stream/${this.id}?ui=embed`;    //Note on archive.org/details this is different from iframeURL and not clear if that is intentional
-        let helpURL = `https://archive.org/help/audio.php?identifier=${this.id}`;
+        let shortEmbedURL = `https://archive.org/stream/${this.itemid}?ui=embed`;    //Note on archive.org/details this is different from iframeURL and not clear if that is intentional
+        let helpURL = `https://archive.org/help/audio.php?identifier=${this.itemid}`;
         //TODO check if its Twitter share title= as on text page, or data-original-title as on image page
         //TODO maybe merge sharing section with Image.js which is identical (first div under cher-body
         return (
