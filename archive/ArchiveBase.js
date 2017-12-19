@@ -34,12 +34,7 @@ export default class ArchiveBase {
     }
     jsxInNav() {
     }
-
-    navwrapped() {
-        /* Wrap the content up in a Nav
-        returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
-         */
-        return new Nav(this.jsxInNav()).render();
+    theatreIaWrap() {
     }
 
     browserBefore() {
@@ -47,7 +42,7 @@ export default class ArchiveBase {
         // Nothing to do by default
     }
     browserAfter() {
-        Util.AJS_on_dom_loaded(); // Runs code pushed archive_setup - needed for image
+        Util.AJS_on_dom_loaded(); // Runs code pushed archive_setup - needed for image if "super" this, put it after superclasses
     }
     nodeHtmlBefore() {
         /* Return html to insert before Nav wrapped part for use in node*/

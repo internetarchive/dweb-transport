@@ -7,7 +7,11 @@ export default class DetailsError extends Details {
         super(itemid, item);
         this.message = message;
     }
-    jsxInNav() {
+    theatreIaWrap() {
         return this.message;
     }
+    render(res, htm) {
+        super.render(res,htm)
+    }
+    itemDetailsAboutJSX() { }
 }

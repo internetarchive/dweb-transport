@@ -37,6 +37,43 @@ export default class Details extends ArchiveBase {
         return this; // For chaining, but note will need to do an "await fetch"
     }
 
+    navwrapped() {
+        /* Wrap the content up checked on mbid (Red Shift) image:  wrap( TODO | nav-wrap1 | maincontent | theatre-ia-wrap | item-details-about | TODO )
+        TODO-DETAILS need stuff before nav-wrap1 and after detailsabout
+        returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
+         */
+        //TODO-DETAILS is putting the description (in 'htm' in as raw html which would be a nasty security hole since that comes from user !
+        return (
+            <div id="wrap">
+                { new Nav().navwrapJSX() }
+                {/*--Begin page content --*/}
+                <div class="container container-ia">
+                    <a name="maincontent" id="maincontent"></a>
+                </div>{/*--//.container-ia--*/}
+                {this.theatreIaWrap()} {/*This is the main-content*/}
+                {this.itemDetailsAboutJSX()}
+            {/*--wrap--*/}</div>
+        );
+    }
+
+
+    browserAfter() {
+        // initialize_flag
+        // overlay related
+        $(".toggle-flag-overlay").click(function (e) {
+            e.preventDefault();
+            $("#theatre-ia-wrap").removeClass("flagged");
+        });
+        // overlay - checkboxes
+        $("#flag-checkboxes a").on("click", function (e) {
+            e.preventDefault();
+            $(this).children(".my-checkbox").toggleClass("checked");
+            $.get($(this).attr("href"))
+        });
+
+        super.browserAfter(); // Do this after the scripts above - which means put this browserAfter AFTER superclasses
+    }
+
     cherModal(type) {
         return(
             <div id="cher-modal" className="modal fade" role="dialog" aria-hidden="true">
@@ -177,37 +214,41 @@ export default class Details extends ArchiveBase {
         );
     }
 
-    aboutJSX() {
-        itemid = this.itemid;
-        metadata = this.metadata;
-        title = metadata.title;
-        creator = metadata.creator;
-        datePublished = metadata.datePublished;
-        publisher=metadata.publisher;
-        keywords = metadata.subject.split(';');
-        licence = metadata.licenseurl; //TODO - handle other licenses - hardwired for CC currently
-        languageAbbrev = metadata.language;
-        languageLong = {eng: "English", dut: "Dutch"}[languageAbbrev]; //TODO-other languages
-        description = metadata.description; // TODO prob need to do via innerHTML thing
-        metadataListPossible = { color: "Color", coverage: "Location", director: "Director", identifier: "Identifier",
-        "identifier-ark": "Identifier-ark", ocr: "Ocr", runtime: "Run time", ppi: "Ppi", sound: "Sound", year: "Year" }; /*TODO expand to longer list*/
-        metadataListFound = metadataListPossible.keys().filter((k) => metadata[k]);    // List of keys in the metadata
-        downloadableFiles = []; //TODO how to pick which to download - on mbid it was original/JPEG derivative JPEG*thumb as capitalized version; but not "JPEG Thumb", and Archive Torrent as TORRENT
-        //TODO  Replace "a" with onclicks to download function on f
-        //TODO Need f.sizePretty property of ArchiveFile
-        filesCount = metadata.files_count;
-        originalFilesCount = metadata.files.filter((f)=>f.source === "original").length;
-        downloadURL = `https://archive.org/download/${itemid}`;
-        compressURL = `https://archive.org/compress/${itemid}`;
-        compressAllURL = `https://archive.org/compress/${itemid}/formats=JSON,METADATA,JPEG,ARCHIVE BITTORRENT,MUSICBRAINZ METADATA`;
-        collections = Array.isArray(metadata.collection) ? metadata.collection : [ metadata.collection ];
-        mediatype = metadata.mediatype;
-        iconchiveIcon="iconchive-"+mediatype;
-        contributor = metadata.contributor;
-        reviews = metadata.reviews;
-        writeReviewsURL = `https://archive.org/write-review.php?identifier=${itemid}`;
-        loginURL = "https://archive.org/account/login.php";
-        bookmarksAddURL = `https://archive.org/bookmarks.php?add_bookmark=1&amp;mediatype=image&amp;identifier=${itemid}&amp;title=${title}`;
+    itemDetailsAboutJSX() {
+        /* This builds a JSX tht sits underneth theatre-ia-wrap DIV that is built by theatreIaWrap */
+        let itemid = this.itemid;
+        let item = this.item
+        let metadata = item.metadata;
+        let title = metadata.title;
+        let creator = metadata.creator;
+        let datePublished = metadata.datePublished;
+        let publisher=metadata.publisher;
+        let keywords = metadata.subject ? metadata.subject.split(';') : undefined ;
+        let licence = metadata.licenseurl; //TODO - handle other licenses - hardwired for CC currently
+        let languageAbbrev = metadata.language;
+        let languageLong = {eng: "English", dut: "Dutch"}[languageAbbrev]; //TODO-other languages
+        let description = metadata.description; // TODO prob need to do via innerHTML thing
+        let metadataListPossible = { color: "Color", coverage: "Location", director: "Director", identifier: "Identifier",
+            "identifier-ark": "Identifier-ark", ocr: "Ocr", runtime: "Run time", ppi: "Ppi", sound: "Sound", year: "Year" }; /*TODO expand to longer list*/
+        let metadataListFound = Object.keys(metadataListPossible).filter((k) => metadata[k]);    // List of keys in the metadata
+        let downloadableFiles = []; //TODO how to pick which to download - on mbid it was original/JPEG derivative JPEG*thumb as capitalized version; but not "JPEG Thumb", and Archive Torrent as TORRENT
+            //TODO  Replace "a" with onclicks to download function on f
+            //TODO Need f.sizePretty property of ArchiveFile
+        let filesCount = metadata.files_count;
+        let originalFilesCount = item.files.filter((f)=>f.source === "original").length;
+        let downloadURL = `https://archive.org/download/${itemid}`;
+        let compressURL = `https://archive.org/compress/${itemid}`;
+        let compressAllURL = `https://archive.org/compress/${itemid}/formats=JSON,METADATA,JPEG,ARCHIVE BITTORRENT,MUSICBRAINZ METADATA`;
+        let collections = Array.isArray(metadata.collection) ? metadata.collection : [ metadata.collection ];
+        let mediatype = metadata.mediatype;
+        let iconchiveIcon="iconchive-"+mediatype;
+        let contributor = metadata.contributor;
+        let reviews = metadata.reviews;
+        let writeReviewsURL = `https://archive.org/write-review.php?identifier=${itemid}`;
+        let loginURL = "https://archive.org/account/login.php";
+        let bookmarksAddURL = `https://archive.org/bookmarks.php?add_bookmark=1&amp;mediatype=image&amp;identifier=${itemid}&amp;title=${title}`;
+        let credits = metadata.credits;
+        //TODO-DETAILS much of below doesn't work (yet)
         return (
             <div class="container container-ia item-details-about">
                 <div class="relative-row row">
@@ -253,31 +294,11 @@ export default class Details extends ArchiveBase {
                                             Broken or Empty Data                </a>
                                         </li>
                                     </ul>
-                                </div> <!-- /#flag-popover -->
-                            </div> <!--/.dropdown -->
+                                </div> {/*-- /#flag-popover --*/}
+                            </div> {/*--/.dropdown --*/}
                         </div>
-                    </div><!--/.action-buttons-->
-            
-                    <script>
-                        function initialize_flag() {
-                            // overlay related
-                            $(".toggle-flag-overlay").click(function (e) {
-                                e.preventDefault();
-                                $("#theatre-ia-wrap").removeClass("flagged");
-                            });
-            
-                            // overlay - checkboxes
-                            $("#flag-checkboxes a").on("click", function (e) {
-                                e.preventDefault();
-                                $(this).children(".my-checkbox").toggleClass("checked");
-                                $.get($(this).attr("href"))
-                            });
-            
-            
-                        }
-            
-                        $(initialize_flag());
-                    </script>
+                    </div>{/*--/.action-buttons--*/}
+                    {/*-- flag initialization moved to browserAfter() --*/}
                     <div class="col-sm-8 thats-left item-details-metadata">
                         <h1 style={{fontSize:"30px", "marginBottom":0}}>
                             <div class="left-icon"><span className={`${iconchiveIcon} ${mediatype}`} aria-hidden="true"></span><span
@@ -293,7 +314,7 @@ export default class Details extends ArchiveBase {
                         <div class="key-val-big">
                             <div>
                                 <span class="key">by</span>
-                                <span class="value"><span><a onClick="Nav.nav_search('creator=\" {creator}\"')">{creator}</a></span></span>
+                                <span class="value"><span><a onClick={`Nav.nav_search('creator=\"${creator}\"')`}>{creator}</a></span></span>
                             </div>
                         </div>
 
@@ -314,9 +335,9 @@ export default class Details extends ArchiveBase {
                         {keywords ? (
                         <div class="key-val-big">
                             Topics <span itemprop="keywords">
-                          {keywords.map(({keyword})=>
-                                <a onClick="Nav.nav_search('subject=\" {keyword}\"')">{keyword}</a>&nbsp;{/*TODO should really have , between each but join() not easy in JSX*/}
-                      </span>
+                          {keywords.map((keyword)=> (
+                                <a onClick={`Nav.nav_search('subject=\"${keyword}\"')`}>{keyword}</a> ))}
+                      </span> {/*TODO should really have , between each but join() not easy in JSX*/}
                         </div>
                         ) : ( undefined ) }
                         { publisher ? (
@@ -324,45 +345,36 @@ export default class Details extends ArchiveBase {
 
                             <span
                                     class="value"
-                            ><a onClick="Nav.nav_search('publisher=\" {publisher}\"')"><span
+                            ><a onClick={`Nav.nav_search('publisher=\"${publisher}\"')`}><span
                                     itemprop="publisher">{publisher}</span></a></span>
                         </div>
                         ) : ( undefined ) }
-                        <!-- sponsor (also does usage rights, if specified for the sponsor) -->
+                        {/*-- sponsor (also does usage rights, if specified for the sponsor) --*/}
 
-                        <!-- contributor (also does usage rights, if specified for the contributor) -->
-                        { contributor ? (
-                        <div><span class="key">Contributor</span><span class="value">{contributor}</span></div>
-                        ) : ( undefined ) }
+                        {/*-- contributor (also does usage rights, if specified for the contributor) --*/}
+                        { contributor ? ( <div><span class="key">Contributor</span><span class="value">{contributor}</span></div> ) : ( undefined ) }
                         { languageAbbrev ? (
-                        <div class="key-val-big">
-                            <div><span class="key">Language</span>
-
-                                <span class="value"><span><a onClick="Nav.nav_search('language=(\" {languageAbbrev}\"+OR+language=\"{languageLong}\")')">{languageLong}</a></span></span>
+                            <div class="key-val-big">
+                                <div>
+                                    <span class="key">Language</span>
+                                    <span class="value"><span><a onClick={`Nav.nav_search('language=(\"${languageAbbrev}\"+OR+language=\"${languageLong}\")')`}>{languageLong}</a></span></span>
+                                </div>
                             </div>
-                        </div>
                         ) : ( undefined ) }
 
                         <div class="clearfix"></div>
-                        { description ? (
+                        { description ? ( <div id="descript" itemprop="description">{description}</div> ) : ( undefined ) }
 
-                        <div id="descript" itemprop="description">{description}
-                        </div><!--/#descript-->
-
-                        ) : ( undefined ) }
-
-                        credits = metadata.credits
-                        { credits ? (
-                        <h2 style="font-size:18px">Credits</h2>
-                        <p class="content">{credits}</p>
-                        ) : ( undefined ) }
+                        { credits ? ( <h2 style="font-size:18px">Credits</h2> ) : ( undefined ) }
+                        { credits ? ( <p class="content">{credits}</p>        ) : ( undefined ) }
 
                         <div class="metadata-expandable-list" role="list">
                             { metadataListFound.map((k) =>
-                            <div role="listitem">
-                                <span class="key">{metadataListPossible[k]</span>
-                                <span class="value">metadata[k]</span>
-                            </div>
+                                <div role="listitem">
+                                    <span class="key">{metadataListPossible[k]}</span>
+                                    <span class="value">metadata[k]</span>
+                                </div>
+                            ) }
                         </div>
 
                         {/*TODO "See also" section drawing from some of metadata.externalidentifier note two adjacent divs present
@@ -379,79 +391,47 @@ export default class Details extends ArchiveBase {
                                 </div>
                                 Reviews
                             </h2>
-                            { reviews.length ? reviews.map((review) => (
-                            <div class="aReview">
-                                <b>Reviewer:</b>
-                                <a onClick="Nav.nav_details('@{review.reviewer}')"
-                                   data-event-click-tracking="ItemReviews|ReviewerLink">{review.reviewer}</a>
-                                -
-                                <span alt={`${review.stars} out of 5 stars`} title={`${review.stars} out of 5 stars`}>
-                                {for (i=0; i < review.stars; i++) { (
-                      <span class="iconochive-favorite size-75-percent" aria-hidden="true"></span><span
-                                            class="sr-only">favorite</span>
-                      ) } }
-                  </span> -
-                                {review.reviewdate}{/*TODO reviewdate needs pretty printing*/}<br/>
-                                <b>Subject:</b>{review.reviewtitle}
-                                <div class="breaker-breaker">{review.reviewbody}</div>
-                            </div>
-                            )) : {
-                            <div class="small-label">
-                                There are no reviews yet. Be the first one to
-                                <a href={writeReviewsURL}>write a review</a>.
-                            </div>
+                            { reviews && reviews.length ? reviews.map((review) => (
+                                <div class="aReview">
+                                    <b>Reviewer:</b>
+                                    <a onClick={`Nav.nav_details('@${review.reviewer}')`}
+                                       data-event-click-tracking="ItemReviews|ReviewerLink">{review.reviewer}</a>
+                                    -
+                                    <span alt={`${review.stars} out of 5 stars`} title={`${review.stars} out of 5 stars`}>
+                                        { ['*','*','*','*','*'].slice(0,review.stars).map(x =>
+                                            [<span class="iconochive-favorite size-75-percent" aria-hidden="true"></span> , <span class="sr-only">favorite</span>]
+                                        ) }
+                                    </span>
+                                    - {review.reviewdate}{/*TODO reviewdate needs pretty printing*/}<br/>
+                                    <b>Subject:</b>{review.reviewtitle}
+                                    <div class="breaker-breaker">{review.reviewbody}</div>
+                                </div>
+                            )) : (
+                                <div class="small-label">
+                                    There are no reviews yet. Be the first one to <a href={writeReviewsURL}>write a review</a>.
+                                </div>
                             )}
                         </div>
 
-                    </div><!--/.col-md-10-->
+                    </div>{/*--/.col-md-10--*/}
                     <div class="col-sm-4 thats-right item-details-archive-info">
                         {/*TODO need section class=boxy item-stats-summary- not obvious where data from, its not in metadata */}
-                        <section class="boxy item-stats-summary">
-                            <p
-                                    itemprop="interactionStatistic"
-                                    itemscope
-                                    itemtype="http://schema.org/InteractionCounter"
-                            >
-                                <link itemprop="interactionType" href="http://schema.org/ViewAction"/>
-
-                                <span
-                                        class="item-stats-summary__count"
-                                        itemprop="userInteractionCount"
-                                >8,937,058</span>
-
-                                Views
-                            </p>
-
-                            <p>
-                                <span class="item-stats-summary__count">8</span>
-                                Favorites </p>
-
-                            <p>
-                                <a href="#reviews">
-                                    <span class="item-stats-summary__count">1</span>
-                                    Review </a>
-                            </p>
-                        </section>
-
                         <div class="boxy quick-down">
-                            <div class="download-button">
-                                DOWNLOAD OPTIONS
-                            </div>
+                            <div class="download-button">DOWNLOAD OPTIONS</div>
                             {downloadableFiles.map((f) => (
-                            <div class="format-group">
-                                <div class="summary-rite">
-                                    <a class="stealth" href=`https://archive.org/download/${f.itemid}/${f.metadata.name}"
-                                       title={f.sizePretty}>
-                              <span class="hover-badge-stealth">
-                                <span class="iconochive-download" aria-hidden="true"></span><span class="sr-only">download</span>1 file</span>
+                                <div class="format-group">
+                                    <div class="summary-rite">
+                                        <a class="stealth" href={`https://archive.org/download/${f.itemid}/${f.metadata.name}`}
+                                           title={f.sizePretty}>
+                                            <span class="hover-badge-stealth"><span class="iconochive-download" aria-hidden="true"></span><span class="sr-only">download</span>1 file</span>
+                                        </a>
+                                    </div>
+                                    <a class="format-summary download-pill"
+                                        href="https://archive.org/download/${f.itemid}/${f.metadata.name}" title={f.sizePretty}
+                                        data-toggle="tooltip" data-placement="auto left" data-container="body">
+                                        {f.metadata.format} <span class="iconochive-download" aria-hidden="true"></span><span class="sr-only">download</span>
                                     </a>
                                 </div>
-                                <a class="format-summary download-pill"
-                                   href="https://archive.org/download/${f.itemid}/${f.metadata.name}" title={f.sizePretty}
-                                   data-toggle="tooltip" data-placement="auto left" data-container="body">
-                                    {f.metadata.format} <span class="iconochive-download" aria-hidden="true"></span><span
-                                        class="sr-only">download</span> </a>
-                            </div>
                             ))}
             
             
@@ -473,20 +453,20 @@ export default class Details extends ArchiveBase {
                             <section class="quick-down collection-list">
                                 <h5 class="collection-title">IN COLLECTIONS</h5>
                                 { collections.map((collection) => (
+                                    <div class="collection-item">
+                                        <a
+                                                onClick={`Nav.nav_details("${collection}")`}
+                                                data-event-click-tracking={`CollectionList|${collection}`}
+                                        >{collection}</a> {/*TODO get name of collection - its not in metadata*/}
+                                    </div>
                                 ) ) }
-                                <div class="collection-item">
-                                    <a
-                                            onClick="Nav.nav_details({collection})"
-                                            data-event-click-tracking=`CollectionList|${collection}`
-                                    >{collection}</a> {/*TODO get name of collection - its not in metadata*/}
-                                </div>
                             </section>
                         </div>
                         {/*TODO need boxy item-upload-info - its not obvious, on commute its the adder field, on mbid its derivation
-                        of uploader which is email, on text its ___
-                    </div><!--/.col-md-2-->
-                </div><!--/.row-->
-            </div><!--//.container-ia-->
+                        of uploader which is email, on text its ___ */}
+                    </div>{/*--/.col-md-2--*/}
+                </div>{/*--/.row--*/}
+            {/*--//.container-ia--*/} </div>
         );
     }
 }

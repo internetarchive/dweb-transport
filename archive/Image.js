@@ -21,7 +21,7 @@ export default class Image extends Details {
         });
         super.browserAfter()
     }
-    jsxInNav() {
+    theatreIaWrap() {
         let item = this.item;
         let itemid = item.metadata.identifier; // Shortcut as used a lot
         let mainArchiveFile = this._list.find((fi) => Util.imageFormats.includes(fi.metadata.format)); // Can be undefined if none included

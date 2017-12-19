@@ -62,6 +62,23 @@ export default class Search extends ArchiveBase {
         return this; // For chaining, but note will need to do an "await fetch"
     }
 
+        navwrapped() {
+        /* Wrap the content up:  wrap( nav=wrap1 | maincontent | detailsabot )
+        TODO-DETAILS need stuff before nav-wrap1 and after detailsabout and need to check this against Search and Collection examples
+        returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
+         */
+        //TODO-DETAILS is putting the description (in 'htm' in as raw html which would be a nasty security hole since that comes from user !
+        return (
+            <div id="wrap">
+                { new Nav().navwrapJSX() }
+                <div className="container container-ia">
+                    {this.jsxInNav()} {/*This is the main-content*/}
+                </div>
+            {/*--wrap--*/}</div>
+        );
+    }
+
+
   nodeHtmlAfter() {
       /* Return htm to insert before Nav wrapped part for use in node*/
       return `

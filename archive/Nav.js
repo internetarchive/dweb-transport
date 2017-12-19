@@ -17,18 +17,14 @@ import DetailsError from './DetailsError'
 
 
 export default class Nav { //extends React.Component
-  constructor(htm) {
+  constructor() {
     //super();
     this.mts = ['web', 'texts', 'movies', 'audio', 'software', 'image'];
-    this.htm = htm; //ARCHIVE-BROWSER could be string or nodes (not sure what class that is, but whatever the JSX compiler gives
   }
 
-  render() {
-      if (typeof this.htm === "string") {
-          this.htm = ( <div dangerouslySetInnerHTML={{__html: this.htm}}></div> );
-      }
+  navwrapJSX() {
+      /* The navigation stuff.   Order is navwrapJSX : maincontent : itemDetailsAbout */
       return (
-      <div id="wrap">
         <div id="navwrap1">
           <div id="navwrap2">
             <div className="navbar navbar-inverse navbar-static-top" role="navigation">
@@ -81,19 +77,15 @@ export default class Nav { //extends React.Component
                 </li>
               </ul>
             </div>
-          </div>
-        </div>
-        <div className="container container-ia">
-          {this.htm}
-        </div>
-      </div>
-    );
+          </div> {/*--nav-wrap2--*/}
+        {/*--nav-wrap1--*/} </div>
+      );
   }
 
   static clear(destn) {
       // Clear the screen to give confidence that action under way
       // Leaves Nav, clears rest
-      React.domrender(new Nav("Loading").render(true), destn);
+      React.domrender(new DetailsError(undefined, undefined, <span>"Loading"</span>).navwrapped(false), destn)
   }
   static async nav_home() {
     console.log("Navigating to Home");

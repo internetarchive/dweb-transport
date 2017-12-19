@@ -7,7 +7,7 @@ export default class Texts extends Details {
     constructor(itemid, item) {
         super(itemid, item);
     }
-    jsxInNav() {
+    theatreIaWrap() {
         //TODO-DETAILS Description does not appear in this Navwrap section, its in the stuff underneath that which is not yet on a page.
         let item = this.item;
         let metadata = item.metadata;

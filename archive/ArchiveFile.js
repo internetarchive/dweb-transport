@@ -26,7 +26,7 @@ export default class ArchiveFile {
         let blob = new Blob([blk._data], {type: Util.archiveMimeTypeFromFormat[this.metadata.format]}) // Works for data={Uint8Array|Blob}
         // This next code is bizarre combination needed to open a blob from within an HTML window.
         let objectURL = URL.createObjectURL(blob);    //TODO-STREAMS make this work on streams
-        console.log("OURL=",objectURL)
+        if (verbose) console.log("Blob URL=",objectURL);
         //jsx.src = `http://archive.org/download/${this.itemid}/${this.metadata.name}`
         jsx.src = objectURL;
     }
