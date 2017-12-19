@@ -42,7 +42,7 @@ class Transports {
          */
         let tt = Dweb.Transports.validFor(undefined, "store"); // Valid connected transports that support "store"
         if (!tt.length) {
-            throw new Dweb.errors.TransportError('Transports.p_rawstore: Cant find transport for urls:'+urls.join(','));
+            throw new Dweb.errors.TransportError('Transports.p_rawstore: Cant find transport for store');
         }
         let errs = [];
         let rr = await Promise.all(tt.map(async function([undef, t]) {

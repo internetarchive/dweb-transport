@@ -315,7 +315,7 @@ class CommonList extends SmartDict {
                             this._list.push(sig);
                             this.dispatchEvent(new CustomEvent("insert", {target: this, detail: sig}));   // Note target doesnt get set here.
                         } else {
-                            console.log("Duplicate signature: ",sig);
+                            console.log("Duplicate signature: %o",sig);
                         }
                     } else {
                         console.log("Rejected signature: ",sig);

@@ -115,6 +115,7 @@ class TransportHTTP extends Transport {
             // Using window.fetch, because it doesn't appear to be in scope otherwise in the browser.
             let response = await fetch(new Request(httpurl, init));
             // fetch throws (on Chrome, untested on Firefox or Node) TypeError: Failed to fetch)
+            // Note response.body gets a stream and response.blob gets a blob and response.arrayBuffer gets a buffer.
             if (response.ok) {
                 if (response.headers.get('Content-Type') === "application/json") {
                     return response.json(); // promise resolving to JSON
