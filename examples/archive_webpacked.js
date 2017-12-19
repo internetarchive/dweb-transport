@@ -1737,12 +1737,12 @@ const archiveMimeTypeFromFormat = { JPEG: "image/jpeg", PNG: "image/png" //TODO 
          Note it can't be inside load_img which has to be synchronous and return a jsx tree.
          */
         let blk = await Dweb.Block.p_fetch([this.metadata.ipfs, this.metadata.contenthash], verbose); //Typically will be a Uint8Array
-        let blob = new Blob([blk.data], { type: archiveMimeTypeFromFormat[this.metadata.format] }); // Works for data={Uint8Array|Blob}
+        let blob = new Blob([blk._data], { type: archiveMimeTypeFromFormat[this.metadata.format] }); // Works for data={Uint8Array|Blob}
         // This next code is bizarre combination needed to open a blob from within an HTML window.
         let objectURL = URL.createObjectURL(blob); //TODO-STREAMS make this work on streams
         console.log("OURL=", objectURL);
-        jsx.src = `http://archive.org/download/${this.itemid}/${this.metadata.name}`;
-        //jsx.src = objectURL;
+        //jsx.src = `http://archive.org/download/${this.itemid}/${this.metadata.name}`
+        jsx.src = objectURL;
     }
     loadImg(jsx) {
         //asynchronously loads file from one of metadata, turns into blob, and stuffs into element
