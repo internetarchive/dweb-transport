@@ -49,7 +49,7 @@ class Transports {
             try {
                 return await t.p_rawstore(data, verbose); //url
             } catch(err) {
-                console.log("Could not rawlist ", url, "from", t.name, err.message);
+                console.log("Could not rawstore to", t.name, err.message);
                 errs.push(err)
                 return undefined;
             }
@@ -92,7 +92,7 @@ class Transports {
         returns:	string - arbitrary bytes retrieved.
         throws:     TransportError with concatenated error messages if none succeed.
          */
-        let tt = Dweb.Transports.validFor(urls, "fetch"); //[ [u,t],[u,t]]
+        let tt = Dweb.Transports.validFor(urls, "fetch"); //[ [Url,t],[Url,t]]
         if (!tt.length) {
             throw new Dweb.errors.TransportError("Transports.p_fetch cant find any transport for urls: " + urls);
         }
@@ -104,7 +104,7 @@ class Transports {
                 return res; //TODO-MULTI-GATEWAY potentially copy from success to failed URLs.
             } catch (err) {
                 errs.push(err);
-                console.log("Could not retrieve ", url, "from", t.name, err.message);
+                console.log("Could not retrieve ", url.href, "from", t.name, err.message);
                 // Don't throw anything here, loop round for next, only throw if drop out bottom
                 //TODO-MULTI-GATEWAY potentially copy from success to failed URLs.
             }

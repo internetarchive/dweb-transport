@@ -117,10 +117,13 @@ class TransportHTTP extends Transport {
             // fetch throws (on Chrome, untested on Firefox or Node) TypeError: Failed to fetch)
             // Note response.body gets a stream and response.blob gets a blob and response.arrayBuffer gets a buffer.
             if (response.ok) {
-                if (response.headers.get('Content-Type') === "application/json") {
+                let contenttype = response.headers.get('Content-Type');
+                if (contenttype === "application/json") {
                     return response.json(); // promise resolving to JSON
-                } else {
-                    return response.text(); // promise resolving to text
+                } else if (contenttype.startsWith("text")) { // Note in particular this is used for responses to store
+                    return response.text(); // promise resolving to arrayBuffer (was returning text, but distorts binaries (e.g. jpegs)
+                } else { // Typically application/octetStream when don't know what fetching
+                    return new Buffer(await response.arrayBuffer()); // Convert arrayBuffer to Buffer which is much more usable currently
                 }
             }   // TODO-HTTP may need to handle binary as a buffer instead of text
             // noinspection ExceptionCaughtLocallyJS
