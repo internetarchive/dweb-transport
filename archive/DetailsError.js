@@ -4,8 +4,7 @@ import Details from './Details'
 
 export default class DetailsError extends Details {
     constructor(itemid, item, message) {
-        super(itemid);
-        this.item = item;
+        super(itemid, item);
         this.message = message;
     }
     jsxInNav(onbrowser) {

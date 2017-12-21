@@ -25,7 +25,7 @@ export default class ArchiveBase {
     ReactFake - spoofs methods of React as otherwise hard to do onclick etc if use real React (note archive.min still uses react a little)
 
     Fields:
-    item    Metadata for item, undefined for a search TODO-DETAILS-SD make this a SD
+    item    Metadata for item, undefined for a search.
     items   Metadata for items found if the item is a Collection,
     query   query part of search to run (Search|Collection|Home only)
      */
@@ -44,7 +44,7 @@ export default class ArchiveBase {
     }
 
     browserBefore() {
-        //Anything that is needed in the browser before the Nav - TODO-DETAILS will have the stuff above the Nav banner
+        //Anything that is needed to be executed in the browser before the main HTML tree is replaced.
         // Nothing to do by default
     }
     browserAfter() {

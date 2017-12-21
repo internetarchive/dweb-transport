@@ -7,9 +7,15 @@ import React from './ReactFake';
 
 import Util from './Util';
 import ArchiveBase from './ArchiveBase'
+import ArchiveFile from "./ArchiveFile";
+
 
 export default class Details extends ArchiveBase {
-    constructor(id, {} = {}) {
+    constructor(id, {metadata = undefined} = {}) {
+        this.metadata = metadata;
+        this._list = this.item.file
+            ? this.item.files.map((f) => new ArchiveFile({itemid: this.itemid, metadata: f})) // Allow methods on files of item
+            : [];   // Default to empty, so usage simpler.
         super(id);
     }
 

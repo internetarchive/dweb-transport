@@ -6,7 +6,6 @@ import Details from './Details'
 export default class Texts extends Details {
     constructor(itemid, item) {
         super(itemid);
-        this.item = item;
     }
     jsxInNav(onbrowser) {
         //TODO-DETAILS Description does not appear in this Navwrap section, its in the stuff underneath that which is not yet on a page.

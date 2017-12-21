@@ -1,7 +1,6 @@
 require('babel-core/register')({ presets: ['env', 'react']}); // ES6 JS below!
 import React from './ReactFake';
-
-const archiveMimeTypeFromFormat = { JPEG: "image/jpeg", PNG: "image/png" }    //TODO expand to other formats
+import Util from './Util';
 
 export default class ArchiveFile {
     /*
@@ -16,7 +15,6 @@ export default class ArchiveFile {
     constructor({itemid = undefined, metadata = undefined}={}) {
         this.itemid = itemid;
         this.metadata = metadata;
-        //TODO-DETAILS-SD create when loading metadata with files - done in image.constructor, maybe move to detail and call superclass
     }
     async p_loadImg(jsx) {
         /*
@@ -25,7 +23,7 @@ export default class ArchiveFile {
         Note it can't be inside load_img which has to be synchronous and return a jsx tree.
          */
         let blk = await  Dweb.Block.p_fetch([this.metadata.ipfs, this.metadata.contenthash], verbose);  //Typically will be a Uint8Array
-        let blob = new Blob([blk._data], {type: archiveMimeTypeFromFormat[this.metadata.format]}) // Works for data={Uint8Array|Blob}
+        let blob = new Blob([blk._data], {type: Util.archiveMimeTypeFromFormat[this.metadata.format]}) // Works for data={Uint8Array|Blob}
         // This next code is bizarre combination needed to open a blob from within an HTML window.
         let objectURL = URL.createObjectURL(blob);    //TODO-STREAMS make this work on streams
         console.log("OURL=",objectURL)

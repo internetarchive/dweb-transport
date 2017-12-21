@@ -6,8 +6,7 @@ import Details from './Details'
 
 export default class AV extends Details {
     constructor(itemid, item) {
-        super(itemid);
-        this.item = item;
+        super(itemid, item);
     }
     nodeHtmlBefore() {
         playlist = JSON.stringify(this.playlist);

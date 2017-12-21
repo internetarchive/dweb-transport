@@ -7,9 +7,11 @@ import ArchiveFile from './ArchiveFile'
 export default class Image extends Details {
     //TODO-DETAILS this is the new approach to embedding a mediatype - to gradually replace inline way in this file.
     constructor(itemid, item) {
-        super(itemid);
-        this.item = item;
-        this._list = this.item.files.map((f) => new ArchiveFile({itemid: this.itemid, metadata: f})) // Allow methods on files of item
+        /*
+        Construct an Image object before rendering it to a HTML page
+        item = metadata from a metadata fetch
+         */
+        super(itemid, item);
     }
 
     browserAfter() {
