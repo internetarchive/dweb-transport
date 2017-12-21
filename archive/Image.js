@@ -3,9 +3,9 @@ import React from './ReactFake';
 
 import Details from './Details'
 import ArchiveFile from './ArchiveFile'
+import Util from './Util'
 
 export default class Image extends Details {
-    //TODO-DETAILS this is the new approach to embedding a mediatype - to gradually replace inline way in this file.
     constructor(itemid, item) {
         /*
         Construct an Image object before rendering it to a HTML page
@@ -15,29 +15,25 @@ export default class Image extends Details {
     }
 
     browserAfter() {
-        archive_setup.push(function () {    //TODO-DETAILS check this isn't being left on archive_setup for next image etc
+        archive_setup.push(function () {    //TODO-DETAILS-ONLINE check this isn't being left on archive_setup for next image etc (it probably is
             AJS.theatresize();
             AJS.carouselsize('#ia-carousel', true);
         });
         super.browserAfter()
     }
-    jsxInNav(onbrowser) {
+    jsxInNav() {
         let item = this.item;
         let itemid = item.metadata.identifier; // Shortcut as used a lot
-        //TODO-DETAILS replace find and other files references below with methods on ArchiveFile and mainfile with mainArchiveFile
-        let mainfile = item.files.find((fi) => ['JPEG','PNG'].includes(fi.format)); //TODO-DETAILS-IMAGE probably add other formats
-        let mainArchiveFile = this._list.find((fi) => ['JPEG','PNG'].includes(fi.metadata.format));
-        let detailsURL = `https://archive.org/details/${itemid}`; //TODO-DETAILS-DWEB will move to this decentralized page, but check usages (like tweet) below
+        let mainArchiveFile = this._list.find((fi) => Util.imageFormats.includes(fi.metadata.format)); // Can be undefined if none included
+        let detailsURL = `https://archive.org/details/${itemid}`; //This is probably correct to remain pointed at archive.org since used as an itemprop
         let embedurl = `https://archive.org/embed/${itemid}`;
-        //TODO-DETAILS check if flag-overlay should include description
-        //TODO-DETAILS merge wordpress block into Details.js
         return (
             <div id="theatre-ia-wrap" className="container container-ia width-max  resized" style={{height: "600px"}}>
                 <link itemProp="url" href={detailsURL}/>
 
-                <link itemProp="thumbnailUrl" href="https://archive.org/services/img/{itemid}"/>{/*TODO is there a better thumbnail*/}
+                <link itemProp="thumbnailUrl" href="https://archive.org/services/img/{itemid}"/>{/*TODO-DETAILS-ONLINE is there a better thumbnail*/}
 
-                { item.files.filter((fi)=> fi.source !== "metadata").map((fi) => (
+                { item.files.filter((fi)=> fi.source !== "metadata").map((fi) => ( //TODO-DETAILS-LIST Maybe use _list instead of .files
                     <link itemProp="associatedMedia" href={`https://archive.org/download/${itemid}/${fi.name}`} key={`${itemid}/${fi.name}`}/>
                 )) }
 
@@ -51,7 +47,7 @@ export default class Image extends Details {
                             <div id="theatre-controls">
                             </div> {/*#theatre-controls*/}
 
-                { mainfile ? (
+                { mainArchiveFile ? (
                             <div className="details-carousel-wrapper">
                                 <section id="ia-carousel" className="carousel slide" data-ride="carousel" data-interval="false"
                                          aria-label="Item image slideshow" style={{maxHeight: "600px"}}>
@@ -63,14 +59,14 @@ export default class Image extends Details {
                                     <div className="carousel-inner">
                                         <div className="item active">
                                             <a className="carousel-image-wrapper"
-                                               href={`http://archive.org/download/${itemid}/${mainfile.name}`}
+                                               href={`http://archive.org/download/${itemid}/${mainArchiveFile.metadata.name}`}
                                                title="Open full sized image">
                                                    {mainArchiveFile.loadImg(
                                                         <img className="rot0 carousel-image" alt="item image #1"/>
-                                                    )} {/*Note archive.org details page erroneously doesnt close this tag*/}
+                                                    )} {/*--Note archive.org details page erroneously doesnt close this tag--*/}
                                             </a>
                                             <div className="carousel-caption">
-                                                {mainfile.name}
+                                                {mainArchiveFile.metadata.name}
                                             </div>
                                         </div>
                                     </div>
@@ -91,7 +87,7 @@ export default class Image extends Details {
                             </div>
                 ) }
                             {/* Script tags moved into the JS*/}
-                            {this.cherModal("audio", onbrowser)}
+                            {this.cherModal("audio")}
                         </div>{/*--/.xs-col-12*/}
                     </div>{/*--/.row*/}
 

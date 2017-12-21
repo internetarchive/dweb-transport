@@ -11,12 +11,17 @@ import ArchiveFile from "./ArchiveFile";
 
 
 export default class Details extends ArchiveBase {
-    constructor(id, {metadata = undefined} = {}) {
-        this.metadata = metadata;
-        this._list = this.item.file
+    constructor(id, item = undefined) {
+        super(id);
+        this.item = item;
+        this._listLoad();
+    }
+
+    _listLoad() { // After set this.item
+        this._list = (this.item && this.item.files )
             ? this.item.files.map((f) => new ArchiveFile({itemid: this.itemid, metadata: f})) // Allow methods on files of item
             : [];   // Default to empty, so usage simpler.
-        super(id);
+
     }
 
     async fetch() {
@@ -28,10 +33,11 @@ export default class Details extends ArchiveBase {
         console.log('get metadata for ' + this.itemid);
         //this.item = await Util.fetch_json(`https://archive.org/metadata/${this.itemid}`);
         this.item = await Util.fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}`);
+        this._listLoad();
         return this; // For chaining, but note will need to do an "await fetch"
     }
 
-    cherModal(type, onbrowser) {
+    cherModal(type) {
         return(
             <div id="cher-modal" className="modal fade" role="dialog" aria-hidden="true">
                 <div class="modal-dialog modal-lg">
@@ -43,10 +49,10 @@ export default class Details extends ArchiveBase {
                             <h3 class="modal-title">Share or Embed This Item</h3>
                         </div>{/*--/.modal-header--*/}
                         <div id="cher-body">
-                            {this.sharing(onbrowser)}
-                            {this.embed(onbrowser)}
-                            {this.embedWordpress(onbrowser)}
-                            {this.embedAdvanced(type, onbrowser)}
+                            {this.sharing()}
+                            {this.embed()}
+                            {this.embedWordpress()}
+                            {this.embedAdvanced(type)}
                         </div>{/*--/#cher-body--*/}
                     </div>{/*--/.modal-content--*/}
                 </div>{/*--/.modal-dialog--*/}
@@ -56,12 +62,12 @@ export default class Details extends ArchiveBase {
 
 
 
-    sharing(onbrowser) {
+    sharing() {
         //Common text across Image and Text and possibly other subclasses
         let item = this.item;
         let itemid = item.metadata.identifier; // Shortcut as used a lot
         let metadata = item.metadata; // Shortcut as used a lot
-        let detailsURL = `https://archive.org/details/${itemid}`; //TODO-DETAILS-DWEB will move to this decentralized page, but check usages (like tweet) below
+        let detailsURL = `https://archive.org/details/${itemid}`; // Note this should remain as pointing at details/itemid since its only used in sharing - FB, Twitter etc
         let sharingText =   `${metadata.title} : ${metadata.creator}`; //String used
         let sharingTextUriEncoded = encodeURIComponent(sharingText);
 
@@ -123,7 +129,7 @@ export default class Details extends ArchiveBase {
 
         );
     }
-    embedWordpress(onbrowser) {
+    embedWordpress() {
         // THis appeared on image and movie examples
         let item = this.item;
         let itemid = item.metadata.identifier; // Shortcut as used a lot
@@ -139,7 +145,7 @@ export default class Details extends ArchiveBase {
             </div>
         );
     }
-    embedAdvanced(type, onbrowser) {
+    embedAdvanced(type) {
         // From text, video, image
         let item = this.item;
         let itemid = item.metadata.identifier; // Shortcut as used a lot
@@ -151,7 +157,7 @@ export default class Details extends ArchiveBase {
             </div>
         );
     }
-    embed(onbrowser) {
+    embed() {
         // Same on text, video, image
         let shortEmbedURL = `https://archive.org/stream/${this.itemid}?ui=embed`;    //Note on archive.org/details this is different from iframeURL and not clear if that is intentional
         return(

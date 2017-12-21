@@ -32,15 +32,14 @@ export default class ArchiveBase {
     constructor(itemid, {}={}) {
         this.itemid = itemid;
     }
-    jsxInNav(onbrowser) {
+    jsxInNav() {
     }
 
-    navwrapped(onbrowser) {
+    navwrapped() {
         /* Wrap the content up in a Nav
-        onbrowser:    true if rendering in browser, false if in node on server
         returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
          */
-        return new Nav(this.jsxInNav(onbrowser)).render(onbrowser);
+        return new Nav(this.jsxInNav()).render();
     }
 
     browserBefore() {
@@ -58,21 +57,11 @@ export default class ArchiveBase {
         /* Return html to insert after Nav wrapped part for use in node*/
         return "";
     }
-    render(res, htm) {
-        const onbrowser = res.constructor.name != "ServerResponse"; // For a browser we render to an element, for server feed to a response stream
-        var els = this.navwrapped(onbrowser);  //ARCHIVE-BROWSER remove unneccessary convert back to HTML and reconversion inside Nav.render
-
-        //ARCHIVE-BROWSER - this is run at the end of archive_min.js in node, on browser it has to be run after doing a search
-        if (onbrowser) {
-            this.browserBefore();
-            React.domrender(els, res);
-            this.browserAfter();
-        } else {
-            htm += this.nodeHtmlBefore();
-            htm += ReactDOMServer.renderToStaticMarkup(els);
-            htm += this.nodeHtmlAfter();
-            res.end(htm);
-        }
+    render(res, htm) {  //TODO-DETAILS remove htm and from calling routines
+        var els = this.navwrapped();
+        this.browserBefore();
+        React.domrender(els, res);
+        this.browserAfter();
     }
 }
 

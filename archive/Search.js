@@ -108,9 +108,8 @@ export default class Search extends ArchiveBase {
       );
   }
 
-  jsxInNav(onbrowser){
+  jsxInNav(){
       /* The main part of the details or search page containing the content
-      onbrowser:    true if rendering in browser, false if in node on server
       returns:      JSX elements tree suitable for passing to new Nav(wrap)
        */
       return (
@@ -121,7 +120,7 @@ export default class Search extends ArchiveBase {
               <div className="col-xs-12">
                 <div id="ikind-search" className="ikind in">
                   {this.items.map(function(item, n){ // Note rendering tiles is quick, its the fetch of the img (async) which is slow.
-                     return new Tile().render(item, onbrowser);
+                     return new Tile().render(item);
                    })}
                 </div>
               </div>

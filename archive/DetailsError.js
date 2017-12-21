@@ -7,14 +7,7 @@ export default class DetailsError extends Details {
         super(itemid, item);
         this.message = message;
     }
-    jsxInNav(onbrowser) {
+    jsxInNav() {
         return this.message;
-    }
-    render(res, htm) {
-        const onbrowser = res.constructor.name != "ServerResponse"; // For a browser we render to an element, for server feed to a response stream
-        if (!onbrowser) {
-            res.statusCode = 500;
-        }
-        super.render(res,htm)
     }
 }

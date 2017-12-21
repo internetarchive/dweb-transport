@@ -26,13 +26,13 @@ export default class AV extends Details {
         super.browserAfter()
         Play('jw6', this.playlist, this.cfg);
     }
-    jsxInNav(onbrowser) {
+    jsxInNav() {
         let item = this.item;
         this.playlist=[];
         let cfg={};
-        let avs = item.files.filter(fi => (fi.format=='h.264' || fi.format=='512Kb MPEG4'));
+        let avs = item.files.filter(fi => (fi.format=='h.264' || fi.format=='512Kb MPEG4'));    //TODO-DETAILS-LIST Maybe use _list instead of .files
         if (!avs.length)
-            avs = item.files.filter(fi => fi.format=='VBR MP3');
+            avs = item.files.filter(fi => fi.format=='VBR MP3'); //TODO-DETAILS-LIST Maybe use _list instead of .files
         cfg.aspectratio = 4/3;
 
         if (avs.length) {
@@ -91,7 +91,7 @@ export default class AV extends Details {
                         </noscript>
 
                         <div id="jw6"></div>
-                        {this.cherModal("video", onbrowser)}
+                        {this.cherModal("video")}
                     </div> {/*--/.xs-col-12--*/}
                 </div>{/*--/.row--*/}
             </div>

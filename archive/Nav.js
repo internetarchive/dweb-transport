@@ -23,11 +23,10 @@ export default class Nav { //extends React.Component
     this.htm = htm; //ARCHIVE-BROWSER could be string or nodes (not sure what class that is, but whatever the JSX compiler gives
   }
 
-  render(onbrowser) {
+  render() {
       if (typeof this.htm === "string") {
           this.htm = ( <div dangerouslySetInnerHTML={{__html: this.htm}}></div> );
       }
-      //TODO-DETAILS is putting the description (in 'htm' in as raw html which would be a nasty security hole since that comes from user !
       return (
       <div id="wrap">
         <div id="navwrap1">
@@ -36,67 +35,34 @@ export default class Nav { //extends React.Component
               <div id="nav-tophat-helper" className="hidden-xs"></div>
               <ul className="nav navbar-nav">
 
-                {this.mts.map(function(mt, n){
-                   return (
+                {this.mts.map((mt, n) => (
                      <li key={'mikey'+n} className="dropdown dropdown-ia pull-left">
-                        { onbrowser ? (
                        <a title={mt} className={'navia-link '+mt}
                           onClick={`Nav.nav_details("${mt}")`}
                           data-top-kind={mt} data-toggle="tooltip" target="_top" data-placement="bottom">
                          <span className={'iconochive-'+mt} aria-hidden="true"></span>
                          <span className="sr-only">{mt}</span>
                        </a>
-                ) : (
-                        <a title={mt} className={'navia-link '+mt}
-                            href={'/details/'+mt}
-                            data-top-kind={mt} data-toggle="tooltip" target="_top" data-placement="bottom">
-                                <span className={'iconochive-'+mt} aria-hidden="true"></span>
-                                <span className="sr-only">{mt}</span>
-                                </a>
-                )}
-                     </li>);
-                 })}
-
+                     </li>
+                ) ) }
                 <li className="navbar-brand-li">
-          { onbrowser ? (
                   <a className="navbar-brand" onClick="Nav.nav_home();" target="_top">
                     <span className="iconochive-logo"  aria-hidden="true"></span>
                     <span className="sr-only">logo</span>
                   </a>
-            ) : (
-                  <a className="navbar-brand" href="/" target="_top">
-                    <span className="iconochive-logo"  aria-hidden="true"></span>
-                    <span className="sr-only">logo</span>
-                  </a>
-            ) }
                 </li>
 
                 <li id="nav-search" className="dropdown dropdown-ia pull-right">
-            { onbrowser ? (
                   <a onClick="$(this).parents('#nav-search').find('form').submit(); return false;">
                     <span className="iconochive-search" aria-hidden="true"></span>
                     <span className="sr-only">search</span>
                   </a>
-            ) : (
-                  <a href="/search.php">
-                    <span className="iconochive-search" aria-hidden="true"></span>
-                    <span className="sr-only">search</span>
-                  </a>
-            ) }
                   <div>
-            { onbrowser ? (
                     <form role="search" onSubmit="Nav.nav_search(this.elements[0].value); return 0;" target="_top">
                       <label htmlFor="search-bar-2" className="sr-only">Search the Archive</label>
                       <input id="search-bar-2" placeholder="Search" type="text" name="query" value=""/>
                       <input type="submit" value="Search"/>
                     </form>
-            ) : (
-                    <form role="search" action="/search.php" target="_top">
-                      <label htmlFor="search-bar-2" className="sr-only">Search the Archive</label>
-                      <input id="search-bar-2" placeholder="Search" type="text" name="query" value=""/>
-                      <input type="submit" value="Search"/>
-                    </form>
-            )}
                   </div>
                 </li>
 
@@ -138,7 +104,6 @@ export default class Nav { //extends React.Component
     console.log("Navigating to Details",id);
     let destn = document.getElementById('main'); // Blank window (except Nav) as loading
     Nav.clear(destn);
-    //let d = await new Details(id).fetch(); // Gets back a obj fetched and ready to render
     await Nav.factory(id, destn, ""); // Not sure what returning ....
     return false; // Dont follow anchor link - unfortunately React ignores this
   }

@@ -60,7 +60,7 @@
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 6);
+/******/ 	return __webpack_require__(__webpack_require__.s = 7);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -69,7 +69,7 @@
 
 /* eslint max-len: 0 */
 // TODO: eventually deprecate this console.trace("use the `babel-register` package instead of `babel-core/register`");
-module.exports = __webpack_require__(7);
+module.exports = __webpack_require__(8);
 
 
 /***/ }),
@@ -143,249 +143,6 @@ class React {
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(3);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__ = __webpack_require__(5);
-__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
-
-//Not needed on client - kept so script can run in both cases
-//import ReactDOMServer from 'react-dom/server';
-//Next line is for client, not needed on server but doesnt hurt
-//import ReactDOM from 'react-dom';
-
-
-
-
-class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default */] {
-    constructor(id, {} = {}) {
-        super(id);
-    }
-
-    async fetch() {
-        /* Fetch JSON by talking to Metadata API
-            this.itemid Archive Item identifier
-            throws: TypeError or Error if fails
-            resolves to: this
-         */
-        console.log('get metadata for ' + this.itemid);
-        //this.item = await Util.fetch_json(`https://archive.org/metadata/${this.itemid}`);
-        this.item = await __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}`);
-        return this; // For chaining, but note will need to do an "await fetch"
-    }
-
-    cherModal(type, onbrowser) {
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            { id: 'cher-modal', className: 'modal fade', role: 'dialog', 'aria-hidden': 'true' },
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'div',
-                { 'class': 'modal-dialog modal-lg' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'div',
-                    { 'class': 'modal-content', style: 'padding:10px;' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { 'class': 'modal-header' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'button',
-                            { type: 'button', 'class': 'close', 'data-dismiss': 'modal', 'aria-hidden': 'true' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', {
-                                'class': 'iconochive-remove-circle', 'aria-hidden': 'true' }),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'span',
-                                { 'class': 'sr-only' },
-                                'remove-circle'
-                            )
-                        ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'h3',
-                            { 'class': 'modal-title' },
-                            'Share or Embed This Item'
-                        )
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { id: 'cher-body' },
-                        this.sharing(onbrowser),
-                        this.embed(onbrowser),
-                        this.embedWordpress(onbrowser),
-                        this.embedAdvanced(type, onbrowser)
-                    )
-                )
-            )
-        );
-    }
-
-    sharing(onbrowser) {
-        //Common text across Image and Text and possibly other subclasses
-        let item = this.item;
-        let itemid = item.metadata.identifier; // Shortcut as used a lot
-        let metadata = item.metadata; // Shortcut as used a lot
-        let detailsURL = `https://archive.org/details/${itemid}`; //TODO-DETAILS-DWEB will move to this decentralized page, but check usages (like tweet) below
-        let sharingText = `${metadata.title} : ${metadata.creator}`; //String used
-        let sharingTextUriEncoded = encodeURIComponent(sharingText);
-
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            { style: { textAlign: "center", margin: "50px auto" } },
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'div',
-                { className: 'topinblock' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'div',
-                    { id: 'sharer' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'a',
-                        { href: `https://twitter.com/intent/tweet?url=${detailsURL}&amp;via=internetarchive&amp;text=${sharingTextUriEncoded}+%3A+${metadata.creator}+%3A+Free+Download+%26+Streaming+%3A+Internet+Archive`,
-                            target: '_blank' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-twitter', 'data-toggle': 'tooltip',
-                            'data-placement': 'bottom', title: '',
-                            'data-original-title': 'Share to Twitter' })
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'a',
-                        { href: `https://www.facebook.com/sharer/sharer.php?u=${detailsURL}`,
-                            target: '_blank' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-facebook', 'data-toggle': 'tooltip',
-                            'data-placement': 'bottom', title: '',
-                            'data-original-title': 'Share to Facebook' })
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'a',
-                        { href: `https://plus.google.com/share?url=${detailsURL}`,
-                            target: '_blank' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-googleplus', 'data-toggle': 'tooltip',
-                            'data-placement': 'bottom', title: '',
-                            'data-original-title': 'Share to Google+' })
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'a',
-                        { href: `http://www.reddit.com/submit?url=${detailsURL}&amp;title=${sharingTextUriEncoded}+%3A+${metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`,
-                            target: '_blank' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-reddit', 'data-toggle': 'tooltip',
-                            'data-placement': 'bottom', title: '',
-                            'data-original-title': 'Share to Reddit' })
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'a',
-                        { href: `https://www.tumblr.com/share/video?embed=%3Ciframe+width%3D%22640%22+height%3D%22480%22+frameborder%3D%220%22+allowfullscreen+src%3D%22https%3A%2F%2Farchive.org%2Fembed%2F%22+webkitallowfullscreen%3D%22true%22+mozallowfullscreen%3D%22true%22%26gt%3B%26lt%3B%2Fiframe%3E&;name=${item.metadata.title}+%3A+${item.metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`,
-                            target: '_blank' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-tumblr', 'data-toggle': 'tooltip',
-                            'data-placement': 'bottom', title: '',
-                            'data-original-title': 'Share to Tumblr' })
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'a',
-                        { href: `http://www.pinterest.com/pin/create/button/?url=${detailsURL}&amp;description=${sharingTextUriEncoded}+%3A+${metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`,
-                            target: '_blank' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-pinterest', 'data-toggle': 'tooltip',
-                            'data-placement': 'bottom', title: '',
-                            'data-original-title': 'Share to Pinterest' })
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'a',
-                        { href: `https://archive.org/pop/editor.html?initialMedia=${detailsURL}`,
-                            target: '_blank' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'sharee iconochive-popcorn', 'data-toggle': 'tooltip',
-                            'data-placement': 'bottom', title: 'Share to Popcorn Maker' })
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'a',
-                        { href: `mailto:?body=${detailsURL}&amp;subject=${sharingText} : ${metadata.creator} : Free Download &amp; Streaming : Internet Archive` },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-email', 'data-toggle': 'tooltip',
-                            'data-placement': 'bottom', title: '',
-                            'data-original-title': 'Share via email' })
-                    )
-                ),
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', { clear: 'all', className: 'clearfix' })
-            )
-        );
-    }
-    embedWordpress(onbrowser) {
-        // THis appeared on image and movie examples
-        let item = this.item;
-        let itemid = item.metadata.identifier; // Shortcut as used a lot
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            null,
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'form',
-                { className: 'form', role: 'form' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'div',
-                    { className: 'form-group' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'label',
-                        null,
-                        'EMBED (for wordpress.com hosted blogs)'
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'textarea',
-                        { id: 'embedcodehereWP', className: 'form-control textarea-invert-readonly',
-                            rows: '3', readOnly: 'readonly' },
-                        `[archiveorg ${itemid} width=560 height=384 frameborder=0 webkitallowfullscreen=true mozallowfullscreen=true]`
-                    )
-                )
-            )
-        );
-    }
-    embedAdvanced(type, onbrowser) {
-        // From text, video, image
-        let item = this.item;
-        let itemid = item.metadata.identifier; // Shortcut as used a lot
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            null,
-            'Want more?',
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'a',
-                { href: `https://archive.org/help/${type}.php?identifier=${itemid}` },
-                'Advanced embedding details, examples, and help'
-            ),
-            '!'
-        );
-    }
-    embed(onbrowser) {
-        // Same on text, video, image
-        let shortEmbedURL = `https://archive.org/stream/${this.itemid}?ui=embed`; //Note on archive.org/details this is different from iframeURL and not clear if that is intentional
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            null,
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'form',
-                { 'class': 'form', role: 'form' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'div',
-                    { 'class': 'form-group' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'label',
-                        null,
-                        'EMBED'
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'textarea',
-                        { id: 'embedcodehere', 'class': 'form-control textarea-invert-readonly',
-                            rows: '3', readonly: 'readonly' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('iframe', {
-                            src: shortEmbedURL,
-                            width: '480', height: '430', frameborder: '0',
-                            webkitallowfullscreen: 'true', mozallowfullscreen: 'true',
-                            allowfullscreen: true })
-                    )
-                )
-            )
-        );
-    }
-}
-/* harmony export (immutable) */ __webpack_exports__["default"] = Details;
-
-
-/***/ }),
-/* 3 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
@@ -393,7 +150,7 @@ __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
  // Note React is used by the JSX compiler that handles the HTML below this fakes the React.createElement
 
 
-/* harmony default export */ __webpack_exports__["a"] = (class {
+class Util {
     static number_format(nStr) //xxx this is just addCommas now
     {
         //http://www.mredkj.com/javascript/numberFormat.html
@@ -508,10 +265,18 @@ __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
                 let t = response.text(); // promise resolving to text
                 throw new Error(`Unable to fetch, return was not JSON - got: ${response.headers.get('Content-Type')} ${t}`);
             }
-        } // TODO-HTTP may need to handle binary as a buffer instead of text if build binary version of this.
+        } // Note - if copy this for binary files, make sure to look at TransportHTTP which uses response.arrayBuffer
     }
-});
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = Util;
 
+
+/* === Configuration info ==== */
+Util.archiveMimeTypeFromFormat = {
+    JPEG: "image/jpeg",
+    PNG: "image/png"
+}; //TODO expand to other formats @IA
+Util.imageFormats = ['JPEG', 'PNG']; //TODO expand to other formats @IA
 // minified FROM http://sourcefrog.net/projects/natsort/natcompare.js
 function isWhitespaceChar(B) {
     var A;A = B.charCodeAt(0);if (A <= 32) {
@@ -588,15 +353,269 @@ function isWhitespaceChar(B) {
 };
 
 /***/ }),
+/* 3 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(2);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__ = __webpack_require__(5);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__ArchiveFile__ = __webpack_require__(6);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
+//Not needed on client - kept so script can run in both cases
+//import ReactDOMServer from 'react-dom/server';
+//Next line is for client, not needed on server but doesnt hurt
+//import ReactDOM from 'react-dom';
+
+
+
+
+
+class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default */] {
+    constructor(id, item = undefined) {
+        super(id);
+        this.item = item;
+        this._listLoad();
+    }
+
+    _listLoad() {
+        // After set this.item
+        this._list = this.item && this.item.files ? this.item.files.map(f => new __WEBPACK_IMPORTED_MODULE_3__ArchiveFile__["a" /* default */]({ itemid: this.itemid, metadata: f })) // Allow methods on files of item
+        : []; // Default to empty, so usage simpler.
+    }
+
+    async fetch() {
+        /* Fetch JSON by talking to Metadata API
+            this.itemid Archive Item identifier
+            throws: TypeError or Error if fails
+            resolves to: this
+         */
+        console.log('get metadata for ' + this.itemid);
+        //this.item = await Util.fetch_json(`https://archive.org/metadata/${this.itemid}`);
+        this.item = await __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}`);
+        this._listLoad();
+        return this; // For chaining, but note will need to do an "await fetch"
+    }
+
+    cherModal(type) {
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            { id: 'cher-modal', className: 'modal fade', role: 'dialog', 'aria-hidden': 'true' },
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'div',
+                { 'class': 'modal-dialog modal-lg' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { 'class': 'modal-content', style: 'padding:10px;' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { 'class': 'modal-header' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'button',
+                            { type: 'button', 'class': 'close', 'data-dismiss': 'modal', 'aria-hidden': 'true' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', {
+                                'class': 'iconochive-remove-circle', 'aria-hidden': 'true' }),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'span',
+                                { 'class': 'sr-only' },
+                                'remove-circle'
+                            )
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'h3',
+                            { 'class': 'modal-title' },
+                            'Share or Embed This Item'
+                        )
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { id: 'cher-body' },
+                        this.sharing(),
+                        this.embed(),
+                        this.embedWordpress(),
+                        this.embedAdvanced(type)
+                    )
+                )
+            )
+        );
+    }
+
+    sharing() {
+        //Common text across Image and Text and possibly other subclasses
+        let item = this.item;
+        let itemid = item.metadata.identifier; // Shortcut as used a lot
+        let metadata = item.metadata; // Shortcut as used a lot
+        let detailsURL = `https://archive.org/details/${itemid}`; // Note this should remain as pointing at details/itemid since its only used in sharing - FB, Twitter etc
+        let sharingText = `${metadata.title} : ${metadata.creator}`; //String used
+        let sharingTextUriEncoded = encodeURIComponent(sharingText);
+
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            { style: { textAlign: "center", margin: "50px auto" } },
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'div',
+                { className: 'topinblock' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { id: 'sharer' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `https://twitter.com/intent/tweet?url=${detailsURL}&amp;via=internetarchive&amp;text=${sharingTextUriEncoded}+%3A+${metadata.creator}+%3A+Free+Download+%26+Streaming+%3A+Internet+Archive`,
+                            target: '_blank' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-twitter', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share to Twitter' })
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `https://www.facebook.com/sharer/sharer.php?u=${detailsURL}`,
+                            target: '_blank' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-facebook', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share to Facebook' })
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `https://plus.google.com/share?url=${detailsURL}`,
+                            target: '_blank' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-googleplus', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share to Google+' })
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `http://www.reddit.com/submit?url=${detailsURL}&amp;title=${sharingTextUriEncoded}+%3A+${metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`,
+                            target: '_blank' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-reddit', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share to Reddit' })
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `https://www.tumblr.com/share/video?embed=%3Ciframe+width%3D%22640%22+height%3D%22480%22+frameborder%3D%220%22+allowfullscreen+src%3D%22https%3A%2F%2Farchive.org%2Fembed%2F%22+webkitallowfullscreen%3D%22true%22+mozallowfullscreen%3D%22true%22%26gt%3B%26lt%3B%2Fiframe%3E&;name=${item.metadata.title}+%3A+${item.metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`,
+                            target: '_blank' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-tumblr', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share to Tumblr' })
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `http://www.pinterest.com/pin/create/button/?url=${detailsURL}&amp;description=${sharingTextUriEncoded}+%3A+${metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`,
+                            target: '_blank' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-pinterest', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share to Pinterest' })
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `https://archive.org/pop/editor.html?initialMedia=${detailsURL}`,
+                            target: '_blank' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'sharee iconochive-popcorn', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: 'Share to Popcorn Maker' })
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `mailto:?body=${detailsURL}&amp;subject=${sharingText} : ${metadata.creator} : Free Download &amp; Streaming : Internet Archive` },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-email', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share via email' })
+                    )
+                ),
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', { clear: 'all', className: 'clearfix' })
+            )
+        );
+    }
+    embedWordpress() {
+        // THis appeared on image and movie examples
+        let item = this.item;
+        let itemid = item.metadata.identifier; // Shortcut as used a lot
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            null,
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'form',
+                { className: 'form', role: 'form' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { className: 'form-group' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'label',
+                        null,
+                        'EMBED (for wordpress.com hosted blogs)'
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'textarea',
+                        { id: 'embedcodehereWP', className: 'form-control textarea-invert-readonly',
+                            rows: '3', readOnly: 'readonly' },
+                        `[archiveorg ${itemid} width=560 height=384 frameborder=0 webkitallowfullscreen=true mozallowfullscreen=true]`
+                    )
+                )
+            )
+        );
+    }
+    embedAdvanced(type) {
+        // From text, video, image
+        let item = this.item;
+        let itemid = item.metadata.identifier; // Shortcut as used a lot
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            null,
+            'Want more?',
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'a',
+                { href: `https://archive.org/help/${type}.php?identifier=${itemid}` },
+                'Advanced embedding details, examples, and help'
+            ),
+            '!'
+        );
+    }
+    embed() {
+        // Same on text, video, image
+        let shortEmbedURL = `https://archive.org/stream/${this.itemid}?ui=embed`; //Note on archive.org/details this is different from iframeURL and not clear if that is intentional
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            null,
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'form',
+                { 'class': 'form', role: 'form' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { 'class': 'form-group' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'label',
+                        null,
+                        'EMBED'
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'textarea',
+                        { id: 'embedcodehere', 'class': 'form-control textarea-invert-readonly',
+                            rows: '3', readonly: 'readonly' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('iframe', {
+                            src: shortEmbedURL,
+                            width: '480', height: '430', frameborder: '0',
+                            webkitallowfullscreen: 'true', mozallowfullscreen: 'true',
+                            allowfullscreen: true })
+                    )
+                )
+            )
+        );
+    }
+}
+/* harmony export (immutable) */ __webpack_exports__["default"] = Details;
+
+
+/***/ }),
 /* 4 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(3);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(2);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__ = __webpack_require__(5);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Tile__ = __webpack_require__(8);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Tile__ = __webpack_require__(9);
 //import ReactDOM from "react-dom";
 //import React from 'react';
 //ARCHIVE-BROWSER ReactDOMServer Not needed for browser, left in to allow use in both browser & Node/Server
@@ -708,9 +727,8 @@ class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default *
         );
     }
 
-    jsxInNav(onbrowser) {
+    jsxInNav() {
         /* The main part of the details or search page containing the content
-        onbrowser:    true if rendering in browser, false if in node on server
         returns:      JSX elements tree suitable for passing to new Nav(wrap)
          */
         return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
@@ -728,7 +746,7 @@ class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default *
                         { id: 'ikind-search', className: 'ikind in' },
                         this.items.map(function (item, n) {
                             // Note rendering tiles is quick, its the fetch of the img (async) which is slow.
-                            return new __WEBPACK_IMPORTED_MODULE_3__Tile__["a" /* default */]().render(item, onbrowser);
+                            return new __WEBPACK_IMPORTED_MODULE_3__Tile__["a" /* default */]().render(item);
                         })
                     )
                 )
@@ -745,7 +763,7 @@ class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default *
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(3);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(2);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 //Not needed on client - kept so script can run in both cases
@@ -772,25 +790,24 @@ class ArchiveBase {
     Tile - elements on a Search - each is a ArchiveItem
     ReactFake - spoofs methods of React as otherwise hard to do onclick etc if use real React (note archive.min still uses react a little)
      Fields:
-    item    Metadata for item, undefined for a search TODO-DETAILS-SD make this a SD
+    item    Metadata for item, undefined for a search.
     items   Metadata for items found if the item is a Collection,
     query   query part of search to run (Search|Collection|Home only)
      */
     constructor(itemid, {} = {}) {
         this.itemid = itemid;
     }
-    jsxInNav(onbrowser) {}
+    jsxInNav() {}
 
-    navwrapped(onbrowser) {
+    navwrapped() {
         /* Wrap the content up in a Nav
-        onbrowser:    true if rendering in browser, false if in node on server
         returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
          */
-        return new Nav(this.jsxInNav(onbrowser)).render(onbrowser);
+        return new Nav(this.jsxInNav()).render();
     }
 
     browserBefore() {
-        //Anything that is needed in the browser before the Nav - TODO-DETAILS will have the stuff above the Nav banner
+        //Anything that is needed to be executed in the browser before the main HTML tree is replaced.
         // Nothing to do by default
     }
     browserAfter() {
@@ -805,20 +822,11 @@ class ArchiveBase {
         return "";
     }
     render(res, htm) {
-        const onbrowser = res.constructor.name != "ServerResponse"; // For a browser we render to an element, for server feed to a response stream
-        var els = this.navwrapped(onbrowser); //ARCHIVE-BROWSER remove unneccessary convert back to HTML and reconversion inside Nav.render
-
-        //ARCHIVE-BROWSER - this is run at the end of archive_min.js in node, on browser it has to be run after doing a search
-        if (onbrowser) {
-            this.browserBefore();
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].domrender(els, res);
-            this.browserAfter();
-        } else {
-            htm += this.nodeHtmlBefore();
-            htm += ReactDOMServer.renderToStaticMarkup(els);
-            htm += this.nodeHtmlAfter();
-            res.end(htm);
-        }
+        //TODO-DETAILS remove htm and from calling routines
+        var els = this.navwrapped();
+        this.browserBefore();
+        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].domrender(els, res);
+        this.browserAfter();
     }
 }
 /* harmony export (immutable) */ __webpack_exports__["a"] = ArchiveBase;
@@ -826,13 +834,60 @@ class ArchiveBase {
 
 /***/ }),
 /* 6 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(2);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
+
+
+class ArchiveFile {
+    /*
+    Represents a single file, currently one that is in the item, but might create sub/super classes to handle other types
+    of file e.g. images used in the UI
+     Fields:
+    metadata: metadata of item - (note will be a pointer into a Detail or Search's metadata so treat as read-only)
+    sd: pointer to SmartDict or Block ? created with Urls (see how did it with Academic)
+     */
+
+    constructor({ itemid = undefined, metadata = undefined } = {}) {
+        this.itemid = itemid;
+        this.metadata = metadata;
+    }
+    async p_loadImg(jsx) {
+        /*
+        This is the asyncronous part of loadImg, runs in the background to update the image.
+         Note it can't be inside load_img which has to be synchronous and return a jsx tree.
+         */
+        let blk = await Dweb.Block.p_fetch([this.metadata.ipfs, this.metadata.contenthash], verbose); //Typically will be a Uint8Array
+        let blob = new Blob([blk._data], { type: __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].archiveMimeTypeFromFormat[this.metadata.format] }); // Works for data={Uint8Array|Blob}
+        // This next code is bizarre combination needed to open a blob from within an HTML window.
+        let objectURL = URL.createObjectURL(blob); //TODO-STREAMS make this work on streams
+        console.log("OURL=", objectURL);
+        //jsx.src = `http://archive.org/download/${this.itemid}/${this.metadata.name}`
+        jsx.src = objectURL;
+    }
+    loadImg(jsx) {
+        //asynchronously loads file from one of metadata, turns into blob, and stuffs into element
+        // Usage like  {this.loadImg(<img width=10>))
+        this.p_loadImg(jsx); /* Asynchronously load image*/
+        return jsx;
+    }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = ArchiveFile;
+
+
+/***/ }),
+/* 7 */
 /***/ (function(module, exports, __webpack_require__) {
 
 //var React = require('react');
 //var ReactDOM = require('react-dom');
-var Details = __webpack_require__(2).default;
+var Details = __webpack_require__(3).default;
 var Search = __webpack_require__(4).default;
-var Nav = __webpack_require__(9).default;
+var Nav = __webpack_require__(10).default;
 //window.Dweb = require('../js/Dweb');
 window.Nav = Nav;
 /*
@@ -843,19 +898,13 @@ BREW check if should add to metadata and/or search
 DT Transport refactor
     For lists ... waiting on S @ Orbit
 
-class ArchiveItem - CL - for item
-class ArchiveFile - SmartDict - holds metadata
-rework rest of code to use them instead of plain dicts with metadata
-{createImage(Archivefile) } or { ArchiveFileInstance.createImageJSX() }
-    returns Image tag with no src
-    runs async to fetch it - passed pointer to image element -
-    on fetch turns into blob
+* rework rest of code to use ArchiveFile & ArchiveItem instead of plain dicts with metadata
+* Fix Search to properly match HTML returned by Search & Collection
+    - dowmload example, then can work on it offline
 
-gateway.dweb.me/content/archiveid/xxx/yyy
-    DT links maybe should point at above (even prior to fetching via Dweb)
-TEST DA add Transport libraries
-    C (later) make UI display IPFS/HTTP consistent.
+Make links point at Dweb OR at gateway.dweb.me/content/archiveid/xxx/yyy
 C Fetch from contenthash or ipfs if available
+    - fix tests so works on HTTP, IPFS or HTTP+IPFS
     - embedded images etc - routine plus object pointed to in body
     - content objects, probably just in images for now
     - figure out how AV dispays and how to pass stream to it (maybe wait on Feross)
@@ -864,17 +913,19 @@ O Talk to Ferross
     DT Add BitTorrent to library
     DA Recognize magnet links
     DG Add the improvements from the doc
-O talk to Brew re Naming
-    DT implement name
+Naming - start implementing - need outline on both DT and DG and DA
 Later
     Add other ways to fetch to metadata returned e.g webtorrent
-        Need to know how to get to Magnet link
+        @IA Need to know how to get to Magnet link
+    ArchiveItem - CL - for item
+    ArchiveFile - SmartDict - holds metadata
+    @IA C (later) make UI display IPFS/HTTP status indicators consistent.
 
 
 */
 
 /***/ }),
-/* 7 */
+/* 8 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -887,12 +938,12 @@ exports.default = function () {};
 module.exports = exports["default"];
 
 /***/ }),
-/* 8 */
+/* 9 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(3);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(2);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 //import React from 'react';
@@ -900,38 +951,21 @@ __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
 class Tile {
-  render(item, onbrowser) {
+  render(item) {
     //xxx shorten/safify certain title usages (compared to Lists.inc)
-    const collections = Array.isArray(item.collection) ? item.collection : typeof item.collection == 'string' ? [item.collection] : [];
+    const collections = Array.isArray(item.collection) ? item.collection : typeof item.collection === 'string' ? [item.collection] : [];
     const collection = collections[0];
     const nFavorites = collections.filter(e => e.startsWith('fav-')).length;
-    const is_collection = item.mediatype == 'collection';
+    const is_collection = item.mediatype === 'collection';
     const classes = 'item-ia' + (is_collection ? ' collection-ia' : '');
     //ARCHIVE-BROWSER on browser, want to load links locally (via APIs) rather than rebuilding HTML page
     // ARCHIVE-BROWSER added key= to keep react happy (I hope)
     return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
       'div',
       { className: classes, 'data-id': item.identifier, key: item.identifier },
-      onbrowser ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
         'a',
         { className: 'stealth', tabIndex: '-1', onClick: `Nav.nav_details("${collection}");` },
-        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-          'div',
-          { className: 'item-parent' },
-          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            { className: 'item-parent-img' },
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { src: 'https://archive.org/services/img/' + collection })
-          ),
-          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            { className: 'item-parent-ttl' },
-            'xxx parent title'
-          )
-        )
-      ) : __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-        'a',
-        { className: 'stealth', tabIndex: '-1', href: '/details/' + collection },
         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
           'div',
           { className: 'item-parent' },
@@ -967,26 +1001,13 @@ class Tile {
         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
           'div',
           { className: 'item-ttl C C2' },
-          onbrowser ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
             'a',
             { onClick: `Nav.nav_details("${item.identifier}");`, title: item.title },
             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
               'div',
               { className: 'tile-img' },
               __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { className: 'item-img', xxxstyle: 'height:180px', src: 'https://archive.org/services/img/' + item.identifier })
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-              'div',
-              { className: 'ttl' },
-              item.title
-            )
-          ) : __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'a',
-            { href: '/details/' + item.identifier, title: item.title },
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-              'div',
-              { className: 'tile-img' },
-              __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { className: 'item-img', xxxstyle: 'height:180px', src: '//archive.org/services/img/' + item.identifier })
             ),
             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
               'div',
@@ -1101,19 +1122,19 @@ class Tile {
 
 
 /***/ }),
-/* 9 */
+/* 10 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(3);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(2);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Search__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Details__ = __webpack_require__(2);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__Home__ = __webpack_require__(10);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__Collection__ = __webpack_require__(11);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__Texts__ = __webpack_require__(12);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__Image__ = __webpack_require__(13);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Details__ = __webpack_require__(3);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__Home__ = __webpack_require__(11);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__Collection__ = __webpack_require__(12);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__Texts__ = __webpack_require__(13);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__Image__ = __webpack_require__(14);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__AV__ = __webpack_require__(15);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_9__DetailsError__ = __webpack_require__(16);
 //import ReactDOM from "react-dom";
@@ -1141,11 +1162,10 @@ class Nav {
     this.htm = htm; //ARCHIVE-BROWSER could be string or nodes (not sure what class that is, but whatever the JSX compiler gives
   }
 
-  render(onbrowser) {
+  render() {
     if (typeof this.htm === "string") {
       this.htm = __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { dangerouslySetInnerHTML: { __html: this.htm } });
     }
-    //TODO-DETAILS is putting the description (in 'htm' in as raw html which would be a nasty security hole since that comes from user !
     return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
       'div',
       { id: 'wrap' },
@@ -1162,50 +1182,28 @@ class Nav {
             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
               'ul',
               { className: 'nav navbar-nav' },
-              this.mts.map(function (mt, n) {
-                return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                  'li',
-                  { key: 'mikey' + n, className: 'dropdown dropdown-ia pull-left' },
-                  onbrowser ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'a',
-                    { title: mt, className: 'navia-link ' + mt,
-                      onClick: `Nav.nav_details("${mt}")`,
-                      'data-top-kind': mt, 'data-toggle': 'tooltip', target: '_top', 'data-placement': 'bottom' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-' + mt, 'aria-hidden': 'true' }),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                      'span',
-                      { className: 'sr-only' },
-                      mt
-                    )
-                  ) : __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'a',
-                    { title: mt, className: 'navia-link ' + mt,
-                      href: '/details/' + mt,
-                      'data-top-kind': mt, 'data-toggle': 'tooltip', target: '_top', 'data-placement': 'bottom' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-' + mt, 'aria-hidden': 'true' }),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                      'span',
-                      { className: 'sr-only' },
-                      mt
-                    )
-                  )
-                );
-              }),
-              __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+              this.mts.map((mt, n) => __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                 'li',
-                { className: 'navbar-brand-li' },
-                onbrowser ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                { key: 'mikey' + n, className: 'dropdown dropdown-ia pull-left' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                   'a',
-                  { className: 'navbar-brand', onClick: 'Nav.nav_home();', target: '_top' },
-                  __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-logo', 'aria-hidden': 'true' }),
+                  { title: mt, className: 'navia-link ' + mt,
+                    onClick: `Nav.nav_details("${mt}")`,
+                    'data-top-kind': mt, 'data-toggle': 'tooltip', target: '_top', 'data-placement': 'bottom' },
+                  __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-' + mt, 'aria-hidden': 'true' }),
                   __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                     'span',
                     { className: 'sr-only' },
-                    'logo'
+                    mt
                   )
-                ) : __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                )
+              )),
+              __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'li',
+                { className: 'navbar-brand-li' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                   'a',
-                  { className: 'navbar-brand', href: '/', target: '_top' },
+                  { className: 'navbar-brand', onClick: 'Nav.nav_home();', target: '_top' },
                   __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-logo', 'aria-hidden': 'true' }),
                   __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                     'span',
@@ -1217,18 +1215,9 @@ class Nav {
               __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                 'li',
                 { id: 'nav-search', className: 'dropdown dropdown-ia pull-right' },
-                onbrowser ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                   'a',
                   { onClick: '$(this).parents(\'#nav-search\').find(\'form\').submit(); return false;' },
-                  __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-search', 'aria-hidden': 'true' }),
-                  __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'span',
-                    { className: 'sr-only' },
-                    'search'
-                  )
-                ) : __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                  'a',
-                  { href: '/search.php' },
                   __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-search', 'aria-hidden': 'true' }),
                   __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                     'span',
@@ -1239,19 +1228,9 @@ class Nav {
                 __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                   'div',
                   null,
-                  onbrowser ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                  __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                     'form',
                     { role: 'search', onSubmit: 'Nav.nav_search(this.elements[0].value); return 0;', target: '_top' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                      'label',
-                      { htmlFor: 'search-bar-2', className: 'sr-only' },
-                      'Search the Archive'
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { id: 'search-bar-2', placeholder: 'Search', type: 'text', name: 'query', value: '' }),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'submit', value: 'Search' })
-                  ) : __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'form',
-                    { role: 'search', action: '/search.php', target: '_top' },
                     __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                       'label',
                       { htmlFor: 'search-bar-2', className: 'sr-only' },
@@ -1312,7 +1291,6 @@ class Nav {
     console.log("Navigating to Details", id);
     let destn = document.getElementById('main'); // Blank window (except Nav) as loading
     Nav.clear(destn);
-    //let d = await new Details(id).fetch(); // Gets back a obj fetched and ready to render
     await Nav.factory(id, destn, ""); // Not sure what returning ....
     return false; // Dont follow anchor link - unfortunately React ignores this
   }
@@ -1362,7 +1340,7 @@ class Nav {
 
 
 /***/ }),
-/* 10 */
+/* 11 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -1398,7 +1376,7 @@ class Home extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
 
 
 /***/ }),
-/* 11 */
+/* 12 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -1472,12 +1450,12 @@ class Collection extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
 
 
 /***/ }),
-/* 12 */
+/* 13 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(2);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(3);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
@@ -1485,14 +1463,13 @@ __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 class Texts extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
     constructor(itemid, item) {
-        super(itemid);
-        this.item = item;
+        super(itemid, item);
     }
-    jsxInNav(onbrowser) {
+    jsxInNav() {
         //TODO-DETAILS Description does not appear in this Navwrap section, its in the stuff underneath that which is not yet on a page.
         let item = this.item;
         let metadata = item.metadata;
-        let detailsURL = `https://archive.org/details/${this.itemid}`;
+        let detailsURL = `https://archive.org/details/${this.itemid}`; // Probably correct as archive.org/details since used as itemProp
         let imageURL = `https://archive.org/services/img/${this.itemid}`;
         //TODO-DETAILS-DWEB use alternative URLS via IPFS
         //TODO-STREAM pass as stream
@@ -1502,11 +1479,9 @@ class Texts extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
         let iframeURL = `${streamURL}?ui=embed`; //This works and matches archive.org
         let shortEmbedURL = `https://archive.org/stream/${this.itemid}?ui=embed`; //Note on archive.org/details this is different from iframeURL and not clear if that is intentional
         let helpURL = `https://archive.org/help/audio.php?identifier=${this.itemid}`;
-        //TODO check if its Twitter share title= as on text page, or data-original-title as on image page
-        //TODO maybe merge sharing section with Image.js which is identical (first div under cher-body
         return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
             'div',
-            { id: 'theatre-ia-wrap', 'class': 'container container-ia width-max ' },
+            { id: 'theatre-ia-wrap', 'class': 'container container-ia width-max' },
             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemprop: 'url', href: detailsURL }),
             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemprop: 'image', href: imageURL }),
             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
@@ -1551,7 +1526,7 @@ class Texts extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
                                 width: '100%', height: '480', frameborder: '0', webkitallowfullscreen: 'true',
                                 mozallowfullscreen: 'true', allowfullscreen: true })
                         ),
-                        this.cherModal("audio", onbrowser),
+                        this.cherModal("audio"),
                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('center', { style: 'color:white;margin-bottom:10px' })
                     )
                 )
@@ -1564,45 +1539,44 @@ class Texts extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
 
 
 /***/ }),
-/* 13 */
+/* 14 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(2);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveFile__ = __webpack_require__(14);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(3);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveFile__ = __webpack_require__(6);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Util__ = __webpack_require__(2);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
 
 
 
+
 class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
-    //TODO-DETAILS this is the new approach to embedding a mediatype - to gradually replace inline way in this file.
     constructor(itemid, item) {
-        super(itemid);
-        this.item = item;
-        this._list = this.item.files.map(f => new __WEBPACK_IMPORTED_MODULE_2__ArchiveFile__["a" /* default */]({ itemid: this.itemid, metadata: f })); // Allow methods on files of item
+        /*
+        Construct an Image object before rendering it to a HTML page
+        item = metadata from a metadata fetch
+         */
+        super(itemid, item);
     }
 
     browserAfter() {
         archive_setup.push(function () {
-            //TODO-DETAILS check this isn't being left on archive_setup for next image etc
+            //TODO-DETAILS-ONLINE check this isn't being left on archive_setup for next image etc (it probably is
             AJS.theatresize();
             AJS.carouselsize('#ia-carousel', true);
         });
         super.browserAfter();
     }
-    jsxInNav(onbrowser) {
+    jsxInNav() {
         let item = this.item;
         let itemid = item.metadata.identifier; // Shortcut as used a lot
-        //TODO-DETAILS replace find and other files references below with methods on ArchiveFile and mainfile with mainArchiveFile
-        let mainfile = item.files.find(fi => ['JPEG', 'PNG'].includes(fi.format)); //TODO-DETAILS-IMAGE probably add other formats
-        let mainArchiveFile = this._list.find(fi => ['JPEG', 'PNG'].includes(fi.metadata.format));
-        let detailsURL = `https://archive.org/details/${itemid}`; //TODO-DETAILS-DWEB will move to this decentralized page, but check usages (like tweet) below
+        let mainArchiveFile = this._list.find(fi => __WEBPACK_IMPORTED_MODULE_3__Util__["a" /* default */].imageFormats.includes(fi.metadata.format)); // Can be undefined if none included
+        let detailsURL = `https://archive.org/details/${itemid}`; //This is probably correct to remain pointed at archive.org since used as an itemprop
         let embedurl = `https://archive.org/embed/${itemid}`;
-        //TODO-DETAILS check if flag-overlay should include description
-        //TODO-DETAILS merge wordpress block into Details.js
         return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
             'div',
             { id: 'theatre-ia-wrap', className: 'container container-ia width-max  resized', style: { height: "600px" } },
@@ -1630,7 +1604,7 @@ class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
                         { className: 'xs-col-12' },
                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'theatre-controls' }),
                         ' ',
-                        mainfile ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        mainArchiveFile ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                             'div',
                             { className: 'details-carousel-wrapper' },
                             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
@@ -1652,7 +1626,7 @@ class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
                                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                                             'a',
                                             { className: 'carousel-image-wrapper',
-                                                href: `http://archive.org/download/${itemid}/${mainfile.name}`,
+                                                href: `http://archive.org/download/${itemid}/${mainArchiveFile.metadata.name}`,
                                                 title: 'Open full sized image' },
                                             mainArchiveFile.loadImg(__WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { className: 'rot0 carousel-image', alt: 'item image #1' })),
                                             ' '
@@ -1660,7 +1634,7 @@ class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
                                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                                             'div',
                                             { className: 'carousel-caption' },
-                                            mainfile.name
+                                            mainArchiveFile.metadata.name
                                         )
                                     )
                                 )
@@ -1695,7 +1669,7 @@ class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
                                 )
                             )
                         ),
-                        this.cherModal("audio", onbrowser)
+                        this.cherModal("audio")
                     )
                 )
             ),
@@ -1707,61 +1681,13 @@ class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
 
 
 /***/ }),
-/* 14 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
-
-
-const archiveMimeTypeFromFormat = { JPEG: "image/jpeg", PNG: "image/png" //TODO expand to other formats
-
-};class ArchiveFile {
-    /*
-    Represents a single file, currently one that is in the item, but might create sub/super classes to handle other types
-    of file e.g. images used in the UI
-     Fields:
-    metadata: metadata of item - (note will be a pointer into a Detail or Search's metadata so treat as read-only)
-    sd: pointer to SmartDict or Block ? created with Urls (see how did it with Academic)
-     */
-
-    constructor({ itemid = undefined, metadata = undefined } = {}) {
-        this.itemid = itemid;
-        this.metadata = metadata;
-        //TODO-DETAILS-SD create when loading metadata with files - done in image.constructor, maybe move to detail and call superclass
-    }
-    async p_loadImg(jsx) {
-        /*
-        This is the asyncronous part of loadImg, runs in the background to update the image.
-         Note it can't be inside load_img which has to be synchronous and return a jsx tree.
-         */
-        let blk = await Dweb.Block.p_fetch([this.metadata.ipfs, this.metadata.contenthash], verbose); //Typically will be a Uint8Array
-        let blob = new Blob([blk._data], { type: archiveMimeTypeFromFormat[this.metadata.format] }); // Works for data={Uint8Array|Blob}
-        // This next code is bizarre combination needed to open a blob from within an HTML window.
-        let objectURL = URL.createObjectURL(blob); //TODO-STREAMS make this work on streams
-        console.log("OURL=", objectURL);
-        //jsx.src = `http://archive.org/download/${this.itemid}/${this.metadata.name}`
-        jsx.src = objectURL;
-    }
-    loadImg(jsx) {
-        //asynchronously loads file from one of metadata, turns into blob, and stuffs into element
-        // Usage like  {this.loadImg(<img width=10>))
-        this.p_loadImg(jsx); /* Asynchronously load image*/
-        return jsx;
-    }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = ArchiveFile;
-
-
-/***/ }),
 /* 15 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(3);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Details__ = __webpack_require__(2);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(2);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Details__ = __webpack_require__(3);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
@@ -1770,8 +1696,7 @@ __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
     constructor(itemid, item) {
-        super(itemid);
-        this.item = item;
+        super(itemid, item);
     }
     nodeHtmlBefore() {
         playlist = JSON.stringify(this.playlist);
@@ -1790,7 +1715,7 @@ class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
         super.browserAfter();
         Play('jw6', this.playlist, this.cfg);
     }
-    jsxInNav(onbrowser) {
+    jsxInNav() {
         let item = this.item;
         this.playlist = [];
         let cfg = {};
@@ -1876,7 +1801,7 @@ class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
                         )
                     ),
                     __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'jw6' }),
-                    this.cherModal("video", onbrowser)
+                    this.cherModal("video")
                 ),
                 ' '
             )
@@ -1892,26 +1817,18 @@ class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(2);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(3);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
 
 class DetailsError extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
     constructor(itemid, item, message) {
-        super(itemid);
-        this.item = item;
+        super(itemid, item);
         this.message = message;
     }
-    jsxInNav(onbrowser) {
+    jsxInNav() {
         return this.message;
-    }
-    render(res, htm) {
-        const onbrowser = res.constructor.name != "ServerResponse"; // For a browser we render to an element, for server feed to a response stream
-        if (!onbrowser) {
-            res.statusCode = 500;
-        }
-        super.render(res, htm);
     }
 }
 /* harmony export (immutable) */ __webpack_exports__["a"] = DetailsError;

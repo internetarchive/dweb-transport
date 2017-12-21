@@ -6,32 +6,23 @@ import Util from './Util';
 
 
 export default class Tile {
-  render(item, onbrowser){
+  render(item){
     //xxx shorten/safify certain title usages (compared to Lists.inc)
-    const collections = (Array.isArray(item.collection) ? item.collection : (typeof(item.collection)=='string' ? [item.collection] : []));
+    const collections = (Array.isArray(item.collection) ? item.collection : (typeof(item.collection) === 'string' ? [item.collection] : []));
     const collection = collections[0];
     const nFavorites = collections.filter(e => e.startsWith('fav-')).length;
-    const is_collection = (item.mediatype=='collection');
+    const is_collection = (item.mediatype === 'collection');
     const classes = 'item-ia' + (is_collection ? ' collection-ia' : '');
     //ARCHIVE-BROWSER on browser, want to load links locally (via APIs) rather than rebuilding HTML page
       // ARCHIVE-BROWSER added key= to keep react happy (I hope)
       return (
       <div className={classes} data-id={item.identifier}  key={item.identifier}>
-        {onbrowser ? (
         <a className="stealth" tabIndex="-1" onClick={`Nav.nav_details("${collection}");`}>
           <div className="item-parent">
             <div className="item-parent-img"><img src={'https://archive.org/services/img/'+collection}/></div>
             <div className="item-parent-ttl">xxx parent title</div>
           </div>{/*.item-parent*/}
         </a>
-        ) : (
-        <a className="stealth" tabIndex="-1" href={'/details/'+collection}>
-            <div className="item-parent">
-            <div className="item-parent-img"><img src={'https://archive.org/services/img/'+collection}/></div>
-        <div className="item-parent-ttl">xxx parent title</div>
-        </div>{/*.item-parent*/}
-        </a>
-        ) }
 
         <div className="hidden-tiles views C C1">
           <nobr className="hidden-xs">{Util.number_format(item.downloads)}</nobr>
@@ -41,7 +32,6 @@ export default class Tile {
 
         <div className="C234">
           <div className="item-ttl C C2">
-          { onbrowser ? (
             <a onClick={`Nav.nav_details("${item.identifier}");`} title={item.title}>
               <div className="tile-img">
                 <img className="item-img" xxxstyle="height:180px" src={'https://archive.org/services/img/'+item.identifier}/>
@@ -50,16 +40,6 @@ export default class Tile {
                 {item.title}
               </div>
             </a>
-          ) : (
-            <a href={'/details/'+item.identifier} title={item.title}>
-              <div className="tile-img">
-                <img className="item-img" xxxstyle="height:180px" src={'//archive.org/services/img/'+item.identifier}/>
-              </div>{/*.tile-img*/}
-              <div className="ttl">
-                {item.title}
-              </div>
-            </a>
-            )}
           </div>
 
           <div className="hidden-tiles pubdate C C3">
