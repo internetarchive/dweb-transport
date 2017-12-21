@@ -185,6 +185,7 @@ class TransportHTTP extends Transport {
     }
 
     p_rawlist(url, verbose) {
+        //TODO-LIST-REFACTOR use CL.listurl not CL.url
         // obj being loaded
         // Locate and return a block, based on its url
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
@@ -209,6 +210,7 @@ class TransportHTTP extends Transport {
     }
 
     p_rawadd(url, sig, verbose) { //TODO-BACKPORT turn date into ISO before adding
+        //TODO-LIST-REFACTOR use CL.listurl not CL.url
         //verbose=true;
         if (!url || !sig) throw new Dweb.errors.CodingError("TransportHTTP.p_rawadd: invalid parms",url, sig);
         if (verbose) console.log("rawadd", url, sig);
@@ -216,8 +218,12 @@ class TransportHTTP extends Transport {
         return this.p_post(servercommands.rawadd, url, "application/json", value, verbose); // Returns immediately
     }
 
+    p_listurl() {
+        //TODO-LIST-REFACTOR return a URL for the list - what does it need as parameters, make sure passed in.
+    }
+
     static async test() {
-        return this;  // I think this should be a noop - fetched already
+        return this;
     }
 
     p_info(verbose) { return this.p_get("info", undefined, verbose); } //TODO-BACKPORT

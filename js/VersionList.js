@@ -101,7 +101,7 @@ class VersionList extends CommonList {
         if (!this._master) {
             delete dd.contentacl;   // Contentacl is the private ACL, no need to send at all
         }
-        return super.preflight(dd); //CL preservers _master and _publicurls
+        return super.preflight(dd); //CL preservers _master and _publicurls and _listpublicurls
     }
 
 

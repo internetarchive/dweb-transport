@@ -3,6 +3,9 @@ const Dweb = require("./Dweb");
 //https://www.npmjs.com/package/custom-event && https://github.com/webmodules/custom-event
 var CustomEvent = require('custom-event'); // From web, Not present in node - this code uses global.CustomEvent if it exists so safe on browser/node
 
+//ToDO-LIST-REFACTOR make sure YJS uses this mechanism
+//TODO-LIST-REFACTOR-API needs updating
+
 class CommonList extends SmartDict {
     /*
     CommonList is a superclass for anything that manages a storable list of other urls
@@ -16,8 +19,8 @@ class CommonList extends SmartDict {
     _allowunsafestore True if should override protection against storing unencrypted private keys (usually only during testing)
     dontstoremaster True if should not store master key
     _listeners      Any event listeners  //TODO-LISTENER - maybe move to SmartDict as generically useful
+    TODO-LIST-REFACTOR document
     */
-
     //TODO extend to cover array functions, but carefully as the semantics require signing and storing.
     //concat - hard to do well as unclear semantics, do you really want a new list with the contents of both ? The signatures on 2nd might not work
     //filter - could be done - just filter list, but do you filter sig or data ?
@@ -42,6 +45,7 @@ class CommonList extends SmartDict {
         if (key) {
             this._setkeypair(key, verbose);
         }
+        //TODO-LIST-REFACTOR - setup _listurls and _listpublicurls
         this._master = (typeof master === "undefined")  ? this.keypair.has_private() : master;  // Note this must be AFTER _setkeypair since that sets based on keypair found and _p_storepublic for example wants to force !master
         if (!this._master && (!this._publicurls || !this._publicurls.length)) {
             this._publicurls = this._urls;  // We aren't master, so publicurl is same as url - note URL will only have been set if constructor called from SmartDict.p_fetch
@@ -49,6 +53,7 @@ class CommonList extends SmartDict {
             if (!this._publicurls) this._publicurls = [];
         }
         this.table = "cl";
+        //TODO-LIST-REFACTOR here, or somewhere before use, need to connect to services and get _listurls
     }
 
     _setdata(value) {
@@ -112,6 +117,7 @@ class CommonList extends SmartDict {
          */
 
         if (dd.keypair) {
+            // Check that we don't unintentionally store an unencrypted version with a private key
             if (dd._master && !dd._acl && !this._allowunsafestore) {
                 throw new Dweb.errors.SecurityWarning("Probably shouldnt be storing private key" + JSON.stringify(dd));
             }
@@ -119,6 +125,7 @@ class CommonList extends SmartDict {
         }
         // Note same code on KeyPair
         let publicurls = dd._publicurls; // Save before preflight
+        //TODO-LIST-REFACTOR - needs fixing
         let master = dd._master;
         dd = super.preflight(dd);  // Edits dd in place
         if (master) { // Only store on Master, on !Master will be None and override storing urls as _publicurls
@@ -134,6 +141,7 @@ class CommonList extends SmartDict {
         */
         if (!this.storedpublic())
             await this._p_storepublic(verbose);
+        //TODO-LIST-REFACTOR - use _listpublicurls
         let lines = await Dweb.Transports.p_rawlist(this._publicurls, verbose); // [[sig,sig],[sig,sig]]
         //TODO-MULTI should probably sort results, in case get some from each
         if (verbose) console.log("CommonList:p_fetchlist.success", this._urls, "len=", lines.length);
@@ -160,7 +168,7 @@ class CommonList extends SmartDict {
     }
 
     async _p_storepublic(verbose) {
-        // Build a copy of the data, then create a new !master version
+        // Build a copy of the data, then create a new !master version - preflight takes care of hiding master urls
         let oo = Object.assign({}, this, {_master: false});
         let ee = new this.constructor(this.preflight(oo), false, null, verbose);
         await ee.p_store(verbose);
@@ -203,7 +211,8 @@ class CommonList extends SmartDict {
                 throw new Dweb.errors.CodingError("CL.p_push obj should never be non-empty");
             }
             let sig;
-            await this.p_store(verbose);        // Make sure stored
+            //TODO-LIST-REFACTOR make sure _listurls set before here
+            await this.p_store(verbose);        // Make sure list is stored before store anything on it.
             if (verbose) console.log("CL.p_push", obj._urls, "onto", this._urls);
             let urls = obj;
             if (obj instanceof Dweb.Transportable) {
@@ -228,7 +237,7 @@ class CommonList extends SmartDict {
     async p_sign(urls, verbose) {
         /*
         Create a signature -
-        Normally better to use p_push as stores signature and puts on _list and on Dweb
+        Note - its normally better to use p_push as stores signature and puts on _list and on Dweb
 
         :param urls:    URL of object to sign
         :returns:       Signature
@@ -244,6 +253,7 @@ class CommonList extends SmartDict {
         /*
         Add a signature to the Dweb for this list
         Note, there is an assumption that sig.signedby is the same as the commonlist
+        Note, normally this will be called through p_push(obj)
 
         :param sig: Signature
         :resolves:  undefined
@@ -306,6 +316,7 @@ class CommonList extends SmartDict {
         /*
         Add a listmonitor for each transport - note this means if multiple transports support it, then will get duplicate events back if everyone else is notifying all of them.
          */
+        //TODO-LIST-REFACTOR - use _listurls
         Dweb.Transports.listmonitor(this._publicurls,
                 (obj) => {
                     if (verbose) console.log("listmonitor added",obj,"to",this._publicurls);

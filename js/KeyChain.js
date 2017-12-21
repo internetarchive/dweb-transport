@@ -89,7 +89,7 @@ class KeyChain extends CommonList {
 
     p_store(verbose) {
         /*
-        Unlike other p_store this ONLY stores the public version, and sets the _publicurls, on the assumption that the private key of a KeyChain should never be stored.
+        Unlike other p_store this ONLY stores the public version, and sets the _publicurls and _listurls, on the assumption that the private key of a KeyChain should never be stored.
         Private/master version should never be stored since the KeyChain is itself the encryption root.
         */
         this.dontstoremaster = true;    // Make sure p_store only stores public version

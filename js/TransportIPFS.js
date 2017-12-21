@@ -4,6 +4,7 @@ This Transport layers builds on IPFS and the YJS DB
 Y Lists have listeners and generate events - see docs at ...
 */
 
+//TODO-LIST-REFACTOR split into TransportIPFS and TransportYJS (and TransportOrbit)
 
 // Library packages other than IPFS
 // IPFS components
@@ -328,6 +329,7 @@ class TransportIPFS extends Transport {
     }
 
     async p_rawlist(url, verbose) {
+        //TODO-LIST-REFACTOR use CL.listurl not CL.url
     /*
     Fetch all the objects in a list, these are identified by the url of the public key used for signing.
     (Note this is the 'signedby' parameter of the p_rawadd call, not the 'url' parameter
@@ -355,14 +357,15 @@ class TransportIPFS extends Transport {
     }
 
     listmonitor(url, callback, verbose) {
-    /*
-    Setup a callback called whenever an item is added to a list, typically it would be called immediately after a p_rawlist to get any more items not returned by p_rawlist.
+        //TODO-LIST-REFACTOR use CL.listurl not CL.url
+        /*
+         Setup a callback called whenever an item is added to a list, typically it would be called immediately after a p_rawlist to get any more items not returned by p_rawlist.
 
-    :param url:         string Identifier of list (as used by p_rawlist and "signedby" parameter of p_rawadd
-    :param callback:    function(obj)  Callback for each new item added to the list
-               obj is same format as p_rawlist or p_rawreverse
-    :param verbose:     boolean - True for debugging output
-     */
+         :param url:         string Identifier of list (as used by p_rawlist and "signedby" parameter of p_rawadd
+         :param callback:    function(obj)  Callback for each new item added to the list
+                    obj is same format as p_rawlist or p_rawreverse
+         :param verbose:     boolean - True for debugging output
+          */
         console.assert(this.options.listmethod === "yarrays");
         if (!(typeof(url) === "string")) { url = url.href; } // Convert if its a parsed URL
         let y = this.yarrays[url];
@@ -418,6 +421,7 @@ class TransportIPFS extends Transport {
     }
 
     async p_rawadd(url, sig, verbose) {
+        //TODO-LIST-REFACTOR use CL.listurl not CL.url
         /*
         Store a new list item, it should be stored so that it can be retrieved either by "signedby" (using p_rawlist) or
         by "url" (with p_rawreverse). The underlying transport does not need to guarrantee the signature,
@@ -439,6 +443,11 @@ class TransportIPFS extends Transport {
         let y = await this.p__yarray(url, verbose);
         y.share.array.push([value]);
     }
+
+    p_listurl() {
+        //TODO-LIST-REFACTOR return a URL for the list - what does it need as parameters, make sure passed in.
+    }
+
     /*OBS - not supporting YARRAY singular
     rawadd(sig, verbose) {
         console.assert(sig.urls && sig.signature && sig.signedby, "TransportIPFS.p_rawadd args",sig);
