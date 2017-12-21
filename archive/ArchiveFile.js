@@ -36,4 +36,7 @@ export default class ArchiveFile {
         this.p_loadImg(jsx); /* Asynchronously load image*/
         return jsx;
     }
+    downloadable() {
+        return Object.keys(Util.downloadableFormats).includes(this.metadata.format)
+    }
 }

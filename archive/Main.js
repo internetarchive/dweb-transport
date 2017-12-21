@@ -88,6 +88,6 @@ app.get('/*', (req, res) => {
 
 
 
-  htm +=  ReactDOMServer.renderToStaticMarkup(new Nav('<div class="well">Node.js says Hai World</div>').render());
+  htm +=  ReactDOMServer.renderToStaticMarkup(new Nav(<div class="well">Node.js says Hai World</div>).render());
   res.end(htm);
 });

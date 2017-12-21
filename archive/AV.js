@@ -30,6 +30,7 @@ export default class AV extends Details {
         let item = this.item;
         let itemid = this.itemid;
         let detailsurl = `https://archive.org/details/${itemid}`
+        let title = item.title
         this.playlist=[];
         let cfg={};
         let avs = item.files.filter(fi => (fi.format=='h.264' || fi.format=='512Kb MPEG4'));    //TODO-DETAILS-LIST Maybe use _list instead of .files
@@ -47,16 +48,6 @@ export default class AV extends Details {
                 this.playlist.push({title:(fi.title ? fi.title : fi.name), sources:[{file:'https://archive.org/download/'+itemid+'/'+fi.name}]});
             this.playlist[0].image = 'https://archive.org/services/img/' + itemid;
         }
-        //TODO - check where h1 title and dangerous description appear in archive.org/details/commute
-        /*
-        return (
-            <div>
-            <h1>{item.metadata.title}</h1>
-        { (avs.length) ?  ( <div id="jw6"></div> ) : undefined }
-            <div dangerouslySetInnerHTML={{__html: item.metadata.description}}></div>
-        </div>
-        );
-        */
         //TODO-DETAILS make next few lines between theatre-ia-wrap and theatre-ia not commute specific
         return (
             <div id="theatre-ia-wrap" class="container container-ia width-max ">
@@ -67,7 +58,7 @@ export default class AV extends Details {
                 <link itemprop="embedUrl" href="https://archive.org/embed/commute/commute.avi">
                  <meta itemprop="duration" content="PT0M115S">
                  --*/}
-                <h1 class="sr-only">{itemid}</h1>
+                <h1 class="sr-only">{title}</h1>
                 <h2 class="sr-only">Movies Preview</h2>
 
                 <div id="theatre-ia" class="container">

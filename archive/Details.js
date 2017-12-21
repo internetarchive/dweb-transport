@@ -217,11 +217,11 @@ export default class Details extends ArchiveBase {
     itemDetailsAboutJSX() {
         /* This builds a JSX tht sits underneth theatre-ia-wrap DIV that is built by theatreIaWrap */
         let itemid = this.itemid;
-        let item = this.item
+        let item = this.item;
         let metadata = item.metadata;
         let title = metadata.title;
         let creator = metadata.creator;
-        let datePublished = metadata.datePublished;
+        let datePublished = metadata.date;
         let publisher=metadata.publisher;
         let keywords = metadata.subject ? metadata.subject.split(';') : undefined ;
         let licence = metadata.licenseurl; //TODO - handle other licenses - hardwired for CC currently
@@ -231,19 +231,19 @@ export default class Details extends ArchiveBase {
         let metadataListPossible = { color: "Color", coverage: "Location", director: "Director", identifier: "Identifier",
             "identifier-ark": "Identifier-ark", ocr: "Ocr", runtime: "Run time", ppi: "Ppi", sound: "Sound", year: "Year" }; /*TODO expand to longer list*/
         let metadataListFound = Object.keys(metadataListPossible).filter((k) => metadata[k]);    // List of keys in the metadata
-        let downloadableFiles = []; //TODO how to pick which to download - on mbid it was original/JPEG derivative JPEG*thumb as capitalized version; but not "JPEG Thumb", and Archive Torrent as TORRENT
+        let downloadableFiles = this._list.filter(f => f.downloadable()); // Note on image it EXCLUDED JPEG Thumb, but included JPEG*Thumb
             //TODO  Replace "a" with onclicks to download function on f
             //TODO Need f.sizePretty property of ArchiveFile
-        let filesCount = metadata.files_count;
-        let originalFilesCount = item.files.filter((f)=>f.source === "original").length;
+        let filesCount = item.files_count;
+        let originalFilesCount = item.files.filter((f)=>f.source === "original").length+1; // Adds in Archive Bittorrent
         let downloadURL = `https://archive.org/download/${itemid}`;
         let compressURL = `https://archive.org/compress/${itemid}`;
         let compressAllURL = `https://archive.org/compress/${itemid}/formats=JSON,METADATA,JPEG,ARCHIVE BITTORRENT,MUSICBRAINZ METADATA`;
         let collections = Array.isArray(metadata.collection) ? metadata.collection : [ metadata.collection ];
         let mediatype = metadata.mediatype;
-        let iconchiveIcon="iconchive-"+mediatype;
+        let iconochiveIcon="iconochive-"+mediatype;
         let contributor = metadata.contributor;
-        let reviews = metadata.reviews;
+        let reviews = item.reviews;
         let writeReviewsURL = `https://archive.org/write-review.php?identifier=${itemid}`;
         let loginURL = "https://archive.org/account/login.php";
         let bookmarksAddURL = `https://archive.org/bookmarks.php?add_bookmark=1&amp;mediatype=image&amp;identifier=${itemid}&amp;title=${title}`;
@@ -301,7 +301,7 @@ export default class Details extends ArchiveBase {
                     {/*-- flag initialization moved to browserAfter() --*/}
                     <div class="col-sm-8 thats-left item-details-metadata">
                         <h1 style={{fontSize:"30px", "marginBottom":0}}>
-                            <div class="left-icon"><span className={`${iconchiveIcon} ${mediatype}`} aria-hidden="true"></span><span
+                            <div class="left-icon"><span className={`${iconochiveIcon} ${mediatype}`} aria-hidden="true"></span><span
                                     class="sr-only">{mediatype}</span></div>
                             <span itemprop="name">{title}</span>
                         </h1>
@@ -357,12 +357,14 @@ export default class Details extends ArchiveBase {
                             <div class="key-val-big">
                                 <div>
                                     <span class="key">Language</span>
+
                                     <span class="value"><span><a onClick={`Nav.nav_search('language=(\"${languageAbbrev}\"+OR+language=\"${languageLong}\")')`}>{languageLong}</a></span></span>
                                 </div>
                             </div>
                         ) : ( undefined ) }
 
                         <div class="clearfix"></div>
+                        {/*--TODO-DETAILS-ONLINE probably needs  <div dangerouslySetInnerHTML={{__html: item.metadata.description}}></div>--*/}
                         { description ? ( <div id="descript" itemprop="description">{description}</div> ) : ( undefined ) }
 
                         { credits ? ( <h2 style="font-size:18px">Credits</h2> ) : ( undefined ) }
@@ -372,13 +374,13 @@ export default class Details extends ArchiveBase {
                             { metadataListFound.map((k) =>
                                 <div role="listitem">
                                     <span class="key">{metadataListPossible[k]}</span>
-                                    <span class="value">metadata[k]</span>
+                                    <span class="value">{metadata[k]}</span>
                                 </div>
                             ) }
                         </div>
 
                         {/*TODO "See also" section drawing from some of metadata.externalidentifier note two adjacent divs present
-                        on mbid-b105f712-d75e-4d0a-a9c5-bf1948461e2b not in commute*/}
+                        on mbid-b105f712-d75e-4d0a-a9c5-bf1948461e2b not in commute will need to retrieve those to do so.*/}
                         <div id="reviews">
                             <h2 style="font-size:36px;font-weight:200;border-bottom:1px solid #979797; padding-bottom:5px; margin-top:50px;">
                                 <div class="pull-right" style="font-size:14px;font-weight:500;padding-top:14px;">
@@ -399,7 +401,7 @@ export default class Details extends ArchiveBase {
                                     -
                                     <span alt={`${review.stars} out of 5 stars`} title={`${review.stars} out of 5 stars`}>
                                         { ['*','*','*','*','*'].slice(0,review.stars).map(x =>
-                                            [<span class="iconochive-favorite size-75-percent" aria-hidden="true"></span> , <span class="sr-only">favorite</span>]
+                                            <span class="iconochive-favorite size-75-percent" aria-hidden="true"></span> , <span class="sr-only">favorite</span>
                                         ) }
                                     </span>
                                     - {review.reviewdate}{/*TODO reviewdate needs pretty printing*/}<br/>
@@ -429,7 +431,7 @@ export default class Details extends ArchiveBase {
                                     <a class="format-summary download-pill"
                                         href="https://archive.org/download/${f.itemid}/${f.metadata.name}" title={f.sizePretty}
                                         data-toggle="tooltip" data-placement="auto left" data-container="body">
-                                        {f.metadata.format} <span class="iconochive-download" aria-hidden="true"></span><span class="sr-only">download</span>
+                                        {Util.downloadableFormats[f.metadata.format]} <span class="iconochive-download" aria-hidden="true"></span><span class="sr-only">download</span>
                                     </a>
                                 </div>
                             ))}
