@@ -10,6 +10,7 @@ exports.CommonList = require("./CommonList");
 exports.AccessControlList = require("./AccessControlList");
 exports.KeyChain = require('./KeyChain');
 exports.TransportIPFS = require('./TransportIPFS');
+exports.TransportYJS = require('./TransportYJS');
 exports.VersionList = require('./VersionList');
 exports.StructuredBlock = require('./StructuredBlock'); //TODO - will remove SB once have path traversal.
 exports.EventListenerHandler = require("./EventListenerHandler")

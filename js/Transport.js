@@ -16,6 +16,17 @@ class Transport {
         throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally undefined function Transport.setup0 should have been subclassed");
         }
 
+    p_setup1a(options, verbose) { return; }
+    p_setup1b(options, verbose) { return; }
+    async p_setup1(options, verbose) {
+        // Do 1a and 1b, normally a transport will only have either 1a or 1b and it will be called through Transports.p_setup1()
+        await this.p_setup1a(options, verbose);
+        await this.p_setup1b(options, verbose);
+        return this;
+    }
+    p_setup(options, verbose) {
+
+    }
     p_setup(options, verbose) {
         /*
         Setup the resource and open any P2P connections etc required to be done just once.

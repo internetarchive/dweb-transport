@@ -53,7 +53,7 @@ class TransportHTTP extends Transport {
             throw err;
         }
     }
-    async p_setup1(verbose) {
+    async p_setup1a(verbose) {
         return this;
     }
     static async p_setup(options, verbose) {

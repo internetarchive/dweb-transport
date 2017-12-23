@@ -4,79 +4,43 @@ This Transport layers builds on IPFS and the YJS DB
 Y Lists have listeners and generate events - see docs at ...
 */
 
-//TODO-LIST-REFACTOR split into TransportIPFS and TransportYJS (and TransportOrbit)
-
-// Library packages other than IPFS
 // IPFS components
 
 const IPFS = require('ipfs');
 const CID = require('cids');
-
-// The following only required for Y version
-const Y = require('yjs');
-require('y-memory')(Y);
-require('y-array')(Y);
-require('y-text')(Y);
-require('y-ipfs-connector')(Y);
-require('y-indexeddb')(Y);
-//require('y-leveldb')(Y); //- can't be there for browser, node seems to find it ok without this, though not sure why..
-const Url = require('url');
 // noinspection NpmUsedModulesInstalled
 const dagPB = require('ipld-dag-pb');
 // noinspection Annotator
 const DAGNode = dagPB.DAGNode; // So can check its type
 
-
-
+// Library packages other than IPFS
+const Url = require('url');
 
 // Utility packages (ours) And one-liners
 const promisify = require('promisify-es6');
 //const makepromises = require('./utils/makepromises'); // Replaced by direct call to promisify
-function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { resolve(val); },ms)})}
 
 // Other Dweb modules
 const Transport = require('./Transport');
 const Dweb = require('./Dweb');
 
-//Debugging only
-
-let defaultipfsoptions = {
-    repo: '/tmp/dweb_ipfsv2700', //TODO-IPFS think through where, esp for browser
-    //init: false,
-    //start: false,
-    //TODO-IPFS-Q how is this decentralized - can it run offline? Does it depend on star-signal.cloud.ipfs.team
-    config: {
-//      Addresses: { Swarm: [ '/dns4/star-signal.cloud.ipfs.team/wss/p2p-webrtc-star']},  // For Y - same as defaults
-//      Addresses: { Swarm: [ ] },   // Disable WebRTC to test browser crash, note disables Y so doesnt work.
-        Addresses: { Swarm: [ '/dns4/ws-star.discovery.libp2p.io/tcp/443/wss/p2p-websocket-star']}, // from https://github.com/ipfs/js-ipfs#faq 2017-12-05 as alternative to webrtc
-    },
-    //init: true, // Comment out for Y
-    EXPERIMENTAL: {
-        pubsub: true
-    }
-};
-
-let defaultyarrayoptions = {    // Based on how IIIF uses them in bootstrap.js in ipfs-iiif-db repo
-    db: {
-        name: 'indexeddb',   // leveldb in node
-    },
-    connector: {
-        name: 'ipfs',
-        room: 'dweb20170908'
-        //ipfs: ipfs,   // Need to link IPFS here once created
-    },
-    share: {
-        //textfield: 'Text'
-        array: 'Array'
-    }
-};
-
 let defaultoptions = {
-    yarray: defaultyarrayoptions,
-    ipfs:   defaultipfsoptions,
-    listmethod: "yarrays"
+    ipfs: {
+        repo: '/tmp/dweb_ipfsv2700', //TODO-IPFS think through where, esp for browser
+        //init: false,
+        //start: false,
+        //TODO-IPFS-Q how is this decentralized - can it run offline? Does it depend on star-signal.cloud.ipfs.team
+        config: {
+            //      Addresses: { Swarm: [ '/dns4/star-signal.cloud.ipfs.team/wss/p2p-webrtc-star']},  // For Y - same as defaults
+            //      Addresses: { Swarm: [ ] },   // Disable WebRTC to test browser crash, note disables Y so doesnt work.
+            Addresses: {Swarm: ['/dns4/ws-star.discovery.libp2p.io/tcp/443/wss/p2p-websocket-star']}, // from https://github.com/ipfs/js-ipfs#faq 2017-12-05 as alternative to webrtc
+        },
+        //init: true, // Comment out for Y
+        EXPERIMENTAL: {
+            pubsub: true
+        }
+    }
 };
-
 
 class TransportIPFS extends Transport {
     /*
@@ -90,10 +54,10 @@ class TransportIPFS extends Transport {
     constructor(options, verbose) {
         super(options, verbose);
         this.ipfs = undefined;          // Undefined till start IPFS
-        this.options = options;         // Dictionary of options { ipfs: {...}, listmethod: "yarrays", yarray: {...} }
+        this.options = options;         // Dictionary of options { ipfs: {...}, "yarrays", yarray: {...} }
         this.name = "IPFS";             // For console log etc
         this.supportURLs = ['ipfs'];
-        this.supportFunctions = ['fetch', 'store', 'add', 'list', 'listmonitor'];   // Does not support reverse
+        this.supportFunctions = ['fetch', 'store'];   // Does not support reverse
         this.status = Dweb.Transport.STATUS_LOADED;
     }
 
@@ -131,84 +95,21 @@ class TransportIPFS extends Transport {
             });
     }
 
-    /* OBS Aug2017 - using "yarrays" now to support multiple connections, leave code here for month or two in case go back.
-    p_yarraystart(verbose) {
-        // Singular version - one Yarray, on one IPFS connection, monitoring everything.
-        let yarrayoptions = this.options.yarray;
-        let self = this;
-        return p_ipfsstart(verbose)
-        .then(() => {
-            yarrayoptions.connector.ipfs = this.ipfs; // Note that Y needs the IPFS instance, while IIIF needed the IPFS options.
-            return Y(yarrayoptions)
-        })
-        .then((y) => {
-            this.yarray = y
-            console.log("Y started");
-        })
-        .catch((err) => {
-            console.log("Error caught in p_yarraystart",err);
-            throw(err);
-        })
-        //Lots of issues with "init" not knowing state before it//  this.ipfs.init({emptyRepo: true, bits: 2048})     //.then((unused) => ipfs.init({emptyRepo: true, bits: 2048}))
-    }
-    */
-
-    async p_yarraysstart(verbose) {
-        /*
-        This starts IPFS, but only sets up for Y connections, which are opened each time a resource is listed, added to, or listmonitored.
-            Throws: Error("websocket error") if WiFi off, probably other errors if fails to connect
-        */
-        try {
-            let self = this;
-            self.yarrays = {};
-            await this.p_ipfsstart(verbose); // Throws Error("websocket error") if Wifi is off
-        } catch(err) {
-            console.log("p_yarraysstart: Error caught:", err.message);
-            throw(err);
-        }
-        //Lots of issues with "init" not knowing state before it//  this.ipfs.init({emptyRepo: true, bits: 2048})     //.then((unused) => ipfs.init({emptyRepo: true, bits: 2048}))
-    }
-
-    async p__yarray(url, verbose) {
-        /*
-        Utility function to get Yarray for this URL and open a new connection if not already
-
-        url:        URL string to find list of
-        resolves:   Y
-        */
-        try {
-            if (this.yarrays[url]) {
-                if (verbose) console.log("Found Y for", url);
-                return this.yarrays[url];
-            } else {
-                let options = Transport.mergeoptions(this.options.yarray, {connector: {room: url}}); // Copies options
-                if (verbose) console.log("Creating Y for", url); //"options=",options);
-                options.connector.ipfs = this.ipfs;
-                return this.yarrays[url] = await Y(options);
-            }
-        } catch(err) {
-            console.log("Failed to initialize Y");
-            throw err;
-        }
-    }
-
     static setup0(options, verbose) {
         /*
             First part of setup, create obj, add to Transports but dont attempt to connect, typically called instead of p_setup if want to parallelize connections.
         */
         let combinedoptions = Transport.mergeoptions(defaultoptions, options);
         console.log("IPFS options %o", combinedoptions);
-        let t = new TransportIPFS(combinedoptions, verbose);   // Note doesnt start IPFS or Y
+        let t = new TransportIPFS(combinedoptions, verbose);   // Note doesnt start IPFS
         Dweb.Transports.addtransport(t);
         return t;
     }
 
-    async p_setup1(verbose) {
-        if (this.options.listmethod !== "yarrays")
-            throw new Dweb.errors.CodingError("Only support yarrays for list"); // There used to be an IIIF and Yarray (singular connection) support
+    async p_setup1a(verbose) {
         try {
             this.status = Dweb.Transport.STATUS_STARTING;   // Should display, but probably not refreshed in most case
-            await this.p_yarraysstart(verbose);    // Only listmethod supported currently, throws Error("websocket error") and possibly others.
+            await this.p_ipfsstart(verbose);    // Throws Error("websocket error") and possibly others.
         } catch(err) {
             console.error("IPFS failed to connect",err);
             this.status = Dweb.Transport.STATUS_FAILED;
@@ -328,80 +229,6 @@ class TransportIPFS extends Transport {
         }
     }
 
-    async p_rawlist(url, verbose) {
-        //TODO-LIST-REFACTOR use CL.listurl not CL.url
-    /*
-    Fetch all the objects in a list, these are identified by the url of the public key used for signing.
-    (Note this is the 'signedby' parameter of the p_rawadd call, not the 'url' parameter
-    Returns a promise that resolves to the list.
-    Each item of the list is a dict: {"url": url, "date": date, "signature": signature, "signedby": signedby}
-    List items may have other data (e.g. reference ids of underlying transport)
-
-    :param string url: String with the url that identifies the list.
-    :param boolean verbose: True for debugging output
-    :resolve array: An array of objects as stored on the list.
-     */
-        try {
-            if (!(typeof(url) === "string")) { url = url.href; } // Convert if its a parsed URL
-            if (this.options.listmethod !== "yarrays") { // noinspection ExceptionCaughtLocallyJS
-                throw new Dweb.errors.CodingError("Only support yarrays");
-            }
-            let y = await this.p__yarray(url, verbose);
-            let res = y.share.array.toArray().filter((obj) => (obj.signedby.includes(url)));
-            if (verbose) console.log("p_rawlist found", ...Dweb.utils.consolearr(res));
-            return res;
-        } catch(err) {
-            console.log("TransportIPFS.p_rawlist failed",err.message);
-            throw(err);
-        }
-    }
-
-    listmonitor(url, callback, verbose) {
-        //TODO-LIST-REFACTOR use CL.listurl not CL.url
-        /*
-         Setup a callback called whenever an item is added to a list, typically it would be called immediately after a p_rawlist to get any more items not returned by p_rawlist.
-
-         :param url:         string Identifier of list (as used by p_rawlist and "signedby" parameter of p_rawadd
-         :param callback:    function(obj)  Callback for each new item added to the list
-                    obj is same format as p_rawlist or p_rawreverse
-         :param verbose:     boolean - True for debugging output
-          */
-        console.assert(this.options.listmethod === "yarrays");
-        if (!(typeof(url) === "string")) { url = url.href; } // Convert if its a parsed URL
-        let y = this.yarrays[url];
-        console.assert(y,"Should always exist before calling listmonitor - async call p__yarray(url) to create");
-        y.share.array.observe((event) => {
-            if (event.type === 'insert') { // Currently ignoring deletions.
-                if (verbose) console.log('resources inserted', event.values);
-                event.values.filter((obj) => obj.signedby.includes(url)).map(callback);
-            }
-        })
-    }
-
-    /*OBS - not supporting YARRAY(Singular)
-    listmonitor(url, callback, verbose) {
-        this.yarray.share.array.observe((event) => {
-            if (event.type === 'insert') { // Currently ignoring deletions.
-                if (verbose) console.log('resources inserted', event.values);
-                event.values.filter((obj) => obj.signedby === url).map(callback) // Note - no longer works with multi urls
-            }
-        });
-    }
-    */
-
-    rawreverse() {
-        /*
-        Similar to p_rawlist, but return the list item of all the places where the object url has been listed.
-        The url here corresponds to the "url" parameter of p_rawadd
-        Returns a promise that resolves to the list.
-
-        :param string url: String with the url that identifies the object put on a list.
-        :param boolean verbose: True for debugging output
-        :resolve array: An array of objects as stored on the list.
-         */
-        //TODO-REVERSE this needs implementing once list structure on IPFS more certain
-        throw new Dweb.errors.ToBeImplementedError("Undefined function TransportHTTP.rawreverse"); }
-
     async p_rawstore(data, verbose) {
         /*
         Store a blob of data onto the decentralised transport.
@@ -420,52 +247,6 @@ class TransportIPFS extends Transport {
         //return this.ipfs.files.put(buf).then((block) => TransportIPFS.cid2url(block.cid));
     }
 
-    async p_rawadd(url, sig, verbose) {
-        //TODO-LIST-REFACTOR use CL.listurl not CL.url
-        /*
-        Store a new list item, it should be stored so that it can be retrieved either by "signedby" (using p_rawlist) or
-        by "url" (with p_rawreverse). The underlying transport does not need to guarrantee the signature,
-        an invalid item on a list should be rejected on higher layers.
-
-        :param string url: String identifying list to post to
-        :param Signature sig: Signature object containing at least:
-            date - date of signing in ISO format,
-            urls - array of urls for the object being signed
-            signature - verifiable signature of date+urls
-            signedby - urls of public key used for the signature
-        :param boolean verbose: True for debugging output
-        :resolve undefined:
-        */
-        if (typeof url !== "string") url = url.href; // Assume its an Url if its not a string
-        console.assert(url && sig.urls.length && sig.signature && sig.signedby.length, "TransportIPFS.p_rawadd args", url, sig);
-        if (verbose) console.log("TransportIPFS.p_rawadd", url, sig);
-        let value = sig.preflight(Object.assign({}, sig));
-        let y = await this.p__yarray(url, verbose);
-        y.share.array.push([value]);
-    }
-
-    p_listurl() {
-        //TODO-LIST-REFACTOR return a URL for the list - what does it need as parameters, make sure passed in.
-    }
-
-    /*OBS - not supporting YARRAY singular
-    rawadd(sig, verbose) {
-        console.assert(sig.urls && sig.signature && sig.signedby, "TransportIPFS.p_rawadd args",sig);
-        if (verbose) console.log("TransportUPFS.p_rawadd", sig.urls, sig.date, sig.signature, sig.signedby);
-        let value = {urls: sig.urls, date: sig.date, signature: sig.signature, signedby: sig.signedby};
-        this.yarray.share.array.push([value]);
-    }
-
-    p_rawadd(url, sig, verbose) {
-        return new Promise((resolve, reject)=> { try {
-            this.rawadd(url, sig, verbose);
-            resolve(undefined);
-        } catch(err) {
-            reject(err);
-        } })
-    }
-    */
-
     static async test(transport, verbose) {
         if (verbose) {console.log("TransportIPFS.test")}
         try {
@@ -483,18 +264,6 @@ class TransportIPFS extends Transport {
             urlqbf = url;
             let data = await transport.p_rawfetch(urlqbf, verbose);
             console.assert(data.toString() === qbf, "Should fetch block stored above");
-            let res = await transport.p_rawlist(testurl, verbose);
-            let listlen = res.length;   // Holds length of list run intermediate
-            if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res));
-            transport.listmonitor(testurl, (obj) => console.log("Monitored", obj), verbose);
-            let sig = new Dweb.Signature({urls: ["123"], date: new Date(Date.now()), signature: "Joe Smith", signedby: [testurl]}, verbose);
-            await transport.p_rawadd(testurl, sig, verbose);
-            if (verbose) console.log("TransportIPFS.p_rawadd returned ");
-            res = await transport.p_rawlist(testurl, verbose);
-            if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res)); // Note not showing return
-            await delay(500);
-            res = await transport.p_rawlist(testurl, verbose);
-            console.assert(res.length === listlen + 1, "Should have added one item");
             //console.log("TransportIPFS test complete");
         } catch(err) {
             console.log("Exception thrown in TransportIPFS.test:", err.message);
@@ -503,5 +272,4 @@ class TransportIPFS extends Transport {
     }
 
 }
-TransportIPFS.Y = Y; // Allow node tests to find it
 exports = module.exports = TransportIPFS;

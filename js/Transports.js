@@ -35,6 +35,10 @@ class Transports {
                             .map((t) => [url, t]))); // [[ u, t1], [u, t2]]
         }
     }
+    static ipfs(verbose) {
+        // Find an ipfs transport if it exists, so for example YJS can use it.
+        return Transports._transports.find((t) => t instanceof Dweb.TransportIPFS)
+    }
 
     static async p_rawstore(data, verbose) {
         /*
@@ -191,7 +195,9 @@ class Transports {
     }
     static async p_setup1(verbose) {
         /* Second stage of setup, connect if possible */
-        return await Promise.all(Dweb.Transports._transports.map((t) = t.p_setup1(verbose)))
+        // Does all setup1a before setup1b since 1b can rely on ones with 1a, e.g. YJS relies on IPFS
+        await Promise.all(Dweb.Transports._transports.map((t) = t.p_setup1a(verbose)));
+        await Promise.all(Dweb.Transports._transports.map((t) = t.p_setup1b(verbose)));
     }
 }
 Transports._transports = [];    // Array of transport instances connected
