@@ -106,7 +106,7 @@ class Signature extends SmartDict {
         // print commonlist0
         // signedblock.sign(commonlist0, verbose) # This should fail, but
         if (verbose) console.log("test_Signatures CommonList");
-        let commonlist = new Dweb.CommonList({name: "test_Signatures.commonlist" }, true, keypair, verbose); //data,master,key,verbose
+        let commonlist = await Dweb.CommonList.p_new({name: "test_Signatures.commonlist" }, true, keypair, verbose); //data,master,key,verbose
         commonlist.table = "BOGUS";
         if (verbose) console.log("test_Signatures sign");
         commonlist._allowunsafestore = true;

@@ -41,19 +41,16 @@ class Transport {
 
     supports(url, func) {
         /*
-        Determine if this transport supports a certain set of URLs
+        Determine if this transport supports a certain set of URLs and a func
 
         :param url: String or parsed URL
-        :return:    True if this protocol supports these URLs
+        :return:    True if this protocol supports these URLs and this func
         :throw:     TransportError if invalid URL
          */
-        if (!url) {
-            return true;
-        }  // By default, can handle default URLs
         if (typeof url === "string") {
             url = Url.parse(url);    // For efficiency, only parse once.
         }
-        if (!url.protocol) {
+        if (url && !url.protocol) {
             throw new Error("URL failed to specific a scheme (before :) " + url.href)
         } //Should be TransportError but out of scope here
         // noinspection Annotator  supportURLs is defined in subclasses
@@ -135,7 +132,14 @@ class Transport {
     }
 
     p_list() {
-        throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_list");
+        throw new Error("Undefined function Transport.p_list");
+    }
+    p_newlisturls(cl, verbose) { //TODO-LISTS-API
+        /*
+        Must be implemented by any list, return a pair of URLS that may be the same, private and public links to the list.
+        returns: ( privateurl, publicurl) e.g. yjs:xxx/yyy or orbitdb:a123
+         */
+        throw new Error("undefined function Transport.p_newlisturls");
     }
 
     //noinspection JSUnusedGlobalSymbols

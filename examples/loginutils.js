@@ -206,8 +206,8 @@ async function p_connect(options) {
     if (verbose) console.group("p_connect ---");
     try {
         options = options || {};
-        let setupoptions = {};  //TODO-LIST-REFACTOR make this connect IPFS then YJS
-        let transpparm = (searchparams.get("transport") || options.defaulttransport || "HTTP,IPFS,YJS").toUpperCase(); //TODO-MULTI switch to HTTP by default
+        let setupoptions = {};
+        let transpparm = (searchparams.get("transport") || options.defaulttransport || "HTTP,IPFS,YJS").toUpperCase();
         let transports = Dweb.Transports.setup0(transpparm);
         replacetexts("transportstatuses", Dweb.Transports._transports);
         await Promise.all(transports.map((t) => _p_connecteach(t)));  // Try and connect each of the transports

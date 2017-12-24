@@ -54,7 +54,7 @@ class VersionList extends CommonList {
         if (!data.acl) data._acl = Dweb.KeyChain.default();
         if (verbose) console.log("VL.p_new data=%o",data);
         await VersionList.p_expanddata(data, verbose);  // Expands _contentacl url
-        let vl = new VersionList(data, master, key, verbose);
+        let vl = await super.p_new(data, master, key, verbose); // Calls CommonList.p_new -> new VL() -> new CL() and then sets listurls and listpublicurls
         await vl.p_store(verbose);
         if (data._acl)  // If logged in (normally the case, but not when testing or some special cases)
             await data._acl.p_push(vl);    // Store on the KeyChain so can find again
@@ -101,7 +101,7 @@ class VersionList extends CommonList {
         if (!this._master) {
             delete dd.contentacl;   // Contentacl is the private ACL, no need to send at all
         }
-        return super.preflight(dd); //CL preservers _master and _publicurls and _listpublicurls
+        return super.preflight(dd); //CL preservers _master and _publicurls and listpublicurls
     }
 
 

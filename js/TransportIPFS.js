@@ -193,9 +193,7 @@ class TransportIPFS extends Transport {
         let cid = TransportIPFS.cidFrom(url);  // Throws TransportError if url bad
 
         try {
-            console.log("XXX@p_rawfetch 294 going to dag.get %o",cid)
             let res = await this.ipfs.dag.get(cid);
-            console.log("XXX@p_rawfetch 296 back from dag.get")
             // noinspection Annotator
             if (res.remainderPath.length)
                 { // noinspection ExceptionCaughtLocallyJS

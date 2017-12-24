@@ -36,7 +36,7 @@ class AccessControlList extends CommonList {
             :param kc: Optional KeyChain to add to
          */
         if (verbose) console.log("AccessControlList.p_new");
-        let acl = new Dweb.AccessControlList(data, master, key, verbose, options); // Create ACL
+        let acl = await super.p_new(data, master, key, verbose); // Calls CommonList.p_new -> new ACL() -> new CL() and then CL.p_new sets listurls and listpublicurls
         if (master) {
             kc = kc || Dweb.keychains[0];    // Default to first KeyChain
             if (kc) {
@@ -69,21 +69,27 @@ class AccessControlList extends CommonList {
         :param viewerpublicurls: KeyPair object (contains a publickey) or array of urls of that publickey
         :data other fields to store on ACLE - currently only supports name, but could support any field
         :resolves to: this for chaining
+        :throws ForbiddenError if not master
         */
-        if (verbose) console.log("ACL.p_add_acle viewerpublicurls=",viewerpublicurls);
-        if (viewerpublicurls instanceof Dweb.KeyPair) viewerpublicurls = viewerpublicurls._publicurls;
-        if (!this._master) throw new Dweb.errors.ForbiddenError("ACL.p_add_acle: Cannot add viewers to a public copy of an ACL");
-        if (!(viewerpublicurls && viewerpublicurls.length)) throw new Dweb.errors.CodingError("ACL.p_add_acle: Cant add empty viewerpublicurls");
-        let viewerpublickeypair = await Dweb.SmartDict.p_fetch(viewerpublicurls, verbose); // Fetch the public key will be KeyPair
+        try {
+            if (verbose) console.log("ACL.p_add_acle viewerpublicurls=", viewerpublicurls);
+            if (viewerpublicurls instanceof Dweb.KeyPair) viewerpublicurls = viewerpublicurls._publicurls;
+            if (!this._master) throw new Dweb.errors.ForbiddenError("ACL.p_add_acle: Cannot add viewers to a public copy of an ACL");
+            if (!(viewerpublicurls && viewerpublicurls.length)) throw new Dweb.errors.CodingError("ACL.p_add_acle: Cant add empty viewerpublicurls");
+            let viewerpublickeypair = await Dweb.SmartDict.p_fetch(viewerpublicurls, verbose); // Fetch the public key will be KeyPair
             // Create a new ACLE with access key, encrypted by publickey
-        let acle = new SmartDict({
-                    //Need to go B64->binary->encrypt->B64
-                    "token": viewerpublickeypair.encrypt(Dweb.KeyPair.b64dec(this.accesskey), true, this),
-                    "viewer": viewerpublicurls,
-                    "name": data["name"]
-                }, verbose); //data,verbose
-        await this.p_push(acle, verbose);
-        return acle;
+            let acle = new SmartDict({
+                //Need to go B64->binary->encrypt->B64
+                "token": viewerpublickeypair.encrypt(Dweb.KeyPair.b64dec(this.accesskey), true, this),
+                "viewer": viewerpublicurls,
+                "name": data["name"]
+            }, verbose); //data,verbose
+            await this.p_push(acle, verbose);   // Throws ForbiddenError if not master
+            return acle;
+        } catch (err) { // ForbiddenError from p_push if not master; not sure what else.
+            console.log("Error caught in ACL.p_add_acle",err.message);
+            throw err;
+        }
     }
 
     p_tokens(verbose) { //TODO-BACKPORT
@@ -218,12 +224,10 @@ class AccessControlList extends CommonList {
             let aclseed = "01234567890123456789012345678902";    // Note seed with 01 at end used in mnemonic faking
             let keypair = new Dweb.KeyPair({key: "NACL SEED:" + Dweb.KeyPair.b64enc(new Buffer(aclseed))}, verbose);
             //ACL(data, master, keypair, keygen, mnemonic, verbose, options)
-            let acl = new Dweb.AccessControlList({
-                accesskey: Dweb.KeyPair.b64enc(accesskey)
+            let acl = await Dweb.AccessControlList.p_new({
+                accesskey: Dweb.KeyPair.b64enc(accesskey),
+                _allowunsafestore: true  // Not setting _acl on this
             }, true, keypair, verbose, {});
-            acl._allowunsafestore = true;    // Not setting _acl on this
-            await acl.p_store(verbose);
-            acl._allowunsafestore = false;
             if (verbose) console.log("Creating AccessControlList url=", acl._urls);
             return {acl: acl};
         } catch(err) {

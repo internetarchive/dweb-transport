@@ -17,13 +17,11 @@ class Transports {
 
         Excludes any transports whose status != 0 as they aren't connected
 
-        TODO-LIST-REFACTOR think this through - prob needs to call validfor on listurls as e.g. orbit should go to orbit
-
         urls:       Array of urls
         func:       Function to check support for: fetch, store, add, list, listmonitor, reverse - see supportFunctions on each Transport class
         returns:    Array of pairs of url & transport instance [ [ u1, t1], [u1, t2], [u2, t1]]
          */
-        console.assert((urls && urls[0]) || ["store"].includes(func), "Transports.validFor failed - coding error - url=", urls, "func=", func) // FOr debugging old calling patterns with [ undefined ]
+        console.assert((urls && urls[0]) || ["store", "newlisturls"].includes(func), "Transports.validFor failed - coding error - url=", urls, "func=", func) // FOr debugging old calling patterns with [ undefined ]
         if (!(urls && urls.length > 0)) {
             return Dweb.Transports._transports.filter((t) => (!t.status && t.supports(undefined, func)))
                 .map((t) => [undefined, t]);
@@ -67,7 +65,6 @@ class Transports {
         return rr;
     }
     static async p_rawlist(urls, verbose) {
-        // TODO-LIST-REFACTOR use list urls and make sure called routines do
         let tt = Dweb.Transports.validFor(urls, "list"); // Valid connected transports that support "store"
         if (!tt.length) {
             throw new Dweb.errors.TransportError('Transports.p_rawlist: Cant find transport for urls:'+urls.join(','));
@@ -120,7 +117,6 @@ class Transports {
     }
 
     static async p_rawadd(urls, sig, verbose) {
-        // TODO-LIST-REFACTOR use list urls and make sure called routines do
         /*
         urls: of lists to add to
         sig: Sig to add
@@ -154,15 +150,18 @@ class Transports {
     static listmonitor(urls, cb) {
         /*
         Add a listmonitor for each transport - note this means if multiple transports support it, then will get duplicate events back if everyone else is notifying all of them.
-        TODO-LIST-REFACTOR needs to be using listurls
          */
         Dweb.Transports.validFor(urls, "listmonitor")
             .map(([u, t]) => t.listmonitor(u, cb));
     }
 
-    static async listurls() {
-        //TODO-LIST-REFACTOR should ask each transport for a listurl
-        //TODO-LIST-REFACTOR need calls on each transport
+    static async p_newlisturls(cl, verbose) {
+        // Create a new list in any transport layer that suppportslists.
+        // cl is a CommonList or subclass and can be used by the Transport to get info for choosing the list URL (normally it won't use it)
+        // Note that normally the CL will not have been stored yet, so you can't use its urls.
+        let uuu = await Promise.all(Dweb.Transports.validFor(undefined, "newlisturls")
+            .map(([u, t]) => t.p_newlisturls(cl, verbose)) )    // [ [ priv, pub] [ priv, pub] [priv pub] ]
+        return [uuu.map(uu=>uu[0]), uuu.map(uu=>uu[1])]
     }
 
     static addtransport(t) {

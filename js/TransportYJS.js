@@ -49,7 +49,7 @@ class TransportYJS extends Transport {
         this.options = options;         // Dictionary of options { ipfs: {...}, "yarrays", yarray: {...} }
         this.name = "YJS";             // For console log etc
         this.supportURLs = ['yjs'];
-        this.supportFunctions = ['add', 'list', 'listmonitor'];   // Only does list functions, Does not support reverse,
+        this.supportFunctions = ['add', 'list', 'listmonitor', 'newlisturls'];   // Only does list functions, Does not support reverse,
         this.status = Dweb.Transport.STATUS_LOADED;
     }
 
@@ -139,7 +139,6 @@ class TransportYJS extends Transport {
     }
 
    async p_rawlist(url, verbose) {
-        //TODO-LIST-REFACTOR use CL.listurl not CL.url
     /*
     Fetch all the objects in a list, these are identified by the url of the public key used for signing.
     (Note this is the 'signedby' parameter of the p_rawadd call, not the 'url' parameter
@@ -154,7 +153,8 @@ class TransportYJS extends Transport {
         try {
             if (!(typeof(url) === "string")) { url = url.href; } // Convert if its a parsed URL
             let y = await this.p__yarray(url, verbose);
-            let res = y.share.array.toArray().filter((obj) => (obj.signedby.includes(url)));
+            let res = y.share.array.toArray()
+            // .filter((obj) => (obj.signedby.includes(url))); Cant filter since url is the YJS URL, not the URL of the CL that signed it. (upper layers verify, which fiters)
             if (verbose) console.log("p_rawlist found", ...Dweb.utils.consolearr(res));
             return res;
         } catch(err) {
@@ -164,7 +164,6 @@ class TransportYJS extends Transport {
     }
 
     listmonitor(url, callback, verbose) {
-        //TODO-LIST-REFACTOR use CL.listurl not CL.url
         /*
          Setup a callback called whenever an item is added to a list, typically it would be called immediately after a p_rawlist to get any more items not returned by p_rawlist.
 
@@ -198,7 +197,6 @@ class TransportYJS extends Transport {
         throw new Dweb.errors.ToBeImplementedError("Undefined function TransportHTTP.rawreverse"); }
 
     async p_rawadd(url, sig, verbose) {
-        //TODO-LIST-REFACTOR use CL.listurl not CL.url
         /*
         Store a new list item, it should be stored so that it can be retrieved either by "signedby" (using p_rawlist) or
         by "url" (with p_rawreverse). The underlying transport does not need to guarrantee the signature,
@@ -221,12 +219,20 @@ class TransportYJS extends Transport {
         y.share.array.push([value]);
     }
 
-    p_listurl() {
-        //TODO-LIST-REFACTOR return a URL for the list - what does it need as parameters, make sure passed in.
+    p_newlisturls(cl, verbose) {
+        let  u = cl._publicurls.map(urlstr => Url.parse(urlstr))
+            .find(parsedurl =>
+                (parsedurl.protocol === "ipfs" && parsedurl.pathname.includes('/ipfs/'))
+                || (parsedurl.protocol === "yjs:"));
+        if (!u) { //TODO-LIST-REFACTOR - solutions here prob needed on YJS
+            u = `yjs:/yjs/${ Dweb.KeyPair.multihashsha256_58(cl.keypair.publicexport()[0]) }`; // Pretty random, but means same test will generate same list
+        }
+        return [u,u];
     }
 
+
     static async test(transport, verbose) {
-        if (verbose) {console.log("TransportIPFS.test")}
+        if (verbose) {console.log("TransportYJS.test")}
         try {
             let testurl = "1114";  // Just a predictable number can work with
             let res = await transport.p_rawlist(testurl, verbose);

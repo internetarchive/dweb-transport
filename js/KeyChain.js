@@ -27,7 +27,7 @@ class KeyChain extends CommonList {
         data, key:  See CommonList for parameters
         resolves to:    KeyChain created
          */
-            let kc = new KeyChain(data, true, key, verbose);
+            let kc = await super.p_new(data, true, key, verbose); // Calls CommonList.p_new -> new KC() -> new CL() and then sets listurls and listpublicurls
             try {
                 await kc.p_store(verbose);
             } catch(err) { // Should be a Transport Error
@@ -89,7 +89,7 @@ class KeyChain extends CommonList {
 
     p_store(verbose) {
         /*
-        Unlike other p_store this ONLY stores the public version, and sets the _publicurls and _listurls, on the assumption that the private key of a KeyChain should never be stored.
+        Unlike other p_store this ONLY stores the public version, and sets the _publicurls, on the assumption that the private key of a KeyChain should never be stored.
         Private/master version should never be stored since the KeyChain is itself the encryption root.
         */
         this.dontstoremaster = true;    // Make sure p_store only stores public version
@@ -192,10 +192,11 @@ class KeyChain extends CommonList {
             console.assert(vlm3.name === vlmaster.name, "Names should survive round trip");
             if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
 
+            verbose = true;
             if (verbose) console.log("KEYCHAIN 5: Check can user ViewerKeyPair");
             // Uses acl passed in from AccessControlList.acl
             acl._allowunsafestore = true;
-            await acl.p_add_acle(viewerkeypair, {"name": "my token"}, verbose);   //Add us as viewer - resolves to tok
+            await acl.p_add_acle(viewerkeypair, {"name": "my token"}, verbose);
             console.assert("acl._list.length === 1", "Should have added exactly 1 viewerkeypair", acl);
             let sb = new Dweb.StructuredBlock({"name": "test_sb", "data": qbf, "_acl": acl}, verbose); //url,data,verbose
             await sb.p_store(verbose);

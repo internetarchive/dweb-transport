@@ -37,7 +37,7 @@ class TransportHTTP extends Transport {
         this.options = options;
         this.urlbase = options.http.urlbase;
         this.supportURLs = ['contenthash', 'http','https']; // http and https are legacy
-        this.supportFunctions = ['fetch', 'store', 'add', 'list', 'reverse']; //Does not support: listmonitor - reverse is disabled somewhere not sure if here or caller
+        this.supportFunctions = ['fetch', 'store', 'add', 'list', 'reverse', 'newlisturls']; //Does not support: listmonitor - reverse is disabled somewhere not sure if here or caller
         this.name = "HTTP";             // For console log etc
         this.status = Dweb.Transport.STATUS_LOADED;
     }
@@ -185,7 +185,6 @@ class TransportHTTP extends Transport {
     }
 
     p_rawlist(url, verbose) {
-        //TODO-LIST-REFACTOR use CL.listurl not CL.url
         // obj being loaded
         // Locate and return a block, based on its url
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
@@ -210,7 +209,6 @@ class TransportHTTP extends Transport {
     }
 
     p_rawadd(url, sig, verbose) { //TODO-BACKPORT turn date into ISO before adding
-        //TODO-LIST-REFACTOR use CL.listurl not CL.url
         //verbose=true;
         if (!url || !sig) throw new Dweb.errors.CodingError("TransportHTTP.p_rawadd: invalid parms",url, sig);
         if (verbose) console.log("rawadd", url, sig);
@@ -218,8 +216,15 @@ class TransportHTTP extends Transport {
         return this.p_post(servercommands.rawadd, url, "application/json", value, verbose); // Returns immediately
     }
 
-    p_listurl() {
-        //TODO-LIST-REFACTOR return a URL for the list - what does it need as parameters, make sure passed in.
+    p_newlisturls(cl, verbose) {
+       let  u = cl._publicurls.map(urlstr => Url.parse(urlstr))
+            .find(parsedurl =>
+                (parsedurl.protocol === "https" && parsedurl.host === "gateway.dweb.me" && parsedurl.pathname.includes('/content/rawfetch'))
+                || (parsedurl.protocol === "contenthash:" && pathparts[1] === "contenthash"))
+        if (!u) { //TODO-LIST-REFACTOR - solutions here prob needed on YJS
+            u = `contenthash:/contenthash/${ Dweb.KeyPair.multihashsha256_58(cl.keypair.publicexport()[0]) }`; // Pretty random, but means same test will generate same list
+        }
+        return [u,u];
     }
 
     static async test() {
