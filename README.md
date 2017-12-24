@@ -33,7 +33,7 @@ see below for IPFS bugs,
 **Verbosity**: You can get debugging output by appending verbose=true to the URLs, 
 this shows up in your console and also (for HTTP) in our server logs.
 
-###BLOCK example
+### BLOCK example
 - In your browser, open examples/example_block.html: 
 [Default](https://dweb.me/examples/example_block.html) [IPFS](https://dweb.me/examples/example_block.html&transport=IPFS)
 or [HTTP](https://dweb.me/examples/example_block.html?transport=HTTP)
@@ -45,7 +45,7 @@ or [HTTP](https://dweb.me/examples/example_block.html?transport=HTTP&verbose=tru
 and open the browser console (e.g. Firefox/tools/Web Developer/Web Console)  
 - Click "FetchIt" and the data should be returned.
 
-###SMART DICT example
+### SMART DICT example
 - In your browser, open example_smartdict.html
 [Default](https://dweb.me/examples/example_smartdict.html) [IPFS](https://dweb.me/examples/example_smartdict.html&transport=IPFS)
 or [HTTP](https://dweb.me/examples/example_smartdict.html?transport=HTTP);
@@ -54,7 +54,7 @@ or [HTTP](https://dweb.me/examples/example_smartdict.html?transport=HTTP);
 - Click "FetchIt" and the data should be returned and displayed.  
 - Hover over "Object Browser" to see the structure of the object.
 
-###COMMON LIST example
+### COMMON LIST example
 - In your browser, open the file:  example_list.html:
 [Default](https://dweb.me/examples/example_list.html) [IPFS](https://dweb.me/examples/example_list.html&transport=IPFS)
 or [HTTP](https://dweb.me/examples/example_list.html?transport=HTTP)
@@ -67,7 +67,7 @@ the user ability to also write to the list.
 - The link icon next to the public hash will only give them the ability to display the list.
 - Hover over "Object Browser" to see the structure of the object.
 
-###ACADEMIC DOCS example
+### ACADEMIC DOCS example
 
 This is a work in progress, dependent on the incompleteness of both the Academic Document virtual collection at Archive.org and 
 the bugs/issues in IPFS.
@@ -84,13 +84,13 @@ or [HTTP](https://dweb.me/examples/example_academic.html?transport=HTTP)
 - The first three fetch from: the Archive's contenthash server; and from two IPFS http gateways.
 - The last link fetches directly in the browser without coming to the Archive or any other single point of failure.
 
-###AUTHENTICATION example
+### AUTHENTICATION example
 - In your browser, open the file:  examples/example_keys.html:
 [Default](https://dweb.me/examples/example_keys.html) [IPFS](https://dweb.me/examples/example_keys.html&transport=IPFS)
 or [HTTP](https://dweb.me/examples/example_keys.html?transport=HTTP)
 - follow the instructions on the page.
 
-###VERSIONS exampe
+### VERSIONS exampe
 - In your browser, open the file examples/example_versions.html
 [Default](https://dweb.me/examples/example_versions.html) [IPFS](https://dweb.me/examples/example_versions.html&transport=IPFS)
 or [HTTP](https://dweb.me/examples/example_versions.html?transport=HTTP);
@@ -113,7 +113,7 @@ virtually clean run gives more confidence that the install worked.
 - This should start a IPFS instance, and generate some messages ending in "delaying 10 secs" and "Completed test".
 - It will leave the IPFS instance running and usually will need a Ctrl-C to exit.
 
-##Major Browser Issues
+## Major Browser Issues
 
 Please not there is an issue with IPFS on some Firefox versions (seen on 54.0.1, not on 49.0.2 for example)
 that is currently leaking Threads and slowing the machine down drastically. This is being explored!  
@@ -121,7 +121,7 @@ Use it on Chrome for now, and expect it to crash every 5 minutes.
 The HTTP versions don't have this problem, but also don't support live notification of changes.
 This is reported on IPFS at [JSIPFS issue#950](https://github.com/ipfs/js-ipfs/issues/950), dweb-transport issue@ and supposedly being fixed 
 
-##See also:
+## See also:
 
 The documentation for the Internet Archive's Dweb project is currently on Google (yes, we appreciate the irony). 
 
