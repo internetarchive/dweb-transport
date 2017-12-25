@@ -191,13 +191,6 @@ function refresh_transportstatuses(el) {
             }
         })
 }
-async function _p_connecteach(t) {
-    /* Sub call for p_connect to fix some async issues, makes sure this is a single promise resolving to undefined */
-    await t.p_setup1(verbose);
-    await t.p_status(verbose); // Set the status field of t, may make async enquiry of server etc
-    refresh_transportstatuses("transportstatuses"); // Update status for anything,
-    return undefined;
-}
 async function p_connect(options) {
     /*
         This is a standardish starting process, feel free to copy and reuse !
@@ -210,9 +203,9 @@ async function p_connect(options) {
         let transpparm = (searchparams.get("transport") || options.defaulttransport || "HTTP,IPFS,YJS").toUpperCase();
         let transports = Dweb.Transports.setup0(transpparm);
         replacetexts("transportstatuses", Dweb.Transports._transports);
-        await Promise.all(transports.map(t => t.p_setup1a(verbose)));
+        await Dweb.Transports.p_setup1(verbose);
         refresh_transportstatuses("transportstatuses"); // Update status for anything,
-        await Promise.all(transports.map(t => t.p_setup1b(verbose)));
+        await Dweb.Transports.p_setup2(verbose);
         refresh_transportstatuses("transportstatuses"); // Update status for anything,
         await Promise.all(transports.map(t => t.p_status(verbose)));
         refresh_transportstatuses("transportstatuses"); // Update status for anything,

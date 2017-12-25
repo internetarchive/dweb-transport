@@ -16,27 +16,21 @@ class Transport {
         throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally undefined function Transport.setup0 should have been subclassed");
         }
 
-    p_setup1a(options, verbose) { return; }
-    p_setup1b(options, verbose) { return; }
-    async p_setup1(options, verbose) {
-        // Do 1a and 1b, normally a transport will only have either 1a or 1b and it will be called through Transports.p_setup1()
-        await this.p_setup1a(options, verbose);
-        await this.p_setup1b(options, verbose);
-        return this;
-    }
-    p_setup(options, verbose) {
+    p_setup1(options, verbose) { return this; }
+    p_setup2(options, verbose) { return this; }
 
-    }
-    p_setup(options, verbose) {
-        /*
-        Setup the resource and open any P2P connections etc required to be done just once.
-        In almost all cases this will call the constructor of the subclass
+    static async p_setup(options, verbose) {
+            /*
+            Setup the resource and open any P2P connections etc required to be done just once.
+            In almost all cases this will call the constructor of the subclass
 
-        :param obj options: Data structure required by underlying transport layer (format determined by that layer)
-        :param boolean verbose: True for debugging output
-        :resolve Transport: Instance of subclass of Transport
-         */
-        throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally undefined function Transport.p_setup should have been subclassed");
+            :param obj options: Data structure required by underlying transport layer (format determined by that layer)
+            :param boolean verbose: True for debugging output
+            :resolve Transport: Instance of subclass of Transport
+             */
+            return await this.setup0(options, verbose) // Sync version that doesnt connect
+                .p_setup1(verbose)     // And connect
+                .p_setup2(verbose);     // And connect
     }
 
     supports(url, func) {

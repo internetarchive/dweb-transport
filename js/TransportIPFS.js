@@ -106,7 +106,7 @@ class TransportIPFS extends Transport {
         return t;
     }
 
-    async p_setup1a(verbose) {
+    async p_setup1(verbose) {
         try {
             this.status = Dweb.Transport.STATUS_STARTING;   // Should display, but probably not refreshed in most case
             await this.p_ipfsstart(verbose);    // Throws Error("websocket error") and possibly others.
@@ -115,21 +115,6 @@ class TransportIPFS extends Transport {
             this.status = Dweb.Transport.STATUS_FAILED;
         }
         return this;
-    }
-
-    static async p_setup(options, verbose ) {
-        /*
-        Setup the resource and open any P2P connections etc required to be done just once.
-        In almost all cases this will call the constructor of the subclass
-        Should return a new Promise that resolves to a instance of the subclass
-
-        :param obj transportoptions: Data structure required by underlying transport layer (format determined by that layer)
-        :param boolean verbose: True for debugging output
-        :param options: Data structure stored on the .options field of the instance returned.
-        :resolve Transport: Instance of subclass of Transport
-         */
-        return await TransportIPFS.setup0(options, verbose) // Create instance but dont connect
-            .p_setup1(verbose);             // Connect
     }
 
     async p_status(verbose) {

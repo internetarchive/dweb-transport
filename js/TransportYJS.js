@@ -53,22 +53,6 @@ class TransportYJS extends Transport {
         this.status = Dweb.Transport.STATUS_LOADED;
     }
 
-    async p_yarraysstart(verbose) {
-        /*
-        This starts IPFS, but only sets up for Y connections, which are opened each time a resource is listed, added to, or listmonitored.
-            Throws: Error("websocket error") if WiFi off, probably other errors if fails to connect
-        */
-        try {
-            let self = this;
-            self.yarrays = {};
-            //await this.p_ipfsstart(verbose); // Throws Error("websocket error") if Wifi is off
-        } catch(err) {
-            console.log("p_yarraysstart: Error caught:", err.message);
-            throw(err);
-        }
-        //Lots of issues with "init" not knowing state before it//  this.ipfs.init({emptyRepo: true, bits: 2048})     //.then((unused) => ipfs.init({emptyRepo: true, bits: 2048}))
-    }
-
     async p__yarray(url, verbose) {
         /*
         Utility function to get Yarray for this URL and open a new connection if not already
@@ -96,37 +80,27 @@ class TransportYJS extends Transport {
             First part of setup, create obj, add to Transports but dont attempt to connect, typically called instead of p_setup if want to parallelize connections.
         */
         let combinedoptions = Transport.mergeoptions(defaultoptions, options);
-        console.log("YJS options %o", combinedoptions);
+        console.log("YJS options %o", combinedoptions); // Log even if !verbose
         let t = new TransportYJS(combinedoptions, verbose);   // Note doesnt start IPFS or Y
         Dweb.Transports.addtransport(t);
         return t;
     }
 
-    async p_setup1b(verbose) {
+    async p_setup2(verbose) {
+        /*
+        This sets up for Y connections, which are opened each time a resource is listed, added to, or listmonitored.
+        p_setup2 is defined because IPFS will have started during the p_setup1 phase.
+        Throws: Error("websocket error") if WiFi off, probably other errors if fails to connect
+        */
         try {
             this.status = Dweb.Transport.STATUS_STARTING;   // Should display, but probably not refreshed in most case
-            this.options.yarray.connector.ipfs = Dweb.Transports.ipfs(verbose).ipfs; // Find an IPFS to use (IPFS's should be starting in p_setup1a)
-            await this.p_yarraysstart(verbose);    // Throws Error("websocket error") and possibly others.
+            this.options.yarray.connector.ipfs = Dweb.Transports.ipfs(verbose).ipfs; // Find an IPFS to use (IPFS's should be starting in p_setup1)
+            this.yarrays = {};
         } catch(err) {
-            console.error("IPFS failed to connect",err);
+            console.error("YJS failed to start",err);
             this.status = Dweb.Transport.STATUS_FAILED;
         }
         return this;
-    }
-
-    static async p_setup(options, verbose ) {
-        /*
-        Setup the resource and open any P2P connections etc required to be done just once.
-        In almost all cases this will call the constructor of the subclass
-        Should return a new Promise that resolves to a instance of the subclass
-
-        :param obj transportoptions: Data structure required by underlying transport layer (format determined by that layer)
-        :param boolean verbose: True for debugging output
-        :param options: Data structure stored on the .options field of the instance returned.
-        :resolve Transport: Instance of subclass of Transport
-         */
-        return await TransportYJS.setup0(options, verbose) // Create instance but dont connect
-            .p_setup1(verbose);             // Connect
     }
 
     async p_status(verbose) {

@@ -53,19 +53,8 @@ class TransportHTTP extends Transport {
             throw err;
         }
     }
-    async p_setup1a(verbose) {
+    async p_setup1(verbose) {
         return this;
-    }
-    static async p_setup(options, verbose) {
-        /*
-        Setup the resource and open any P2P connections etc required to be done just once.
-
-        :param boolean verbose: True for debugging output
-        :param options: Options to override defaulthttpoptions of form  {http: {urlbase: "http://localhost:4244"}};
-        :resolve Transport: Instance of subclass of Transport
-         */
-        return await TransportHTTP.setup0(options, verbose) // Sync version that doesnt connect
-            .p_setup1(verbose);     // And connect
     }
 
     async p_status(verbose) {    //TODO-BACKPORT

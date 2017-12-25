@@ -195,8 +195,12 @@ class Transports {
     static async p_setup1(verbose) {
         /* Second stage of setup, connect if possible */
         // Does all setup1a before setup1b since 1b can rely on ones with 1a, e.g. YJS relies on IPFS
-        await Promise.all(Dweb.Transports._transports.map((t) = t.p_setup1a(verbose)));
-        await Promise.all(Dweb.Transports._transports.map((t) = t.p_setup1b(verbose)));
+        await Promise.all(Dweb.Transports._transports.map((t) => t.p_setup1(verbose)));
+    }
+    static async p_setup2(verbose) {
+        /* Second stage of setup, connect if possible */
+        // Does all setup1a before setup1b since 1b can rely on ones with 1a, e.g. YJS relies on IPFS
+        await Promise.all(Dweb.Transports._transports.map((t) => t.p_setup2(verbose)));
     }
 }
 Transports._transports = [];    // Array of transport instances connected
