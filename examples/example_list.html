@@ -19,7 +19,7 @@
             // Get the data from the form
             let dict = form2dict("newform");
             <!--CommonList(data, master, key, verbose, options)-->
-            let obj = new Dweb.CommonList(dict, true, {keygen: true}, verbose, {_allowunsafestore: true});
+            let obj = await Dweb.CommonList.p_new(dict, true, {keygen: true}, verbose, {_allowunsafestore: true});
             // _allowunsafestore is set to true since AccessControlList not set yet, so storing unencrypted.
             console.log("Created=", obj);
             await obj.p_store(verbose);

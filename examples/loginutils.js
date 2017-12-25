@@ -210,7 +210,12 @@ async function p_connect(options) {
         let transpparm = (searchparams.get("transport") || options.defaulttransport || "HTTP,IPFS,YJS").toUpperCase();
         let transports = Dweb.Transports.setup0(transpparm);
         replacetexts("transportstatuses", Dweb.Transports._transports);
-        await Promise.all(transports.map((t) => _p_connecteach(t)));  // Try and connect each of the transports
+        await Promise.all(transports.map(t => t.p_setup1a(verbose)));
+        refresh_transportstatuses("transportstatuses"); // Update status for anything,
+        await Promise.all(transports.map(t => t.p_setup1b(verbose)));
+        refresh_transportstatuses("transportstatuses"); // Update status for anything,
+        await Promise.all(transports.map(t => t.p_status(verbose)));
+        refresh_transportstatuses("transportstatuses"); // Update status for anything,
     } catch(err) {
         console.error("ERROR in p_connect:",err.message);
         throw(err);

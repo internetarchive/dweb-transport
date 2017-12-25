@@ -59,7 +59,7 @@
     async function main() {
         //This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
         try {
-            await p_connect(); // Default startup beavior from loginutils.js // {http: {urlbase: "http://localhost:4244"}} for local
+            await p_connect({defaulttransport: "HTTP,IPFS"}); // Default startup beavior from loginutils.js // {http: {urlbase: "http://localhost:4244"}} for local
             // Any code you want to run once online goes here.
             if (url) fetchanddisplay(url);
             //Setup a callback so once logged in it will populate drop-downs (comment out if not using logins or defining onlogin)

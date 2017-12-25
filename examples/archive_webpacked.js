@@ -875,11 +875,11 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
                                 href: 'http://creativecommons.org/licenses/by-nc-nd/2.0/', target: '_blank' },
                             'http://creativecommons.org/licenses/by-nc-nd/2.0/',
                             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', {
-                                'class': 'cclic', src: '/images/cc/cc.png' }),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { 'class': 'cclic', src: '/images/cc/by.png' }),
+                                'class': 'cclic', src: 'https://archive.org/images/cc/cc.png' }),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { 'class': 'cclic', src: 'https://archive.org/images/cc/by.png' }),
                             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', {
-                                'class': 'cclic', src: '/images/cc/nc.png' }),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { 'class': 'cclic', src: '/images/cc/nd.png' })
+                                'class': 'cclic', src: 'https://archive.org/images/cc/nc.png' }),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { 'class': 'cclic', src: 'https://archive.org/images/cc/nd.png' })
                         )
                     ) : undefined,
                     keywords ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
