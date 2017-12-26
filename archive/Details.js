@@ -365,7 +365,7 @@ export default class Details extends ArchiveBase {
 
                         <div class="clearfix"></div>
                         {/*--TODO-DETAILS-ONLINE probably needs  <div dangerouslySetInnerHTML={{__html: item.metadata.description}}></div>--*/}
-                        { description ? ( <div id="descript" itemprop="description">{description}</div> ) : ( undefined ) }
+                        { description ? ( <div id="descript" itemprop="description" dangerouslySetInnerHTML={{__html: description}}></div> ) : ( undefined ) }
 
                         { credits ? ( <h2 style="font-size:18px">Credits</h2> ) : ( undefined ) }
                         { credits ? ( <p class="content">{credits}</p>        ) : ( undefined ) }
