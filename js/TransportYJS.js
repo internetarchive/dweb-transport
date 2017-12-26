@@ -198,7 +198,7 @@ class TransportYJS extends Transport {
             .find(parsedurl =>
                 (parsedurl.protocol === "ipfs" && parsedurl.pathname.includes('/ipfs/'))
                 || (parsedurl.protocol === "yjs:"));
-        if (!u) { //TODO-LIST-REFACTOR - solutions here prob needed on YJS
+        if (!u) {
             u = `yjs:/yjs/${ Dweb.KeyPair.multihashsha256_58(cl.keypair.publicexport()[0]) }`; // Pretty random, but means same test will generate same list
         }
         return [u,u];

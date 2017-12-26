@@ -3,7 +3,6 @@ const Dweb = require("./Dweb");
 //https://www.npmjs.com/package/custom-event && https://github.com/webmodules/custom-event
 var CustomEvent = require('custom-event'); // From web, Not present in node - this code uses global.CustomEvent if it exists so safe on browser/node
 
-//TODO-LIST-REFACTOR-API needs updating
 
 class CommonList extends SmartDict {
     /*
@@ -20,7 +19,6 @@ class CommonList extends SmartDict {
     _allowunsafestore True if should override protection against storing unencrypted private keys (usually only during testing)
     dontstoremaster True if should not store master key
     _listeners      Any event listeners  //TODO-LISTENER - maybe move to SmartDict as generically useful
-    TODO-LIST-REFACTOR document changes  in list library and API
     */
     //TODO extend to cover array functions, but carefully as the semantics require signing and storing.
     //concat - hard to do well as unclear semantics, do you really want a new list with the contents of both ? The signatures on 2nd might not work
