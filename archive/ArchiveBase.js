@@ -6,8 +6,9 @@ import React from './ReactFake';
 //import ReactDOM from 'react-dom';
 //TODO-DETAILS add a config file, load at compile and make overridable - server etc go there
 import Util from './Util';
+import ArchiveItem from './ArchiveItem';
 
-export default class ArchiveBase {
+export default class ArchiveBase extends ArchiveItem {  //TODO-REFACTOR - extends ArchiveItem and rename to ArchivePageBase - move data to AI
     /*
     Base class for Archive application - base of Details = which includes single element items and Search which includes both searches and collections (which are actually items).
     ArchiveBase
@@ -29,8 +30,8 @@ export default class ArchiveBase {
     items   Metadata for items found if the item is a Collection,
     query   query part of search to run (Search|Collection|Home only)
      */
-    constructor(itemid, {}={}) {
-        this.itemid = itemid;
+    constructor(itemid,  {item = undefined}={}) {
+        super({itemid: itemid, item: item});
     }
     jsxInNav() {
     }

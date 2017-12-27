@@ -1,10 +1,6 @@
-//import ReactDOM from "react-dom";
-//import React from 'react';
-//ARCHIVE-BROWSER ReactDOMServer Not needed for browser, left in to allow use in both browser & Node/Server
 import React from './ReactFake';
 
 require('babel-core/register')({ presets: ['env', 'react']}); // ES6 JS below!
-//import ReactDOMServer from 'react-dom/server';
 
 import Util from './Util';
 import ArchiveBase from './ArchiveBase';
@@ -38,31 +34,15 @@ export default class Search extends ArchiveBase {
     Inherited from ArchiveBase: item
     items   List of items found
      */
-  constructor({query='*:*', sort='', limit=75, banner='', id=undefined}={}) {
-      super(id);
-      this.query = query;
-      this.limit= limit;
-      this.sort = sort;
-      console.log('search for:', 'http://archive.org/advancedsearch.php?output=json&q=' + query + '&rows=' + limit + '&sort[]=' + sort)
-  }
-    async fetch() {
-        /* Do an advanced search.
-            Goes through gateway.dweb.me so that we can work around a CORS issue (general approach & security questions confirmed with Sam!)
-
-            this.itemid Archive Item identifier
-            throws: TypeError or Error if fails
-            resolves to: this
-         */
-        let j = await Util.fetch_json(
-            //`https://archive.org/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`, // Archive (CORS fail)
-            `https://gateway.dweb.me/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`,
-            //`http://localhost:4244/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`, //Testing
-        );
-        this.items = j.response.docs;
-        return this; // For chaining, but note will need to do an "await fetch"
+    constructor({query='*:*', sort='', limit=75, banner='', item=undefined, itemid=undefined}={}) {
+        super(itemid, {item: item});
+        this.query = query;
+        this.limit= limit;
+        this.sort = sort;
+        console.log('search for:', 'http://archive.org/advancedsearch.php?output=json&q=' + query + '&rows=' + limit + '&sort[]=' + sort)
     }
 
-        navwrapped() {
+    navwrapped() {
         /* Wrap the content up:  wrap( nav=wrap1 | maincontent | detailsabot )
         TODO-DETAILS need stuff before nav-wrap1 and after detailsabout and need to check this against Search and Collection examples
         returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
@@ -77,31 +57,26 @@ export default class Search extends ArchiveBase {
             {/*--wrap--*/}</div>
         );
     }
+
     browserBefore() {
-      $('body').addClass('bgEEE');
-      archive_setup.push(function(){ //TODO-DETAILS check not pushing on top of existing (it probably is)
-          AJS.lists_v_tiles_setup('search');
-          AJS.popState('search');
-
-          $('div.ikind').css({visibility:'visible'});
-
-          AJS.tiler();      // Note Traceys code had AJS.tiler('#ikind-search') but Search and Collections examples have it with no args
-
-          $(window).on('resize  orientationchange', function(evt){
-              clearTimeout(AJS.node_search_throttler);
-              AJS.node_search_throttler = setTimeout(AJS.tiler, 250);
-          });
+        $('body').addClass('bgEEE');
+        archive_setup.push(function(){ //TODO-DETAILS check not pushing on top of existing (it probably is)
+            AJS.lists_v_tiles_setup('search');
+            AJS.popState('search');
+            $('div.ikind').css({visibility:'visible'});
+            AJS.tiler();      // Note Traceys code had AJS.tiler('#ikind-search') but Search and Collections examples have it with no args
+            $(window).on('resize  orientationchange', function(evt){
+                clearTimeout(AJS.node_search_throttler);
+                AJS.node_search_throttler = setTimeout(AJS.tiler, 250);
+            });
           // register for scroll updates (for infinite search results)
           $(window).scroll(AJS.scrolled);
+        });
+    }
 
-      });
-
-  }
-  banner() {
-      return (
-          <h1>Search: {this.query}</h1>
-      );
-  }
+    banner() {
+        return <h1>Search: {this.query}</h1>;
+    }
 
   jsxInNav(){
       /* The main part of the details or search page containing the content
