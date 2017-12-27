@@ -18,9 +18,9 @@ export default class Home extends Search {
         super({
             query:  query,
             sort:   '-downloads',
+            itemid: itemid,
+            item:   item
         });
-        this.item = item;
-        this.itemid = itemid;
     }
     banner() {
         return (

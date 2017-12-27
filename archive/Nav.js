@@ -121,7 +121,7 @@ export default class Nav { //extends React.Component
                 if (verbose) console.log("Found mediatype", item.metadata.mediatype);
                 switch (item.metadata.mediatype) {
                     case "collection":
-                        return (await new Collection(itemid, item).fetch()).render(res, htm);
+                        return (await new Collection(itemid, item).fetch()).render(res, htm);   //fetch will do search
                         break;
                     case "texts":
                         new Texts(itemid, item).render(res, htm);

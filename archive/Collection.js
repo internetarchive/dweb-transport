@@ -7,9 +7,9 @@ export default class Collection extends Search {
         super({
             query:  'collection:'+itemid,
             sort:   '-downloads',
+            itemid: itemid,
+            item:   item,
         });
-        this.item = item;
-        this.itemid = itemid;
     }
 
     banner() {

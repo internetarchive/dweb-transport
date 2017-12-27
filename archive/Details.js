@@ -26,26 +26,6 @@ export default class Details extends ArchiveBase {
         this._listLoad();
     }
 
-    _listLoad() { // After set this.item
-        this._list = (this.item && this.item.files )
-            ? this.item.files.map((f) => new ArchiveFile({itemid: this.itemid, metadata: f})) // Allow methods on files of item
-            : [];   // Default to empty, so usage simpler.
-
-    }
-
-    async fetch() {
-        /* Fetch JSON by talking to Metadata API
-            this.itemid Archive Item identifier
-            throws: TypeError or Error if fails
-            resolves to: this
-         */
-        console.log('get metadata for ' + this.itemid);
-        //this.item = await Util.fetch_json(`https://archive.org/metadata/${this.itemid}`);
-        this.item = await Util.fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}`);
-        this._listLoad();
-        return this; // For chaining, but note will need to do an "await fetch"
-    }
-
     navwrapped() {
         /* Wrap the content up checked on mbid (Red Shift) image:  wrap( TODO | nav-wrap1 | maincontent | theatre-ia-wrap | item-details-about | TODO )
         TODO-DETAILS need stuff before nav-wrap1 and after detailsabout

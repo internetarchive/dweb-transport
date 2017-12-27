@@ -398,25 +398,6 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
         this._listLoad();
     }
 
-    _listLoad() {
-        // After set this.item
-        this._list = this.item && this.item.files ? this.item.files.map(f => new __WEBPACK_IMPORTED_MODULE_3__ArchiveFile__["a" /* default */]({ itemid: this.itemid, metadata: f })) // Allow methods on files of item
-        : []; // Default to empty, so usage simpler.
-    }
-
-    async fetch() {
-        /* Fetch JSON by talking to Metadata API
-            this.itemid Archive Item identifier
-            throws: TypeError or Error if fails
-            resolves to: this
-         */
-        console.log('get metadata for ' + this.itemid);
-        //this.item = await Util.fetch_json(`https://archive.org/metadata/${this.itemid}`);
-        this.item = await __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}`);
-        this._listLoad();
-        return this; // For chaining, but note will need to do an "await fetch"
-    }
-
     navwrapped() {
         /* Wrap the content up checked on mbid (Red Shift) image:  wrap( TODO | nav-wrap1 | maincontent | theatre-ia-wrap | item-details-about | TODO )
         TODO-DETAILS need stuff before nav-wrap1 and after detailsabout
@@ -1244,14 +1225,10 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(2);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__ = __webpack_require__(5);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Tile__ = __webpack_require__(9);
-//import ReactDOM from "react-dom";
-//import React from 'react';
-//ARCHIVE-BROWSER ReactDOMServer Not needed for browser, left in to allow use in both browser & Node/Server
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Tile__ = __webpack_require__(10);
 
 
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
-//import ReactDOMServer from 'react-dom/server';
 
 
 
@@ -1283,27 +1260,12 @@ class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default *
     Inherited from ArchiveBase: item
     items   List of items found
      */
-    constructor({ query = '*:*', sort = '', limit = 75, banner = '', id = undefined } = {}) {
-        super(id);
+    constructor({ query = '*:*', sort = '', limit = 75, banner = '', item = undefined, itemid = undefined } = {}) {
+        super(itemid, { item: item });
         this.query = query;
         this.limit = limit;
         this.sort = sort;
         console.log('search for:', 'http://archive.org/advancedsearch.php?output=json&q=' + query + '&rows=' + limit + '&sort[]=' + sort);
-    }
-    async fetch() {
-        /* Do an advanced search.
-            Goes through gateway.dweb.me so that we can work around a CORS issue (general approach & security questions confirmed with Sam!)
-             this.itemid Archive Item identifier
-            throws: TypeError or Error if fails
-            resolves to: this
-         */
-        let j = await __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].fetch_json(
-        //`https://archive.org/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`, // Archive (CORS fail)
-        `https://gateway.dweb.me/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`
-        //`http://localhost:4244/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`, //Testing
-        );
-        this.items = j.response.docs;
-        return this; // For chaining, but note will need to do an "await fetch"
     }
 
     navwrapped() {
@@ -1324,17 +1286,15 @@ class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default *
             )
         );
     }
+
     browserBefore() {
         $('body').addClass('bgEEE');
         archive_setup.push(function () {
             //TODO-DETAILS check not pushing on top of existing (it probably is)
             AJS.lists_v_tiles_setup('search');
             AJS.popState('search');
-
             $('div.ikind').css({ visibility: 'visible' });
-
             AJS.tiler(); // Note Traceys code had AJS.tiler('#ikind-search') but Search and Collections examples have it with no args
-
             $(window).on('resize  orientationchange', function (evt) {
                 clearTimeout(AJS.node_search_throttler);
                 AJS.node_search_throttler = setTimeout(AJS.tiler, 250);
@@ -1343,6 +1303,7 @@ class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default *
             $(window).scroll(AJS.scrolled);
         });
     }
+
     banner() {
         return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
             'h1',
@@ -1389,6 +1350,7 @@ class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default *
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(2);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveItem__ = __webpack_require__(9);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 //Not needed on client - kept so script can run in both cases
@@ -1398,7 +1360,9 @@ __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 //TODO-DETAILS add a config file, load at compile and make overridable - server etc go there
 
 
-class ArchiveBase {
+
+class ArchiveBase extends __WEBPACK_IMPORTED_MODULE_2__ArchiveItem__["a" /* default */] {
+    //TODO-REFACTOR - extends ArchiveItem and rename to ArchivePageBase - move data to AI
     /*
     Base class for Archive application - base of Details = which includes single element items and Search which includes both searches and collections (which are actually items).
     ArchiveBase
@@ -1419,8 +1383,8 @@ class ArchiveBase {
     items   Metadata for items found if the item is a Collection,
     query   query part of search to run (Search|Collection|Home only)
      */
-    constructor(itemid, {} = {}) {
-        this.itemid = itemid;
+    constructor(itemid, { item = undefined } = {}) {
+        super({ itemid: itemid, item: item });
     }
     jsxInNav() {}
     theatreIaWrap() {}
@@ -1509,7 +1473,7 @@ class ArchiveFile {
 //var ReactDOM = require('react-dom');
 var Details = __webpack_require__(3).default;
 var Search = __webpack_require__(4).default;
-var Nav = __webpack_require__(10).default;
+var Nav = __webpack_require__(11).default;
 //window.Dweb = require('../js/Dweb');
 window.Nav = Nav;
 /*
@@ -1576,6 +1540,80 @@ module.exports = exports["default"];
 
 /***/ }),
 /* 9 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__ = __webpack_require__(6);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(2);
+
+
+
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
+//const Dweb = require('../js/Dweb');     // Gets SmartDict and the Transports
+//TODO-REFACTOR extends SmartDict to eventually allow loading via URL - having problems with webpack ... libsodium -> fs
+//TODO-NAMING url could be a name
+
+class ArchiveItem {
+    //extends SmartDict {  //TODO should extend SmartDict, but having Webpack issues loading it
+    /*
+    Base class representing an Item and/or a Search query (A Collection is both).
+    This is just storage, the UI is in ArchiveBase and subclasses, theoretically this class could be used for a server or gateway app with no UI.
+     Fields:
+    itemid: Archive.org reference for object
+    item:   Metadata decoded from JSON from metadata search.
+    items:  Array of data from a search.
+    _list:  Will hold a list of files when its a single item, TODO-REFACTOR maybe this holds a array of ArchiveItem when its a search BUT only have partial metadata info
+     Once subclass SmartDict
+    _urls:  Will be list of places to retrieve this data (not quite a metadata call)
+     */
+
+    constructor({ itemid = undefined, item = undefined } = {}) {
+        this.itemid = itemid;
+        this.item = item; // Havent fetched yet, subclass constructors may override
+    }
+
+    _listLoad() {
+        /*
+         After set this.item, load the _list with an array for ArchiveFile
+        */
+        this._list = this.item && this.item.files ? this.item.files.map(f => new __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__["a" /* default */]({ itemid: this.itemid, metadata: f })) // Allow methods on files of item
+        : []; // Default to empty, so usage simpler.
+    }
+
+    async fetch() {
+        /* Fetch what we can about this item, it might be an item or something we have to search for.
+            Fetch item metadata as JSON by talking to Metadata API
+            Fetch collection info by an advanced search.
+            Goes through gateway.dweb.me so that we can work around a CORS issue (general approach & security questions confirmed with Sam!)
+             this.itemid Archive Item identifier
+            throws: TypeError or Error if fails
+            resolves to: this
+         */
+        if (this.itemid && !this.item) {
+            console.log('get metadata for ' + this.itemid);
+            //this.item = await Util.fetch_json(`https://archive.org/metadata/${this.itemid}`);
+            this.item = await __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}`);
+            this._listLoad(); // Load _list with ArchiveFile
+        } //TODO-REFACTOR make Collections automatically load query and do both
+        if (this.query) {
+            // This is for Search, Collection and Home.
+            let j = await __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].fetch_json(
+            //`https://archive.org/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`, // Archive (CORS fail)
+            `https://gateway.dweb.me/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`
+            //`http://localhost:4244/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`, //Testing
+            );
+            this.items = j.response.docs;
+        }
+        return this; // For chaining, but note will need to do an "await fetch"
+    }
+
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = ArchiveItem;
+
+
+/***/ }),
+/* 10 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -1759,7 +1797,7 @@ class Tile {
 
 
 /***/ }),
-/* 10 */
+/* 11 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -1768,12 +1806,12 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(2);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Search__ = __webpack_require__(4);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Details__ = __webpack_require__(3);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__Home__ = __webpack_require__(11);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__Collection__ = __webpack_require__(12);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__Texts__ = __webpack_require__(13);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__Image__ = __webpack_require__(14);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__AV__ = __webpack_require__(15);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_9__DetailsError__ = __webpack_require__(16);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__Home__ = __webpack_require__(12);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__Collection__ = __webpack_require__(13);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__Texts__ = __webpack_require__(14);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__Image__ = __webpack_require__(15);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__AV__ = __webpack_require__(16);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_9__DetailsError__ = __webpack_require__(17);
 //import ReactDOM from "react-dom";
 
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
@@ -1946,7 +1984,7 @@ class Nav {
         if (verbose) console.log("Found mediatype", item.metadata.mediatype);
         switch (item.metadata.mediatype) {
           case "collection":
-            return (await new __WEBPACK_IMPORTED_MODULE_5__Collection__["a" /* default */](itemid, item).fetch()).render(res, htm);
+            return (await new __WEBPACK_IMPORTED_MODULE_5__Collection__["a" /* default */](itemid, item).fetch()).render(res, htm); //fetch will do search
             break;
           case "texts":
             new __WEBPACK_IMPORTED_MODULE_6__Texts__["a" /* default */](itemid, item).render(res, htm);
@@ -1971,7 +2009,7 @@ class Nav {
 
 
 /***/ }),
-/* 11 */
+/* 12 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -1990,10 +2028,10 @@ class Home extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
         const query = 'mediatype:collection AND NOT noindex:true AND NOT collection:web AND NOT identifier:fav-* AND NOT identifier:' + NOT.join(' AND NOT identifier:');
         super({
             query: query,
-            sort: '-downloads'
+            sort: '-downloads',
+            itemid: itemid,
+            item: item
         });
-        this.item = item;
-        this.itemid = itemid;
     }
     banner() {
         return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
@@ -2007,7 +2045,7 @@ class Home extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
 
 
 /***/ }),
-/* 12 */
+/* 13 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -2021,10 +2059,10 @@ class Collection extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
     constructor(itemid, item) {
         super({
             query: 'collection:' + itemid,
-            sort: '-downloads'
+            sort: '-downloads',
+            itemid: itemid,
+            item: item
         });
-        this.item = item;
-        this.itemid = itemid;
     }
 
     banner() {
@@ -2100,7 +2138,7 @@ class Collection extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
 
 
 /***/ }),
-/* 13 */
+/* 14 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -2195,16 +2233,14 @@ class Texts extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
 
 
 /***/ }),
-/* 14 */
+/* 15 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(3);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveFile__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Util__ = __webpack_require__(2);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Util__ = __webpack_require__(2);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
-
 
 
 
@@ -2227,7 +2263,7 @@ class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
     theatreIaWrap() {
         let item = this.item;
         let itemid = item.metadata.identifier; // Shortcut as used a lot
-        let mainArchiveFile = this._list.find(fi => __WEBPACK_IMPORTED_MODULE_3__Util__["a" /* default */].imageFormats.includes(fi.metadata.format)); // Can be undefined if none included
+        let mainArchiveFile = this._list.find(fi => __WEBPACK_IMPORTED_MODULE_2__Util__["a" /* default */].imageFormats.includes(fi.metadata.format)); // Can be undefined if none included
         let detailsURL = `https://archive.org/details/${itemid}`; //This is probably correct to remain pointed at archive.org since used as an itemprop
         let embedurl = `https://archive.org/embed/${itemid}`;
         return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
@@ -2335,7 +2371,7 @@ class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
 
 
 /***/ }),
-/* 15 */
+/* 16 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -2486,7 +2522,7 @@ class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
 
 
 /***/ }),
-/* 16 */
+/* 17 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
