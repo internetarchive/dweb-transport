@@ -8,35 +8,39 @@ export default class AV extends Details {
     constructor(itemid, item) {
         super(itemid, item);
     }
-    nodeHtmlBefore() {
-        playlist = JSON.stringify(this.playlist);
-        cfg = JSON.stringify(this.cfg);
-        return `
-          <script src="//archive.org/jw/6.8/jwplayer.js" type="text/javascript"></script>
-          <script src="//archive.org/includes/play.js" type="text/javascript"></script>
-          <script>
-            $(function(){ Play('jw6', ${playlist}, ${cfg}); });
-          </script>
-          <style>
-            #jw6, #jw6__list { backgroundColor:black; }
-          </style>`;
-
-    }
-    browserAfter() {
-        super.browserAfter()
-        Play('jw6', this.playlist, this.cfg);
+    archive_setup_push() {
+        let self = this;
+        super.archive_setup_push(); // On commute.html the Play came after the parts common to AV, Image and Text
+        archive_setup.push(function() { //TODO-ARCHIVE_SETUP move Play from browserAfter to here
+            Play('jw6', self.playlist, self.cfg); });
     }
     theatreIaWrap() {
         let item = this.item;
         let itemid = this.itemid;
         let detailsurl = `https://archive.org/details/${itemid}`
         let title = item.title
+        //let cfg  = {"aspectratio": 4/3 }; // Old version in Traceys code which was missign other parts of cfg below
+        //TODO-ARCHIVE not that Tracey code has cfg.aspectration = 4/3 and none of the material below which appears in its archive.org/details page
+        let cfg =    {"start":0,"embed":null,"so":false,"autoplay":false,"width":0,"height":0,"list_height":0,"audio":false,
+            "responsive":true,"flash":false, "hide_list":true,
+            "identifier": this.itemid, //TODO-DETAILS-ONLINE check another example and see if identifier should be itemid or title
+            "collection": this.item.metadata.collection[0],
+        };
+
+        //TODO this code is from details/commute.html - bears little resemblance to that in Tracey's code
+        /*
+        [{"title":"commute","orig":"commute.avi","image":"/download/commute/commute.thumbs%2Fcommute_000005.jpg",
+            "duration":"115.61",
+            "sources":[
+                {"file":"/download/commute/commute.mp4","type":"mp4","height":"480", "width":"640","label":"480p"},
+                {"file":"/download/commute/commute.ogv","type":"ogg","height":"304","width":"400","label":"304p"}],
+            "tracks":[{"file":"https://archive.org/stream/commute/commute.thumbs/commute_000005.jpg&vtt=vtt.vtt","kind":"thumbnails"}]}],
+        */
         this.playlist=[];
-        let cfg={};
+        //TODO-DETAILS put these formats in a list in Utils.config
         let avs = item.files.filter(fi => (fi.format=='h.264' || fi.format=='512Kb MPEG4'));    //TODO-DETAILS-LIST Maybe use _list instead of .files
         if (!avs.length)
             avs = item.files.filter(fi => fi.format=='VBR MP3'); //TODO-DETAILS-LIST Maybe use _list instead of .files
-        cfg.aspectratio = 4/3;
 
         if (avs.length) {
 
@@ -44,8 +48,11 @@ export default class AV extends Details {
             //avs = avs.map(val => val.name);
 
             avs.sort((a, b) => Util.natcompare(a.name, b.name));   //Unsure why sorting names, presumably tracks are named alphabetically ?
+            // TODO-DETAULS note these playlists dont match the code in details/commute.html
             for (var fi of avs) //TODO-DETAILS make this a map (note its tougher than it looks!)
-                this.playlist.push({title:(fi.title ? fi.title : fi.name), sources:[{file:'https://archive.org/download/'+itemid+'/'+fi.name}]});
+                this.playlist.push({
+                    title:(fi.title ? fi.title : fi.name),
+                    sources:[{file:'https://archive.org/download/'+itemid+'/'+fi.name}]});
             this.playlist[0].image = 'https://archive.org/services/img/' + itemid;
         }
         //TODO-DETAILS make next few lines between theatre-ia-wrap and theatre-ia not commute specific

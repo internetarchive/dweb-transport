@@ -7,6 +7,10 @@ export default class Texts extends Details {
     constructor(itemid, item) {
         super(itemid, item);
     }
+    archive_setup_push() {
+        super.archive_setup_push(); // On eample images the theatre & carosel came before the parts common to AV, Image and Text
+        archive_setup.push(function(){ AJS.booksize(); });
+    }
     theatreIaWrap() {
         //TODO-DETAILS Description does not appear in this Navwrap section, its in the stuff underneath that which is not yet on a page.
         let item = this.item;

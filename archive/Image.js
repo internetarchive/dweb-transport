@@ -13,14 +13,12 @@ export default class Image extends Details {
          */
         super(itemid, item);
     }
-
-    browserAfter() {
-        archive_setup.push(function () {    //TODO-DETAILS-ONLINE check this isn't being left on archive_setup for next image etc (it probably is
-            AJS.theatresize();
-            AJS.carouselsize('#ia-carousel', true);
-        });
-        super.browserAfter()
+    archive_setup_push() {
+        AJS.theatresize();
+        AJS.carouselsize('#ia-carousel', true);
+        super.archive_setup_push(); // On eample images the theatre & carosel came before the parts common to AV, Image and Text
     }
+
     theatreIaWrap() {
         let item = this.item;
         let itemid = item.metadata.identifier; // Shortcut as used a lot

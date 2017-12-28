@@ -237,6 +237,7 @@ class Util {
             // when DOM loaded/stable, do some setup
             $(() => {
                 for (const fn of archive_setup) fn();
+                /*TODO may need to delete fn so doesnt stay between pages */
             });
         }
 
@@ -378,6 +379,15 @@ __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 //import ReactDOM from 'react-dom';
 
 
+// Notes on use of JSX (embedded HTML) for when converting HTML to JSX
+// Anything that is to be parameterised gets {} and code between is javascript executed in context (this has the expected meaning)
+// By implication an embedded object is {{foo: bar}}
+// All comments have to be quoted <!--foo--> becomes {/*--foo--*}
+// The "ReactFake code is a little more tolerant than React, specifically
+// React requires style={{display: none}} ReactFake can also handle quoted style="display: none"
+// React requires className= rather than class=, ReactFake supports both
+
+
 
 
 
@@ -428,9 +438,20 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
         );
     }
 
+    archive_setup_push() {
+        archive_setup.push(function () {
+            // This is common to Text, AV and image - though some have stuff before this and some a
+            AJS.tilebars(); // page load
+            $(window).on('resize  orientationchange', function (evt) {
+                clearTimeout(AJS.also_found_throttler);
+                AJS.also_found_throttler = setTimeout(AJS.tilebars, 250);
+            });
+        });
+    }
     browserAfter() {
         // initialize_flag
         // overlay related
+        this.archive_setup_push(); // Subclassed function to setup stuff for after loading.
         $(".toggle-flag-overlay").click(function (e) {
             e.preventDefault();
             $("#theatre-ia-wrap").removeClass("flagged");
@@ -442,7 +463,7 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
             $.get($(this).attr("href"));
         });
 
-        super.browserAfter(); // Do this after the scripts above - which means put this browserAfter AFTER superclasses
+        super.browserAfter(); // runs Util.AJS_on_dom_loaded(); Do this after the scripts above - which means put this browserAfter AFTER superclasses
     }
 
     cherModal(type) {
@@ -963,11 +984,7 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
                         )
                     ) : undefined,
                     __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'clearfix' }),
-                    description ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { id: 'descript', itemprop: 'description' },
-                        description
-                    ) : undefined,
+                    description ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'descript', itemprop: 'description', dangerouslySetInnerHTML: { __html: description } }) : undefined,
                     credits ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                         'h2',
                         { style: 'font-size:18px' },
@@ -1210,6 +1227,10 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
             ' '
         );
     }
+
+    alsoFoundJSX() {
+        //TODO-DETAILS this needs implementing, but its another API call - it goes beneath itemDetailsAboutJSX
+    }
 }
 /* harmony export (immutable) */ __webpack_exports__["default"] = Details;
 
@@ -1303,31 +1324,6 @@ class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default *
             )
         );
     }
-
-    nodeHtmlAfter() {
-        /* Return htm to insert before Nav wrapped part for use in node*/
-        return `
-            <script type="text/javascript">
-             $('body').addClass('bgEEE');//xxx
-              archive_setup.push(function(){
-               AJS.lists_v_tiles_setup('search');
-               AJS.popState('search');
-            
-               $('div.ikind').css({visibility:'visible'});
-            
-               AJS.tiler('#ikind-search');
-            
-               $(window).on('resize  orientationchange', function(evt){
-                 clearTimeout(AJS.node_search_throttler);
-                 AJS.node_search_throttler = setTimeout(AJS.tiler, 250);
-               });
-            
-               // register for scroll updates (for infinite search results)
-               $(window).scroll(AJS.scrolled);
-              });
-            </script>
-        `;
-    }
     browserBefore() {
         $('body').addClass('bgEEE');
         archive_setup.push(function () {
@@ -1337,12 +1333,14 @@ class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default *
 
             $('div.ikind').css({ visibility: 'visible' });
 
-            AJS.tiler('#ikind-search');
+            AJS.tiler(); // Note Traceys code had AJS.tiler('#ikind-search') but Search and Collections examples have it with no args
 
             $(window).on('resize  orientationchange', function (evt) {
                 clearTimeout(AJS.node_search_throttler);
                 AJS.node_search_throttler = setTimeout(AJS.tiler, 250);
             });
+            // register for scroll updates (for infinite search results)
+            $(window).scroll(AJS.scrolled);
         });
     }
     banner() {
@@ -2079,6 +2077,24 @@ class Collection extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
             )
         );
     }
+    browserBefore() {
+        $('body').addClass('bgEEE');
+        // Note the archive_setup.push stuff is subtly different from that for 'search'
+        archive_setup.push(function () {
+            //TODO-DETAILS check not pushing on top of existing (it probably is)
+            AJS.lists_v_tiles_setup('collection');
+            $('div.ikind').css({ visibility: 'visible' });
+            AJS.popState('');
+            AJS.tiler();
+            $(window).on('resize  orientationchange', function (evt) {
+                clearTimeout(AJS.tiles_wrap_throttler);
+                AJS.tiles_wrap_throttler = setTimeout(AJS.tiler, 250);
+            });
+            // register for scroll updates (for infinite search results)
+            $(window).scroll(AJS.scrolled);
+        });
+    }
+
 }
 /* harmony export (immutable) */ __webpack_exports__["a"] = Collection;
 
@@ -2098,6 +2114,12 @@ __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 class Texts extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
     constructor(itemid, item) {
         super(itemid, item);
+    }
+    archive_setup_push() {
+        super.archive_setup_push(); // On eample images the theatre & carosel came before the parts common to AV, Image and Text
+        archive_setup.push(function () {
+            AJS.booksize();
+        });
     }
     theatreIaWrap() {
         //TODO-DETAILS Description does not appear in this Navwrap section, its in the stuff underneath that which is not yet on a page.
@@ -2196,15 +2218,12 @@ class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
          */
         super(itemid, item);
     }
-
-    browserAfter() {
-        archive_setup.push(function () {
-            //TODO-DETAILS-ONLINE check this isn't being left on archive_setup for next image etc (it probably is
-            AJS.theatresize();
-            AJS.carouselsize('#ia-carousel', true);
-        });
-        super.browserAfter();
+    archive_setup_push() {
+        AJS.theatresize();
+        AJS.carouselsize('#ia-carousel', true);
+        super.archive_setup_push(); // On eample images the theatre & carosel came before the parts common to AV, Image and Text
     }
+
     theatreIaWrap() {
         let item = this.item;
         let itemid = item.metadata.identifier; // Shortcut as used a lot
@@ -2333,33 +2352,40 @@ class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
     constructor(itemid, item) {
         super(itemid, item);
     }
-    nodeHtmlBefore() {
-        playlist = JSON.stringify(this.playlist);
-        cfg = JSON.stringify(this.cfg);
-        return `
-          <script src="//archive.org/jw/6.8/jwplayer.js" type="text/javascript"></script>
-          <script src="//archive.org/includes/play.js" type="text/javascript"></script>
-          <script>
-            $(function(){ Play('jw6', ${playlist}, ${cfg}); });
-          </script>
-          <style>
-            #jw6, #jw6__list { backgroundColor:black; }
-          </style>`;
-    }
-    browserAfter() {
-        super.browserAfter();
-        Play('jw6', this.playlist, this.cfg);
+    archive_setup_push() {
+        let self = this;
+        super.archive_setup_push(); // On commute.html the Play came after the parts common to AV, Image and Text
+        archive_setup.push(function () {
+            //TODO-ARCHIVE_SETUP move Play from browserAfter to here
+            Play('jw6', self.playlist, self.cfg);
+        });
     }
     theatreIaWrap() {
         let item = this.item;
         let itemid = this.itemid;
         let detailsurl = `https://archive.org/details/${itemid}`;
         let title = item.title;
+        //let cfg  = {"aspectratio": 4/3 }; // Old version in Traceys code which was missign other parts of cfg below
+        //TODO-ARCHIVE not that Tracey code has cfg.aspectration = 4/3 and none of the material below which appears in its archive.org/details page
+        let cfg = { "start": 0, "embed": null, "so": false, "autoplay": false, "width": 0, "height": 0, "list_height": 0, "audio": false,
+            "responsive": true, "flash": false, "hide_list": true,
+            "identifier": this.itemid, //TODO-DETAILS-ONLINE check another example and see if identifier should be itemid or title
+            "collection": this.item.metadata.collection[0]
+        };
+
+        //TODO this code is from details/commute.html - bears little resemblance to that in Tracey's code
+        /*
+        [{"title":"commute","orig":"commute.avi","image":"/download/commute/commute.thumbs%2Fcommute_000005.jpg",
+            "duration":"115.61",
+            "sources":[
+                {"file":"/download/commute/commute.mp4","type":"mp4","height":"480", "width":"640","label":"480p"},
+                {"file":"/download/commute/commute.ogv","type":"ogg","height":"304","width":"400","label":"304p"}],
+            "tracks":[{"file":"https://archive.org/stream/commute/commute.thumbs/commute_000005.jpg&vtt=vtt.vtt","kind":"thumbnails"}]}],
+        */
         this.playlist = [];
-        let cfg = {};
+        //TODO-DETAILS put these formats in a list in Utils.config
         let avs = item.files.filter(fi => fi.format == 'h.264' || fi.format == '512Kb MPEG4'); //TODO-DETAILS-LIST Maybe use _list instead of .files
         if (!avs.length) avs = item.files.filter(fi => fi.format == 'VBR MP3'); //TODO-DETAILS-LIST Maybe use _list instead of .files
-        cfg.aspectratio = 4 / 3;
 
         if (avs.length) {
 
@@ -2367,8 +2393,11 @@ class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
             //avs = avs.map(val => val.name);
 
             avs.sort((a, b) => __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].natcompare(a.name, b.name)); //Unsure why sorting names, presumably tracks are named alphabetically ?
+            // TODO-DETAULS note these playlists dont match the code in details/commute.html
             for (var fi of avs) //TODO-DETAILS make this a map (note its tougher than it looks!)
-            this.playlist.push({ title: fi.title ? fi.title : fi.name, sources: [{ file: 'https://archive.org/download/' + itemid + '/' + fi.name }] });
+            this.playlist.push({
+                title: fi.title ? fi.title : fi.name,
+                sources: [{ file: 'https://archive.org/download/' + itemid + '/' + fi.name }] });
             this.playlist[0].image = 'https://archive.org/services/img/' + itemid;
         }
         //TODO-DETAILS make next few lines between theatre-ia-wrap and theatre-ia not commute specific

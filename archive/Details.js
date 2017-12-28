@@ -5,6 +5,15 @@ import React from './ReactFake';
 //Next line is for client, not needed on server but doesnt hurt
 //import ReactDOM from 'react-dom';
 
+
+// Notes on use of JSX (embedded HTML) for when converting HTML to JSX
+// Anything that is to be parameterised gets {} and code between is javascript executed in context (this has the expected meaning)
+// By implication an embedded object is {{foo: bar}}
+// All comments have to be quoted <!--foo--> becomes {/*--foo--*}
+// The "ReactFake code is a little more tolerant than React, specifically
+// React requires style={{display: none}} ReactFake can also handle quoted style="display: none"
+// React requires className= rather than class=, ReactFake supports both
+
 import Util from './Util';
 import ArchiveBase from './ArchiveBase'
 import ArchiveFile from "./ArchiveFile";
@@ -57,9 +66,19 @@ export default class Details extends ArchiveBase {
     }
 
 
+    archive_setup_push() {
+        archive_setup.push(function(){  // This is common to Text, AV and image - though some have stuff before this and some a
+            AJS.tilebars(); // page load
+            $(window).on('resize  orientationchange', function(evt){
+                clearTimeout(AJS.also_found_throttler)
+                AJS.also_found_throttler = setTimeout(AJS.tilebars, 250)
+            });
+        });
+    }
     browserAfter() {
         // initialize_flag
         // overlay related
+        this.archive_setup_push(); // Subclassed function to setup stuff for after loading.
         $(".toggle-flag-overlay").click(function (e) {
             e.preventDefault();
             $("#theatre-ia-wrap").removeClass("flagged");
@@ -71,7 +90,7 @@ export default class Details extends ArchiveBase {
             $.get($(this).attr("href"))
         });
 
-        super.browserAfter(); // Do this after the scripts above - which means put this browserAfter AFTER superclasses
+        super.browserAfter(); // runs Util.AJS_on_dom_loaded(); Do this after the scripts above - which means put this browserAfter AFTER superclasses
     }
 
     cherModal(type) {
@@ -470,5 +489,9 @@ export default class Details extends ArchiveBase {
                 </div>{/*--/.row--*/}
             {/*--//.container-ia--*/} </div>
         );
+    }
+
+    alsoFoundJSX() {
+        //TODO-DETAILS this needs implementing, but its another API call - it goes beneath itemDetailsAboutJSX
     }
 }

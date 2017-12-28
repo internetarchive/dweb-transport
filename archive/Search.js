@@ -77,33 +77,7 @@ export default class Search extends ArchiveBase {
             {/*--wrap--*/}</div>
         );
     }
-
-
-  nodeHtmlAfter() {
-      /* Return htm to insert before Nav wrapped part for use in node*/
-      return `
-            <script type="text/javascript">
-             $('body').addClass('bgEEE');//xxx
-              archive_setup.push(function(){
-               AJS.lists_v_tiles_setup('search');
-               AJS.popState('search');
-            
-               $('div.ikind').css({visibility:'visible'});
-            
-               AJS.tiler('#ikind-search');
-            
-               $(window).on('resize  orientationchange', function(evt){
-                 clearTimeout(AJS.node_search_throttler);
-                 AJS.node_search_throttler = setTimeout(AJS.tiler, 250);
-               });
-            
-               // register for scroll updates (for infinite search results)
-               $(window).scroll(AJS.scrolled);
-              });
-            </script>
-        `
-  }
-  browserBefore() {
+    browserBefore() {
       $('body').addClass('bgEEE');
       archive_setup.push(function(){ //TODO-DETAILS check not pushing on top of existing (it probably is)
           AJS.lists_v_tiles_setup('search');
@@ -111,13 +85,17 @@ export default class Search extends ArchiveBase {
 
           $('div.ikind').css({visibility:'visible'});
 
-          AJS.tiler('#ikind-search');
+          AJS.tiler();      // Note Traceys code had AJS.tiler('#ikind-search') but Search and Collections examples have it with no args
 
           $(window).on('resize  orientationchange', function(evt){
               clearTimeout(AJS.node_search_throttler);
               AJS.node_search_throttler = setTimeout(AJS.tiler, 250);
           });
+          // register for scroll updates (for infinite search results)
+          $(window).scroll(AJS.scrolled);
+
       });
+
   }
   banner() {
       return (
