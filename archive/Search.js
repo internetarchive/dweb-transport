@@ -58,8 +58,7 @@ export default class Search extends ArchiveBase {
         );
     }
 
-    browserBefore() {
-        $('body').addClass('bgEEE');
+    archive_setup_push() {
         archive_setup.push(function(){ //TODO-DETAILS check not pushing on top of existing (it probably is)
             AJS.lists_v_tiles_setup('search');
             AJS.popState('search');
@@ -69,11 +68,13 @@ export default class Search extends ArchiveBase {
                 clearTimeout(AJS.node_search_throttler);
                 AJS.node_search_throttler = setTimeout(AJS.tiler, 250);
             });
-          // register for scroll updates (for infinite search results)
-          $(window).scroll(AJS.scrolled);
+            // register for scroll updates (for infinite search results)
+            $(window).scroll(AJS.scrolled);
         });
     }
-
+    browserBefore() {
+        $('body').addClass('bgEEE');
+    }
     banner() {
         return <h1>Search: {this.query}</h1>;
     }

@@ -43,6 +43,7 @@ export default class ArchiveBase extends ArchiveItem {  //TODO-REFACTOR - extend
         // Nothing to do by default
     }
     browserAfter() {
+        this.archive_setup_push(); // Subclassed function to setup stuff for after loading.
         Util.AJS_on_dom_loaded(); // Runs code pushed archive_setup - needed for image if "super" this, put it after superclasses
     }
     nodeHtmlBefore() {

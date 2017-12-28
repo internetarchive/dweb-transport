@@ -41,6 +41,8 @@ export default class Details extends ArchiveBase {
                 </div>{/*--//.container-ia--*/}
                 {this.theatreIaWrap()} {/*This is the main-content*/}
                 {this.itemDetailsAboutJSX()}
+                {/* should have: alsoFound here (look at end of commute.html) */}
+                {/* should have: analytics here (look at end of commute.html) */}
             {/*--wrap--*/}</div>
         );
     }
@@ -58,7 +60,6 @@ export default class Details extends ArchiveBase {
     browserAfter() {
         // initialize_flag
         // overlay related
-        this.archive_setup_push(); // Subclassed function to setup stuff for after loading.
         $(".toggle-flag-overlay").click(function (e) {
             e.preventDefault();
             $("#theatre-ia-wrap").removeClass("flagged");
@@ -69,8 +70,7 @@ export default class Details extends ArchiveBase {
             $(this).children(".my-checkbox").toggleClass("checked");
             $.get($(this).attr("href"))
         });
-
-        super.browserAfter(); // runs Util.AJS_on_dom_loaded(); Do this after the scripts above - which means put this browserAfter AFTER superclasses
+        super.browserAfter(); // runs archive_setup_push and Util.AJS_on_dom_loaded(); Do this after the scripts above - which means put this browserAfter AFTER superclasses
     }
 
     cherModal(type) {
