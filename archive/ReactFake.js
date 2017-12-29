@@ -23,13 +23,28 @@ function deletechildren(el, keeptemplate) { //TODO-DETAILS-REACT copied from htm
 }
 
 export default class React  {
+    static config(options) {
+        /*
+            Configure ReachFake
+
+            root: protocol and host to insert before URLs (currently in img tags only) e.g. "https://archive.org"
+         */
+        for (x of options) React._config[x] = options[x];
+    }
     static createElement(tag, attrs, children) {        // Note arguments is set to tag, attrs, child1, child2 etc
         var element = document.createElement(tag);
         for (let name in attrs) {
             let attrname = (name.toLowerCase() === "classname" ? "class" : name);
             if (name === "dangerouslySetInnerHTML") {
                 element.innerHTML = attrs[name]["__html"];
-            } else if (name && attrs.hasOwnProperty(name)) {
+                delete attrs.dangerouslySetInnerHTML;
+            }
+            if (["img.src", "a.href"].includes(tag+"."+name) && attrs[name].startsWith('/')) {
+                if (!React._config.root) console.error("Need to React.config({root: 'https://xxx.yyy'");
+                attrs[name] = React._config.root + attrs[name];  // e.g. /foo => https://bar.com/foo
+                console.log("XXX@43",attrs[name])
+            }
+            if (name && attrs.hasOwnProperty(name)) {
                 let value = attrs[name];
                 if (value === true) {
                     element.setAttribute(attrname, name);
@@ -42,19 +57,19 @@ export default class React  {
                 }
             }
         }
-            for (let i = 2; i < arguments.length; i++) {
-                let child = arguments[i];
-                if (!child) {
-                } else if (Array.isArray(child)) {
-                    child.map((c) => element.appendChild(c.nodeType == null ?
-                        document.createTextNode(c.toString()) : c))
-                }
-                 else {
-                    element.appendChild(
-                        child.nodeType == null ?
-                            document.createTextNode(child.toString()) : child);
-                }
+        for (let i = 2; i < arguments.length; i++) {
+            let child = arguments[i];
+            if (!child) {
+            } else if (Array.isArray(child)) {
+                child.map((c) => element.appendChild(c.nodeType == null ?
+                    document.createTextNode(c.toString()) : c))
             }
+             else {
+                element.appendChild(
+                    child.nodeType == null ?
+                        document.createTextNode(child.toString()) : child);
+            }
+        }
         return element;
     }
     static domrender(els, node) {
@@ -62,3 +77,8 @@ export default class React  {
         node.appendChild(els);
     }
 };
+
+//Default configuration
+React.config = {
+    root: "https://archive.org",
+}

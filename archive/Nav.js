@@ -83,32 +83,31 @@ export default class Nav { //extends React.Component
       );
   }
 
-  static clear(destn) {
-      // Clear the screen to give confidence that action under way
-      // Leaves Nav, clears rest
-      React.domrender(new DetailsError(undefined, undefined, <span>"Loading"</span>).navwrapped(false), destn)
-  }
-  static async nav_home() {
-    console.log("Navigating to Home");
-    return await Nav.nav_details(undefined);
-  }
+    static clear(destn) {
+        // Clear the screen to give confidence that action under way
+        // Leaves Nav, clears rest
+        React.domrender(new DetailsError(undefined, undefined, < span > "Loading" < /span>).navwrapped(false), destn)
+    }
+    static async nav_home() {
+        console.log("Navigating to Home");
+        return await Nav.nav_details(undefined);
+    }
 
-  static async nav_details(id) {
-    console.log("Navigating to Details",id);
-    let destn = document.getElementById('main'); // Blank window (except Nav) as loading
-    Nav.clear(destn);
-    await Nav.factory(id, destn, ""); // Not sure what returning ....
-    return false; // Dont follow anchor link - unfortunately React ignores this
-  }
+    static async nav_details(id) {
+        console.log("Navigating to Details", id);
+        let destn = document.getElementById('main'); // Blank window (except Nav) as loading
+        Nav.clear(destn);
+        await Nav.factory(id, destn, ""); // Not sure what returning ....
+        return false; // Dont follow anchor link - unfortunately React ignores this
+    }
 
-  static async nav_search(q) {
+    static async nav_search(q) {
         console.log("Navigating to Search");
-      let destn = document.getElementById('main'); // Blank window (except Nav) as loading
-      Nav.clear(destn);
-        let s = await new Search( q ? {query:encodeURIComponent(q)} : undefined).fetch();
+        let destn = document.getElementById('main'); // Blank window (except Nav) as loading
+        Nav.clear(destn);
+        let s = await new Search((typeof(q) === "object") ? q : (typeof(q) === "string") ? {query: encodeURIComponent(q)} : undefined).fetch();
         s.render(destn, "");
-
-  }
+    }
 
     static async factory(itemid, res, htm) {
         if (!itemid) {

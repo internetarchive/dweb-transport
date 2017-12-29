@@ -34,16 +34,17 @@ export default class Search extends ArchiveBase {
     Inherited from ArchiveBase: item
     items   List of items found
      */
-    constructor({query='*:*', sort='', limit=75, banner='', item=undefined, itemid=undefined}={}) {
+    constructor({query='*:*', sort='', and='', limit=75, banner='', page=1, item=undefined, itemid=undefined}={}) {
         super(itemid, {item: item});
         this.query = query;
         this.limit= limit;
         this.sort = sort;
-        console.log('search for:', 'http://archive.org/advancedsearch.php?output=json&q=' + query + '&rows=' + limit + '&sort[]=' + sort)
+        this.and = and;
+        this.page = page;
     }
 
     navwrapped() {
-        /* Wrap the content up:  wrap( nav=wrap1 | maincontent | detailsabot )
+        /* Wrap the content up: wrap ( TODO-DONATE | navwrap |
         TODO-DETAILS need stuff before nav-wrap1 and after detailsabout and need to check this against Search and Collection examples
         returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
          */
@@ -51,14 +52,34 @@ export default class Search extends ArchiveBase {
         return (
             <div id="wrap">
                 { new Nav().navwrapJSX() }
+                //TODO - follow structure used by Details and check matches archive.html/details examples
+                {/*--Begin page content --*/}
+                <div class="container container-ia">
+                    <a name="maincontent" id="maincontent"></a>
+                </div>{/*--//.container-ia--*/}
+                {/*--TODO-DETAILS check below here matches originals/search.html--*/}
                 <div className="container container-ia">
-                    {this.jsxInNav()} {/*This is the main-content*/}
+                    {this.banner()}
+
+                    <div className="row">
+                        <div className="col-xs-12">
+                            <div id="ikind-search" className="ikind in">
+                                {this.items.map(function(item, n){ // Note rendering tiles is quick, its the fetch of the img (async) which is slow.
+                                    return new Tile().render(item);
+                                })}
+                            </div>
+                        </div>
+                    </div>
                 </div>
+                {/*--TODO-ANALYTiCS is missing --*/}
             {/*--wrap--*/}</div>
         );
     }
 
     archive_setup_push() {
+        archive_setup.push(function() {
+            AJS.date_switcher(`&nbsp;<a href="/search.php?query=${query}&amp;sort=-publicdate"><div class="date_switcher in">Date Archived</div></a> <a href="/search.php?query=${query}&amp;sort=-date"><div class="date_switcher">Date Published</div></a> <a href="/search.php?query=${query}&amp;sort=-reviewdate"><div class="date_switcher">Date Reviewed</div></a> `);
+            });
         archive_setup.push(function(){ //TODO-DETAILS check not pushing on top of existing (it probably is)
             AJS.lists_v_tiles_setup('search');
             AJS.popState('search');
@@ -79,24 +100,4 @@ export default class Search extends ArchiveBase {
         return <h1>Search: {this.query}</h1>;
     }
 
-  jsxInNav(){
-      /* The main part of the details or search page containing the content
-      returns:      JSX elements tree suitable for passing to new Nav(wrap)
-       */
-      return (
-          <div>
-              {this.banner()}
-
-            <div className="row">
-              <div className="col-xs-12">
-                <div id="ikind-search" className="ikind in">
-                  {this.items.map(function(item, n){ // Note rendering tiles is quick, its the fetch of the img (async) which is slow.
-                     return new Tile().render(item);
-                   })}
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-  }
 }

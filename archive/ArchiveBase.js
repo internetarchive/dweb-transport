@@ -34,8 +34,6 @@ export default class ArchiveBase extends ArchiveItem {  //TODO-REFACTOR - extend
     constructor(itemid,  {item = undefined}={}) {
         super({itemid: itemid, item: item});
     }
-    jsxInNav() {
-    }
     theatreIaWrap() {
     }
 

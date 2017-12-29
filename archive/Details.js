@@ -27,13 +27,12 @@ export default class Details extends ArchiveBase {
     }
 
     navwrapped() {
-        /* Wrap the content up checked on mbid (Red Shift) image:  wrap( TODO | nav-wrap1 | maincontent | theatre-ia-wrap | item-details-about | TODO )
-        TODO-DETAILS need stuff before nav-wrap1 and after detailsabout
+        /* Wrap the content up checked on mbid (Red Shift) image:  wrap( TODO-TODO-DONATEBANNER | nav-wrap1 | maincontent | theatre-ia-wrap | item-details-about | TODO-ALSOFOND  | TODO-ANALYTICS )
         returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
          */
-        //TODO-DETAILS is putting the description (in 'htm' in as raw html which would be a nasty security hole since that comes from user !
         return (
-            <div id="wrap">
+            <div id="wrap" itemscope itemtype={this.itemtype}>
+                {/* Missing donate-banner and scripts & css before it */}
                 { new Nav().navwrapJSX() }
                 {/*--Begin page content --*/}
                 <div class="container container-ia">
