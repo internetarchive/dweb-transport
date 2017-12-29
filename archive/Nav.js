@@ -24,6 +24,7 @@ export default class Nav { //extends React.Component
 
   navwrapJSX() {
       /* The navigation stuff.   Order is navwrapJSX : maincontent : itemDetailsAbout */
+      {/*--TODO-DETAILS update navwrap to match actual code in both search.html and commute.html--*/}
       return (
         <div id="navwrap1">
           <div id="navwrap2">

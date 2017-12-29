@@ -1,6 +1,10 @@
 /*
 Based on https://stackoverflow.com/questions/30430982/can-i-use-jsx-without-react-to-inline-html-in-script
 I wanted this because React was doing nasty things at run-time (like catching events) and stopping Search box working
+
+This expanded in use to make it easier to use HTML in as unchanged form from existing react in particular.
+- URLs in image tags are re-rooted, i.e. <img src="/foo"> => <img src="https://bar.com/foo">
+- look at onClick's especially if set window.location
  */
 
 function deletechildren(el, keeptemplate) { //TODO-DETAILS-REACT copied from htmlutils, maybe include that instead

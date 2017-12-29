@@ -7,6 +7,7 @@ import Details from './Details'
 export default class AV extends Details {
     constructor(itemid, item) {
         super(itemid, item);
+        this.itemtype="http://schema.org/VideoObject";
     }
     archive_setup_push() {
         let self = this;

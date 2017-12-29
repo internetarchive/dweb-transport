@@ -28,6 +28,7 @@ export default class ArchiveBase extends ArchiveItem {  //TODO-REFACTOR - extend
     Fields:
     item    Metadata for item, undefined for a search.
     items   Metadata for items found if the item is a Collection,
+    itemtype    Schema.org for this eg. "http://schema.org/TextDigitalDocument"
     query   query part of search to run (Search|Collection|Home only)
      */
     constructor(itemid,  {item = undefined}={}) {
@@ -45,14 +46,6 @@ export default class ArchiveBase extends ArchiveItem {  //TODO-REFACTOR - extend
     browserAfter() {
         this.archive_setup_push(); // Subclassed function to setup stuff for after loading.
         Util.AJS_on_dom_loaded(); // Runs code pushed archive_setup - needed for image if "super" this, put it after superclasses
-    }
-    nodeHtmlBefore() {
-        /* Return html to insert before Nav wrapped part for use in node*/
-        return "";
-    }
-    nodeHtmlAfter() {
-        /* Return html to insert after Nav wrapped part for use in node*/
-        return "";
     }
     render(res, htm) {  //TODO-DETAILS remove htm and from calling routines
         var els = this.navwrapped();

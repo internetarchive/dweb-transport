@@ -11,6 +11,7 @@ export default class Image extends Details {
         item = metadata from a metadata fetch
          */
         super(itemid, item);
+        this.itemtype = "http://schema.org/VisualArtwork";
     }
     archive_setup_push() {
         AJS.theatresize();

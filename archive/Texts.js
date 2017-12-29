@@ -6,6 +6,7 @@ import Details from './Details'
 export default class Texts extends Details {
     constructor(itemid, item) {
         super(itemid, item);
+        this.itemtype="http://schema.org/TextDigitalDocument"
     }
     archive_setup_push() {
         super.archive_setup_push(); // On eample images the theatre & carosel came before the parts common to AV, Image and Text
