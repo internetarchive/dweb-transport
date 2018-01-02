@@ -1,7 +1,5 @@
 /*
-This Transport layers builds on IPFS and the YJS DB
-
-Y Lists have listeners and generate events - see docs at ...
+This is a shim to the IPFS library, (Lists are handled in YJS or OrbitDB)
 */
 
 // IPFS components

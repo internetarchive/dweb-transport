@@ -27,23 +27,34 @@ async function p_test(verbose) {
     try {
         //Comment out one of these next two lines
         //let transportclass = Dweb.TransportIPFS;
+        //SEE-OTHER-ADDTRANSPORT - note these are options just for testing that override default options for the transport.
         let opts = {
             http: {urlbase: "http://localhost:4244"},   // Localhost - comment out if want to use gateway.dweb.me (default args use this)
             yarray: {db: {name: "leveldb", dir: "../dbtestjs", cleanStart: true, connector: {}}},  // Cleanstart clears db
+            torrent: {}
         }; // Note browser requires indexeddb
+
         // Note the order of these is significant, it will retrieve by preference from the first setup, try with both orders if in doubt.
-        //let t_http = await Dweb.TransportHTTP.p_setup(opts, verbose);
+        //SEE-OTHER-ADDTRANSPORT
+        let t_http = await Dweb.TransportHTTP.p_setup(opts, verbose);
         let t_ipfs = await Dweb.TransportIPFS.p_setup(opts, verbose); // Note browser requires indexeddb
         let t_yjs = await Dweb.TransportYJS.p_setup(opts, verbose); // Should find ipfs transport
+        let t_torrent = await Dweb.TransportTORRENT.p_setup(opts, verbose); //
         if (verbose) console.log("setup returned and transport set");
+
         // Need to ask status before using as wont update status till then which means wont be used
-        //await t_http.p_status();
+        //SEE-OTHER-ADDTRANSPORT
+        await t_http.p_status();
         await t_ipfs.p_status();
         await t_yjs.p_status();
+        await t_torrent.p_status();
 
-        //await Dweb.TransportHTTP.test(t_http, verbose);
+        //SEE-OTHER-ADDTRANSPORT
+        await Dweb.TransportHTTP.test(t_http, verbose);
         await Dweb.TransportIPFS.test(t_ipfs, verbose);
         await Dweb.TransportYJS.test(t_yjs, verbose);
+        await Dweb.TransportTorrent.test(t_yjs, verbose);
+
         if (verbose) console.log("Transports tested");
         await Dweb.Block.p_test(verbose);
         await Dweb.Signature.p_test(verbose);

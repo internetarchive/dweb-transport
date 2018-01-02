@@ -1,5 +1,9 @@
 exports.Transport = require('./Transport');
+// SEE-OTHER-ADDTRANSPORT */
 exports.TransportHTTP = require('./TransportHTTP'); // Note this used to cause a problem in bundle I believe
+exports.TransportIPFS = require('./TransportIPFS');
+exports.TransportYJS = require('./TransportYJS');
+exports.TransportTORRENT = require('./TransportTORRENT'); //WebTorrent
 exports.Transports = require('./Transports'); // Handles multiple transports
 exports.Transportable = require('./Transportable');
 exports.Block = require('./Block');
@@ -9,12 +13,9 @@ exports.Signature = require("./Signature");
 exports.CommonList = require("./CommonList");
 exports.AccessControlList = require("./AccessControlList");
 exports.KeyChain = require('./KeyChain');
-exports.TransportIPFS = require('./TransportIPFS');
-exports.TransportYJS = require('./TransportYJS');
 exports.VersionList = require('./VersionList');
 exports.StructuredBlock = require('./StructuredBlock'); //TODO - will remove SB once have path traversal.
 exports.EventListenerHandler = require("./EventListenerHandler")
-//*/
 
 exports.table2class = { // Each of these needs a constructor that takes data and is ok with no other parameters, (otherwise define a set of these methods as factories)
     "cl": "CommonList",

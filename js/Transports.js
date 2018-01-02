@@ -163,6 +163,28 @@ class Transports {
             .map(([u, t]) => t.p_newlisturls(cl, verbose)) )    // [ [ priv, pub] [ priv, pub] [priv pub] ]
         return [uuu.map(uu=>uu[0]), uuu.map(uu=>uu[1])]
     }
+    // Stream handling
+    static async p_createReadStream(url, options, verbose) {
+        let tt = Dweb.Transports.validFor(urls, "createReadStream", options); //[ [Url,t],[Url,t]]  // Passing options - most callers will ignore TODO-STREAM support options in validFor
+        if (!tt.length) {
+            throw new Dweb.errors.TransportError("Transports.p_createReadStream cant find any transport for urls: " + urls);
+        }
+        //With multiple transports, it should return when the first one returns something.
+        let errs = [];
+        for (const [url, t] of tt) {
+            try {
+                let res = await t.p_createReadStream(url, options, verbose);
+                return res;
+            } catch (err) {
+                errs.push(err);
+                console.log("Could not retrieve ", url.href, "from", t.name, err.message);
+                // Don't throw anything here, loop round for next, only throw if drop out bottom
+                //TODO-MULTI-GATEWAY potentially copy from success to failed URLs.
+            }
+        }
+        throw new Dweb.errors.TransportError(errs.map((err)=>err.message).join(', '));  //Throw err with combined messages if none succeed
+    }
+
 
     static addtransport(t) {
         /*
@@ -170,6 +192,8 @@ class Transports {
          */
         Transports._transports.push(t);
     }
+
+    // Setup Transports - setup0 is called once, and should return quickly, p_setup1 and p_setup2 are asynchronous and p_setup2 relies on p_setup1 having resolved.
 
     static setup0(transports, options, verbose) {
         /*
