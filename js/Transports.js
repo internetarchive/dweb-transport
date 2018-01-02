@@ -21,7 +21,7 @@ class Transports {
         func:       Function to check support for: fetch, store, add, list, listmonitor, reverse - see supportFunctions on each Transport class
         returns:    Array of pairs of url & transport instance [ [ u1, t1], [u1, t2], [u2, t1]]
          */
-        console.assert((urls && urls[0]) || ["store", "newlisturls"].includes(func), "Transports.validFor failed - coding error - url=", urls, "func=", func) // FOr debugging old calling patterns with [ undefined ]
+        console.assert((urls && urls[0]) || ["store", "newlisturls"].includes(func), "Transports.validFor failed - coding error - url=", urls, "func=", func); // FOr debugging old calling patterns with [ undefined ]
         if (!(urls && urls.length > 0)) {
             return Dweb.Transports._transports.filter((t) => (!t.status && t.supports(undefined, func)))
                 .map((t) => [undefined, t]);
@@ -54,13 +54,13 @@ class Transports {
                 return await t.p_rawstore(data, verbose); //url
             } catch(err) {
                 console.log("Could not rawstore to", t.name, err.message);
-                errs.push(err)
+                errs.push(err);
                 return undefined;
             }
         }));
         rr = rr.filter((r) => !!r); // Trim any that had errors
         if (!rr.length) {
-            throw new Dweb.errors.TransportError(errs.map((err)=>err.message).join(', ')); // New error with concatentated messages
+            throw new Dweb.errors.TransportError(errs.map((err)=>err.message).join(', ')); // New error with concatenated messages
         }
         return rr;
     }
@@ -81,12 +81,11 @@ class Transports {
         })); // [[sig,sig],[sig,sig]]
         if (errs.length >= tt.length) {
             // All Transports failed (maybe only 1)
-            throw new Dweb.errors.TransportError(errs.map((err)=>err.message).join(', ')); // New error with concatentated messages
+            throw new Dweb.errors.TransportError(errs.map((err)=>err.message).join(', ')); // New error with concatenated messages
         }
         let uniques = {}; // Used to filter duplicates
-        let lines = [].concat(...ttlines)
+        return [].concat(...ttlines)
             .filter((x) => (!uniques[x.signature] && (uniques[x.signature] = true)));
-        return lines;
     }
 
     static async p_rawfetch(urls, verbose) {
@@ -104,8 +103,7 @@ class Transports {
         let errs = [];
         for (const [url, t] of tt) {
             try {
-                let res = await t.p_rawfetch(url, verbose);
-                return res; //TODO-MULTI-GATEWAY potentially copy from success to failed URLs.
+                return await t.p_rawfetch(url, verbose); //TODO-MULTI-GATEWAY potentially copy from success to failed URLs.
             } catch (err) {
                 errs.push(err);
                 console.log("Could not retrieve ", url.href, "from", t.name, err.message);
@@ -135,13 +133,13 @@ class Transports {
                 return undefined;
             } catch(err) {
                 console.log("Could not rawlist ", u, "from", t.name, err.message);
-                errs.push(err)
+                errs.push(err);
                 return undefined;
             }
         }));
         if (errs.length >= tt.length) {
             // All Transports failed (maybe only 1)
-            throw new Dweb.errors.TransportError(errs.map((err)=>err.message).join(', ')); // New error with concatentated messages
+            throw new Dweb.errors.TransportError(errs.map((err)=>err.message).join(', ')); // New error with concatenated messages
         }
         return undefined;
 
@@ -156,15 +154,15 @@ class Transports {
     }
 
     static async p_newlisturls(cl, verbose) {
-        // Create a new list in any transport layer that suppportslists.
+        // Create a new list in any transport layer that supports lists.
         // cl is a CommonList or subclass and can be used by the Transport to get info for choosing the list URL (normally it won't use it)
         // Note that normally the CL will not have been stored yet, so you can't use its urls.
         let uuu = await Promise.all(Dweb.Transports.validFor(undefined, "newlisturls")
-            .map(([u, t]) => t.p_newlisturls(cl, verbose)) )    // [ [ priv, pub] [ priv, pub] [priv pub] ]
+            .map(([u, t]) => t.p_newlisturls(cl, verbose)) );   // [ [ priv, pub] [ priv, pub] [priv pub] ]
         return [uuu.map(uu=>uu[0]), uuu.map(uu=>uu[1])]
     }
     // Stream handling
-    static async p_createReadStream(url, options, verbose) {
+    static async p_createReadStream(urls, options, verbose) {
         let tt = Dweb.Transports.validFor(urls, "createReadStream", options); //[ [Url,t],[Url,t]]  // Passing options - most callers will ignore TODO-STREAM support options in validFor
         if (!tt.length) {
             throw new Dweb.errors.TransportError("Transports.p_createReadStream cant find any transport for urls: " + urls);
@@ -173,8 +171,7 @@ class Transports {
         let errs = [];
         for (const [url, t] of tt) {
             try {
-                let res = await t.p_createReadStream(url, options, verbose);
-                return res;
+                return await t.p_createReadStream(url, options, verbose);
             } catch (err) {
                 errs.push(err);
                 console.log("Could not retrieve ", url.href, "from", t.name, err.message);
