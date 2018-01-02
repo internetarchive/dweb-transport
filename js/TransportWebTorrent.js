@@ -1,5 +1,5 @@
 /*
-This Transport layers builds on IPFS and the YJS DB
+This Transport layers builds on WebTorrent
 
 Y Lists have listeners and generate events - see docs at ...
 */
@@ -21,8 +21,7 @@ class TransportWebTorrent extends Transport {
     WebTorrent specific transport
 
     Fields:
-    ipfs: object returned when starting IPFS
-    yarray: object returned when starting yarray
+    webtorrent: object returned when starting webtorrent
      */
 
     constructor(options, verbose) {
@@ -119,11 +118,11 @@ class TransportWebTorrent extends Transport {
                 return reject(new Dweb.errors.CodingError("TransportWebTorrent.p_rawfetch: invalid url - missing path component. Should look like magnet:XXXXXX/path/to/file"));
             }
 
-            const torrentId = index.slice(0, index);
-            const path = index.slice(index + 1);
+            const torrentId = url.slice(0, index);
+            const path = url.slice(index + 1);
 
             // Check if this torrentId is already added to the webtorrent client
-            const torrent = this.webtorrent.get(torrentId);
+            let torrent = this.webtorrent.get(torrentId);
 
             // If not, then add the torrentId to the torrent client
             if (!torrent) {
@@ -164,23 +163,15 @@ class TransportWebTorrent extends Transport {
         let bigBuckBunny = 'magnet:?xt=urn:btih:dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c&dn=Big+Buck+Bunny&tr=udp%3A%2F%2Fexplodie.org%3A6969&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Ftracker.empire-js.us%3A1337&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337&tr=wss%3A%2F%2Ftracker.btorrent.xyz&tr=wss%3A%2F%2Ftracker.fastcast.nz&tr=wss%3A%2F%2Ftracker.openwebtorrent.com&ws=https%3A%2F%2Fwebtorrent.io%2Ftorrents%2F&xs=https%3A%2F%2Fwebtorrent.io%2Ftorrents%2Fbig-buck-bunny.torrent/Big Buck Bunny.en.srt'
 
         let data = await transport.p_rawfetch(bigBuckBunny, verbose);
+        data = data.toString()
 
-        let expectedData =
-`
-1
-00:00:02,000 --> 00:00:05,000
-Big Buck Bunny
-The Movie
+        // Test for a string that is contained within the file
+        let expectedWithinData = '00:00:02,000 --> 00:00:05,000'
+        console.assert(data.indexOf(expectedWithinData) !== -1, "Should fetch 'Big Buck Bunny.en.srt' from the torrent");
 
-1
-00:00:45,000 --> 00:00:59,000
-Hello, there...
-I'm Big Buck Bunny
-
-`
-
-        console.assert(data.indexOf(expectedData) === 0, "Should fetch 'Big Buck Bunny.en.srt' from the torrent");
+        // Test that the length is what we expect
+        console.assert(data.length, 129, "'Big Buck Bunny.en.srt' was " + data.length)
     }
 
 }
-exports = module.exports = TransportIPFS;
+exports = module.exports = TransportWebTorrent;

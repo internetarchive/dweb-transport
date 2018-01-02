@@ -28,9 +28,10 @@ class Transport {
             :param boolean verbose: True for debugging output
             :resolve Transport: Instance of subclass of Transport
              */
-            return await this.setup0(options, verbose) // Sync version that doesnt connect
-                .p_setup1(verbose)     // And connect
-                .p_setup2(verbose);     // And connect
+            let t = await this.setup0(options, verbose) // Sync version that doesnt connect
+                .p_setup1(verbose); // And connect
+
+            return t.p_setup2(verbose);     // And connect
     }
 
     supports(url, func) {
