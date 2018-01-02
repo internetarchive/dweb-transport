@@ -17,6 +17,7 @@
     "promisify-es6": "^1.0.3",
     "request": "^2.83.0",
     "sha3": "^1.2.0",
+    "webtorrent": "^0.98.20",
     "whatwg-fetch": "^2.0.3",
     "xmlhttprequest": "^1.8.0",
     "y-array": "^10.1.4",
