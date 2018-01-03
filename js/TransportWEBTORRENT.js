@@ -16,7 +16,7 @@ let defaultoptions = {
     webtorrent: {}
 };
 
-class TransportWebTorrent extends Transport {
+class TransportWEBTORRENT extends Transport {
     /*
     WebTorrent specific transport
 
@@ -28,9 +28,9 @@ class TransportWebTorrent extends Transport {
         super(options, verbose);
         this.webtorrent = undefined;    // Undefined till start WebTorrent
         this.options = options;         // Dictionary of options
-        this.name = "WebTorrent";       // For console log etc
+        this.name = "WEBTORRENT";       // For console log etc
         this.supportURLs = ['magnet'];
-        this.supportFunctions = ['fetch', 'createreadstream'];
+        this.supportFunctions = ['fetch', 'createReadStream'];
         this.status = Dweb.Transport.STATUS_LOADED;
     }
 
@@ -58,7 +58,7 @@ class TransportWebTorrent extends Transport {
         */
         let combinedoptions = Transport.mergeoptions(defaultoptions, options);
         console.log("WebTorrent options %o", combinedoptions);
-        let t = new TransportWebTorrent(combinedoptions, verbose);
+        let t = new TransportWEBTORRENT(combinedoptions, verbose);
         Dweb.Transports.addtransport(t);
 
         return t;
@@ -92,17 +92,17 @@ class TransportWebTorrent extends Transport {
 
     webtorrentparseurl(url) {
         if (!url) {
-            throw new Dweb.errors.CodingError("TransportWebTorrent.p_rawfetch: requires url");
+            throw new Dweb.errors.CodingError("TransportWEBTORRENT.p_rawfetch: requires url");
         }
 
-        const index = url.indexOf('/');
+        const index = url.href.indexOf('/');
 
         if (index === -1) {
-            throw new Dweb.errors.CodingError("TransportWebTorrent.p_rawfetch: invalid url - missing path component. Should look like magnet:XXXXXX/path/to/file");
+            throw new Dweb.errors.CodingError("TransportWEBTORRENT.p_rawfetch: invalid url - missing path component. Should look like magnet:XXXXXX/path/to/file");
         }
 
-        const torrentId = url.slice(0, index);
-        const path = url.slice(index + 1);
+        const torrentId = url.href.slice(0, index);
+        const path = url.href.slice(index + 1);
 
         return { torrentId, path }
     }
@@ -186,7 +186,7 @@ class TransportWebTorrent extends Transport {
         });
     }
 
-    async p_createreadstream(url, opts, verbose) {
+    async p_createReadStream(url, opts, verbose) {
         /*
         Fetch bytes progressively, using a node.js readable stream, based on a url of the form:
 
@@ -208,7 +208,7 @@ class TransportWebTorrent extends Transport {
 
         const { torrentId, path } = this.webtorrentparseurl(url);
         const torrent = await this.p_webtorrentadd(torrentId);
-        const file = await this.webtorrentfindfile(torrent, path);
+        const file = await this.p_webtorrentfindfile(torrent, path);
 
         return file.createReadStream(opts);
     }
@@ -221,7 +221,7 @@ class TransportWebTorrent extends Transport {
         data1 = data1.toString();
         assertData(data1);
 
-        const stream = await transport.p_createreadstream(bigBuckBunny, verbose);
+        const stream = await transport.p_createReadStream(bigBuckBunny, verbose);
 
         const chunks = [];
         stream.on("data", (chunk) => {
@@ -244,4 +244,4 @@ class TransportWebTorrent extends Transport {
     }
 
 }
-exports = module.exports = TransportWebTorrent;
+exports = module.exports = TransportWEBTORRENT;

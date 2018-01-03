@@ -2,7 +2,9 @@ require('babel-core/register')({ presets: ['env', 'react']}); // ES6 JS below!
 import React from './ReactFake';
 import Util from "./Util";
 
-import Details from './Details'
+import Details from './Details';
+import RenderMedia from 'render-media';
+import stream from 'readable-stream';
 
 export default class AV extends Details {
     constructor(itemid, item) {
@@ -12,9 +14,35 @@ export default class AV extends Details {
     archive_setup_push() {
         let self = this;
         super.archive_setup_push(); // On commute.html the Play came after the parts common to AV, Image and Text
-        archive_setup.push(function() { //TODO-ARCHIVE_SETUP move Play from browserAfter to here
-            Play('jw6', self.playlist, self.cfg); });
+        // archive_setup.push(function() { //TODO-ARCHIVE_SETUP move Play from browserAfter to here
+        //    Play('jw6', self.playlist, self.cfg);
+        // });
+
+        const name = this.playlist[0].name;
+        const urls = [this.playlist[0].url];
+
+        var file = {
+            name: name,
+            createReadStream: function (opts) {
+                // Return a readable stream that provides the bytes between offsets "start"
+                // and "end" inclusive. This works just like fs.createReadStream(opts) from
+                // the node.js "fs" module.
+
+                const passthrough = new stream.PassThrough();
+
+                Dweb.Transports.p_createReadStream(urls, opts)
+                    .then(stream => stream.pipe(passthrough))
+                    .catch(err => {
+                        console.error("Uncaught error in AV.js " + err.message);
+                    });
+
+                return passthrough;
+            }
+        }
+
+        RenderMedia.append(file, '#videoContainer');
     }
+
     theatreIaWrap() {
         let item = this.item;
         let itemid = this.itemid;
@@ -44,17 +72,22 @@ export default class AV extends Details {
             avs = item.files.filter(fi => fi.format=='VBR MP3'); //TODO-DETAILS-LIST Maybe use _list instead of .files
 
         if (avs.length) {
+            avs.sort((a, b) => Util.natcompare(a.name, b.name));   //Unsure why sorting names, presumably tracks are named alphabetically ?
+
+            const name = avs[0].name
+            const url = item.metadata.magnetlink + '/' + name
+
+            this.playlist.push({ name, url })
 
             // reduce array down to array of just filenames
             //avs = avs.map(val => val.name);
 
-            avs.sort((a, b) => Util.natcompare(a.name, b.name));   //Unsure why sorting names, presumably tracks are named alphabetically ?
             // TODO-DETAULS note these playlists dont match the code in details/commute.html
-            for (var fi of avs) //TODO-DETAILS make this a map (note its tougher than it looks!)
-                this.playlist.push({
-                    title:(fi.title ? fi.title : fi.name),
-                    sources:[{file:'https://archive.org/download/'+itemid+'/'+fi.name}]});
-            this.playlist[0].image = 'https://archive.org/services/img/' + itemid;
+            // for (var fi of avs) //TODO-DETAILS make this a map (note its tougher than it looks!)
+            //     this.playlist.push({
+            //         title:(fi.title ? fi.title : fi.name),
+            //         sources:[{file:'https://archive.org/download/'+itemid+'/'+fi.name}]});
+            // this.playlist[0].image = 'https://archive.org/services/img/' + itemid;
         }
         //TODO-DETAILS make next few lines between theatre-ia-wrap and theatre-ia not commute specific
         return (
@@ -74,7 +107,7 @@ export default class AV extends Details {
                         <div class="xs-col-12">
 
                             <div id="theatre-controls">
-                                <a href="#" id="gofullscreen" onclick="jwplayer('jw6').setFullscreen()">
+                                <a href="#" id="gofullscreen" onclick="">
                                     <div data-toggle="tooltip" data-container="body" data-placement="left" class="iconochive-fullscreen"
                                          title="fullscreen view"></div>
                                 </a>
@@ -103,7 +136,7 @@ export default class AV extends Details {
                                 </div>
                             </noscript>
 
-                            <div id="jw6"></div>
+                            <div id="videoContainer"></div>
                             {this.cherModal("video")}
                         </div> {/*--/.xs-col-12--*/}
                     </div>{/*--/.row--*/}
