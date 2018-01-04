@@ -5,6 +5,8 @@ import Util from "./Util";
 import Details from './Details';
 import RenderMedia from 'render-media';
 import stream from 'readable-stream';
+import throttle from 'throttleit'
+import prettierBytes from 'prettier-bytes'
 
 export default class AV extends Details {
     constructor(itemid, item) {
@@ -41,6 +43,29 @@ export default class AV extends Details {
         }
 
         RenderMedia.append(file, '#videoContainer');
+
+        // TODO: port this to JSX
+        if (window.WEBTORRENT_TORRENT) {
+            const torrent = window.WEBTORRENT_TORRENT
+            const $webtorrentStats = document.querySelector('#webtorrentStats')
+
+            const updateSpeed = () => {
+                var progress = (100 * torrent.progress).toFixed(1)
+
+                const html =
+                    '<b>Peers:</b> ' + torrent.numPeers + ' ' +
+                    '<b>Progress:</b> ' + progress + '% ' +
+                    '<b>Download speed:</b> ' + prettierBytes(torrent.downloadSpeed) + '/s ' +
+                    '<b>Upload speed:</b> ' + prettierBytes(torrent.uploadSpeed) + '/s'
+
+                $webtorrentStats.innerHTML = html
+            }
+
+            torrent.on('download', throttle(updateSpeed, 250))
+            torrent.on('upload', throttle(updateSpeed, 250))
+            setInterval(updateSpeed, 1000)
+            updateSpeed()
+          }
     }
 
     theatreIaWrap() {
@@ -136,7 +161,8 @@ export default class AV extends Details {
                                 </div>
                             </noscript>
 
-                            <div id="videoContainer"></div>
+                            <div id="videoContainer" style="text-align: center;"></div>
+                            <div id="webtorrentStats" style="color: white; text-align: center;"></div>
                             {this.cherModal("video")}
                         </div> {/*--/.xs-col-12--*/}
                     </div>{/*--/.row--*/}

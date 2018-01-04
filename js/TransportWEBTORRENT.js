@@ -132,6 +132,11 @@ class TransportWEBTORRENT extends Transport {
                     resolve(torrent);
                 });
             }
+
+            window.WEBTORRENT_TORRENT = torrent
+            torrent.once('close', () => {
+                window.WEBTORRENT_TORRENT = null
+            })
         });
     }
 
