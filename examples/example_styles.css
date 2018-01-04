@@ -28,6 +28,7 @@
    Some specific styles used by difference examples
  */
 .floatright {margin: 0 0 3px 10px; float: right; clear: right; text-align: right} /* Grouped in top right corner */
+.examplesarchive .floatright { position: fixed; z-index: 999999; top: 10px; right: 10px; }
 .floatleft {margin: 0 0 3px 10px;  clear: left; float: left; text-align: left} /* Grouped in top left corner */
 .floatright li {margin: 0 0 3px 10px; }
 .floatright ul {margin: 0 0 3px 10px; }
