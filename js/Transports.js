@@ -162,7 +162,7 @@ class Transports {
         return [uuu.map(uu=>uu[0]), uuu.map(uu=>uu[1])]
     }
     // Stream handling
-    static async p_createReadStream(urls, options, verbose) {
+    static createReadStream(urls, options, verbose) {
         let tt = Dweb.Transports.validFor(urls, "createReadStream", options); //[ [Url,t],[Url,t]]  // Passing options - most callers will ignore TODO-STREAM support options in validFor
         if (!tt.length) {
             throw new Dweb.errors.TransportError("Transports.p_createReadStream cant find any transport for urls: " + urls);
@@ -171,7 +171,7 @@ class Transports {
         let errs = [];
         for (const [url, t] of tt) {
             try {
-                return await t.p_createReadStream(url, options, verbose);
+                return t.createReadStream(url, options, verbose);
             } catch (err) {
                 errs.push(err);
                 console.log("Could not retrieve ", url.href, "from", t.name, err.message);
