@@ -202,11 +202,11 @@ export default class Details extends ArchiveBase {
                     <div class="form-group">
                         <label>EMBED</label>
                         <textarea id="embedcodehere" class="form-control textarea-invert-readonly"
-                                  rows="3" readonly="readonly"><iframe
-                                src={shortEmbedURL}
+                                  rows="3" readonly="readonly">{`<iframe 
+                                src=${shortEmbedURL}
                                 width="480" height="430" frameborder="0"
                                 webkitallowfullscreen="true" mozallowfullscreen="true"
-                                allowfullscreen></iframe></textarea>
+                                allowfullscreen></iframe>`}</textarea>
                     </div>
                 </form>
             </div>
