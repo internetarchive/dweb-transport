@@ -7,6 +7,7 @@ Y Lists have listeners and generate events - see docs at ...
 // WebTorrent components
 
 const WebTorrent = require('webtorrent');
+const stream = require('readable-stream');
 
 // Other Dweb modules
 const Transport = require('./Transport');
@@ -140,22 +141,20 @@ class TransportWEBTORRENT extends Transport {
         });
     }
 
-    async p_webtorrentfindfile (torrent, path) {
+    webtorrentfindfile (torrent, path) {
         /*
         Given a torrent object and a path to a file within the torrent, find the given file.
          */
-        return new Promise((resolve, reject) => {
-            const filePath = torrent.name + '/' + path;
-            const file = torrent.files.find(file => {
-                return file.path === filePath;
-            });
-
-            if (!file) {
-                return reject(new Dweb.errors.TransportError("Requested file (" + path + ") not found within torrent " + err.message));
-            }
-
-            resolve(file);
+        const filePath = torrent.name + '/' + path;
+        const file = torrent.files.find(file => {
+            return file.path === filePath;
         });
+
+        if (!file) {
+            throw new Dweb.errors.TransportError("Requested file (" + path + ") not found within torrent " + err.message);
+        }
+
+        return file;
     }
 
     p_rawfetch(url, verbose) {
@@ -178,20 +177,20 @@ class TransportWEBTORRENT extends Transport {
 
             const { torrentId, path } = this.webtorrentparseurl(url);
             this.p_webtorrentadd(torrentId)
-                .then((torrent) => this.p_webtorrentfindfile(torrent, path))
-                .then(file => {
+                .then((torrent) => {
+                    const file = this.webtorrentfindfile(torrent, path);
                     file.getBuffer((err, buffer) => {
                         if (err) {
                             return reject(new Dweb.errors.TransportError("Torrent encountered a fatal error " + err.message + " (" + torrent.name + ")"));
                         }
                         resolve(buffer);
                     });
-                });
-
+                })
+                .catch((err) => reject(err));
         });
     }
 
-    async p_createReadStream(url, opts, verbose) {
+    createReadStream(url, opts, verbose) {
         /*
         Fetch bytes progressively, using a node.js readable stream, based on a url of the form:
 
@@ -211,11 +210,21 @@ class TransportWEBTORRENT extends Transport {
          */
         if (verbose) console.log("WebTorrent p_createreadstream", url);
 
+        const through = new stream.PassThrough();
         const { torrentId, path } = this.webtorrentparseurl(url);
-        const torrent = await this.p_webtorrentadd(torrentId);
-        const file = await this.p_webtorrentfindfile(torrent, path);
 
-        return file.createReadStream(opts);
+        this.p_webtorrentadd(torrentId)
+            .then((torrent) => {
+                const file = this.webtorrentfindfile(torrent, path);
+                const fileStream = file.createReadStream(opts);
+                fileStream.pipe(through);
+            })
+            .catch((err) => {
+                if (typeof through.destroy === 'function') through.destroy(err)
+                else through.emit('error', err)
+            });
+
+        return through;
     }
 
     static async test(transport, verbose) {

@@ -4,7 +4,6 @@ import Util from "./Util";
 
 import Details from './Details';
 import RenderMedia from 'render-media';
-import stream from 'readable-stream';
 import throttle from 'throttleit'
 import prettierBytes from 'prettier-bytes'
 
@@ -30,15 +29,7 @@ export default class AV extends Details {
                 // and "end" inclusive. This works just like fs.createReadStream(opts) from
                 // the node.js "fs" module.
 
-                const passthrough = new stream.PassThrough();
-
-                Dweb.Transports.p_createReadStream(urls, opts)
-                    .then(stream => stream.pipe(passthrough))
-                    .catch(err => {
-                        console.error("Uncaught error in AV.js " + err.message);
-                    });
-
-                return passthrough;
+                return Dweb.Transports.createReadStream(urls, opts)
             }
         }
 
