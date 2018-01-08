@@ -55,9 +55,9 @@ export default class ArchiveItem { //extends SmartDict {  //TODO should extend S
         }   //TODO-REFACTOR make Collections automatically load query and do both
         if (this.query) {   // This is for Search, Collection and Home.
             let url =
-                //`https://archive.org/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`, // Archive (CORS fail)
-                `https://gateway.dweb.me/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}&and[]=${this.and}`,
-                //`http://localhost:4244/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`, //Testing
+                //`https://archive.org/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`; // Archive (CORS fail)
+                `https://gateway.dweb.me/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}&and[]=${this.and}`;
+                //`http://localhost:4244/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`; //Testing
             console.log(url);
             let j = await Util.fetch_json(url);
             this.items = j.response.docs;
