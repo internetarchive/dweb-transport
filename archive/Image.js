@@ -59,9 +59,7 @@ export default class Image extends Details {
                                             <a className="carousel-image-wrapper"
                                                href={`http://archive.org/download/${itemid}/${mainArchiveFile.metadata.name}`}
                                                title="Open full sized image">
-                                                   {mainArchiveFile.loadImg(
-                                                        <img className="rot0 carousel-image" alt="item image #1"/>
-                                                    )} {/*--Note archive.org details page erroneously doesnt close this tag--*/}
+                                                    <img id="streamContainer" src={mainArchiveFile} className="rot0 carousel-image" alt="item image #1"/>
                                             </a>
                                             <div className="carousel-caption">
                                                 {mainArchiveFile.metadata.name}
@@ -85,6 +83,7 @@ export default class Image extends Details {
                             </div>
                 ) }
                             {/* Script tags moved into the JS*/}
+                            <div id="webtorrentStats" style="color: white; text-align: center;"></div>
                             {this.cherModal("audio")}
                         </div>{/*--/.xs-col-12*/}
                     </div>{/*--/.row*/}

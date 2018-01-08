@@ -15,16 +15,15 @@ export default class AV extends Details {
     setupPlaylist() {
         this.playlist=[];
         //TODO-DETAILS put these formats in a list in Utils.config
-        let avs = item.files.filter(fi => (fi.format=='h.264' || fi.format=='512Kb MPEG4'));    //TODO-DETAILS-LIST Maybe use _list instead of .files
-        if (!avs.length)
-            avs = item.files.filter(fi => fi.format=='VBR MP3'); //TODO-DETAILS-LIST Maybe use _list instead of .files
+        this.avs = this._list.filter(fi => (fi.metadata.format=='h.264' || fi.metadata.format=='512Kb MPEG4'));    //TODO-DETAILS-LIST Maybe use _list instead of .files
+        if (!this.avs.length)
+            this.avs = this._list.filter(fi => fi.metadata.format=='VBR MP3'); //TODO-DETAILS-LIST Maybe use _list instead of .files
 
-        if (avs.length) {
-            avs.sort((a, b) => Util.natcompare(a.name, b.name));   //Unsure why sorting names, presumably tracks are named alphabetically ?
+        if (this.avs.length) {
+            this.avs.sort((a, b) => Util.natcompare(a.name, b.name));   //Unsure why sorting names, presumably tracks are named alphabetically ?
 
-            this.playlist.push({ name: avs[0].name,
-                                 urls: [item.metadata.magnetlink + '/' + avs[0].name] })
-
+            this.playlist.push({ name: this.avs[0].name,
+                                 urls: [item.metadata.magnetlink + '/' + this.avs[0].name] })
             // reduce array down to array of just filenames
             //avs = avs.map(val => val.name);
 
@@ -37,50 +36,6 @@ export default class AV extends Details {
         }
 
     }
-    browserAfter() {
-        this.setupPlaylist();
-        super.browserAfter();   // Runs archive_setup_push() at end
-        this.playMedia(this.playlist[0].name, this.playlist[0].urls);
-    }
-    playMedia(name, urls) {
-
-        var file = {
-            name: name,
-            createReadStream: function (opts) {
-                // Return a readable stream that provides the bytes between offsets "start"
-                // and "end" inclusive. This works just like fs.createReadStream(opts) from
-                // the node.js "fs" module.
-
-                return Dweb.Transports.createReadStream(urls, opts)
-            }
-        }
-
-        RenderMedia.append(file, '#videoContainer');
-
-        // TODO: port this to JSX
-        if (window.WEBTORRENT_TORRENT) {
-            const torrent = window.WEBTORRENT_TORRENT
-            const $webtorrentStats = document.querySelector('#webtorrentStats')
-
-            const updateSpeed = () => {
-                var progress = (100 * torrent.progress).toFixed(1)
-
-                const html =
-                    '<b>Peers:</b> ' + torrent.numPeers + ' ' +
-                    '<b>Progress:</b> ' + progress + '% ' +
-                    '<b>Download speed:</b> ' + prettierBytes(torrent.downloadSpeed) + '/s ' +
-                    '<b>Upload speed:</b> ' + prettierBytes(torrent.uploadSpeed) + '/s'
-
-                $webtorrentStats.innerHTML = html
-            }
-
-            torrent.on('download', throttle(updateSpeed, 250))
-            torrent.on('upload', throttle(updateSpeed, 250))
-            setInterval(updateSpeed, 1000)
-            updateSpeed()
-        }
-    }
-
     archive_setup_push() {
         let self = this;
         super.archive_setup_push(); // On commute.html the Play came after the parts common to AV, Image and Text
@@ -102,7 +57,6 @@ export default class AV extends Details {
             "identifier": this.itemid, //TODO-DETAILS-ONLINE check another example and see if identifier should be itemid or title
             "collection": this.item.metadata.collection[0],
         };
-
         //TODO this code is from details/commute.html - bears little resemblance to that in Tracey's code
         /*
         [{"title":"commute","orig":"commute.avi","image":"/download/commute/commute.thumbs%2Fcommute_000005.jpg",
@@ -112,6 +66,8 @@ export default class AV extends Details {
                 {"file":"/download/commute/commute.ogv","type":"ogg","height":"304","width":"400","label":"304p"}],
             "tracks":[{"file":"https://archive.org/stream/commute/commute.thumbs/commute_000005.jpg&vtt=vtt.vtt","kind":"thumbnails"}]}],
         */
+        this.setupPlaylist();
+
         //TODO-DETAILS make next few lines between theatre-ia-wrap and theatre-ia not commute specific
         return (
             <div id="theatre-ia-wrap" class="container container-ia width-max ">
@@ -159,7 +115,9 @@ export default class AV extends Details {
                                 </div>
                             </noscript>
 
-                            <div id="videoContainer" style="text-align: center;"></div>
+                            <div id="videoContainerX" style="text-align: center;">
+                                <video id="streamContainer" src={this.avs[0]}></video>
+                            </div>
                             <div id="webtorrentStats" style="color: white; text-align: center;"></div>
                             {this.cherModal("video")}
                         </div> {/*--/.xs-col-12--*/}

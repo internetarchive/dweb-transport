@@ -7,6 +7,8 @@ This expanded in use to make it easier to use HTML in as unchanged form from exi
 - look at onClick's especially if set window.location
  */
 
+import ArchiveFile from "./ArchiveFile";
+
 function deletechildren(el, keeptemplate) { //TODO-DETAILS-REACT copied from htmlutils, maybe include that instead
     /*
     Remove all children from a node
@@ -39,12 +41,14 @@ export default class React  {
                 element.innerHTML = attrs[name]["__html"];
                 delete attrs.dangerouslySetInnerHTML;
             }
-            if (["img.src", "a.href"].includes(tag+"."+name) && attrs[name].startsWith('/')) {
+            if (["img.src", "a.href"].includes(tag+"."+name) && (typeof attrs[name] === "string") && attrs[name].startsWith('/')) {
                 if (!React._config.root) console.error("Need to React.config({root: 'https://xxx.yyy'");
                 attrs[name] = React._config.root + attrs[name];  // e.g. /foo => https://bar.com/foo
                 console.log("XXX@43",attrs[name])
             }
-            if (name && attrs.hasOwnProperty(name)) {
+            if (["video.src", "img.src"].includes(tag+"."+name) && attrs[name] instanceof ArchiveFile) {
+                attrs[name].loadImg(element);
+            } else if (name && attrs.hasOwnProperty(name)) {
                 let value = attrs[name];
                 if (value === true) {
                     element.setAttribute(attrname, name);

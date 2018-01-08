@@ -1,6 +1,10 @@
+import prettierBytes from "prettier-bytes";
+import RenderMedia from 'render-media';
+
 require('babel-core/register')({ presets: ['env', 'react']}); // ES6 JS below!
 import React from './ReactFake';
 import Util from './Util';
+import throttle from "throttleit";
 
 export default class ArchiveFile {
     /*
@@ -31,10 +35,50 @@ export default class ArchiveFile {
         //jsx.src = `http://archive.org/download/${this.itemid}/${this.metadata.name}`
         jsx.src = objectURL;
     }
+    async p_loadStream(jsx) {
+        let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash];   // Multiple potential sources
+        var file = {
+            name: this.metadata.name,
+            createReadStream: function (opts) {
+                // Return a readable stream that provides the bytes between offsets "start"
+                // and "end" inclusive. This works just like fs.createReadStream(opts) from
+                // the node.js "fs" module.
+
+                return Dweb.Transports.createReadStream(urls, opts)
+            }
+        }
+
+        //RenderMedia.append(file, '#videoContainer');  //TODO-STREAM move to append
+        RenderMedia.render(file, jsx);  // Render into supplied element
+
+        // TODO: port this to JSX
+        if (window.WEBTORRENT_TORRENT) {
+            const torrent = window.WEBTORRENT_TORRENT
+
+            const updateSpeed = () => {
+                const webtorrentStats = document.querySelector('#webtorrentStats'); // Not moved into updateSpeed as not in document when this is run first time
+                var progress = (100 * torrent.progress).toFixed(1)
+
+                const html =
+                    '<b>Peers:</b> ' + torrent.numPeers + ' ' +
+                    '<b>Progress:</b> ' + progress + '% ' +
+                    '<b>Download speed:</b> ' + prettierBytes(torrent.downloadSpeed) + '/s ' +
+                    '<b>Upload speed:</b> ' + prettierBytes(torrent.uploadSpeed) + '/s'
+
+                if (webtorrentStats) webtorrentStats.innerHTML = html;    // May be null during loading, or not in UI
+            }
+
+            torrent.on('download', throttle(updateSpeed, 250))
+            torrent.on('upload', throttle(updateSpeed, 250))
+            setInterval(updateSpeed, 1000)
+            updateSpeed()
+        }
+
+    }
     loadImg(jsx) {
         //asynchronously loads file from one of metadata, turns into blob, and stuffs into element
         // Usage like  {this.loadImg(<img width=10>))
-        this.p_loadImg(jsx); /* Asynchronously load image*/
+        this.p_loadStream(jsx); /* Asynchronously load image*/  //TODO-STREAM was p_loadImg
         return jsx;
     }
     downloadable() {
