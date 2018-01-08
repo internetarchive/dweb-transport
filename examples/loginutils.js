@@ -200,7 +200,7 @@ async function p_connect(options) {
     try {
         options = options || {};
         let setupoptions = {};
-        let transpparm = (searchparams.get("transport") || options.defaulttransport || "HTTP,IPFS,YJS,WEBTORRENT").toUpperCase();
+        let transpparm = (searchparams.get("transport") || options.defaulttransport || "HTTP,IPFS,YJS,WEBTORRENT,ORBITDB").toUpperCase();
         let transports = Dweb.Transports.setup0(transpparm);
         replacetexts("transportstatuses", Dweb.Transports._transports);
         await Dweb.Transports.p_setup1(verbose);

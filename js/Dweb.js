@@ -4,6 +4,8 @@ exports.TransportHTTP = require('./TransportHTTP'); // Note this used to cause a
 exports.TransportIPFS = require('./TransportIPFS');
 exports.TransportYJS = require('./TransportYJS');
 exports.TransportWEBTORRENT = require('./TransportWEBTORRENT');
+exports.TransportORBITDB = require('./TransportOrbitDB');
+// End of Transports
 exports.Transports = require('./Transports'); // Handles multiple transports
 exports.Transportable = require('./Transportable');
 exports.Block = require('./Block');
