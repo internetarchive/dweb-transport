@@ -52,7 +52,7 @@ export default class Search extends ArchiveBase {
         return (
             <div id="wrap">
                 { new Nav().navwrapJSX() }
-                //TODO - follow structure used by Details and check matches archive.html/details examples
+                {/*TODO - follow structure used by Details and check matches archive.html/details examples */}
                 {/*--Begin page content --*/}
                 <div class="container container-ia">
                     <a name="maincontent" id="maincontent"></a>

@@ -12,15 +12,37 @@ export default class AV extends Details {
         super(itemid, item);
         this.itemtype="http://schema.org/VideoObject";
     }
-    archive_setup_push() {
-        let self = this;
-        super.archive_setup_push(); // On commute.html the Play came after the parts common to AV, Image and Text
-        // archive_setup.push(function() { //TODO-ARCHIVE_SETUP move Play from browserAfter to here
-        //    Play('jw6', self.playlist, self.cfg);
-        // });
+    setupPlaylist() {
+        this.playlist=[];
+        //TODO-DETAILS put these formats in a list in Utils.config
+        let avs = item.files.filter(fi => (fi.format=='h.264' || fi.format=='512Kb MPEG4'));    //TODO-DETAILS-LIST Maybe use _list instead of .files
+        if (!avs.length)
+            avs = item.files.filter(fi => fi.format=='VBR MP3'); //TODO-DETAILS-LIST Maybe use _list instead of .files
 
-        const name = this.playlist[0].name;
-        const urls = [this.playlist[0].url];
+        if (avs.length) {
+            avs.sort((a, b) => Util.natcompare(a.name, b.name));   //Unsure why sorting names, presumably tracks are named alphabetically ?
+
+            this.playlist.push({ name: avs[0].name,
+                                 urls: [item.metadata.magnetlink + '/' + avs[0].name] })
+
+            // reduce array down to array of just filenames
+            //avs = avs.map(val => val.name);
+
+            // TODO-DETAILS note these playlists dont match the code in details/commute.html
+            // for (var fi of avs) //TODO-DETAILS make this a map (note its tougher than it looks!)
+            //     this.playlist.push({
+            //         title:(fi.title ? fi.title : fi.name),
+            //         sources:[{file:'https://archive.org/download/'+itemid+'/'+fi.name}]});
+            // this.playlist[0].image = 'https://archive.org/services/img/' + itemid;
+        }
+
+    }
+    browserAfter() {
+        this.setupPlaylist();
+        super.browserAfter();   // Runs archive_setup_push() at end
+        this.playMedia(this.playlist[0].name, this.playlist[0].urls);
+    }
+    playMedia(name, urls) {
 
         var file = {
             name: name,
@@ -56,7 +78,16 @@ export default class AV extends Details {
             torrent.on('upload', throttle(updateSpeed, 250))
             setInterval(updateSpeed, 1000)
             updateSpeed()
-          }
+        }
+    }
+
+    archive_setup_push() {
+        let self = this;
+        super.archive_setup_push(); // On commute.html the Play came after the parts common to AV, Image and Text
+        // archive_setup.push(function() { //TODO-ARCHIVE_SETUP move Play from browserAfter to here
+        //    Play('jw6', self.playlist, self.cfg);
+        // });
+
     }
 
     theatreIaWrap() {
@@ -81,30 +112,6 @@ export default class AV extends Details {
                 {"file":"/download/commute/commute.ogv","type":"ogg","height":"304","width":"400","label":"304p"}],
             "tracks":[{"file":"https://archive.org/stream/commute/commute.thumbs/commute_000005.jpg&vtt=vtt.vtt","kind":"thumbnails"}]}],
         */
-        this.playlist=[];
-        //TODO-DETAILS put these formats in a list in Utils.config
-        let avs = item.files.filter(fi => (fi.format=='h.264' || fi.format=='512Kb MPEG4'));    //TODO-DETAILS-LIST Maybe use _list instead of .files
-        if (!avs.length)
-            avs = item.files.filter(fi => fi.format=='VBR MP3'); //TODO-DETAILS-LIST Maybe use _list instead of .files
-
-        if (avs.length) {
-            avs.sort((a, b) => Util.natcompare(a.name, b.name));   //Unsure why sorting names, presumably tracks are named alphabetically ?
-
-            const name = avs[0].name
-            const url = item.metadata.magnetlink + '/' + name
-
-            this.playlist.push({ name, url })
-
-            // reduce array down to array of just filenames
-            //avs = avs.map(val => val.name);
-
-            // TODO-DETAULS note these playlists dont match the code in details/commute.html
-            // for (var fi of avs) //TODO-DETAILS make this a map (note its tougher than it looks!)
-            //     this.playlist.push({
-            //         title:(fi.title ? fi.title : fi.name),
-            //         sources:[{file:'https://archive.org/download/'+itemid+'/'+fi.name}]});
-            // this.playlist[0].image = 'https://archive.org/services/img/' + itemid;
-        }
         //TODO-DETAILS make next few lines between theatre-ia-wrap and theatre-ia not commute specific
         return (
             <div id="theatre-ia-wrap" class="container container-ia width-max ">

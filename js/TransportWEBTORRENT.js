@@ -151,7 +151,8 @@ class TransportWEBTORRENT extends Transport {
         });
 
         if (!file) {
-            throw new Dweb.errors.TransportError("Requested file (" + path + ") not found within torrent " + err.message);
+            //debugger;
+            throw new Dweb.errors.TransportError("Requested file (" + path + ") not found within torrent ");
         }
 
         return file;
