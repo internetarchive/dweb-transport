@@ -129,7 +129,7 @@ class Transport {
     p_list() {
         throw new Error("Undefined function Transport.p_list");
     }
-    p_newlisturls(cl, verbose) { //TODO-LISTS-API
+    p_newlisturls(cl, verbose) {
         /*
         Must be implemented by any list, return a pair of URLS that may be the same, private and public links to the list.
         returns: ( privateurl, publicurl) e.g. yjs:xxx/yyy or orbitdb:a123

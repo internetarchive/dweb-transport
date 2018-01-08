@@ -42,10 +42,9 @@ NEEDS PATH: Figure out pushing entire examples dir to ipfs and accessing via pat
 
 Later
     Add other ways to fetch to metadata returned e.g webtorrent
-        @IA Need to know how to get to Magnet link
     ArchiveItem - CL - for item
     ArchiveFile - SmartDict - holds metadata
-    @IA C (later) make UI display IPFS/HTTP status indicators consistent.
+    Make UI display IPFS/HTTP status indicators consistent.
 
 
 STREAMS - fetches to return streams if req

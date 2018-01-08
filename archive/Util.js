@@ -130,8 +130,8 @@ export default class Util {
 Util.archiveMimeTypeFromFormat = {
         JPEG: "image/jpeg",
         PNG: "image/png"
-    };   //TODO expand to other formats @IA
-Util.imageFormats = ['JPEG', 'PNG'];     //TODO expand to other formats @IA
+    };   //TODO expand to other formats - see mimetypes list from petabox
+Util.imageFormats = ['JPEG', 'PNG'];     //TODO expand to other formats - see mimetypes list from petabox
 Util.downloadableFormats = {
     'JPEG Thumb': 'JPEG THUMB',
     'JPEG 250px Thumb': 'JPEG 250PX THUMB',

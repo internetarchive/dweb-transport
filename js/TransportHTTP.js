@@ -76,11 +76,10 @@ class TransportHTTP extends Transport {
         /*
         Fetch a url based from default server at command/multihash
 
-        url: optional - contains multihash as last component (Maybe TODO handle already parsed URL if provided).
+        url: optional (depends on command)
         resolves to: data as text or json depending on Content-Type header
         throws: TransportError if fails to fetch
          */
-        //TODO-HTTP could check that rest of URL conforms to expectations.
         let httpurl = `${this.urlbase}/${command}`;
         try {
             if (url) {
@@ -114,7 +113,7 @@ class TransportHTTP extends Transport {
                 } else { // Typically application/octetStream when don't know what fetching
                     return new Buffer(await response.arrayBuffer()); // Convert arrayBuffer to Buffer which is much more usable currently
                 }
-            }   // TODO-HTTP may need to handle binary as a buffer instead of text
+            }
             // noinspection ExceptionCaughtLocallyJS
             throw new Dweb.errors.TransportError(`Transport Error ${response.status}: ${response.statusText}`);
         } catch (err) {

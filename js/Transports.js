@@ -121,7 +121,7 @@ class Transports {
         returns:    undefined
         throws: TransportError with message being concatenated messages of transports if NONE of them succeed.
          */
-        //TODO-MULTI might be smarter about not waiting but Promise.race is inappropriate as returns after a failure as well.
+        //TODO-MULTI-GATEWAY might be smarter about not waiting but Promise.race is inappropriate as returns after a failure as well.
         let tt = Dweb.Transports.validFor(urls, "add"); // Valid connected transports that support "store"
         if (!tt.length) {
             throw new Dweb.errors.TransportError('Transports.p_rawstore: Cant find transport for urls:'+urls.join(','));
@@ -159,7 +159,7 @@ class Transports {
         // Note that normally the CL will not have been stored yet, so you can't use its urls.
         let uuu = await Promise.all(Dweb.Transports.validFor(undefined, "newlisturls")
             .map(([u, t]) => t.p_newlisturls(cl, verbose)) );   // [ [ priv, pub] [ priv, pub] [priv pub] ]
-        return [uuu.map(uu=>uu[0]), uuu.map(uu=>uu[1])]
+        return [uuu.map(uu=>uu[0]), uuu.map(uu=>uu[1])];    // [[ priv priv priv ] [ pub pub pub ] ]
     }
     // Stream handling
     static createReadStream(urls, options, verbose) {

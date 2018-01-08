@@ -162,10 +162,6 @@ class TransportIPFS extends Transport {
         Returns a new Promise that resolves currently to a string.
         There may also be need for a streaming version of this call, at this point undefined since we havent (currently) got a use case..
 
-        TODO - there is still the failure case of short files like  ipfs/QmTds3bVoiM9pzfNJX6vT2ohxnezKPdaGHLd4Ptc4ACMLa
-        TODO - added with http /api/v0/add/ but unretrievable on a browser (it retrieves below in Node).
-        TODO - see https://github.com/ipfs/interface-ipfs-core/issues/164 but since can't get acknowledgement from David that this is even an issue its unlikely to get fixed
-
         :param string url: URL of object being retrieved
         :param boolean verbose: True for debugging output
         :resolve buffer: Return the object being fetched. (may in the future return a stream and buffer externally)
