@@ -1,7 +1,6 @@
 /*
 This Transport layers uses OrbitDB and IPFS as its transport.
 */
-// The following only required for Y version
 const OrbitDB = require('orbit-db')
 
 // Utility packages (ours) And one-liners
@@ -30,6 +29,7 @@ class TransportORBITDB extends Transport {
         this.orbitdb = options.orbitdb;
         this.name = "ORBITDB";
         this.supportURLs = ['orbitdb'];
+        //TODO-ORBIT - Samuli, what is fetch in orbit context?
         this.supportFunctions = ['add', 'list', 'fetch', 'listmonitor', 'newlisturls'];
         this.status = Dweb.Transport.STATUS_LOADED;
     }
@@ -50,11 +50,13 @@ class TransportORBITDB extends Transport {
                 const db = await this.orbitdb.eventlog(url, options);
                 await db.load()
                 const u = `orbitdb:${db.address.toString()}`; // Pretty random, but means same test will generate same list
+                //TODO-ORBIT - Samuli, this looks wrong, I think it should be this.databases[url] = db and we dont need the u= line above.
+                //TODO-ORBUT - Samuli, also it looks like you assume that you stored it under "url" in some places below (e.g. p_newlisturls)
                 this.databases[u] = db
                 return this.databases[u];
             }
         } catch(err) {
-            console.log("Failed to initialize database");
+            console.log("Failed to initialize OrbitDB database");
             throw err;
         }
     }
@@ -64,7 +66,7 @@ class TransportORBITDB extends Transport {
             First part of setup, create obj, add to Transports but dont attempt to connect, typically called instead of p_setup if want to parallelize connections.
         */
         let combinedoptions = Transport.mergeoptions(defaultoptions, options);
-        console.log("Options %o", combinedoptions); // Log even if !verbose
+        console.log("OrbitDB options %o", combinedoptions); // Log even if !verbose
         let t = new TransportORBITDB(combinedoptions, verbose);   // Note doesnt start IPFS or OrbitDB
         Dweb.Transports.addtransport(t);
         return t;
@@ -82,7 +84,7 @@ class TransportORBITDB extends Transport {
             this.orbitdb = new OrbitDB(this.ipfs)
             this.databases = {};
         } catch(err) {
-            console.error("Failed to start",err);
+            console.error("OrbitDB failed to start",err);
             this.status = Dweb.Transport.STATUS_FAILED;
         }
         return this;
@@ -97,19 +99,21 @@ class TransportORBITDB extends Transport {
         return this.status;
     }
 
-   async p_rawlist(url, verbose) {
-    /*
-    Fetch all the objects in a list, these are identified by the url of the public key used for signing.
-    (Note this is the 'signedby' parameter of the p_rawadd call, not the 'url' parameter
-    Returns a promise that resolves to the list.
-    Each item of the list is a dict: {"url": url, "date": date, "signature": signature, "signedby": signedby}
-    List items may have other data (e.g. reference ids of underlying transport)
+    async p_rawlist(url, verbose) {
+        /*
+        Fetch all the objects in a list, these are identified by the url of the public key used for signing.
+        (Note this is the 'signedby' parameter of the p_rawadd call, not the 'url' parameter
+        Returns a promise that resolves to the list.
+        Each item of the list is a dict: {"url": url, "date": date, "signature": signature, "signedby": signedby}
+        List items may have other data (e.g. reference ids of underlying transport)
 
-    :param string url: String with the url that identifies the list.
-    :param boolean verbose: True for debugging output
-    :resolve array: An array of objects as stored on the list.
-     */
+        :param string url: String with the url that identifies the list.
+        :param boolean verbose: True for debugging output
+        :resolve array: An array of objects as stored on the list.
+         */
         try {
+            //TODO-ORBIT Samuli, if we want url parts its probably best to turn into parsed URL and use that.
+            //TODO-ORBIT Samuli, but I think this is wrong, and that url should be passed to p__database like you are doing in p_rawadd
             if (!(typeof(url) === "string")) { url = url.href; } // Convert if its a parsed URL
             let db = this.databases[url]
             if (!db) {
@@ -124,7 +128,7 @@ class TransportORBITDB extends Transport {
             if (verbose) console.log("p_rawlist found", ...Dweb.utils.consolearr(res));
             return res;
         } catch(err) {
-            console.log("TransportIPFS.p_rawlist failed",err.message);
+            console.log("TransportORBITDB.p_rawlist failed",err.message);
             throw(err);
         }
     }
@@ -139,6 +143,7 @@ class TransportORBITDB extends Transport {
          :param verbose:     boolean - True for debugging output
           */
         if (!(typeof(url) === "string")) { url = url.href; } // Convert if its a parsed URL
+        //TODO-ORBIT Samuli, presuming this is not complete
         let y = this.databases[url];
         console.assert(y,"Should always exist before calling listmonitor - async call p__database(url) to create");
         // y.share.array.observe((event) => {
@@ -191,9 +196,10 @@ class TransportORBITDB extends Transport {
 
     async p_newlisturls(cl, verbose) {
         let  u = cl._publicurls.map(urlstr => Url.parse(urlstr))
-            .find(parsedurl =>
-                (parsedurl.protocol === "ipfs" && parsedurl.pathname.includes('/ipfs/'))
-                || (parsedurl.protocol === "orbitdb:"));
+            .find(parsedurl => (parsedurl.protocol === "orbitdb:"));
+        //TODO-ORBIT Orbit doesnt need the check against ipfs: that is for handling legacy lists where the YJS URl was same as IPFS
+        //(parsedurl.protocol === "ipfs" && parsedurl.pathname.includes('/ipfs/'))
+        //|| (parsedurl.protocol === "orbitdb:"));
         if (!u) {
             // TODO: pass 'Dweb.KeyPair.multihashsha256_58(cl.keypair.publicexport()[0])' to orbitdb options.write
             const options = {
