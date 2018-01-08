@@ -41,6 +41,8 @@ class TransportORBITDB extends Transport {
         url:        URL string to find list of
         resolves:   OrbitDB database
         */
+        //TODO-ORBITDB - Samuli, how will we handle the case where urls are on different orbitdb, because created on other peers?
+        //TODO-ORBITDB - Samuli, maybe we need to store an array of orbitdb as well as of eventlog ? 
         try {
             if (this.databases[url]) {
                 if (verbose) console.log("Found database for", url);
@@ -50,8 +52,8 @@ class TransportORBITDB extends Transport {
                 const db = await this.orbitdb.eventlog(url, options);
                 await db.load()
                 const u = `orbitdb:${db.address.toString()}`; // Pretty random, but means same test will generate same list
-                //TODO-ORBIT - Samuli, this looks wrong, I think it should be this.databases[url] = db and we dont need the u= line above.
-                //TODO-ORBUT - Samuli, also it looks like you assume that you stored it under "url" in some places below (e.g. p_newlisturls)
+                //TODO-ORBITDB - Samuli, this looks wrong, I think it should be this.databases[url] = db and we dont need the u= line above.
+                //TODO-ORBITDB - Samuli, also it looks like you assume that you stored it under "url" in some places below (e.g. p_newlisturls)
                 this.databases[u] = db
                 return this.databases[u];
             }
@@ -206,6 +208,7 @@ class TransportORBITDB extends Transport {
                 create: true,
                 // write: ['ABC'],
             }
+            //TODO-ORBIT in future return a private key that can be used in a separate this.orbitdb.eventlog(u)
             const db = await this.p__database(cl.name, options, verbose);
             u = `orbitdb:${db.address.toString()}`;
         }
