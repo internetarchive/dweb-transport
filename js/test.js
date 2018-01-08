@@ -40,6 +40,7 @@ async function p_test(verbose) {
         let t_ipfs = await Dweb.TransportIPFS.p_setup(opts, verbose); // Note browser requires indexeddb
         let t_yjs = await Dweb.TransportYJS.p_setup(opts, verbose); // Should find ipfs transport
         let t_webtorrent = await Dweb.TransportWebTorrent.p_setup(opts, verbose); //
+        let t_orbitdb = await Dweb.TransportORBITDB.p_setup(opts, verbose); //
         if (verbose) console.log("setup returned and transport set");
 
         // Need to ask status before using as wont update status till then which means wont be used
@@ -48,12 +49,14 @@ async function p_test(verbose) {
         await t_ipfs.p_status();
         await t_yjs.p_status();
         await t_webtorrent.p_status();
+        await t_orbitdb.p_status();
 
         //SEE-OTHER-ADDTRANSPORT
         await Dweb.TransportHTTP.test(t_http, verbose);
         await Dweb.TransportIPFS.test(t_ipfs, verbose);
         await Dweb.TransportYJS.test(t_yjs, verbose);
         await Dweb.TransportWebTorrent.test(t_webtorrent, verbose);
+        await Dweb.TransportORBITDB.test(t_webtorrent, verbose);
 
         if (verbose) console.log("Transports tested");
         await Dweb.Block.p_test(verbose);
