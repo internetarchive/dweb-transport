@@ -1966,7 +1966,7 @@ function isnan (val) {
   return val !== val // eslint-disable-line no-self-compare
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(9)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(8)))
 
 /***/ }),
 /* 4 */
@@ -2658,11 +2658,11 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
                         'textarea',
                         { id: 'embedcodehere', 'class': 'form-control textarea-invert-readonly',
                             rows: '3', readonly: 'readonly' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('iframe', {
-                            src: shortEmbedURL,
-                            width: '480', height: '430', frameborder: '0',
-                            webkitallowfullscreen: 'true', mozallowfullscreen: 'true',
-                            allowfullscreen: true })
+                        `<iframe 
+                                src=${shortEmbedURL}
+                                width="480" height="430" frameborder="0"
+                                webkitallowfullscreen="true" mozallowfullscreen="true"
+                                allowfullscreen></iframe>`
                     )
                 )
             )
@@ -3284,7 +3284,7 @@ var objectKeys = Object.keys || function (obj) {
 module.exports = Duplex;
 
 /*<replacement>*/
-var util = __webpack_require__(10);
+var util = __webpack_require__(9);
 util.inherits = __webpack_require__(2);
 /*</replacement>*/
 
@@ -3366,19 +3366,6 @@ function forEach(xs, f) {
 
 /***/ }),
 /* 8 */
-/***/ (function(module, exports, __webpack_require__) {
-
-exports = module.exports = __webpack_require__(20);
-exports.Stream = exports;
-exports.Readable = exports;
-exports.Writable = __webpack_require__(24);
-exports.Duplex = __webpack_require__(7);
-exports.Transform = __webpack_require__(26);
-exports.PassThrough = __webpack_require__(50);
-
-
-/***/ }),
-/* 9 */
 /***/ (function(module, exports) {
 
 var g;
@@ -3405,7 +3392,7 @@ module.exports = g;
 
 
 /***/ }),
-/* 10 */
+/* 9 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {// Copyright Joyent, Inc. and other Node contributors.
@@ -3519,7 +3506,7 @@ function objectToString(o) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 11 */
+/* 10 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -3644,6 +3631,19 @@ class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default *
     }
 }
 /* harmony export (immutable) */ __webpack_exports__["default"] = Search;
+
+
+/***/ }),
+/* 11 */
+/***/ (function(module, exports, __webpack_require__) {
+
+exports = module.exports = __webpack_require__(20);
+exports.Stream = exports;
+exports.Readable = exports;
+exports.Writable = __webpack_require__(24);
+exports.Duplex = __webpack_require__(7);
+exports.Transform = __webpack_require__(26);
+exports.PassThrough = __webpack_require__(50);
 
 
 /***/ }),
@@ -4476,7 +4476,7 @@ class ArchiveFile {
 module.exports = MediaElementWrapper
 
 var inherits = __webpack_require__(2)
-var stream = __webpack_require__(8)
+var stream = __webpack_require__(11)
 var toArrayBuffer = __webpack_require__(51)
 
 var MediaSource = typeof window !== 'undefined' && window.MediaSource
@@ -4791,7 +4791,7 @@ function _isUint8Array(obj) {
 /*</replacement>*/
 
 /*<replacement>*/
-var util = __webpack_require__(10);
+var util = __webpack_require__(9);
 util.inherits = __webpack_require__(2);
 /*</replacement>*/
 
@@ -5732,7 +5732,7 @@ function indexOf(xs, x) {
   }
   return -1;
 }
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(9), __webpack_require__(5)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(8), __webpack_require__(5)))
 
 /***/ }),
 /* 21 */
@@ -5901,7 +5901,7 @@ var Duplex;
 Writable.WritableState = WritableState;
 
 /*<replacement>*/
-var util = __webpack_require__(10);
+var util = __webpack_require__(9);
 util.inherits = __webpack_require__(2);
 /*</replacement>*/
 
@@ -6499,7 +6499,7 @@ Writable.prototype._destroy = function (err, cb) {
   this.end();
   cb(err);
 };
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5), __webpack_require__(47).setImmediate, __webpack_require__(9)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5), __webpack_require__(47).setImmediate, __webpack_require__(8)))
 
 /***/ }),
 /* 25 */
@@ -6854,7 +6854,7 @@ module.exports = Transform;
 var Duplex = __webpack_require__(7);
 
 /*<replacement>*/
-var util = __webpack_require__(10);
+var util = __webpack_require__(9);
 util.inherits = __webpack_require__(2);
 /*</replacement>*/
 
@@ -7006,7 +7006,7 @@ function done(stream, er, data) {
 //var React = require('react');
 //var ReactDOM = require('react-dom');
 var Details = __webpack_require__(6).default;
-var Search = __webpack_require__(11).default;
+var Search = __webpack_require__(10).default;
 var Nav = __webpack_require__(31).default;
 //window.Dweb = require('../js/Dweb');
 window.Nav = Nav;
@@ -7338,14 +7338,14 @@ class Tile {
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Search__ = __webpack_require__(11);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Search__ = __webpack_require__(10);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Details__ = __webpack_require__(6);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__Home__ = __webpack_require__(32);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__Collection__ = __webpack_require__(33);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__Texts__ = __webpack_require__(34);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__Image__ = __webpack_require__(35);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__AV__ = __webpack_require__(36);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_9__DetailsError__ = __webpack_require__(70);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_9__DetailsError__ = __webpack_require__(72);
 //import ReactDOM from "react-dom";
 
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
@@ -7549,7 +7549,7 @@ class Nav {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Search__ = __webpack_require__(11);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Search__ = __webpack_require__(10);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
@@ -7585,7 +7585,7 @@ class Home extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Search__ = __webpack_require__(11);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Search__ = __webpack_require__(10);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
@@ -7917,9 +7917,12 @@ class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Details__ = __webpack_require__(6);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_render_media__ = __webpack_require__(37);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_render_media___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_3_render_media__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_readable_stream__ = __webpack_require__(8);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_readable_stream___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_4_readable_stream__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit__ = __webpack_require__(70);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_4_throttleit__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_prettier_bytes__ = __webpack_require__(71);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_prettier_bytes___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_5_prettier_bytes__);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
 
 
 
@@ -7949,17 +7952,30 @@ class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
                 // and "end" inclusive. This works just like fs.createReadStream(opts) from
                 // the node.js "fs" module.
 
-                const passthrough = new __WEBPACK_IMPORTED_MODULE_4_readable_stream___default.a.PassThrough();
-
-                Dweb.Transports.p_createReadStream(urls, opts).then(stream => stream.pipe(passthrough)).catch(err => {
-                    console.error("Uncaught error in AV.js " + err.message);
-                });
-
-                return passthrough;
+                return Dweb.Transports.createReadStream(urls, opts);
             }
         };
 
         __WEBPACK_IMPORTED_MODULE_3_render_media___default.a.append(file, '#videoContainer');
+
+        // TODO: port this to JSX
+        if (window.WEBTORRENT_TORRENT) {
+            const torrent = window.WEBTORRENT_TORRENT;
+            const $webtorrentStats = document.querySelector('#webtorrentStats');
+
+            const updateSpeed = () => {
+                var progress = (100 * torrent.progress).toFixed(1);
+
+                const html = '<b>Peers:</b> ' + torrent.numPeers + ' ' + '<b>Progress:</b> ' + progress + '% ' + '<b>Download speed:</b> ' + __WEBPACK_IMPORTED_MODULE_5_prettier_bytes___default()(torrent.downloadSpeed) + '/s ' + '<b>Upload speed:</b> ' + __WEBPACK_IMPORTED_MODULE_5_prettier_bytes___default()(torrent.uploadSpeed) + '/s';
+
+                $webtorrentStats.innerHTML = html;
+            };
+
+            torrent.on('download', __WEBPACK_IMPORTED_MODULE_4_throttleit___default()(updateSpeed, 250));
+            torrent.on('upload', __WEBPACK_IMPORTED_MODULE_4_throttleit___default()(updateSpeed, 250));
+            setInterval(updateSpeed, 1000);
+            updateSpeed();
+        }
     }
 
     theatreIaWrap() {
@@ -8079,7 +8095,8 @@ class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
                                 'Internet Archive\'s in-browser video player requires JavaScript to be enabled. It appears your browser does not have it turned on. Please see your browser settings for this feature.'
                             )
                         ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'videoContainer' }),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'videoContainer', style: 'text-align: center;' }),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'webtorrentStats', style: 'color: white; text-align: center;' }),
                         this.cherModal("video")
                     ),
                     ' '
@@ -9578,7 +9595,7 @@ exports.clearImmediate = clearImmediate;
     attachTo.clearImmediate = clearImmediate;
 }(typeof self === "undefined" ? typeof global === "undefined" ? this : global : self));
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(9), __webpack_require__(5)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(8), __webpack_require__(5)))
 
 /***/ }),
 /* 49 */
@@ -9652,7 +9669,7 @@ function config (name) {
   return String(val).toLowerCase() === 'true';
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(9)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(8)))
 
 /***/ }),
 /* 50 */
@@ -9691,7 +9708,7 @@ module.exports = PassThrough;
 var Transform = __webpack_require__(26);
 
 /*<replacement>*/
-var util = __webpack_require__(10);
+var util = __webpack_require__(9);
 util.inherits = __webpack_require__(2);
 /*</replacement>*/
 
@@ -10903,7 +10920,7 @@ exports.encode = __webpack_require__(68)
 /* 63 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer) {var stream = __webpack_require__(8)
+/* WEBPACK VAR INJECTION */(function(Buffer) {var stream = __webpack_require__(11)
 var inherits = __webpack_require__(2)
 var nextEvent = __webpack_require__(64)
 var Box = __webpack_require__(14)
@@ -12170,7 +12187,7 @@ exports.DecoderConfigDescriptor.decode = function (buf, start, end) {
 /* 68 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer, process) {var stream = __webpack_require__(8)
+/* WEBPACK VAR INJECTION */(function(Buffer, process) {var stream = __webpack_require__(11)
 var inherits = __webpack_require__(2)
 var Box = __webpack_require__(14)
 
@@ -12317,7 +12334,7 @@ emits 'stalled' once everything is written
 
 */
 var inherits = __webpack_require__(2)
-var stream = __webpack_require__(8)
+var stream = __webpack_require__(11)
 
 module.exports = RangeSliceStream
 
@@ -12436,6 +12453,80 @@ RangeSliceStream.prototype.destroy = function (err) {
 
 /***/ }),
 /* 70 */
+/***/ (function(module, exports) {
+
+module.exports = throttle;
+
+/**
+ * Returns a new function that, when invoked, invokes `func` at most once per `wait` milliseconds.
+ *
+ * @param {Function} func Function to wrap.
+ * @param {Number} wait Number of milliseconds that must elapse between `func` invocations.
+ * @return {Function} A new function that wraps the `func` function passed in.
+ */
+
+function throttle (func, wait) {
+  var ctx, args, rtn, timeoutID; // caching
+  var last = 0;
+
+  return function throttled () {
+    ctx = this;
+    args = arguments;
+    var delta = new Date() - last;
+    if (!timeoutID)
+      if (delta >= wait) call();
+      else timeoutID = setTimeout(call, wait - delta);
+    return rtn;
+  };
+
+  function call () {
+    timeoutID = 0;
+    last = +new Date();
+    rtn = func.apply(ctx, args);
+    ctx = null;
+    args = null;
+  }
+}
+
+
+/***/ }),
+/* 71 */
+/***/ (function(module, exports) {
+
+module.exports = prettierBytes
+
+function prettierBytes (num) {
+  if (typeof num !== 'number' || isNaN(num)) {
+    throw new TypeError('Expected a number, got ' + typeof num)
+  }
+
+  var neg = num < 0
+  var units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
+
+  if (neg) {
+    num = -num
+  }
+
+  if (num < 1) {
+    return (neg ? '-' : '') + num + ' B'
+  }
+
+  var exponent = Math.min(Math.floor(Math.log(num) / Math.log(1000)), units.length - 1)
+  num = Number(num / Math.pow(1000, exponent))
+  var unit = units[exponent]
+
+  if (num >= 10 || num % 1 === 0) {
+    // Do not show decimals when the number is two-digit, or if the number has no
+    // decimal component.
+    return (neg ? '-' : '') + num.toFixed(0) + ' ' + unit
+  } else {
+    return (neg ? '-' : '') + num.toFixed(1) + ' ' + unit
+  }
+}
+
+
+/***/ }),
+/* 72 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
