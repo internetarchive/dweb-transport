@@ -2,6 +2,8 @@ const Transport = require('./Transport.js');
 const Dweb = require('./Dweb.js');
 const nodefetch = require('node-fetch-npm');
 const Url = require('url');
+const stream = require('readable-stream');
+
 var fetch,Headers,Request;
 if (typeof(Window) === "undefined") {
     //var fetch = require('whatwg-fetch').fetch; //Not as good as node-fetch-npm, but might be the polyfill needed for browser.safari
@@ -28,7 +30,7 @@ servercommands = {
     rawstore: "contenturl/rawstore",
     rawadd: "void/rawadd",
     rawlist: "metadata/rawlist"
-}
+};
 
 class TransportHTTP extends Transport {
 
@@ -37,7 +39,7 @@ class TransportHTTP extends Transport {
         this.options = options;
         this.urlbase = options.http.urlbase;
         this.supportURLs = ['contenthash', 'http','https']; // http and https are legacy
-        this.supportFunctions = ['fetch', 'store', 'add', 'list', 'reverse', 'newlisturls']; //Does not support: listmonitor - reverse is disabled somewhere not sure if here or caller
+        this.supportFunctions = ['fetch', 'store', 'add', 'list', 'reverse', 'newlisturls', 'createReadStream']; //Does not support: listmonitor - reverse is disabled somewhere not sure if here or caller
         this.name = "HTTP";             // For console log etc
         this.status = Dweb.Transport.STATUS_LOADED;
     }
@@ -208,11 +210,31 @@ class TransportHTTP extends Transport {
        let  u = cl._publicurls.map(urlstr => Url.parse(urlstr))
             .find(parsedurl =>
                 (parsedurl.protocol === "https" && parsedurl.host === "gateway.dweb.me" && parsedurl.pathname.includes('/content/rawfetch'))
-                || (parsedurl.protocol === "contenthash:" && pathparts[1] === "contenthash"))
+                || (parsedurl.protocol === "contenthash:" && (parsedurl.pathname.split('/')[1] === "contenthash")));
         if (!u) {
             u = `contenthash:/contenthash/${ Dweb.KeyPair.multihashsha256_58(cl.keypair.publicexport()[0]) }`; // Pretty random, but means same test will generate same list
         }
         return [u,u];
+    }
+
+    createReadStream(url, opts = {}, verbose = false) {
+        if (verbose) console.log(`TransportHTTP:createReadStream: %o, %o",url, opts`);
+        const through = new stream.PassThrough();
+        // Locate and return a block, based on its url
+        // Throws TransportError if fails
+        // resolves to: URL that can be used to fetch the resource, of form contenthash:/contenthash/Q123
+        let init = {    //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
+            method: 'GET',
+            headers: new Headers({range: `bytes=${opts.start || 0}-${opts.end || ""}`}),
+            mode: 'cors',
+            cache: 'default',
+            redirect: 'follow',  // Chrome defaults to manual
+        };
+        this.p_httpfetch(servercommands.rawfetch, url, init, verbose)
+            .then((buff) => { through.write(buff); through.end(); }); // Should be a buffer we can pass to through
+        //TODO-STREAMS to be totally accurate we should check the range returned and check it matches what sent as HTTP servers can ignore range
+        // Return the stream immediately. wont output anything till promise above resolves and writes the buffer to it.
+        return through;
     }
 
     static async test() {

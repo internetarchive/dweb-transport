@@ -44,7 +44,7 @@ export default class ArchiveFile {
                 // and "end" inclusive. This works just like fs.createReadStream(opts) from
                 // the node.js "fs" module.
 
-                return Dweb.Transports.createReadStream(urls, opts)
+                return Dweb.Transports.createReadStream(urls, opts, verbose)
             }
         }
 

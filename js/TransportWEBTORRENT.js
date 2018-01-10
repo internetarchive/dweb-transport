@@ -209,7 +209,7 @@ class TransportWEBTORRENT extends Transport {
         :resolve stream: Return the readable stream.
         :throws:        TransportError if url invalid - note this happens immediately, not as a catch in the promise
          */
-        if (verbose) console.log("WebTorrent p_createreadstream", url);
+        if (verbose) console.log("TransportWEBTORRENT createreadstream %o %o", url, opts);
 
         const through = new stream.PassThrough();
         const { torrentId, path } = this.webtorrentparseurl(url);

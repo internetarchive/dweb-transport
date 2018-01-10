@@ -10,6 +10,7 @@ const CID = require('cids');
 const dagPB = require('ipld-dag-pb');
 // noinspection Annotator
 const DAGNode = dagPB.DAGNode; // So can check its type
+const stream = require('readable-stream');  // Needed for the pullthrough - this is NOT Ipfs streams
 
 // Library packages other than IPFS
 const Url = require('url');
@@ -55,7 +56,7 @@ class TransportIPFS extends Transport {
         this.options = options;         // Dictionary of options { ipfs: {...}, "yarrays", yarray: {...} }
         this.name = "IPFS";             // For console log etc
         this.supportURLs = ['ipfs'];
-        this.supportFunctions = ['fetch', 'store'];   // Does not support reverse
+        this.supportFunctions = ['fetch', 'store', 'createReadStream'];   // Does not support reverse
         this.status = Dweb.Transport.STATUS_LOADED;
     }
 
@@ -222,6 +223,19 @@ class TransportIPFS extends Transport {
         let cid = await this.ipfs.dag.put(buf,{ format: 'dag-cbor', hashAlg: 'sha2-256' });
         return TransportIPFS.cid2url(cid);
         //return this.ipfs.files.put(buf).then((block) => TransportIPFS.cid2url(block.cid));
+    }
+
+    createReadStream(url, opts = {}, verbose = false) {
+        // Locate and return a block, based on its url
+        // Throws TransportError if fails
+        // resolves to: URL that can be used to fetch the resource, of form contenthash:/contenthash/Q123
+        if (verbose) console.log("TransportIPFS:createReadStream:%o, %o",url, opts);
+        const through = new stream.PassThrough();
+        this.p_rawfetch(url, verbose)
+            .then((buff) => buff.slice(opts.start || 0, opts.end || buff.length))
+            .then((buff) => { through.write(buff); through.end(); }); // Should be a buffer we can pass to through
+        // Return the stream immediately. wont output anything till promise above resolves and writes the buffer to it.
+        return through;
     }
 
     static async test(transport, verbose) {
