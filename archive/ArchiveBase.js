@@ -8,7 +8,7 @@ import React from './ReactFake';
 import Util from './Util';
 import ArchiveItem from './ArchiveItem';
 
-export default class ArchiveBase extends ArchiveItem {  //TODO-REFACTOR - extends ArchiveItem and rename to ArchivePageBase - move data to AI
+export default class ArchiveBase extends ArchiveItem {
     /*
     Base class for Archive application - base of Details = which includes single element items and Search which includes both searches and collections (which are actually items).
     ArchiveBase

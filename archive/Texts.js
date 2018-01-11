@@ -13,7 +13,6 @@ export default class Texts extends Details {
         archive_setup.push(function(){ AJS.booksize(); });
     }
     theatreIaWrap() {
-        //TODO-DETAILS Description does not appear in this Navwrap section, its in the stuff underneath that which is not yet on a page.
         let item = this.item;
         let metadata = item.metadata;
         let detailsURL = `https://archive.org/details/${this.itemid}`;  // Probably correct as archive.org/details since used as itemProp

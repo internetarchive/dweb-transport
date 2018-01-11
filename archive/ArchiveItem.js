@@ -52,7 +52,7 @@ export default class ArchiveItem { //extends SmartDict {  //TODO should extend S
             //this.item = await Util.fetch_json(`https://archive.org/metadata/${this.itemid}`);
             this.item = await Util.fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}`);
             this._listLoad();   // Load _list with ArchiveFile
-        }   //TODO-REFACTOR make Collections automatically load query and do both
+        }
         if (this.query) {   // This is for Search, Collection and Home.
             let url =
                 //`https://archive.org/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`; // Archive (CORS fail)

@@ -27,7 +27,7 @@ export default class Details extends ArchiveBase {
     }
 
     navwrapped() {
-        /* Wrap the content up checked on mbid (Red Shift) image:  wrap( TODO-TODO-DONATEBANNER | nav-wrap1 | maincontent | theatre-ia-wrap | item-details-about | TODO-ALSOFOND  | TODO-ANALYTICS )
+        /* Wrap the content up checked on mbid (Red Shift) image:  wrap( TODO-TODO-DONATEBANNER | nav-wrap1 | maincontent | theatre-ia-wrap | item-details-about | TODO-ACTIONBUTTONS | TODO-ALSOFOUND  | TODO-ANALYTICS )
         returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
          */
         return (
@@ -134,8 +134,7 @@ export default class Details extends ArchiveBase {
                                  data-placement="bottom" title=""
                                  data-original-title="Share to Reddit"></div>
                         </a>
-                        {/*This next one looks wrong, the URL is missing TODO-DETAILS-IMAGE try a different example */}
-                        <a href={`https://www.tumblr.com/share/video?embed=%3Ciframe+width%3D%22640%22+height%3D%22480%22+frameborder%3D%220%22+allowfullscreen+src%3D%22https%3A%2F%2Farchive.org%2Fembed%2F%22+webkitallowfullscreen%3D%22true%22+mozallowfullscreen%3D%22true%22%26gt%3B%26lt%3B%2Fiframe%3E&;name=${item.metadata.title}+%3A+${item.metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`}
+                        <a href={`https://www.tumblr.com/share/video?embed=%3Ciframe+width%3D%22640%22+height%3D%22480%22+frameborder%3D%220%22+allowfullscreen+src%3D%22https%3A%2F%2Farchive.org%2Fembed%2F%22+webkitallowfullscreen%3D%22true%22+mozallowfullscreen%3D%22true%22%26gt%3B%26lt%3B%2Fiframe%3E&;name=${itemid}+%3A+${item.metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`}
                            target="_blank">
                             <div className="sharee iconochive-tumblr" data-toggle="tooltip"
                                  data-placement="bottom" title=""
@@ -225,13 +224,13 @@ export default class Details extends ArchiveBase {
         let licence = metadata.licenseurl; //TODO - handle other licenses - hardwired for CC currently
         let languageAbbrev = metadata.language;
         let languageLong = {eng: "English", dut: "Dutch"}[languageAbbrev]; //TODO-other languages
-        let description = metadata.description; // TODO prob need to do via innerHTML thing
+        let description = metadata.description; // Contains HTML (supposedly safe) inserted via innerHTML thing
         let metadataListPossible = { color: "Color", coverage: "Location", director: "Director", identifier: "Identifier",
             "identifier-ark": "Identifier-ark", ocr: "Ocr", runtime: "Run time", ppi: "Ppi", sound: "Sound", year: "Year" }; /*TODO expand to longer list*/
         let metadataListFound = Object.keys(metadataListPossible).filter((k) => metadata[k]);    // List of keys in the metadata
         let downloadableFiles = this._list.filter(f => f.downloadable()); // Note on image it EXCLUDED JPEG Thumb, but included JPEG*Thumb
             //TODO  Replace "a" with onclicks to download function on f
-            //TODO Need f.sizePretty property of ArchiveFile
+            //TODO Need f.sizePretty property of ArchiveFile (see prettierbytes used in WebTorrent)
         let filesCount = item.files_count;
         let originalFilesCount = item.files.filter((f)=>f.source === "original").length+1; // Adds in Archive Bittorrent
         let downloadURL = `https://archive.org/download/${itemid}`;
@@ -362,7 +361,6 @@ export default class Details extends ArchiveBase {
                         ) : ( undefined ) }
 
                         <div class="clearfix"></div>
-                        {/*--TODO-DETAILS-ONLINE probably needs  <div dangerouslySetInnerHTML={{__html: item.metadata.description}}></div>--*/}
                         { description ? ( <div id="descript" itemprop="description" dangerouslySetInnerHTML={{__html: description}}></div> ) : ( undefined ) }
 
                         { credits ? ( <h2 style="font-size:18px">Credits</h2> ) : ( undefined ) }
