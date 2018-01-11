@@ -2,7 +2,6 @@ const Transport = require('./Transport.js');
 const Dweb = require('./Dweb.js');
 const nodefetch = require('node-fetch-npm');
 const Url = require('url');
-const stream = require('readable-stream');
 
 var fetch,Headers,Request;
 if (typeof(Window) === "undefined") {
@@ -40,6 +39,7 @@ class TransportHTTP extends Transport {
         this.urlbase = options.http.urlbase;
         this.supportURLs = ['contenthash', 'http','https']; // http and https are legacy
         this.supportFunctions = ['fetch', 'store', 'add', 'list', 'reverse', 'newlisturls', 'createReadStream']; //Does not support: listmonitor - reverse is disabled somewhere not sure if here or caller
+        this.supportFeatures = ['fetch.range']
         this.name = "HTTP";             // For console log etc
         this.status = Dweb.Transport.STATUS_LOADED;
     }
@@ -129,13 +129,15 @@ class TransportHTTP extends Transport {
         }
     }
 
-    async p_get(command, url, verbose) {
+    async p_get(command, url, verbose, opts={}) {
         // Locate and return a block, based on its url
         // Throws TransportError if fails
         // resolves to: URL that can be used to fetch the resource, of form contenthash:/contenthash/Q123
+        let headers = new Headers();
+        if (opts.start || opts.end) headers.append("range", `bytes=${opts.start || 0}-${opts.end || ""}`);
         let init = {    //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
             method: 'GET',
-            headers: new Headers(),
+            headers: headers,
             mode: 'cors',
             cache: 'default',
             redirect: 'follow',  // Chrome defaults to manual
@@ -162,7 +164,7 @@ class TransportHTTP extends Transport {
         return this.p_httpfetch(command, url, init, verbose);
     }
 
-    p_rawfetch(url, verbose) {
+    p_rawfetch(url, verbose, opts={}) {
         /*
         Fetch from underlying transport,
         url: Of resource - which is turned into the HTTP url in p_httpfetch
@@ -171,7 +173,7 @@ class TransportHTTP extends Transport {
         //if (!(url && url.includes(':') ))
         //    throw new Dweb.errors.CodingError("TransportHTTP.p_rawfetch bad url: "+url);
         console.assert(url, "TransportHTTP.p_rawlist: requires url");
-        return this.p_get(servercommands.rawfetch, url, verbose)
+        return this.p_get(servercommands.rawfetch, url, verbose, opts)
     }
 
     p_rawlist(url, verbose) {
@@ -215,26 +217,6 @@ class TransportHTTP extends Transport {
             u = `contenthash:/contenthash/${ Dweb.KeyPair.multihashsha256_58(cl.keypair.publicexport()[0]) }`; // Pretty random, but means same test will generate same list
         }
         return [u,u];
-    }
-
-    createReadStream(url, opts = {}, verbose = false) {
-        if (verbose) console.log(`TransportHTTP:createReadStream: %o, %o",url, opts`);
-        const through = new stream.PassThrough();
-        // Locate and return a block, based on its url
-        // Throws TransportError if fails
-        // resolves to: URL that can be used to fetch the resource, of form contenthash:/contenthash/Q123
-        let init = {    //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
-            method: 'GET',
-            headers: new Headers({range: `bytes=${opts.start || 0}-${opts.end || ""}`}),
-            mode: 'cors',
-            cache: 'default',
-            redirect: 'follow',  // Chrome defaults to manual
-        };
-        this.p_httpfetch(servercommands.rawfetch, url, init, verbose)
-            .then((buff) => { through.write(buff); through.end(); }); // Should be a buffer we can pass to through
-        //TODO-STREAMS to be totally accurate we should check the range returned and check it matches what sent as HTTP servers can ignore range
-        // Return the stream immediately. wont output anything till promise above resolves and writes the buffer to it.
-        return through;
     }
 
     static async test() {

@@ -56,7 +56,7 @@ class TransportIPFS extends Transport {
         this.options = options;         // Dictionary of options { ipfs: {...}, "yarrays", yarray: {...} }
         this.name = "IPFS";             // For console log etc
         this.supportURLs = ['ipfs'];
-        this.supportFunctions = ['fetch', 'store', 'createReadStream'];   // Does not support reverse
+        this.supportFunctions = ['fetch', 'store'];   // Does not support reverse, createReadStream fails as cant seek
         this.status = Dweb.Transport.STATUS_LOADED;
     }
 
@@ -199,7 +199,7 @@ class TransportIPFS extends Transport {
             } else { //c: not a file
                 buff = res.value;
             }
-            if (verbose) console.log("fetched ", buff.length);
+            if (verbose) console.log("IPFS fetched ", buff.length);
             return buff;
         } catch (err) {
             console.log("Caught misc error in TransportIPFS.p_rawfetch");
@@ -226,16 +226,12 @@ class TransportIPFS extends Transport {
     }
 
     createReadStream(url, opts = {}, verbose = false) {
-        // Locate and return a block, based on its url
-        // Throws TransportError if fails
-        // resolves to: URL that can be used to fetch the resource, of form contenthash:/contenthash/Q123
-        if (verbose) console.log("TransportIPFS:createReadStream:%o, %o",url, opts);
-        const through = new stream.PassThrough();
-        this.p_rawfetch(url, verbose)
-            .then((buff) => buff.slice(opts.start || 0, opts.end || buff.length))
-            .then((buff) => { through.write(buff); through.end(); }); // Should be a buffer we can pass to through
-        // Return the stream immediately. wont output anything till promise above resolves and writes the buffer to it.
-        return through;
+        //TODO-API needs documentation and API update
+        //TODO-STREAMS untested - doesnt work since cant seek into streams.
+        if (verbose) console.log("TransportIPFS:createReadStream:%o, %o", url, opts);
+        if (!url) throw new Dweb.errors.CodingError("TransportIPFS.p_rawfetch: requires url");
+        let stream = this.ipfs.files.catReadableStream(TransportIPFS.cidFrom(url));   // cidFrom Throws TransportError if url bad
+        return stream;
     }
 
     static async test(transport, verbose) {

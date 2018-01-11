@@ -15,24 +15,15 @@ export default class AV extends Details {
     setupPlaylist() {
         this.playlist=[];
         //TODO-DETAILS put these formats in a list in Utils.config
-        this.avs = this._list.filter(fi => (fi.metadata.format=='h.264' || fi.metadata.format=='512Kb MPEG4'));    //TODO-DETAILS-LIST Maybe use _list instead of .files
+        this.avs = this._list.filter(fi => (fi.metadata.format=='h.264' || fi.metadata.format=='512Kb MPEG4'));
         if (!this.avs.length)
-            this.avs = this._list.filter(fi => fi.metadata.format=='VBR MP3'); //TODO-DETAILS-LIST Maybe use _list instead of .files
+            this.avs = this._list.filter(fi => fi.metadata.format=='VBR MP3');
 
         if (this.avs.length) {
             this.avs.sort((a, b) => Util.natcompare(a.name, b.name));   //Unsure why sorting names, presumably tracks are named alphabetically ?
 
             this.playlist.push({ name: this.avs[0].name,
                                  urls: [item.metadata.magnetlink + '/' + this.avs[0].name] })
-            // reduce array down to array of just filenames
-            //avs = avs.map(val => val.name);
-
-            // TODO-DETAILS note these playlists dont match the code in details/commute.html
-            // for (var fi of avs) //TODO-DETAILS make this a map (note its tougher than it looks!)
-            //     this.playlist.push({
-            //         title:(fi.title ? fi.title : fi.name),
-            //         sources:[{file:'https://archive.org/download/'+itemid+'/'+fi.name}]});
-            // this.playlist[0].image = 'https://archive.org/services/img/' + itemid;
         }
 
     }
@@ -51,13 +42,11 @@ export default class AV extends Details {
         let detailsurl = `https://archive.org/details/${itemid}`
         let title = item.title
         //let cfg  = {"aspectratio": 4/3 }; // Old version in Traceys code which was missign other parts of cfg below
-        //TODO-ARCHIVE not that Tracey code has cfg.aspectration = 4/3 and none of the material below which appears in its archive.org/details page
         let cfg =    {"start":0,"embed":null,"so":false,"autoplay":false,"width":0,"height":0,"list_height":0,"audio":false,
             "responsive":true,"flash":false, "hide_list":true,
             "identifier": this.itemid, //TODO-DETAILS-ONLINE check another example and see if identifier should be itemid or title
             "collection": this.item.metadata.collection[0],
         };
-        //TODO this code is from details/commute.html - bears little resemblance to that in Tracey's code
         /*
         [{"title":"commute","orig":"commute.avi","image":"/download/commute/commute.thumbs%2Fcommute_000005.jpg",
             "duration":"115.61",

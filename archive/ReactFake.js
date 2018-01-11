@@ -46,8 +46,10 @@ export default class React  {
                 attrs[name] = React._config.root + attrs[name];  // e.g. /foo => https://bar.com/foo
                 console.log("XXX@43",attrs[name])
             }
-            if (["video.src", "img.src"].includes(tag+"."+name) && attrs[name] instanceof ArchiveFile) {
+            if (["img.src"].includes(tag+"."+name) && attrs[name] instanceof ArchiveFile) {
                 attrs[name].loadImg(element);
+            } else if (["video.src", "img.src"].includes(tag+"."+name) && attrs[name] instanceof ArchiveFile) {
+                attrs[name].loadStream(element);
             } else if (name && attrs.hasOwnProperty(name)) {
                 let value = attrs[name];
                 if (value === true) {

@@ -23,6 +23,7 @@ export default class ArchiveFile {
     async p_loadImg(jsx) {
         /*
         This is the asyncronous part of loadImg, runs in the background to update the image.
+        It gets a static (non stream) content and puts in an existing IMG tag.
 
         Note it can't be inside load_img which has to be synchronous and return a jsx tree.
          */
@@ -30,7 +31,7 @@ export default class ArchiveFile {
         let blk = await  Dweb.Block.p_fetch(urls, verbose);  //Typically will be a Uint8Array
         let blob = new Blob([blk._data], {type: Util.archiveMimeTypeFromFormat[this.metadata.format]}) // Works for data={Uint8Array|Blob}
         // This next code is bizarre combination needed to open a blob from within an HTML window.
-        let objectURL = URL.createObjectURL(blob);    //TODO-STREAMS make this work on streams
+        let objectURL = URL.createObjectURL(blob);
         if (verbose) console.log("Blob URL=",objectURL);
         //jsx.src = `http://archive.org/download/${this.itemid}/${this.metadata.name}`
         jsx.src = objectURL;
@@ -48,7 +49,6 @@ export default class ArchiveFile {
             }
         }
 
-        //RenderMedia.append(file, '#videoContainer');  //TODO-STREAM move to append
         RenderMedia.render(file, jsx);  // Render into supplied element
 
         // TODO: port this to JSX
@@ -78,7 +78,13 @@ export default class ArchiveFile {
     loadImg(jsx) {
         //asynchronously loads file from one of metadata, turns into blob, and stuffs into element
         // Usage like  {this.loadImg(<img width=10>))
-        this.p_loadStream(jsx); /* Asynchronously load image*/  //TODO-STREAM was p_loadImg
+        this.p_loadImg(jsx); /* Asynchronously load image*/
+        return jsx;
+    }
+    loadStream(jsx) {
+        //asynchronously loads file from one of metadata, turns into blob, and stuffs into element
+        // Usage like  {this.loadImg(<img width=10>))
+        this.p_loadStream(jsx); /* Asynchronously load image*/
         return jsx;
     }
     downloadable() {
