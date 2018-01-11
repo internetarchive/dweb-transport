@@ -60,7 +60,7 @@
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 29);
+/******/ 	return __webpack_require__(__webpack_require__.s = 30);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -69,7 +69,7 @@
 
 /* eslint max-len: 0 */
 // TODO: eventually deprecate this console.trace("use the `babel-register` package instead of `babel-core/register`");
-module.exports = __webpack_require__(30);
+module.exports = __webpack_require__(31);
 
 
 /***/ }),
@@ -77,7 +77,7 @@ module.exports = __webpack_require__(30);
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__ = __webpack_require__(18);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__ = __webpack_require__(15);
 /*
 Based on https://stackoverflow.com/questions/30430982/can-i-use-jsx-without-react-to-inline-html-in-script
 I wanted this because React was doing nasty things at run-time (like catching events) and stopping Search box working
@@ -127,8 +127,10 @@ class React {
                 attrs[name] = React._config.root + attrs[name]; // e.g. /foo => https://bar.com/foo
                 console.log("XXX@43", attrs[name]);
             }
-            if (["video.src", "img.src"].includes(tag + "." + name) && attrs[name] instanceof __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__["a" /* default */]) {
+            if (["img.src"].includes(tag + "." + name) && attrs[name] instanceof __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__["a" /* default */]) {
                 attrs[name].loadImg(element);
+            } else if (["video.src", "img.src"].includes(tag + "." + name) && attrs[name] instanceof __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__["a" /* default */]) {
+                attrs[name].loadStream(element);
             } else if (name && attrs.hasOwnProperty(name)) {
                 let value = attrs[name];
                 if (value === true) {
@@ -210,9 +212,9 @@ if (typeof Object.create === 'function') {
 
 
 
-var base64 = __webpack_require__(45)
-var ieee754 = __webpack_require__(46)
-var isArray = __webpack_require__(23)
+var base64 = __webpack_require__(37)
+var ieee754 = __webpack_require__(38)
+var isArray = __webpack_require__(22)
 
 exports.Buffer = Buffer
 exports.SlowBuffer = SlowBuffer
@@ -2413,8 +2415,8 @@ process.umask = function() { return 0; };
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__ = __webpack_require__(17);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__ArchiveFile__ = __webpack_require__(18);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__ = __webpack_require__(29);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__ArchiveFile__ = __webpack_require__(15);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 //Not needed on client - kept so script can run in both cases
@@ -2443,7 +2445,7 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
     }
 
     navwrapped() {
-        /* Wrap the content up checked on mbid (Red Shift) image:  wrap( TODO-TODO-DONATEBANNER | nav-wrap1 | maincontent | theatre-ia-wrap | item-details-about | TODO-ALSOFOND  | TODO-ANALYTICS )
+        /* Wrap the content up checked on mbid (Red Shift) image:  wrap( TODO-TODO-DONATEBANNER | nav-wrap1 | maincontent | theatre-ia-wrap | item-details-about | TODO-ACTIONBUTTONS | TODO-ALSOFOUND  | TODO-ANALYTICS )
         returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
          */
         return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
@@ -2582,7 +2584,7 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
                     ),
                     __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                         'a',
-                        { href: `https://www.tumblr.com/share/video?embed=%3Ciframe+width%3D%22640%22+height%3D%22480%22+frameborder%3D%220%22+allowfullscreen+src%3D%22https%3A%2F%2Farchive.org%2Fembed%2F%22+webkitallowfullscreen%3D%22true%22+mozallowfullscreen%3D%22true%22%26gt%3B%26lt%3B%2Fiframe%3E&;name=${item.metadata.title}+%3A+${item.metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`,
+                        { href: `https://www.tumblr.com/share/video?embed=%3Ciframe+width%3D%22640%22+height%3D%22480%22+frameborder%3D%220%22+allowfullscreen+src%3D%22https%3A%2F%2Farchive.org%2Fembed%2F%22+webkitallowfullscreen%3D%22true%22+mozallowfullscreen%3D%22true%22%26gt%3B%26lt%3B%2Fiframe%3E&;name=${itemid}+%3A+${item.metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`,
                             target: '_blank' },
                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-tumblr', 'data-toggle': 'tooltip',
                             'data-placement': 'bottom', title: '',
@@ -2704,13 +2706,13 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
         let licence = metadata.licenseurl; //TODO - handle other licenses - hardwired for CC currently
         let languageAbbrev = metadata.language;
         let languageLong = { eng: "English", dut: "Dutch" }[languageAbbrev]; //TODO-other languages
-        let description = metadata.description; // TODO prob need to do via innerHTML thing
+        let description = metadata.description; // Contains HTML (supposedly safe) inserted via innerHTML thing
         let metadataListPossible = { color: "Color", coverage: "Location", director: "Director", identifier: "Identifier",
             "identifier-ark": "Identifier-ark", ocr: "Ocr", runtime: "Run time", ppi: "Ppi", sound: "Sound", year: "Year" }; /*TODO expand to longer list*/
         let metadataListFound = Object.keys(metadataListPossible).filter(k => metadata[k]); // List of keys in the metadata
         let downloadableFiles = this._list.filter(f => f.downloadable()); // Note on image it EXCLUDED JPEG Thumb, but included JPEG*Thumb
         //TODO  Replace "a" with onclicks to download function on f
-        //TODO Need f.sizePretty property of ArchiveFile
+        //TODO Need f.sizePretty property of ArchiveFile (see prettierbytes used in WebTorrent)
         let filesCount = item.files_count;
         let originalFilesCount = item.files.filter(f => f.source === "original").length + 1; // Adds in Archive Bittorrent
         let downloadURL = `https://archive.org/download/${itemid}`;
@@ -3291,7 +3293,7 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
 
 /*<replacement>*/
 
-var processNextTick = __webpack_require__(12);
+var processNextTick = __webpack_require__(11);
 /*</replacement>*/
 
 /*<replacement>*/
@@ -3310,8 +3312,8 @@ var util = __webpack_require__(9);
 util.inherits = __webpack_require__(2);
 /*</replacement>*/
 
-var Readable = __webpack_require__(22);
-var Writable = __webpack_require__(26);
+var Readable = __webpack_require__(21);
+var Writable = __webpack_require__(25);
 
 util.inherits(Duplex, Readable);
 
@@ -3529,145 +3531,19 @@ function objectToString(o) {
 
 /***/ }),
 /* 10 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
-"use strict";
-Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__ = __webpack_require__(17);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Tile__ = __webpack_require__(32);
-
-
-__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
-
-
-
-
-
-/* Section to ensure node and browser able to use Headers, Request and Fetch */
-/*
-var fetch,Headers,Request;
-if (typeof(Window) === "undefined") {
-    //var fetch = require('whatwg-fetch').fetch; //Not as good as node-fetch-npm, but might be the polyfill needed for browser.safari
-    //XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;  // Note this doesnt work if set to a var or const, needed by whatwg-fetch
-    console.log("Node loaded");
-    fetch = nodefetch;
-    Headers = fetch.Headers;      // A class
-    Request = fetch.Request;      // A class
-} else {
-    // If on a browser, need to find fetch,Headers,Request in window
-    console.log("Loading browser version of fetch,Headers,Request");
-    fetch = window.fetch;
-    Headers = window.Headers;
-    Request = window.Request;
-}
-*/
-
-class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default */] {
-    /*
-    Superclass for Searches - including Collections & Home
-     Fields:
-    Inherited from ArchiveBase: item
-    items   List of items found
-     */
-    constructor({ query = '*:*', sort = '', and = '', limit = 75, banner = '', page = 1, item = undefined, itemid = undefined } = {}) {
-        super(itemid, { item: item });
-        this.query = query;
-        this.limit = limit;
-        this.sort = sort;
-        this.and = and;
-        this.page = page;
-    }
-
-    navwrapped() {
-        /* Wrap the content up: wrap ( TODO-DONATE | navwrap |
-        TODO-DETAILS need stuff before nav-wrap1 and after detailsabout and need to check this against Search and Collection examples
-        returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
-         */
-        //TODO-DETAILS is putting the description (in 'htm' in as raw html which would be a nasty security hole since that comes from user !
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            { id: 'wrap' },
-            new Nav().navwrapJSX(),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'div',
-                { 'class': 'container container-ia' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('a', { name: 'maincontent', id: 'maincontent' })
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'div',
-                { className: 'container container-ia' },
-                this.banner(),
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'div',
-                    { className: 'row' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { className: 'col-xs-12' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { id: 'ikind-search', className: 'ikind in' },
-                            this.items.map(function (item, n) {
-                                // Note rendering tiles is quick, its the fetch of the img (async) which is slow.
-                                return new __WEBPACK_IMPORTED_MODULE_3__Tile__["a" /* default */]().render(item);
-                            })
-                        )
-                    )
-                )
-            )
-        );
-    }
-
-    archive_setup_push() {
-        archive_setup.push(function () {
-            AJS.date_switcher(`&nbsp;<a href="/search.php?query=${query}&amp;sort=-publicdate"><div class="date_switcher in">Date Archived</div></a> <a href="/search.php?query=${query}&amp;sort=-date"><div class="date_switcher">Date Published</div></a> <a href="/search.php?query=${query}&amp;sort=-reviewdate"><div class="date_switcher">Date Reviewed</div></a> `);
-        });
-        archive_setup.push(function () {
-            //TODO-DETAILS check not pushing on top of existing (it probably is)
-            AJS.lists_v_tiles_setup('search');
-            AJS.popState('search');
-            $('div.ikind').css({ visibility: 'visible' });
-            AJS.tiler(); // Note Traceys code had AJS.tiler('#ikind-search') but Search and Collections examples have it with no args
-            $(window).on('resize  orientationchange', function (evt) {
-                clearTimeout(AJS.node_search_throttler);
-                AJS.node_search_throttler = setTimeout(AJS.tiler, 250);
-            });
-            // register for scroll updates (for infinite search results)
-            $(window).scroll(AJS.scrolled);
-        });
-    }
-    browserBefore() {
-        $('body').addClass('bgEEE');
-    }
-    banner() {
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'h1',
-            null,
-            'Search: ',
-            this.query
-        );
-    }
-
-}
-/* harmony export (immutable) */ __webpack_exports__["default"] = Search;
+exports = module.exports = __webpack_require__(21);
+exports.Stream = exports;
+exports.Readable = exports;
+exports.Writable = __webpack_require__(25);
+exports.Duplex = __webpack_require__(7);
+exports.Transform = __webpack_require__(27);
+exports.PassThrough = __webpack_require__(44);
 
 
 /***/ }),
 /* 11 */
-/***/ (function(module, exports, __webpack_require__) {
-
-exports = module.exports = __webpack_require__(22);
-exports.Stream = exports;
-exports.Readable = exports;
-exports.Writable = __webpack_require__(26);
-exports.Duplex = __webpack_require__(7);
-exports.Transform = __webpack_require__(28);
-exports.PassThrough = __webpack_require__(52);
-
-
-/***/ }),
-/* 12 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3718,7 +3594,7 @@ function nextTick(fn, arg1, arg2, arg3) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5)))
 
 /***/ }),
-/* 13 */
+/* 12 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* eslint-disable node/no-deprecated-api */
@@ -3786,13 +3662,13 @@ SafeBuffer.allocUnsafeSlow = function (size) {
 
 
 /***/ }),
-/* 14 */
+/* 13 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {// var assert = require('assert')
-var uint64be = __webpack_require__(67)
+var uint64be = __webpack_require__(59)
 
-var boxes = __webpack_require__(68)
+var boxes = __webpack_require__(60)
 
 var UINT32_MAX = 4294967295
 
@@ -4018,7 +3894,235 @@ Box.encodingLength = function (obj) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
+/* 14 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__ = __webpack_require__(29);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Tile__ = __webpack_require__(65);
+
+
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
+
+
+
+
+/* Section to ensure node and browser able to use Headers, Request and Fetch */
+/*
+var fetch,Headers,Request;
+if (typeof(Window) === "undefined") {
+    //var fetch = require('whatwg-fetch').fetch; //Not as good as node-fetch-npm, but might be the polyfill needed for browser.safari
+    //XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;  // Note this doesnt work if set to a var or const, needed by whatwg-fetch
+    console.log("Node loaded");
+    fetch = nodefetch;
+    Headers = fetch.Headers;      // A class
+    Request = fetch.Request;      // A class
+} else {
+    // If on a browser, need to find fetch,Headers,Request in window
+    console.log("Loading browser version of fetch,Headers,Request");
+    fetch = window.fetch;
+    Headers = window.Headers;
+    Request = window.Request;
+}
+*/
+
+class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default */] {
+    /*
+    Superclass for Searches - including Collections & Home
+     Fields:
+    Inherited from ArchiveBase: item
+    items   List of items found
+     */
+    constructor({ query = '*:*', sort = '', and = '', limit = 75, banner = '', page = 1, item = undefined, itemid = undefined } = {}) {
+        super(itemid, { item: item });
+        this.query = query;
+        this.limit = limit;
+        this.sort = sort;
+        this.and = and;
+        this.page = page;
+    }
+
+    navwrapped() {
+        /* Wrap the content up: wrap ( TODO-DONATE | navwrap |
+        TODO-DETAILS need stuff before nav-wrap1 and after detailsabout and need to check this against Search and Collection examples
+        returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
+         */
+        //TODO-DETAILS is putting the description (in 'htm' in as raw html which would be a nasty security hole since that comes from user !
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            { id: 'wrap' },
+            new Nav().navwrapJSX(),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'div',
+                { 'class': 'container container-ia' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('a', { name: 'maincontent', id: 'maincontent' })
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'div',
+                { className: 'container container-ia' },
+                this.banner(),
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { className: 'row' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { className: 'col-xs-12' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { id: 'ikind-search', className: 'ikind in' },
+                            this.items.map(function (item, n) {
+                                // Note rendering tiles is quick, its the fetch of the img (async) which is slow.
+                                return new __WEBPACK_IMPORTED_MODULE_3__Tile__["a" /* default */]().render(item);
+                            })
+                        )
+                    )
+                )
+            )
+        );
+    }
+
+    archive_setup_push() {
+        archive_setup.push(function () {
+            AJS.date_switcher(`&nbsp;<a href="/search.php?query=${query}&amp;sort=-publicdate"><div class="date_switcher in">Date Archived</div></a> <a href="/search.php?query=${query}&amp;sort=-date"><div class="date_switcher">Date Published</div></a> <a href="/search.php?query=${query}&amp;sort=-reviewdate"><div class="date_switcher">Date Reviewed</div></a> `);
+        });
+        archive_setup.push(function () {
+            //TODO-DETAILS check not pushing on top of existing (it probably is)
+            AJS.lists_v_tiles_setup('search');
+            AJS.popState('search');
+            $('div.ikind').css({ visibility: 'visible' });
+            AJS.tiler(); // Note Traceys code had AJS.tiler('#ikind-search') but Search and Collections examples have it with no args
+            $(window).on('resize  orientationchange', function (evt) {
+                clearTimeout(AJS.node_search_throttler);
+                AJS.node_search_throttler = setTimeout(AJS.tiler, 250);
+            });
+            // register for scroll updates (for infinite search results)
+            $(window).scroll(AJS.scrolled);
+        });
+    }
+    browserBefore() {
+        $('body').addClass('bgEEE');
+    }
+    banner() {
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'h1',
+            null,
+            'Search: ',
+            this.query
+        );
+    }
+
+}
+/* harmony export (immutable) */ __webpack_exports__["default"] = Search;
+
+
+/***/ }),
 /* 15 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_prettier_bytes__ = __webpack_require__(18);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_prettier_bytes___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_prettier_bytes__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_render_media__ = __webpack_require__(19);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_render_media___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1_render_media__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Util__ = __webpack_require__(4);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit__ = __webpack_require__(28);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_4_throttleit__);
+
+
+
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
+
+
+
+class ArchiveFile {
+    /*
+    Represents a single file, currently one that is in the item, but might create sub/super classes to handle other types
+    of file e.g. images used in the UI
+     Fields:
+    metadata: metadata of item - (note will be a pointer into a Detail or Search's metadata so treat as read-only)
+    sd: pointer to SmartDict or Block ? created with Urls (see how did it with Academic)
+     */
+
+    constructor({ itemid = undefined, metadata = undefined } = {}) {
+        this.itemid = itemid;
+        this.metadata = metadata;
+    }
+    async p_loadImg(jsx) {
+        /*
+        This is the asyncronous part of loadImg, runs in the background to update the image.
+        It gets a static (non stream) content and puts in an existing IMG tag.
+         Note it can't be inside load_img which has to be synchronous and return a jsx tree.
+         */
+        let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash]; // Multiple potential sources
+        let blk = await Dweb.Block.p_fetch(urls, verbose); //Typically will be a Uint8Array
+        let blob = new Blob([blk._data], { type: __WEBPACK_IMPORTED_MODULE_3__Util__["a" /* default */].archiveMimeTypeFromFormat[this.metadata.format] }); // Works for data={Uint8Array|Blob}
+        // This next code is bizarre combination needed to open a blob from within an HTML window.
+        let objectURL = URL.createObjectURL(blob);
+        if (verbose) console.log("Blob URL=", objectURL);
+        //jsx.src = `http://archive.org/download/${this.itemid}/${this.metadata.name}`
+        jsx.src = objectURL;
+    }
+    async p_loadStream(jsx) {
+        let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash]; // Multiple potential sources
+        var file = {
+            name: this.metadata.name,
+            createReadStream: function (opts) {
+                // Return a readable stream that provides the bytes between offsets "start"
+                // and "end" inclusive. This works just like fs.createReadStream(opts) from
+                // the node.js "fs" module.
+
+                return Dweb.Transports.createReadStream(urls, opts, verbose);
+            }
+        };
+
+        __WEBPACK_IMPORTED_MODULE_1_render_media___default.a.render(file, jsx); // Render into supplied element
+
+        // TODO: port this to JSX
+        if (window.WEBTORRENT_TORRENT) {
+            const torrent = window.WEBTORRENT_TORRENT;
+
+            const updateSpeed = () => {
+                const webtorrentStats = document.querySelector('#webtorrentStats'); // Not moved into updateSpeed as not in document when this is run first time
+                var progress = (100 * torrent.progress).toFixed(1);
+
+                const html = '<b>Peers:</b> ' + torrent.numPeers + ' ' + '<b>Progress:</b> ' + progress + '% ' + '<b>Download speed:</b> ' + __WEBPACK_IMPORTED_MODULE_0_prettier_bytes___default()(torrent.downloadSpeed) + '/s ' + '<b>Upload speed:</b> ' + __WEBPACK_IMPORTED_MODULE_0_prettier_bytes___default()(torrent.uploadSpeed) + '/s';
+
+                if (webtorrentStats) webtorrentStats.innerHTML = html; // May be null during loading, or not in UI
+            };
+
+            torrent.on('download', __WEBPACK_IMPORTED_MODULE_4_throttleit___default()(updateSpeed, 250));
+            torrent.on('upload', __WEBPACK_IMPORTED_MODULE_4_throttleit___default()(updateSpeed, 250));
+            setInterval(updateSpeed, 1000);
+            updateSpeed();
+        }
+    }
+    loadImg(jsx) {
+        //asynchronously loads file from one of metadata, turns into blob, and stuffs into element
+        // Usage like  {this.loadImg(<img width=10>))
+        this.p_loadImg(jsx); /* Asynchronously load image*/
+        return jsx;
+    }
+    loadStream(jsx) {
+        //asynchronously loads file from one of metadata, turns into blob, and stuffs into element
+        // Usage like  {this.loadImg(<img width=10>))
+        this.p_loadStream(jsx); /* Asynchronously load image*/
+        return jsx;
+    }
+    downloadable() {
+        return Object.keys(__WEBPACK_IMPORTED_MODULE_3__Util__["a" /* default */].downloadableFormats).includes(this.metadata.format);
+    }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = ArchiveFile;
+
+
+/***/ }),
+/* 16 */
 /***/ (function(module, exports) {
 
 // Copyright Joyent, Inc. and other Node contributors.
@@ -4326,10 +4430,10 @@ function isUndefined(arg) {
 
 
 /***/ }),
-/* 16 */
+/* 17 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var wrappy = __webpack_require__(57)
+var wrappy = __webpack_require__(49)
 module.exports = wrappy(once)
 module.exports.strict = wrappy(onceStrict)
 
@@ -4374,167 +4478,7 @@ function onceStrict (fn) {
 
 
 /***/ }),
-/* 17 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveItem__ = __webpack_require__(31);
-__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
-
-//Not needed on client - kept so script can run in both cases
-//import ReactDOMServer from 'react-dom/server';
-//Next line is for client, not needed on server but doesnt hurt
-//import ReactDOM from 'react-dom';
-//TODO-DETAILS add a config file, load at compile and make overridable - server etc go there
-
-
-
-class ArchiveBase extends __WEBPACK_IMPORTED_MODULE_2__ArchiveItem__["a" /* default */] {
-    //TODO-REFACTOR - extends ArchiveItem and rename to ArchivePageBase - move data to AI
-    /*
-    Base class for Archive application - base of Details = which includes single element items and Search which includes both searches and collections (which are actually items).
-    ArchiveBase
-    - Details
-    - - AV
-    - - Image
-    - - Text
-    - - Software (not implemented)
-    - Search
-    - - Home
-    - - Collection
-    Nav - knows about all the classes (includes factory() but doesnt subclass them
-    Util - just some utility functions
-    Tile - elements on a Search - each is a ArchiveItem
-    ReactFake - spoofs methods of React as otherwise hard to do onclick etc if use real React (note archive.min still uses react a little)
-     Fields:
-    item    Metadata for item, undefined for a search.
-    items   Metadata for items found if the item is a Collection,
-    itemtype    Schema.org for this eg. "http://schema.org/TextDigitalDocument"
-    query   query part of search to run (Search|Collection|Home only)
-     */
-    constructor(itemid, { item = undefined } = {}) {
-        super({ itemid: itemid, item: item });
-    }
-    theatreIaWrap() {}
-
-    browserBefore() {
-        //Anything that is needed to be executed in the browser before the main HTML tree is replaced.
-        // Nothing to do by default
-    }
-    browserAfter() {
-        this.archive_setup_push(); // Subclassed function to setup stuff for after loading.
-        __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].AJS_on_dom_loaded(); // Runs code pushed archive_setup - needed for image if "super" this, put it after superclasses
-    }
-    render(res, htm) {
-        //TODO-DETAILS remove htm and from calling routines
-        var els = this.navwrapped();
-        this.browserBefore();
-        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].domrender(els, res);
-        this.browserAfter();
-    }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = ArchiveBase;
-
-
-/***/ }),
 /* 18 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_prettier_bytes__ = __webpack_require__(19);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_prettier_bytes___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_prettier_bytes__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_render_media__ = __webpack_require__(39);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_render_media___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1_render_media__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Util__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit__ = __webpack_require__(20);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_4_throttleit__);
-
-
-
-__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
-
-
-
-
-class ArchiveFile {
-    /*
-    Represents a single file, currently one that is in the item, but might create sub/super classes to handle other types
-    of file e.g. images used in the UI
-     Fields:
-    metadata: metadata of item - (note will be a pointer into a Detail or Search's metadata so treat as read-only)
-    sd: pointer to SmartDict or Block ? created with Urls (see how did it with Academic)
-     */
-
-    constructor({ itemid = undefined, metadata = undefined } = {}) {
-        this.itemid = itemid;
-        this.metadata = metadata;
-    }
-    async p_loadImg(jsx) {
-        /*
-        This is the asyncronous part of loadImg, runs in the background to update the image.
-         Note it can't be inside load_img which has to be synchronous and return a jsx tree.
-         */
-        let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash]; // Multiple potential sources
-        let blk = await Dweb.Block.p_fetch(urls, verbose); //Typically will be a Uint8Array
-        let blob = new Blob([blk._data], { type: __WEBPACK_IMPORTED_MODULE_3__Util__["a" /* default */].archiveMimeTypeFromFormat[this.metadata.format] }); // Works for data={Uint8Array|Blob}
-        // This next code is bizarre combination needed to open a blob from within an HTML window.
-        let objectURL = URL.createObjectURL(blob); //TODO-STREAMS make this work on streams
-        if (verbose) console.log("Blob URL=", objectURL);
-        //jsx.src = `http://archive.org/download/${this.itemid}/${this.metadata.name}`
-        jsx.src = objectURL;
-    }
-    async p_loadStream(jsx) {
-        let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash]; // Multiple potential sources
-        var file = {
-            name: this.metadata.name,
-            createReadStream: function (opts) {
-                // Return a readable stream that provides the bytes between offsets "start"
-                // and "end" inclusive. This works just like fs.createReadStream(opts) from
-                // the node.js "fs" module.
-
-                return Dweb.Transports.createReadStream(urls, opts);
-            }
-
-            //RenderMedia.append(file, '#videoContainer');  //TODO-STREAM move to append
-        };__WEBPACK_IMPORTED_MODULE_1_render_media___default.a.render(file, jsx); // Render into supplied element
-
-        // TODO: port this to JSX
-        if (window.WEBTORRENT_TORRENT) {
-            const torrent = window.WEBTORRENT_TORRENT;
-
-            const updateSpeed = () => {
-                const webtorrentStats = document.querySelector('#webtorrentStats'); // Not moved into updateSpeed as not in document when this is run first time
-                var progress = (100 * torrent.progress).toFixed(1);
-
-                const html = '<b>Peers:</b> ' + torrent.numPeers + ' ' + '<b>Progress:</b> ' + progress + '% ' + '<b>Download speed:</b> ' + __WEBPACK_IMPORTED_MODULE_0_prettier_bytes___default()(torrent.downloadSpeed) + '/s ' + '<b>Upload speed:</b> ' + __WEBPACK_IMPORTED_MODULE_0_prettier_bytes___default()(torrent.uploadSpeed) + '/s';
-
-                if (webtorrentStats) webtorrentStats.innerHTML = html; // May be null during loading, or not in UI
-            };
-
-            torrent.on('download', __WEBPACK_IMPORTED_MODULE_4_throttleit___default()(updateSpeed, 250));
-            torrent.on('upload', __WEBPACK_IMPORTED_MODULE_4_throttleit___default()(updateSpeed, 250));
-            setInterval(updateSpeed, 1000);
-            updateSpeed();
-        }
-    }
-    loadImg(jsx) {
-        //asynchronously loads file from one of metadata, turns into blob, and stuffs into element
-        // Usage like  {this.loadImg(<img width=10>))
-        this.p_loadStream(jsx); /* Asynchronously load image*/ //TODO-STREAM was p_loadImg
-        return jsx;
-    }
-    downloadable() {
-        return Object.keys(__WEBPACK_IMPORTED_MODULE_3__Util__["a" /* default */].downloadableFormats).includes(this.metadata.format);
-    }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = ArchiveFile;
-
-
-/***/ }),
-/* 19 */
 /***/ (function(module, exports) {
 
 module.exports = prettierBytes
@@ -4570,52 +4514,370 @@ function prettierBytes (num) {
 
 
 /***/ }),
-/* 20 */
-/***/ (function(module, exports) {
+/* 19 */
+/***/ (function(module, exports, __webpack_require__) {
 
-module.exports = throttle;
+exports.render = render
+exports.append = append
+exports.mime = __webpack_require__(32)
 
-/**
- * Returns a new function that, when invoked, invokes `func` at most once per `wait` milliseconds.
- *
- * @param {Function} func Function to wrap.
- * @param {Number} wait Number of milliseconds that must elapse between `func` invocations.
- * @return {Function} A new function that wraps the `func` function passed in.
- */
+var debug = __webpack_require__(33)('render-media')
+var isAscii = __webpack_require__(36)
+var MediaElementWrapper = __webpack_require__(20)
+var path = __webpack_require__(46)
+var streamToBlobURL = __webpack_require__(47)
+var videostream = __webpack_require__(50)
 
-function throttle (func, wait) {
-  var ctx, args, rtn, timeoutID; // caching
-  var last = 0;
+var VIDEOSTREAM_EXTS = [
+  '.m4a',
+  '.m4v',
+  '.mp4'
+]
 
-  return function throttled () {
-    ctx = this;
-    args = arguments;
-    var delta = new Date() - last;
-    if (!timeoutID)
-      if (delta >= wait) call();
-      else timeoutID = setTimeout(call, wait - delta);
-    return rtn;
-  };
+var MEDIASOURCE_VIDEO_EXTS = [
+  '.m4v',
+  '.mkv',
+  '.mp4',
+  '.webm'
+]
 
-  function call () {
-    timeoutID = 0;
-    last = +new Date();
-    rtn = func.apply(ctx, args);
-    ctx = null;
-    args = null;
+var MEDIASOURCE_AUDIO_EXTS = [
+  '.m4a',
+  '.mp3'
+]
+
+var MEDIASOURCE_EXTS = [].concat(
+  MEDIASOURCE_VIDEO_EXTS,
+  MEDIASOURCE_AUDIO_EXTS
+)
+
+var AUDIO_EXTS = [
+  '.aac',
+  '.oga',
+  '.ogg',
+  '.wav'
+]
+
+var IMAGE_EXTS = [
+  '.bmp',
+  '.gif',
+  '.jpeg',
+  '.jpg',
+  '.png',
+  '.svg'
+]
+
+var IFRAME_EXTS = [
+  '.css',
+  '.html',
+  '.js',
+  '.md',
+  '.pdf',
+  '.txt'
+]
+
+// Maximum file length for which the Blob URL strategy will be attempted
+// See: https://github.com/feross/render-media/issues/18
+var MAX_BLOB_LENGTH = 200 * 1000 * 1000 // 200 MB
+
+var MediaSource = typeof window !== 'undefined' && window.MediaSource
+
+function render (file, elem, opts, cb) {
+  if (typeof opts === 'function') {
+    cb = opts
+    opts = {}
   }
+  if (!opts) opts = {}
+  if (!cb) cb = function () {}
+
+  validateFile(file)
+  parseOpts(opts)
+
+  if (typeof elem === 'string') elem = document.querySelector(elem)
+
+  renderMedia(file, function (tagName) {
+    if (elem.nodeName !== tagName.toUpperCase()) {
+      var extname = path.extname(file.name).toLowerCase()
+
+      throw new Error(
+        'Cannot render "' + extname + '" inside a "' +
+        elem.nodeName.toLowerCase() + '" element, expected "' + tagName + '"'
+      )
+    }
+
+    return elem
+  }, opts, cb)
+}
+
+function append (file, rootElem, opts, cb) {
+  if (typeof opts === 'function') {
+    cb = opts
+    opts = {}
+  }
+  if (!opts) opts = {}
+  if (!cb) cb = function () {}
+
+  validateFile(file)
+  parseOpts(opts)
+
+  if (typeof rootElem === 'string') rootElem = document.querySelector(rootElem)
+
+  if (rootElem && (rootElem.nodeName === 'VIDEO' || rootElem.nodeName === 'AUDIO')) {
+    throw new Error(
+      'Invalid video/audio node argument. Argument must be root element that ' +
+      'video/audio tag will be appended to.'
+    )
+  }
+
+  renderMedia(file, getElem, opts, done)
+
+  function getElem (tagName) {
+    if (tagName === 'video' || tagName === 'audio') return createMedia(tagName)
+    else return createElem(tagName)
+  }
+
+  function createMedia (tagName) {
+    var elem = createElem(tagName)
+    if (opts.controls) elem.controls = true
+    if (opts.autoplay) elem.autoplay = true
+    rootElem.appendChild(elem)
+    return elem
+  }
+
+  function createElem (tagName) {
+    var elem = document.createElement(tagName)
+    rootElem.appendChild(elem)
+    return elem
+  }
+
+  function done (err, elem) {
+    if (err && elem) elem.remove()
+    cb(err, elem)
+  }
+}
+
+function renderMedia (file, getElem, opts, cb) {
+  var extname = path.extname(file.name).toLowerCase()
+  var currentTime = 0
+  var elem
+
+  if (MEDIASOURCE_EXTS.indexOf(extname) >= 0) {
+    renderMediaSource()
+  } else if (AUDIO_EXTS.indexOf(extname) >= 0) {
+    renderAudio()
+  } else if (IMAGE_EXTS.indexOf(extname) >= 0) {
+    renderImage()
+  } else if (IFRAME_EXTS.indexOf(extname) >= 0) {
+    renderIframe()
+  } else {
+    tryRenderIframe()
+  }
+
+  function renderMediaSource () {
+    var tagName = MEDIASOURCE_VIDEO_EXTS.indexOf(extname) >= 0 ? 'video' : 'audio'
+
+    if (MediaSource) {
+      if (VIDEOSTREAM_EXTS.indexOf(extname) >= 0) {
+        useVideostream()
+      } else {
+        useMediaSource()
+      }
+    } else {
+      useBlobURL()
+    }
+
+    function useVideostream () {
+      debug('Use `videostream` package for ' + file.name)
+      prepareElem()
+      elem.addEventListener('error', fallbackToMediaSource)
+      elem.addEventListener('loadstart', onLoadStart)
+      elem.addEventListener('canplay', onCanPlay)
+      videostream(file, elem)
+    }
+
+    function useMediaSource () {
+      debug('Use MediaSource API for ' + file.name)
+      prepareElem()
+      elem.addEventListener('error', fallbackToBlobURL)
+      elem.addEventListener('loadstart', onLoadStart)
+      elem.addEventListener('canplay', onCanPlay)
+
+      var wrapper = new MediaElementWrapper(elem)
+      var writable = wrapper.createWriteStream(getCodec(file.name))
+      file.createReadStream().pipe(writable)
+
+      if (currentTime) elem.currentTime = currentTime
+    }
+
+    function useBlobURL () {
+      debug('Use Blob URL for ' + file.name)
+      prepareElem()
+      elem.addEventListener('error', fatalError)
+      elem.addEventListener('loadstart', onLoadStart)
+      elem.addEventListener('canplay', onCanPlay)
+      getBlobURL(file, function (err, url) {
+        if (err) return fatalError(err)
+        elem.src = url
+        if (currentTime) elem.currentTime = currentTime
+      })
+    }
+
+    function fallbackToMediaSource (err) {
+      debug('videostream error: fallback to MediaSource API: %o', err.message || err)
+      elem.removeEventListener('error', fallbackToMediaSource)
+      elem.removeEventListener('canplay', onCanPlay)
+
+      useMediaSource()
+    }
+
+    function fallbackToBlobURL (err) {
+      debug('MediaSource API error: fallback to Blob URL: %o', err.message || err)
+
+      if (typeof file.length === 'number' && file.length > opts.maxBlobLength) {
+        debug(
+          'File length too large for Blob URL approach: %d (max: %d)',
+          file.length, opts.maxBlobLength
+        )
+        return fatalError(new Error(
+          'File length too large for Blob URL approach: ' + file.length +
+          ' (max: ' + opts.maxBlobLength + ')'
+        ))
+      }
+
+      elem.removeEventListener('error', fallbackToBlobURL)
+      elem.removeEventListener('canplay', onCanPlay)
+
+      useBlobURL()
+    }
+
+    function prepareElem () {
+      if (!elem) {
+        elem = getElem(tagName)
+
+        elem.addEventListener('progress', function () {
+          currentTime = elem.currentTime
+        })
+      }
+    }
+  }
+
+  function renderAudio () {
+    elem = getElem('audio')
+    getBlobURL(file, function (err, url) {
+      if (err) return fatalError(err)
+      elem.addEventListener('error', fatalError)
+      elem.addEventListener('loadstart', onLoadStart)
+      elem.addEventListener('canplay', onCanPlay)
+      elem.src = url
+    })
+  }
+
+  function onLoadStart () {
+    elem.removeEventListener('loadstart', onLoadStart)
+    if (opts.autoplay) elem.play()
+  }
+
+  function onCanPlay () {
+    elem.removeEventListener('canplay', onCanPlay)
+    cb(null, elem)
+  }
+
+  function renderImage () {
+    elem = getElem('img')
+    getBlobURL(file, function (err, url) {
+      if (err) return fatalError(err)
+      elem.src = url
+      elem.alt = file.name
+      cb(null, elem)
+    })
+  }
+
+  function renderIframe () {
+    elem = getElem('iframe')
+
+    getBlobURL(file, function (err, url) {
+      if (err) return fatalError(err)
+      elem.src = url
+      if (extname !== '.pdf') elem.sandbox = 'allow-forms allow-scripts'
+      cb(null, elem)
+    })
+  }
+
+  function tryRenderIframe () {
+    debug('Unknown file extension "%s" - will attempt to render into iframe', extname)
+
+    var str = ''
+    file.createReadStream({ start: 0, end: 1000 })
+      .setEncoding('utf8')
+      .on('data', function (chunk) {
+        str += chunk
+      })
+      .on('end', done)
+      .on('error', cb)
+
+    function done () {
+      if (isAscii(str)) {
+        debug('File extension "%s" appears ascii, so will render.', extname)
+        renderIframe()
+      } else {
+        debug('File extension "%s" appears non-ascii, will not render.', extname)
+        cb(new Error('Unsupported file type "' + extname + '": Cannot append to DOM'))
+      }
+    }
+  }
+
+  function fatalError (err) {
+    err.message = 'Error rendering file "' + file.name + '": ' + err.message
+    debug(err.message)
+    cb(err)
+  }
+}
+
+function getBlobURL (file, cb) {
+  var extname = path.extname(file.name).toLowerCase()
+  streamToBlobURL(file.createReadStream(), exports.mime[extname], cb)
+}
+
+function validateFile (file) {
+  if (file == null) {
+    throw new Error('file cannot be null or undefined')
+  }
+  if (typeof file.name !== 'string') {
+    throw new Error('missing or invalid file.name property')
+  }
+  if (typeof file.createReadStream !== 'function') {
+    throw new Error('missing or invalid file.createReadStream property')
+  }
+}
+
+function getCodec (name) {
+  var extname = path.extname(name).toLowerCase()
+  return {
+    '.m4a': 'audio/mp4; codecs="mp4a.40.5"',
+    '.m4v': 'video/mp4; codecs="avc1.640029, mp4a.40.5"',
+    '.mkv': 'video/webm; codecs="avc1.640029, mp4a.40.5"',
+    '.mp3': 'audio/mpeg',
+    '.mp4': 'video/mp4; codecs="avc1.640029, mp4a.40.5"',
+    '.webm': 'video/webm; codecs="vorbis, vp8"'
+  }[extname]
+}
+
+function parseOpts (opts) {
+  if (opts.autoplay == null) opts.autoplay = true
+  if (opts.controls == null) opts.controls = true
+  if (opts.maxBlobLength == null) opts.maxBlobLength = MAX_BLOB_LENGTH
 }
 
 
 /***/ }),
-/* 21 */
+/* 20 */
 /***/ (function(module, exports, __webpack_require__) {
 
 module.exports = MediaElementWrapper
 
 var inherits = __webpack_require__(2)
-var stream = __webpack_require__(11)
-var toArrayBuffer = __webpack_require__(53)
+var stream = __webpack_require__(10)
+var toArrayBuffer = __webpack_require__(45)
 
 var MediaSource = typeof window !== 'undefined' && window.MediaSource
 
@@ -4859,7 +5121,7 @@ MediaSourceStream.prototype._getBufferDuration = function () {
 
 
 /***/ }),
-/* 22 */
+/* 21 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4888,13 +5150,13 @@ MediaSourceStream.prototype._getBufferDuration = function () {
 
 /*<replacement>*/
 
-var processNextTick = __webpack_require__(12);
+var processNextTick = __webpack_require__(11);
 /*</replacement>*/
 
 module.exports = Readable;
 
 /*<replacement>*/
-var isArray = __webpack_require__(23);
+var isArray = __webpack_require__(22);
 /*</replacement>*/
 
 /*<replacement>*/
@@ -4904,7 +5166,7 @@ var Duplex;
 Readable.ReadableState = ReadableState;
 
 /*<replacement>*/
-var EE = __webpack_require__(15).EventEmitter;
+var EE = __webpack_require__(16).EventEmitter;
 
 var EElistenerCount = function (emitter, type) {
   return emitter.listeners(type).length;
@@ -4912,13 +5174,13 @@ var EElistenerCount = function (emitter, type) {
 /*</replacement>*/
 
 /*<replacement>*/
-var Stream = __webpack_require__(24);
+var Stream = __webpack_require__(23);
 /*</replacement>*/
 
 // TODO(bmeurer): Change this back to const once hole checks are
 // properly optimized away early in Ignition+TurboFan.
 /*<replacement>*/
-var Buffer = __webpack_require__(13).Buffer;
+var Buffer = __webpack_require__(12).Buffer;
 var OurUint8Array = global.Uint8Array || function () {};
 function _uint8ArrayToBuffer(chunk) {
   return Buffer.from(chunk);
@@ -4934,7 +5196,7 @@ util.inherits = __webpack_require__(2);
 /*</replacement>*/
 
 /*<replacement>*/
-var debugUtil = __webpack_require__(47);
+var debugUtil = __webpack_require__(39);
 var debug = void 0;
 if (debugUtil && debugUtil.debuglog) {
   debug = debugUtil.debuglog('stream');
@@ -4943,8 +5205,8 @@ if (debugUtil && debugUtil.debuglog) {
 }
 /*</replacement>*/
 
-var BufferList = __webpack_require__(48);
-var destroyImpl = __webpack_require__(25);
+var BufferList = __webpack_require__(40);
+var destroyImpl = __webpack_require__(24);
 var StringDecoder;
 
 util.inherits(Readable, Stream);
@@ -5027,7 +5289,7 @@ function ReadableState(options, stream) {
   this.decoder = null;
   this.encoding = null;
   if (options.encoding) {
-    if (!StringDecoder) StringDecoder = __webpack_require__(27).StringDecoder;
+    if (!StringDecoder) StringDecoder = __webpack_require__(26).StringDecoder;
     this.decoder = new StringDecoder(options.encoding);
     this.encoding = options.encoding;
   }
@@ -5183,7 +5445,7 @@ Readable.prototype.isPaused = function () {
 
 // backwards compatibility.
 Readable.prototype.setEncoding = function (enc) {
-  if (!StringDecoder) StringDecoder = __webpack_require__(27).StringDecoder;
+  if (!StringDecoder) StringDecoder = __webpack_require__(26).StringDecoder;
   this._readableState.decoder = new StringDecoder(enc);
   this._readableState.encoding = enc;
   return this;
@@ -5873,7 +6135,7 @@ function indexOf(xs, x) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(8), __webpack_require__(5)))
 
 /***/ }),
-/* 23 */
+/* 22 */
 /***/ (function(module, exports) {
 
 var toString = {}.toString;
@@ -5884,14 +6146,14 @@ module.exports = Array.isArray || function (arr) {
 
 
 /***/ }),
-/* 24 */
+/* 23 */
 /***/ (function(module, exports, __webpack_require__) {
 
-module.exports = __webpack_require__(15).EventEmitter;
+module.exports = __webpack_require__(16).EventEmitter;
 
 
 /***/ }),
-/* 25 */
+/* 24 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5899,7 +6161,7 @@ module.exports = __webpack_require__(15).EventEmitter;
 
 /*<replacement>*/
 
-var processNextTick = __webpack_require__(12);
+var processNextTick = __webpack_require__(11);
 /*</replacement>*/
 
 // undocumented cb() API, needed for core, not for public API
@@ -5969,7 +6231,7 @@ module.exports = {
 };
 
 /***/ }),
-/* 26 */
+/* 25 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -6002,7 +6264,7 @@ module.exports = {
 
 /*<replacement>*/
 
-var processNextTick = __webpack_require__(12);
+var processNextTick = __webpack_require__(11);
 /*</replacement>*/
 
 module.exports = Writable;
@@ -6045,16 +6307,16 @@ util.inherits = __webpack_require__(2);
 
 /*<replacement>*/
 var internalUtil = {
-  deprecate: __webpack_require__(51)
+  deprecate: __webpack_require__(43)
 };
 /*</replacement>*/
 
 /*<replacement>*/
-var Stream = __webpack_require__(24);
+var Stream = __webpack_require__(23);
 /*</replacement>*/
 
 /*<replacement>*/
-var Buffer = __webpack_require__(13).Buffer;
+var Buffer = __webpack_require__(12).Buffer;
 var OurUint8Array = global.Uint8Array || function () {};
 function _uint8ArrayToBuffer(chunk) {
   return Buffer.from(chunk);
@@ -6064,7 +6326,7 @@ function _isUint8Array(obj) {
 }
 /*</replacement>*/
 
-var destroyImpl = __webpack_require__(25);
+var destroyImpl = __webpack_require__(24);
 
 util.inherits(Writable, Stream);
 
@@ -6637,16 +6899,16 @@ Writable.prototype._destroy = function (err, cb) {
   this.end();
   cb(err);
 };
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5), __webpack_require__(49).setImmediate, __webpack_require__(8)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5), __webpack_require__(41).setImmediate, __webpack_require__(8)))
 
 /***/ }),
-/* 27 */
+/* 26 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var Buffer = __webpack_require__(13).Buffer;
+var Buffer = __webpack_require__(12).Buffer;
 
 var isEncoding = Buffer.isEncoding || function (encoding) {
   encoding = '' + encoding;
@@ -6918,7 +7180,7 @@ function simpleEnd(buf) {
 }
 
 /***/ }),
-/* 28 */
+/* 27 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -7138,14 +7400,116 @@ function done(stream, er, data) {
 }
 
 /***/ }),
+/* 28 */
+/***/ (function(module, exports) {
+
+module.exports = throttle;
+
+/**
+ * Returns a new function that, when invoked, invokes `func` at most once per `wait` milliseconds.
+ *
+ * @param {Function} func Function to wrap.
+ * @param {Number} wait Number of milliseconds that must elapse between `func` invocations.
+ * @return {Function} A new function that wraps the `func` function passed in.
+ */
+
+function throttle (func, wait) {
+  var ctx, args, rtn, timeoutID; // caching
+  var last = 0;
+
+  return function throttled () {
+    ctx = this;
+    args = arguments;
+    var delta = new Date() - last;
+    if (!timeoutID)
+      if (delta >= wait) call();
+      else timeoutID = setTimeout(call, wait - delta);
+    return rtn;
+  };
+
+  function call () {
+    timeoutID = 0;
+    last = +new Date();
+    rtn = func.apply(ctx, args);
+    ctx = null;
+    args = null;
+  }
+}
+
+
+/***/ }),
 /* 29 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveItem__ = __webpack_require__(64);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
+//Not needed on client - kept so script can run in both cases
+//import ReactDOMServer from 'react-dom/server';
+//Next line is for client, not needed on server but doesnt hurt
+//import ReactDOM from 'react-dom';
+//TODO-DETAILS add a config file, load at compile and make overridable - server etc go there
+
+
+
+class ArchiveBase extends __WEBPACK_IMPORTED_MODULE_2__ArchiveItem__["a" /* default */] {
+    /*
+    Base class for Archive application - base of Details = which includes single element items and Search which includes both searches and collections (which are actually items).
+    ArchiveBase
+    - Details
+    - - AV
+    - - Image
+    - - Text
+    - - Software (not implemented)
+    - Search
+    - - Home
+    - - Collection
+    Nav - knows about all the classes (includes factory() but doesnt subclass them
+    Util - just some utility functions
+    Tile - elements on a Search - each is a ArchiveItem
+    ReactFake - spoofs methods of React as otherwise hard to do onclick etc if use real React (note archive.min still uses react a little)
+     Fields:
+    item    Metadata for item, undefined for a search.
+    items   Metadata for items found if the item is a Collection,
+    itemtype    Schema.org for this eg. "http://schema.org/TextDigitalDocument"
+    query   query part of search to run (Search|Collection|Home only)
+     */
+    constructor(itemid, { item = undefined } = {}) {
+        super({ itemid: itemid, item: item });
+    }
+    theatreIaWrap() {}
+
+    browserBefore() {
+        //Anything that is needed to be executed in the browser before the main HTML tree is replaced.
+        // Nothing to do by default
+    }
+    browserAfter() {
+        this.archive_setup_push(); // Subclassed function to setup stuff for after loading.
+        __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].AJS_on_dom_loaded(); // Runs code pushed archive_setup - needed for image if "super" this, put it after superclasses
+    }
+    render(res, htm) {
+        //TODO-DETAILS remove htm and from calling routines
+        var els = this.navwrapped();
+        this.browserBefore();
+        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].domrender(els, res);
+        this.browserAfter();
+    }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = ArchiveBase;
+
+
+/***/ }),
+/* 30 */
 /***/ (function(module, exports, __webpack_require__) {
 
 //var React = require('react');
 //var ReactDOM = require('react-dom');
 var Details = __webpack_require__(6).default;
-var Search = __webpack_require__(10).default;
-var Nav = __webpack_require__(33).default;
+var Search = __webpack_require__(14).default;
+var Nav = __webpack_require__(66).default;
 //window.Dweb = require('../js/Dweb');
 window.Nav = Nav;
 /*
@@ -7197,7 +7561,7 @@ LISTS - support for multiple list transports
 */
 
 /***/ }),
-/* 30 */
+/* 31 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -7210,1376 +7574,13 @@ exports.default = function () {};
 module.exports = exports["default"];
 
 /***/ }),
-/* 31 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__ = __webpack_require__(18);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
-
-
-
-__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
-
-//const Dweb = require('../js/Dweb');     // Gets SmartDict and the Transports
-//TODO-REFACTOR extends SmartDict to eventually allow loading via URL - having problems with webpack ... libsodium -> fs
-//TODO-NAMING url could be a name
-
-class ArchiveItem {
-    //extends SmartDict {  //TODO should extend SmartDict, but having Webpack issues loading it
-    /*
-    Base class representing an Item and/or a Search query (A Collection is both).
-    This is just storage, the UI is in ArchiveBase and subclasses, theoretically this class could be used for a server or gateway app with no UI.
-     Fields:
-    itemid: Archive.org reference for object
-    item:   Metadata decoded from JSON from metadata search.
-    items:  Array of data from a search.
-    _list:  Will hold a list of files when its a single item, TODO-REFACTOR maybe this holds a array of ArchiveItem when its a search BUT only have partial metadata info
-     Once subclass SmartDict
-    _urls:  Will be list of places to retrieve this data (not quite a metadata call)
-     */
-
-    constructor({ itemid = undefined, item = undefined } = {}) {
-        this.itemid = itemid;
-        this.item = item; // Havent fetched yet, subclass constructors may override
-    }
-
-    _listLoad() {
-        /*
-         After set this.item, load the _list with an array for ArchiveFile
-        */
-        this._list = this.item && this.item.files ? this.item.files.map(f => new __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__["a" /* default */]({ itemid: this.itemid, metadata: f })) // Allow methods on files of item
-        : []; // Default to empty, so usage simpler.
-    }
-
-    async fetch() {
-        /* Fetch what we can about this item, it might be an item or something we have to search for.
-            Fetch item metadata as JSON by talking to Metadata API
-            Fetch collection info by an advanced search.
-            Goes through gateway.dweb.me so that we can work around a CORS issue (general approach & security questions confirmed with Sam!)
-             this.itemid Archive Item identifier
-            throws: TypeError or Error if fails
-            resolves to: this
-         */
-        if (this.itemid && !this.item) {
-            console.log('get metadata for ' + this.itemid);
-            //this.item = await Util.fetch_json(`https://archive.org/metadata/${this.itemid}`);
-            this.item = await __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}`);
-            this._listLoad(); // Load _list with ArchiveFile
-        } //TODO-REFACTOR make Collections automatically load query and do both
-        if (this.query) {
-            // This is for Search, Collection and Home.
-            let url =
-            //`https://archive.org/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`; // Archive (CORS fail)
-            `https://gateway.dweb.me/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}&and[]=${this.and}`;
-            //`http://localhost:4244/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`; //Testing
-            console.log(url);
-            let j = await __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].fetch_json(url);
-            this.items = j.response.docs;
-        }
-        return this; // For chaining, but note will need to do an "await fetch"
-    }
-
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = ArchiveItem;
-
-
-/***/ }),
 /* 32 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
-__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
-
-//import React from 'react';
-
-
-
-class Tile {
-  render(item) {
-    //xxx shorten/safify certain title usages (compared to Lists.inc)
-    const collections = Array.isArray(item.collection) ? item.collection : typeof item.collection === 'string' ? [item.collection] : [];
-    const collection = collections[0];
-    const nFavorites = collections.filter(e => e.startsWith('fav-')).length;
-    const is_collection = item.mediatype === 'collection';
-    const classes = 'item-ia' + (is_collection ? ' collection-ia' : '');
-    //ARCHIVE-BROWSER on browser, want to load links locally (via APIs) rather than rebuilding HTML page
-    // ARCHIVE-BROWSER added key= to keep react happy (I hope)
-    return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-      'div',
-      { className: classes, 'data-id': item.identifier, key: item.identifier },
-      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-        'a',
-        { className: 'stealth', tabIndex: '-1', onClick: `Nav.nav_details("${collection}");` },
-        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-          'div',
-          { className: 'item-parent' },
-          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            { className: 'item-parent-img' },
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { src: 'https://archive.org/services/img/' + collection })
-          ),
-          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            { className: 'item-parent-ttl' },
-            'xxx parent title'
-          )
-        )
-      ),
-      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-        'div',
-        { className: 'hidden-tiles views C C1' },
-        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-          'nobr',
-          { className: 'hidden-xs' },
-          __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].number_format(item.downloads)
-        ),
-        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-          'nobr',
-          { className: 'hidden-sm hidden-md hidden-lg' },
-          __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].number_format(item.downloads)
-        )
-      ),
-      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-        'div',
-        { className: 'C234' },
-        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-          'div',
-          { className: 'item-ttl C C2' },
-          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'a',
-            { onClick: `Nav.nav_details("${item.identifier}");`, title: item.title },
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-              'div',
-              { className: 'tile-img' },
-              __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { className: 'item-img', xxxstyle: 'height:180px', src: 'https://archive.org/services/img/' + item.identifier })
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-              'div',
-              { className: 'ttl' },
-              item.title
-            )
-          )
-        ),
-        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-          'div',
-          { className: 'hidden-tiles pubdate C C3' },
-          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'nobr',
-            { className: 'hidden-xs' },
-            'Dec 3, 2012'
-          ),
-          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'nobr',
-            { className: 'hidden-sm hidden-md hidden-lg' },
-            '12/12'
-          )
-        ),
-        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-          'div',
-          { className: 'by C C4' },
-          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'span',
-            { className: 'hidden-lists' },
-            item.creator && 'by '
-          ),
-          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'span',
-            { title: Array.isArray(item.creator) ? item.creator.join(',') : item.creator },
-            item.creator
-          )
-        )
-      ),
-      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-        'div',
-        { className: 'mt-icon C C5' },
-        __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].mediatype_icon(item.mediatype)
-      ),
-      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-        'h6',
-        { className: 'stat ' },
-        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-eye', 'aria-hidden': 'true' }),
-        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-          'span',
-          { className: 'sr-only' },
-          'eye'
-        ),
-        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-          'nobr',
-          null,
-          __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].number_format(item.downloads)
-        )
-      ),
-      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-        'h6',
-        { className: 'stat' },
-        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-favorite', 'aria-hidden': 'true' }),
-        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-          'span',
-          { className: 'sr-only' },
-          'favorite'
-        ),
-        nFavorites
-      ),
-      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-        'h6',
-        { className: 'stat' },
-        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-comment', 'aria-hidden': 'true' }),
-        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-          'span',
-          { className: 'sr-only' },
-          'comment'
-        ),
-        item.num_reviews || "0"
-      )
-    );
-  }
-
-  collection_stats(item) {
-    return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-      'div',
-      { className: 'collection-stats' },
-      __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].glyph({ name: 'collection', classes: 'topinblock hidden-lists' }),
-      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-        'div',
-        { className: 'num-items topinblock' },
-        '0',
-        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-          'div',
-          { className: 'micro-label' },
-          'ITEMS'
-        )
-      ),
-      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-        'div',
-        { className: 'num-items hidden-tiles' },
-        __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].number_format(item.downloads),
-        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-          'div',
-          { className: 'micro-label' },
-          'VIEWS'
-        )
-      )
-    );
-  }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = Tile;
-
-
-/***/ }),
-/* 33 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Search__ = __webpack_require__(10);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Details__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__Home__ = __webpack_require__(34);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__Collection__ = __webpack_require__(35);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__Texts__ = __webpack_require__(36);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__Image__ = __webpack_require__(37);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__AV__ = __webpack_require__(38);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_9__DetailsError__ = __webpack_require__(72);
-//import ReactDOM from "react-dom";
-
-__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
-
-// https://ponyfoo.com/articles/universal-react-babel
-
-
-
-
-
-
-
-
-
-
-
-
-class Nav {
-  //extends React.Component
-  constructor() {
-    //super();
-    this.mts = ['web', 'texts', 'movies', 'audio', 'software', 'image'];
-  }
-
-  navwrapJSX() {
-    /* The navigation stuff.   Order is navwrapJSX : maincontent : itemDetailsAbout */
-    {/*--TODO-DETAILS update navwrap to match actual code in both search.html and commute.html--*/}
-    return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-      'div',
-      { id: 'navwrap1' },
-      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-        'div',
-        { id: 'navwrap2' },
-        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-          'div',
-          { className: 'navbar navbar-inverse navbar-static-top', role: 'navigation' },
-          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'nav-tophat-helper', className: 'hidden-xs' }),
-          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'ul',
-            { className: 'nav navbar-nav' },
-            this.mts.map((mt, n) => __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-              'li',
-              { key: 'mikey' + n, className: 'dropdown dropdown-ia pull-left' },
-              __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'a',
-                { title: mt, className: 'navia-link ' + mt,
-                  onClick: `Nav.nav_details("${mt}")`,
-                  'data-top-kind': mt, 'data-toggle': 'tooltip', target: '_top', 'data-placement': 'bottom' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-' + mt, 'aria-hidden': 'true' }),
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                  'span',
-                  { className: 'sr-only' },
-                  mt
-                )
-              )
-            )),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-              'li',
-              { className: 'navbar-brand-li' },
-              __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'a',
-                { className: 'navbar-brand', onClick: 'Nav.nav_home();', target: '_top' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-logo', 'aria-hidden': 'true' }),
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                  'span',
-                  { className: 'sr-only' },
-                  'logo'
-                )
-              )
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-              'li',
-              { id: 'nav-search', className: 'dropdown dropdown-ia pull-right' },
-              __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'a',
-                { onClick: '$(this).parents(\'#nav-search\').find(\'form\').submit(); return false;' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-search', 'aria-hidden': 'true' }),
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                  'span',
-                  { className: 'sr-only' },
-                  'search'
-                )
-              ),
-              __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'div',
-                null,
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                  'form',
-                  { role: 'search', onSubmit: 'Nav.nav_search(this.elements[0].value); return 0;', target: '_top' },
-                  __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'label',
-                    { htmlFor: 'search-bar-2', className: 'sr-only' },
-                    'Search the Archive'
-                  ),
-                  __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { id: 'search-bar-2', placeholder: 'Search', type: 'text', name: 'query', value: '' }),
-                  __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'submit', value: 'Search' })
-                )
-              )
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-              'li',
-              { className: 'dropdown dropdown-ia pull-right' },
-              __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'a',
-                { id: 'glyphme', href: 'https://archive.org/donate', _target: 'top',
-                  'data-toggle': 'tooltip', 'data-placement': 'bottom', title: 'Donate' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { src: 'https://archive.org/images/gift.png' })
-              )
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-              'li',
-              { className: 'dropdown dropdown-ia pull-right' },
-              __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'a',
-                { href: 'https://archive.org/create', _target: 'top', 'data-toggle': 'tooltip', 'data-placement': 'bottom', title: 'Upload' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-upload', 'aria-hidden': 'true' }),
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                  'span',
-                  { className: 'sr-only' },
-                  'upload'
-                )
-              )
-            )
-          )
-        )
-      ),
-      ' ',
-      ' '
-    );
-  }
-
-  static clear(destn) {
-    // Clear the screen to give confidence that action under way
-    // Leaves Nav, clears rest
-    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].domrender(new __WEBPACK_IMPORTED_MODULE_9__DetailsError__["a" /* default */](undefined, undefined, __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-      'span',
-      null,
-      ' "Loading" '
-    )).navwrapped(false), destn);
-  }
-  static async nav_home() {
-    console.log("Navigating to Home");
-    return await Nav.nav_details(undefined);
-  }
-
-  static async nav_details(id) {
-    console.log("Navigating to Details", id);
-    let destn = document.getElementById('main'); // Blank window (except Nav) as loading
-    Nav.clear(destn);
-    await Nav.factory(id, destn, ""); // Not sure what returning ....
-    return false; // Dont follow anchor link - unfortunately React ignores this
-  }
-
-  static async nav_search(q) {
-    console.log("Navigating to Search");
-    let destn = document.getElementById('main'); // Blank window (except Nav) as loading
-    Nav.clear(destn);
-    let s = await new __WEBPACK_IMPORTED_MODULE_2__Search__["default"](typeof q === "object" ? q : typeof q === "string" ? { query: encodeURIComponent(q) } : undefined).fetch();
-    s.render(destn, "");
-  }
-
-  static async factory(itemid, res, htm) {
-    if (!itemid) {
-      (await new __WEBPACK_IMPORTED_MODULE_4__Home__["a" /* default */](itemid, undefined).fetch()).render(res, htm);
-    } else {
-      let obj = await new __WEBPACK_IMPORTED_MODULE_3__Details__["default"](itemid).fetch();
-      item = obj.item;
-      if (!item.metadata) {
-        new __WEBPACK_IMPORTED_MODULE_9__DetailsError__["a" /* default */](itemid, item, `item ${itemid} cannot be found or does not have metadata`).render(res, htm);
-      } else {
-        if (verbose) console.log("Found mediatype", item.metadata.mediatype);
-        switch (item.metadata.mediatype) {
-          case "collection":
-            return (await new __WEBPACK_IMPORTED_MODULE_5__Collection__["a" /* default */](itemid, item).fetch()).render(res, htm); //fetch will do search
-            break;
-          case "texts":
-            new __WEBPACK_IMPORTED_MODULE_6__Texts__["a" /* default */](itemid, item).render(res, htm);
-            break;
-          case "image":
-            new __WEBPACK_IMPORTED_MODULE_7__Image__["a" /* default */](itemid, item).render(res, htm);
-            break;
-          case "audio": // Intentionally drop thru to movies
-          case "movies":
-            new __WEBPACK_IMPORTED_MODULE_8__AV__["a" /* default */](itemid, item).render(res, htm);
-            break;
-          default:
-            new __WEBPACK_IMPORTED_MODULE_9__DetailsError__["a" /* default */](itemid, item, `Unsupported mediatype: ${item.metadata.mediatype}`).render(res, htm);
-          //    return new Nav(")
-        }
-      }
-    }
-  }
-
-}
-/* harmony export (immutable) */ __webpack_exports__["default"] = Nav;
-
-
-/***/ }),
-/* 34 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Search__ = __webpack_require__(10);
-__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
-
-
-
-class Home extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
-    constructor(itemid, item) {
-        const NOT = ['what_cd', 'cd', 'vinyl', 'librarygenesis', 'bibalex', // per alexis
-        'movies', 'audio', 'texts', 'software', 'image', 'data', 'web', // per alexis/tracey
-        'additional_collections', 'animationandcartoons', 'artsandmusicvideos', 'audio_bookspoetry', 'audio_foreign', 'audio_music', 'audio_news', 'audio_podcast', 'audio_religion', 'audio_tech', 'computersandtechvideos', 'coverartarchive', 'culturalandacademicfilms', 'ephemera', 'gamevideos', 'inlibrary', 'moviesandfilms', 'newsandpublicaffairs', 'ourmedia', 'radioprograms', 'samples_only', 'spiritualityandreligion', 'stream_only', 'television', 'test_collection', 'usgovfilms', 'vlogs', 'youth_media'];
-
-        const query = 'mediatype:collection AND NOT noindex:true AND NOT collection:web AND NOT identifier:fav-* AND NOT identifier:' + NOT.join(' AND NOT identifier:');
-        super({
-            query: query,
-            sort: '-downloads',
-            itemid: itemid,
-            item: item
-        });
-    }
-    banner() {
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'center',
-            { style: { margin: "35px" } },
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { style: { fontSize: "125px" }, className: 'iconochive-logo' })
-        );
-    }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = Home;
-
-
-/***/ }),
-/* 35 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Search__ = __webpack_require__(10);
-__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
-
-
-
-class Collection extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
-    constructor(itemid, item) {
-        super({
-            query: 'collection:' + itemid,
-            sort: '-downloads',
-            itemid: itemid,
-            item: item
-        });
-    }
-
-    banner() {
-        item = this.item;
-        //TODO-DETAILS probably move this to the Search class after move to use the approach taken in template_image.js
-        const creator = item.metadata.creator && item.metadata.creator != item.metadata.title ? item.metadata.creator : '';
-        //ARCHIVE-BROWSER note the elements below were converted to HTML 3 times in original version
-        //TODO-DETAILS on prelinger, banner description is getting truncated.
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            { className: 'welcome container container-ia width-max', style: { 'backgroundColor': 'white' } },
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'div',
-                { className: 'container' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'div',
-                    { className: 'row' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { className: 'col-xs-11 col-sm-10 welcome-left' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { id: 'file-dropper-wrap' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'file-dropper' }),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { id: 'file-dropper-img', className: 'img-responsive', style: { 'maxWidth': "350px", margin: '0 10px 5px 0' }, src: 'https://archive.org/services/img/' + this.itemid })
-                        ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'h1',
-                            null,
-                            item.metadata.title
-                        ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'h4',
-                            null,
-                            creator
-                        ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { id: 'descript', style: { maxHeight: "43px", cursor: 'pointer' } },
-                            item.metadata.description,
-                            ' '
-                        )
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { className: 'col-xs-1 col-sm-2 welcome-right' },
-                        'xxx'
-                    )
-                )
-            )
-        );
-    }
-    browserBefore() {
-        $('body').addClass('bgEEE');
-        // Note the archive_setup.push stuff is subtly different from that for 'search'
-        archive_setup.push(function () {
-            //TODO-DETAILS check not pushing on top of existing (it probably is)
-            AJS.lists_v_tiles_setup('collection');
-            $('div.ikind').css({ visibility: 'visible' });
-            AJS.popState('');
-            AJS.tiler();
-            $(window).on('resize  orientationchange', function (evt) {
-                clearTimeout(AJS.tiles_wrap_throttler);
-                AJS.tiles_wrap_throttler = setTimeout(AJS.tiler, 250);
-            });
-            // register for scroll updates (for infinite search results)
-            $(window).scroll(AJS.scrolled);
-        });
-    }
-
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = Collection;
-
-
-/***/ }),
-/* 36 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(6);
-__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
-
-
-
-
-class Texts extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
-    constructor(itemid, item) {
-        super(itemid, item);
-        this.itemtype = "http://schema.org/TextDigitalDocument";
-    }
-    archive_setup_push() {
-        super.archive_setup_push(); // On eample images the theatre & carosel came before the parts common to AV, Image and Text
-        archive_setup.push(function () {
-            AJS.booksize();
-        });
-    }
-    theatreIaWrap() {
-        //TODO-DETAILS Description does not appear in this Navwrap section, its in the stuff underneath that which is not yet on a page.
-        let item = this.item;
-        let metadata = item.metadata;
-        let detailsURL = `https://archive.org/details/${this.itemid}`; // Probably correct as archive.org/details since used as itemProp
-        let imageURL = `https://archive.org/services/img/${this.itemid}`;
-        //TODO-DETAILS-DWEB use alternative URLS via IPFS
-        //TODO-STREAM pass as stream
-        let streamURL = `https://archive.org/stream/${this.itemid}`; //{1992.Zandvoorts.Nieuwsblad}`; //TODO-TEXTS Cant find 2nd part of URL
-        //let streamURL = `https://archive.org/stream/${this.itemid}/1992.Zandvoorts.Nieuwsblad`;   // In archive.org but needs looking for this string in file names
-        //let iframeURL = `${streamURL}?ui=embed#mode/2up`;   //This comes from Traceys code and works
-        let iframeURL = `${streamURL}?ui=embed`; //This works and matches archive.org
-        let shortEmbedURL = `https://archive.org/stream/${this.itemid}?ui=embed`; //Note on archive.org/details this is different from iframeURL and not clear if that is intentional
-        let helpURL = `https://archive.org/help/audio.php?identifier=${this.itemid}`;
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            { id: 'theatre-ia-wrap', 'class': 'container container-ia width-max' },
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemprop: 'url', href: detailsURL }),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemprop: 'image', href: imageURL }),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'h1',
-                { 'class': 'sr-only' },
-                metadata.title
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'h2',
-                { 'class': 'sr-only' },
-                'Item Preview'
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'div',
-                { id: 'theatre-ia', 'class': 'container' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'div',
-                    { 'class': 'row' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { 'class': 'xs-col-12' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { id: 'theatre-controls' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'a',
-                                { href: streamURL },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { title: 'fullscreen view', 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left',
-                                    'class': 'iconochive-fullscreen' })
-                            ),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'a',
-                                { href: streamURL },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { title: 'search inside', 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left',
-                                    'class': 'iconochive-search' })
-                            )
-                        ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { id: 'texty', style: 'font-size:0px', 'class': '' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('iframe', { src: iframeURL,
-                                width: '100%', height: '480', frameborder: '0', webkitallowfullscreen: 'true',
-                                mozallowfullscreen: 'true', allowfullscreen: true })
-                        ),
-                        this.cherModal("audio"),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('center', { style: 'color:white;margin-bottom:10px' })
-                    )
-                )
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'flag-overlay', 'class': 'center-area ' })
-        );
-    }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = Texts;
-
-
-/***/ }),
-/* 37 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Util__ = __webpack_require__(4);
-__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
-
-
-
-
-
-class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
-    constructor(itemid, item) {
-        /*
-        Construct an Image object before rendering it to a HTML page
-        item = metadata from a metadata fetch
-         */
-        super(itemid, item);
-        this.itemtype = "http://schema.org/VisualArtwork";
-    }
-    archive_setup_push() {
-        AJS.theatresize();
-        AJS.carouselsize('#ia-carousel', true);
-        super.archive_setup_push(); // On eample images the theatre & carosel came before the parts common to AV, Image and Text
-    }
-
-    theatreIaWrap() {
-        let item = this.item;
-        let itemid = item.metadata.identifier; // Shortcut as used a lot
-        let mainArchiveFile = this._list.find(fi => __WEBPACK_IMPORTED_MODULE_2__Util__["a" /* default */].imageFormats.includes(fi.metadata.format)); // Can be undefined if none included
-        let detailsURL = `https://archive.org/details/${itemid}`; //This is probably correct to remain pointed at archive.org since used as an itemprop
-        let embedurl = `https://archive.org/embed/${itemid}`;
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            { id: 'theatre-ia-wrap', className: 'container container-ia width-max  resized', style: { height: "600px" } },
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemProp: 'url', href: detailsURL }),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemProp: 'thumbnailUrl', href: 'https://archive.org/services/img/{itemid}' }),
-            item.files.filter(fi => fi.source !== "metadata").map(fi => //TODO-DETAILS-LIST Maybe use _list instead of .files
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemProp: 'associatedMedia', href: `https://archive.org/download/${itemid}/${fi.name}`, key: `${itemid}/${fi.name}` })),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'h1',
-                { className: 'sr-only' },
-                item.metadata.title
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'h2',
-                { className: 'sr-only' },
-                'Item Preview'
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'div',
-                { id: 'theatre-ia', className: 'container' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'div',
-                    { className: 'row' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { className: 'xs-col-12' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'theatre-controls' }),
-                        ' ',
-                        mainArchiveFile ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { className: 'details-carousel-wrapper' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'section',
-                                { id: 'ia-carousel', className: 'carousel slide', 'data-ride': 'carousel', 'data-interval': 'false',
-                                    'aria-label': 'Item image slideshow', style: { maxHeight: "600px" } },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'ol',
-                                    { className: 'carousel-indicators', style: { display: "none" } },
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('li', { 'data-target': '#ia-carousel', 'data-slide-to': '0', className: ' active', role: 'button', tabIndex: '0',
-                                        'aria-label': 'Go to image 1' })
-                                ),
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'div',
-                                    { className: 'carousel-inner' },
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'div',
-                                        { className: 'item active' },
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'a',
-                                            { className: 'carousel-image-wrapper',
-                                                href: `http://archive.org/download/${itemid}/${mainArchiveFile.metadata.name}`,
-                                                title: 'Open full sized image' },
-                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { id: 'streamContainer', src: mainArchiveFile, className: 'rot0 carousel-image', alt: 'item image #1' })
-                                        ),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'div',
-                                            { className: 'carousel-caption' },
-                                            mainArchiveFile.metadata.name
-                                        )
-                                    )
-                                )
-                            )
-                        ) : __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { className: 'row', style: { color: "white" } },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'div',
-                                { className: 'col-md-10 col-md-offset-1 no-preview' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'p',
-                                    { className: 'theatre-title' },
-                                    'There Is No Preview Available For This Item'
-                                ),
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'p',
-                                    null,
-                                    'This item does not appear to have any files that can be experienced on Archive.org',
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'span',
-                                        { className: 'hidden-xs hidden-sm' },
-                                        'Please download files in this item to interact with them on your computer.'
-                                    ),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'a',
-                                        { className: 'show-all', href: `https://archive.org/download/${itemid}`, target: '_blank' },
-                                        'Show all files'
-                                    )
-                                )
-                            )
-                        ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'webtorrentStats', style: 'color: white; text-align: center;' }),
-                        this.cherModal("audio")
-                    )
-                )
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'flag-overlay', className: 'center-area ' })
-        );
-    }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = Image;
-
-
-/***/ }),
-/* 38 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Details__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_render_media__ = __webpack_require__(39);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_render_media___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_3_render_media__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit__ = __webpack_require__(20);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_4_throttleit__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_prettier_bytes__ = __webpack_require__(19);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_prettier_bytes___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_5_prettier_bytes__);
-__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
-
-
-
-
-
-
-
-
-class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
-    constructor(itemid, item) {
-        super(itemid, item);
-        this.itemtype = "http://schema.org/VideoObject";
-    }
-    setupPlaylist() {
-        this.playlist = [];
-        //TODO-DETAILS put these formats in a list in Utils.config
-        this.avs = this._list.filter(fi => fi.metadata.format == 'h.264' || fi.metadata.format == '512Kb MPEG4'); //TODO-DETAILS-LIST Maybe use _list instead of .files
-        if (!this.avs.length) this.avs = this._list.filter(fi => fi.metadata.format == 'VBR MP3'); //TODO-DETAILS-LIST Maybe use _list instead of .files
-
-        if (this.avs.length) {
-            this.avs.sort((a, b) => __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].natcompare(a.name, b.name)); //Unsure why sorting names, presumably tracks are named alphabetically ?
-
-            this.playlist.push({ name: this.avs[0].name,
-                urls: [item.metadata.magnetlink + '/' + this.avs[0].name] });
-            // reduce array down to array of just filenames
-            //avs = avs.map(val => val.name);
-
-            // TODO-DETAILS note these playlists dont match the code in details/commute.html
-            // for (var fi of avs) //TODO-DETAILS make this a map (note its tougher than it looks!)
-            //     this.playlist.push({
-            //         title:(fi.title ? fi.title : fi.name),
-            //         sources:[{file:'https://archive.org/download/'+itemid+'/'+fi.name}]});
-            // this.playlist[0].image = 'https://archive.org/services/img/' + itemid;
-        }
-    }
-    archive_setup_push() {
-        let self = this;
-        super.archive_setup_push(); // On commute.html the Play came after the parts common to AV, Image and Text
-        // archive_setup.push(function() { //TODO-ARCHIVE_SETUP move Play from browserAfter to here
-        //    Play('jw6', self.playlist, self.cfg);
-        // });
-    }
-
-    theatreIaWrap() {
-        let item = this.item;
-        let itemid = this.itemid;
-        let detailsurl = `https://archive.org/details/${itemid}`;
-        let title = item.title;
-        //let cfg  = {"aspectratio": 4/3 }; // Old version in Traceys code which was missign other parts of cfg below
-        //TODO-ARCHIVE not that Tracey code has cfg.aspectration = 4/3 and none of the material below which appears in its archive.org/details page
-        let cfg = { "start": 0, "embed": null, "so": false, "autoplay": false, "width": 0, "height": 0, "list_height": 0, "audio": false,
-            "responsive": true, "flash": false, "hide_list": true,
-            "identifier": this.itemid, //TODO-DETAILS-ONLINE check another example and see if identifier should be itemid or title
-            "collection": this.item.metadata.collection[0]
-        };
-        //TODO this code is from details/commute.html - bears little resemblance to that in Tracey's code
-        /*
-        [{"title":"commute","orig":"commute.avi","image":"/download/commute/commute.thumbs%2Fcommute_000005.jpg",
-            "duration":"115.61",
-            "sources":[
-                {"file":"/download/commute/commute.mp4","type":"mp4","height":"480", "width":"640","label":"480p"},
-                {"file":"/download/commute/commute.ogv","type":"ogg","height":"304","width":"400","label":"304p"}],
-            "tracks":[{"file":"https://archive.org/stream/commute/commute.thumbs/commute_000005.jpg&vtt=vtt.vtt","kind":"thumbnails"}]}],
-        */
-        this.setupPlaylist();
-
-        //TODO-DETAILS make next few lines between theatre-ia-wrap and theatre-ia not commute specific
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            { id: 'theatre-ia-wrap', 'class': 'container container-ia width-max ' },
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemprop: 'url', href: detailsurl }),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'h1',
-                { 'class': 'sr-only' },
-                title
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'h2',
-                { 'class': 'sr-only' },
-                'Movies Preview'
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'div',
-                { id: 'theatre-ia', 'class': 'container' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'div',
-                    { 'class': 'row' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { 'class': 'xs-col-12' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { id: 'theatre-controls' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'a',
-                                { href: '#', id: 'gofullscreen', onclick: '' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left', 'class': 'iconochive-fullscreen',
-                                    title: 'fullscreen view' })
-                            ),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'a',
-                                { href: '#', onclick: 'return AJS.flash_click(0)' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left', 'class': 'iconochive-flash',
-                                    title: 'Click to have player try flash first, then HTML5 second' })
-                            ),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'a',
-                                { href: '#', onclick: 'return AJS.mute_click()' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left', 'class': 'iconochive-unmute',
-                                    title: 'sound is on.  click to mute sound.' })
-                            ),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'a',
-                                { href: '#', onclick: 'return AJS.mute_click()' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left', 'class': 'iconochive-mute',
-                                    style: 'display:none', title: 'sound is off.  click for sound.' })
-                            )
-                        ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'noscript',
-                            null,
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'div',
-                                { 'class': 'alert alert-danger alert-dismissable', 'data-dismiss': 'alert' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'button',
-                                    { type: 'button', 'class': 'close', 'data-dismiss': 'alert', 'aria-hidden': 'true' },
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', {
-                                        'class': 'iconochive-remove-circle', 'aria-hidden': 'true' }),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'span',
-                                        { 'class': 'sr-only' },
-                                        'remove-circle'
-                                    )
-                                ),
-                                'Internet Archive\'s in-browser video player requires JavaScript to be enabled. It appears your browser does not have it turned on. Please see your browser settings for this feature.'
-                            )
-                        ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { id: 'videoContainerX', style: 'text-align: center;' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('video', { id: 'streamContainer', src: this.avs[0] })
-                        ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'webtorrentStats', style: 'color: white; text-align: center;' }),
-                        this.cherModal("video")
-                    ),
-                    ' '
-                )
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'flag-overlay', 'class': 'center-area ' })
-        );
-    }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = AV;
-
-
-/***/ }),
-/* 39 */
-/***/ (function(module, exports, __webpack_require__) {
-
-exports.render = render
-exports.append = append
-exports.mime = __webpack_require__(40)
-
-var debug = __webpack_require__(41)('render-media')
-var isAscii = __webpack_require__(44)
-var MediaElementWrapper = __webpack_require__(21)
-var path = __webpack_require__(54)
-var streamToBlobURL = __webpack_require__(55)
-var videostream = __webpack_require__(58)
-
-var VIDEOSTREAM_EXTS = [
-  '.m4a',
-  '.m4v',
-  '.mp4'
-]
-
-var MEDIASOURCE_VIDEO_EXTS = [
-  '.m4v',
-  '.mkv',
-  '.mp4',
-  '.webm'
-]
-
-var MEDIASOURCE_AUDIO_EXTS = [
-  '.m4a',
-  '.mp3'
-]
-
-var MEDIASOURCE_EXTS = [].concat(
-  MEDIASOURCE_VIDEO_EXTS,
-  MEDIASOURCE_AUDIO_EXTS
-)
-
-var AUDIO_EXTS = [
-  '.aac',
-  '.oga',
-  '.ogg',
-  '.wav'
-]
-
-var IMAGE_EXTS = [
-  '.bmp',
-  '.gif',
-  '.jpeg',
-  '.jpg',
-  '.png',
-  '.svg'
-]
-
-var IFRAME_EXTS = [
-  '.css',
-  '.html',
-  '.js',
-  '.md',
-  '.pdf',
-  '.txt'
-]
-
-// Maximum file length for which the Blob URL strategy will be attempted
-// See: https://github.com/feross/render-media/issues/18
-var MAX_BLOB_LENGTH = 200 * 1000 * 1000 // 200 MB
-
-var MediaSource = typeof window !== 'undefined' && window.MediaSource
-
-function render (file, elem, opts, cb) {
-  if (typeof opts === 'function') {
-    cb = opts
-    opts = {}
-  }
-  if (!opts) opts = {}
-  if (!cb) cb = function () {}
-
-  validateFile(file)
-  parseOpts(opts)
-
-  if (typeof elem === 'string') elem = document.querySelector(elem)
-
-  renderMedia(file, function (tagName) {
-    if (elem.nodeName !== tagName.toUpperCase()) {
-      var extname = path.extname(file.name).toLowerCase()
-
-      throw new Error(
-        'Cannot render "' + extname + '" inside a "' +
-        elem.nodeName.toLowerCase() + '" element, expected "' + tagName + '"'
-      )
-    }
-
-    return elem
-  }, opts, cb)
-}
-
-function append (file, rootElem, opts, cb) {
-  if (typeof opts === 'function') {
-    cb = opts
-    opts = {}
-  }
-  if (!opts) opts = {}
-  if (!cb) cb = function () {}
-
-  validateFile(file)
-  parseOpts(opts)
-
-  if (typeof rootElem === 'string') rootElem = document.querySelector(rootElem)
-
-  if (rootElem && (rootElem.nodeName === 'VIDEO' || rootElem.nodeName === 'AUDIO')) {
-    throw new Error(
-      'Invalid video/audio node argument. Argument must be root element that ' +
-      'video/audio tag will be appended to.'
-    )
-  }
-
-  renderMedia(file, getElem, opts, done)
-
-  function getElem (tagName) {
-    if (tagName === 'video' || tagName === 'audio') return createMedia(tagName)
-    else return createElem(tagName)
-  }
-
-  function createMedia (tagName) {
-    var elem = createElem(tagName)
-    if (opts.controls) elem.controls = true
-    if (opts.autoplay) elem.autoplay = true
-    rootElem.appendChild(elem)
-    return elem
-  }
-
-  function createElem (tagName) {
-    var elem = document.createElement(tagName)
-    rootElem.appendChild(elem)
-    return elem
-  }
-
-  function done (err, elem) {
-    if (err && elem) elem.remove()
-    cb(err, elem)
-  }
-}
-
-function renderMedia (file, getElem, opts, cb) {
-  var extname = path.extname(file.name).toLowerCase()
-  var currentTime = 0
-  var elem
-
-  if (MEDIASOURCE_EXTS.indexOf(extname) >= 0) {
-    renderMediaSource()
-  } else if (AUDIO_EXTS.indexOf(extname) >= 0) {
-    renderAudio()
-  } else if (IMAGE_EXTS.indexOf(extname) >= 0) {
-    renderImage()
-  } else if (IFRAME_EXTS.indexOf(extname) >= 0) {
-    renderIframe()
-  } else {
-    tryRenderIframe()
-  }
-
-  function renderMediaSource () {
-    var tagName = MEDIASOURCE_VIDEO_EXTS.indexOf(extname) >= 0 ? 'video' : 'audio'
-
-    if (MediaSource) {
-      if (VIDEOSTREAM_EXTS.indexOf(extname) >= 0) {
-        useVideostream()
-      } else {
-        useMediaSource()
-      }
-    } else {
-      useBlobURL()
-    }
-
-    function useVideostream () {
-      debug('Use `videostream` package for ' + file.name)
-      prepareElem()
-      elem.addEventListener('error', fallbackToMediaSource)
-      elem.addEventListener('loadstart', onLoadStart)
-      elem.addEventListener('canplay', onCanPlay)
-      videostream(file, elem)
-    }
-
-    function useMediaSource () {
-      debug('Use MediaSource API for ' + file.name)
-      prepareElem()
-      elem.addEventListener('error', fallbackToBlobURL)
-      elem.addEventListener('loadstart', onLoadStart)
-      elem.addEventListener('canplay', onCanPlay)
-
-      var wrapper = new MediaElementWrapper(elem)
-      var writable = wrapper.createWriteStream(getCodec(file.name))
-      file.createReadStream().pipe(writable)
-
-      if (currentTime) elem.currentTime = currentTime
-    }
-
-    function useBlobURL () {
-      debug('Use Blob URL for ' + file.name)
-      prepareElem()
-      elem.addEventListener('error', fatalError)
-      elem.addEventListener('loadstart', onLoadStart)
-      elem.addEventListener('canplay', onCanPlay)
-      getBlobURL(file, function (err, url) {
-        if (err) return fatalError(err)
-        elem.src = url
-        if (currentTime) elem.currentTime = currentTime
-      })
-    }
-
-    function fallbackToMediaSource (err) {
-      debug('videostream error: fallback to MediaSource API: %o', err.message || err)
-      elem.removeEventListener('error', fallbackToMediaSource)
-      elem.removeEventListener('canplay', onCanPlay)
-
-      useMediaSource()
-    }
-
-    function fallbackToBlobURL (err) {
-      debug('MediaSource API error: fallback to Blob URL: %o', err.message || err)
-
-      if (typeof file.length === 'number' && file.length > opts.maxBlobLength) {
-        debug(
-          'File length too large for Blob URL approach: %d (max: %d)',
-          file.length, opts.maxBlobLength
-        )
-        return fatalError(new Error(
-          'File length too large for Blob URL approach: ' + file.length +
-          ' (max: ' + opts.maxBlobLength + ')'
-        ))
-      }
-
-      elem.removeEventListener('error', fallbackToBlobURL)
-      elem.removeEventListener('canplay', onCanPlay)
-
-      useBlobURL()
-    }
-
-    function prepareElem () {
-      if (!elem) {
-        elem = getElem(tagName)
-
-        elem.addEventListener('progress', function () {
-          currentTime = elem.currentTime
-        })
-      }
-    }
-  }
-
-  function renderAudio () {
-    elem = getElem('audio')
-    getBlobURL(file, function (err, url) {
-      if (err) return fatalError(err)
-      elem.addEventListener('error', fatalError)
-      elem.addEventListener('loadstart', onLoadStart)
-      elem.addEventListener('canplay', onCanPlay)
-      elem.src = url
-    })
-  }
-
-  function onLoadStart () {
-    elem.removeEventListener('loadstart', onLoadStart)
-    if (opts.autoplay) elem.play()
-  }
-
-  function onCanPlay () {
-    elem.removeEventListener('canplay', onCanPlay)
-    cb(null, elem)
-  }
-
-  function renderImage () {
-    elem = getElem('img')
-    getBlobURL(file, function (err, url) {
-      if (err) return fatalError(err)
-      elem.src = url
-      elem.alt = file.name
-      cb(null, elem)
-    })
-  }
-
-  function renderIframe () {
-    elem = getElem('iframe')
-
-    getBlobURL(file, function (err, url) {
-      if (err) return fatalError(err)
-      elem.src = url
-      if (extname !== '.pdf') elem.sandbox = 'allow-forms allow-scripts'
-      cb(null, elem)
-    })
-  }
-
-  function tryRenderIframe () {
-    debug('Unknown file extension "%s" - will attempt to render into iframe', extname)
-
-    var str = ''
-    file.createReadStream({ start: 0, end: 1000 })
-      .setEncoding('utf8')
-      .on('data', function (chunk) {
-        str += chunk
-      })
-      .on('end', done)
-      .on('error', cb)
-
-    function done () {
-      if (isAscii(str)) {
-        debug('File extension "%s" appears ascii, so will render.', extname)
-        renderIframe()
-      } else {
-        debug('File extension "%s" appears non-ascii, will not render.', extname)
-        cb(new Error('Unsupported file type "' + extname + '": Cannot append to DOM'))
-      }
-    }
-  }
-
-  function fatalError (err) {
-    err.message = 'Error rendering file "' + file.name + '": ' + err.message
-    debug(err.message)
-    cb(err)
-  }
-}
-
-function getBlobURL (file, cb) {
-  var extname = path.extname(file.name).toLowerCase()
-  streamToBlobURL(file.createReadStream(), exports.mime[extname], cb)
-}
-
-function validateFile (file) {
-  if (file == null) {
-    throw new Error('file cannot be null or undefined')
-  }
-  if (typeof file.name !== 'string') {
-    throw new Error('missing or invalid file.name property')
-  }
-  if (typeof file.createReadStream !== 'function') {
-    throw new Error('missing or invalid file.createReadStream property')
-  }
-}
-
-function getCodec (name) {
-  var extname = path.extname(name).toLowerCase()
-  return {
-    '.m4a': 'audio/mp4; codecs="mp4a.40.5"',
-    '.m4v': 'video/mp4; codecs="avc1.640029, mp4a.40.5"',
-    '.mkv': 'video/webm; codecs="avc1.640029, mp4a.40.5"',
-    '.mp3': 'audio/mpeg',
-    '.mp4': 'video/mp4; codecs="avc1.640029, mp4a.40.5"',
-    '.webm': 'video/webm; codecs="vorbis, vp8"'
-  }[extname]
-}
-
-function parseOpts (opts) {
-  if (opts.autoplay == null) opts.autoplay = true
-  if (opts.controls == null) opts.controls = true
-  if (opts.maxBlobLength == null) opts.maxBlobLength = MAX_BLOB_LENGTH
-}
-
-
-/***/ }),
-/* 40 */
 /***/ (function(module, exports) {
 
 module.exports = {".3gp":"video/3gpp",".aac":"audio/aac",".aif":"audio/x-aiff",".aiff":"audio/x-aiff",".atom":"application/atom+xml",".avi":"video/x-msvideo",".bmp":"image/bmp",".bz2":"application/x-bzip2",".conf":"text/plain",".css":"text/css",".csv":"text/plain",".diff":"text/x-diff",".doc":"application/msword",".flv":"video/x-flv",".gif":"image/gif",".gz":"application/x-gzip",".htm":"text/html",".html":"text/html",".ico":"image/vnd.microsoft.icon",".ics":"text/calendar",".iso":"application/octet-stream",".jar":"application/java-archive",".jpeg":"image/jpeg",".jpg":"image/jpeg",".js":"application/javascript",".json":"application/json",".less":"text/css",".log":"text/plain",".m3u":"audio/x-mpegurl",".m4a":"audio/mp4",".m4v":"video/mp4",".manifest":"text/cache-manifest",".markdown":"text/x-markdown",".mathml":"application/mathml+xml",".md":"text/x-markdown",".mid":"audio/midi",".midi":"audio/midi",".mov":"video/quicktime",".mp3":"audio/mpeg",".mp4":"video/mp4",".mp4v":"video/mp4",".mpeg":"video/mpeg",".mpg":"video/mpeg",".odp":"application/vnd.oasis.opendocument.presentation",".ods":"application/vnd.oasis.opendocument.spreadsheet",".odt":"application/vnd.oasis.opendocument.text",".oga":"audio/ogg",".ogg":"application/ogg",".pdf":"application/pdf",".png":"image/png",".pps":"application/vnd.ms-powerpoint",".ppt":"application/vnd.ms-powerpoint",".ps":"application/postscript",".psd":"image/vnd.adobe.photoshop",".qt":"video/quicktime",".rar":"application/x-rar-compressed",".rdf":"application/rdf+xml",".rss":"application/rss+xml",".rtf":"application/rtf",".svg":"image/svg+xml",".svgz":"image/svg+xml",".swf":"application/x-shockwave-flash",".tar":"application/x-tar",".tbz":"application/x-bzip-compressed-tar",".text":"text/plain",".tif":"image/tiff",".tiff":"image/tiff",".torrent":"application/x-bittorrent",".ttf":"application/x-font-ttf",".txt":"text/plain",".wav":"audio/wav",".webm":"video/webm",".wma":"audio/x-ms-wma",".wmv":"video/x-ms-wmv",".xls":"application/vnd.ms-excel",".xml":"application/xml",".yaml":"text/yaml",".yml":"text/yaml",".zip":"application/zip"}
 
 /***/ }),
-/* 41 */
+/* 33 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(process) {/**
@@ -8588,7 +7589,7 @@ module.exports = {".3gp":"video/3gpp",".aac":"audio/aac",".aif":"audio/x-aiff","
  * Expose `debug()` as the module.
  */
 
-exports = module.exports = __webpack_require__(42);
+exports = module.exports = __webpack_require__(34);
 exports.log = log;
 exports.formatArgs = formatArgs;
 exports.save = save;
@@ -8771,7 +7772,7 @@ function localstorage() {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5)))
 
 /***/ }),
-/* 42 */
+/* 34 */
 /***/ (function(module, exports, __webpack_require__) {
 
 
@@ -8787,7 +7788,7 @@ exports.coerce = coerce;
 exports.disable = disable;
 exports.enable = enable;
 exports.enabled = enabled;
-exports.humanize = __webpack_require__(43);
+exports.humanize = __webpack_require__(35);
 
 /**
  * The currently active debug mode names, and names to skip.
@@ -8979,7 +7980,7 @@ function coerce(val) {
 
 
 /***/ }),
-/* 43 */
+/* 35 */
 /***/ (function(module, exports) {
 
 /**
@@ -9137,7 +8138,7 @@ function plural(ms, n, name) {
 
 
 /***/ }),
-/* 44 */
+/* 36 */
 /***/ (function(module, exports) {
 
 /* (c) 2016 Ari Porad (@ariporad) <http://ariporad.com>. License: ariporad.mit-license.org */
@@ -9156,7 +8157,7 @@ module.exports = function isAscii(str) {
 
 
 /***/ }),
-/* 45 */
+/* 37 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -9277,7 +8278,7 @@ function fromByteArray (uint8) {
 
 
 /***/ }),
-/* 46 */
+/* 38 */
 /***/ (function(module, exports) {
 
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
@@ -9367,13 +8368,13 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
 
 
 /***/ }),
-/* 47 */
+/* 39 */
 /***/ (function(module, exports) {
 
 /* (ignored) */
 
 /***/ }),
-/* 48 */
+/* 40 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -9383,7 +8384,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var Buffer = __webpack_require__(13).Buffer;
+var Buffer = __webpack_require__(12).Buffer;
 /*</replacement>*/
 
 function copyBuffer(src, target, offset) {
@@ -9453,7 +8454,7 @@ module.exports = function () {
 }();
 
 /***/ }),
-/* 49 */
+/* 41 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var apply = Function.prototype.apply;
@@ -9506,13 +8507,13 @@ exports._unrefActive = exports.active = function(item) {
 };
 
 // setimmediate attaches itself to the global object
-__webpack_require__(50);
+__webpack_require__(42);
 exports.setImmediate = setImmediate;
 exports.clearImmediate = clearImmediate;
 
 
 /***/ }),
-/* 50 */
+/* 42 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global, process) {(function (global, undefined) {
@@ -9705,7 +8706,7 @@ exports.clearImmediate = clearImmediate;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(8), __webpack_require__(5)))
 
 /***/ }),
-/* 51 */
+/* 43 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global) {
@@ -9779,7 +8780,7 @@ function config (name) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(8)))
 
 /***/ }),
-/* 52 */
+/* 44 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -9812,7 +8813,7 @@ function config (name) {
 
 module.exports = PassThrough;
 
-var Transform = __webpack_require__(28);
+var Transform = __webpack_require__(27);
 
 /*<replacement>*/
 var util = __webpack_require__(9);
@@ -9832,7 +8833,7 @@ PassThrough.prototype._transform = function (chunk, encoding, cb) {
 };
 
 /***/ }),
-/* 53 */
+/* 45 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var Buffer = __webpack_require__(3).Buffer
@@ -9865,7 +8866,7 @@ module.exports = function (buf) {
 
 
 /***/ }),
-/* 54 */
+/* 46 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(process) {// Copyright Joyent, Inc. and other Node contributors.
@@ -10096,12 +9097,12 @@ var substr = 'ab'.substr(-1) === 'b'
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5)))
 
 /***/ }),
-/* 55 */
+/* 47 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* global URL */
 
-var getBlob = __webpack_require__(56)
+var getBlob = __webpack_require__(48)
 
 module.exports = function getBlobURL (stream, mimeType, cb) {
   if (typeof mimeType === 'function') return getBlobURL(stream, null, mimeType)
@@ -10114,12 +9115,12 @@ module.exports = function getBlobURL (stream, mimeType, cb) {
 
 
 /***/ }),
-/* 56 */
+/* 48 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* global Blob */
 
-var once = __webpack_require__(16)
+var once = __webpack_require__(17)
 
 module.exports = function getBlob (stream, mimeType, cb) {
   if (typeof mimeType === 'function') return getBlob(stream, null, mimeType)
@@ -10140,7 +9141,7 @@ module.exports = function getBlob (stream, mimeType, cb) {
 
 
 /***/ }),
-/* 57 */
+/* 49 */
 /***/ (function(module, exports) {
 
 // Returns a wrapper function that returns a wrapped callback
@@ -10179,13 +9180,13 @@ function wrappy (fn, cb) {
 
 
 /***/ }),
-/* 58 */
+/* 50 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var MediaElementWrapper = __webpack_require__(21)
-var pump = __webpack_require__(59)
+var MediaElementWrapper = __webpack_require__(20)
+var pump = __webpack_require__(51)
 
-var MP4Remuxer = __webpack_require__(62)
+var MP4Remuxer = __webpack_require__(54)
 
 module.exports = VideoStream
 
@@ -10308,12 +9309,12 @@ VideoStream.prototype.destroy = function () {
 
 
 /***/ }),
-/* 59 */
+/* 51 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var once = __webpack_require__(16)
-var eos = __webpack_require__(60)
-var fs = __webpack_require__(61) // we only need fs to get the ReadStream and WriteStream prototypes
+var once = __webpack_require__(17)
+var eos = __webpack_require__(52)
+var fs = __webpack_require__(53) // we only need fs to get the ReadStream and WriteStream prototypes
 
 var noop = function () {}
 
@@ -10394,10 +9395,10 @@ module.exports = pump
 
 
 /***/ }),
-/* 60 */
+/* 52 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var once = __webpack_require__(16);
+var once = __webpack_require__(17);
 
 var noop = function() {};
 
@@ -10483,21 +9484,21 @@ module.exports = eos;
 
 
 /***/ }),
-/* 61 */
+/* 53 */
 /***/ (function(module, exports) {
 
 /* (ignored) */
 
 /***/ }),
-/* 62 */
+/* 54 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer) {var bs = __webpack_require__(63)
-var EventEmitter = __webpack_require__(15).EventEmitter
+/* WEBPACK VAR INJECTION */(function(Buffer) {var bs = __webpack_require__(55)
+var EventEmitter = __webpack_require__(16).EventEmitter
 var inherits = __webpack_require__(2)
-var mp4 = __webpack_require__(64)
-var Box = __webpack_require__(14)
-var RangeSliceStream = __webpack_require__(71)
+var mp4 = __webpack_require__(56)
+var Box = __webpack_require__(13)
+var RangeSliceStream = __webpack_require__(63)
 
 module.exports = MP4Remuxer
 
@@ -10967,7 +9968,7 @@ MP4Remuxer.prototype._generateMoof = function (track, firstSample, lastSample) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 63 */
+/* 55 */
 /***/ (function(module, exports) {
 
 module.exports = function(haystack, needle, comparator, low, high) {
@@ -11016,21 +10017,21 @@ module.exports = function(haystack, needle, comparator, low, high) {
 
 
 /***/ }),
-/* 64 */
+/* 56 */
 /***/ (function(module, exports, __webpack_require__) {
 
-exports.decode = __webpack_require__(65)
-exports.encode = __webpack_require__(70)
+exports.decode = __webpack_require__(57)
+exports.encode = __webpack_require__(62)
 
 
 /***/ }),
-/* 65 */
+/* 57 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer) {var stream = __webpack_require__(11)
+/* WEBPACK VAR INJECTION */(function(Buffer) {var stream = __webpack_require__(10)
 var inherits = __webpack_require__(2)
-var nextEvent = __webpack_require__(66)
-var Box = __webpack_require__(14)
+var nextEvent = __webpack_require__(58)
+var Box = __webpack_require__(13)
 
 var EMPTY = new Buffer(0)
 
@@ -11216,7 +10217,7 @@ MediaData.prototype.destroy = function (err) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 66 */
+/* 58 */
 /***/ (function(module, exports) {
 
 module.exports = nextEvent
@@ -11237,7 +10238,7 @@ function nextEvent (emitter, name) {
 
 
 /***/ }),
-/* 67 */
+/* 59 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var UINT_32_MAX = 0xffffffff
@@ -11276,12 +10277,12 @@ exports.decode.bytes = 8
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 68 */
+/* 60 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {// This is an intentionally recursive require. I don't like it either.
-var Box = __webpack_require__(14)
-var Descriptor = __webpack_require__(69)
+var Box = __webpack_require__(13)
+var Descriptor = __webpack_require__(61)
 
 var TIME_OFFSET = 2082844800000
 
@@ -12212,7 +11213,7 @@ function readString (buf, offset, length) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 69 */
+/* 61 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var tagToName = {
@@ -12291,12 +11292,12 @@ exports.DecoderConfigDescriptor.decode = function (buf, start, end) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 70 */
+/* 62 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer, process) {var stream = __webpack_require__(11)
+/* WEBPACK VAR INJECTION */(function(Buffer, process) {var stream = __webpack_require__(10)
 var inherits = __webpack_require__(2)
-var Box = __webpack_require__(14)
+var Box = __webpack_require__(13)
 
 module.exports = Encoder
 
@@ -12428,7 +11429,7 @@ MediaData.prototype.destroy = function (err) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer, __webpack_require__(5)))
 
 /***/ }),
-/* 71 */
+/* 63 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -12441,7 +11442,7 @@ emits 'stalled' once everything is written
 
 */
 var inherits = __webpack_require__(2)
-var stream = __webpack_require__(11)
+var stream = __webpack_require__(10)
 
 module.exports = RangeSliceStream
 
@@ -12556,6 +11557,1001 @@ RangeSliceStream.prototype.destroy = function (err) {
 
 	if (err) self.emit('error', err)
 }
+
+
+/***/ }),
+/* 64 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__ = __webpack_require__(15);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
+
+
+
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
+//const Dweb = require('../js/Dweb');     // Gets SmartDict and the Transports
+//TODO-REFACTOR extends SmartDict to eventually allow loading via URL - having problems with webpack ... libsodium -> fs
+//TODO-NAMING url could be a name
+
+class ArchiveItem {
+    //extends SmartDict {  //TODO should extend SmartDict, but having Webpack issues loading it
+    /*
+    Base class representing an Item and/or a Search query (A Collection is both).
+    This is just storage, the UI is in ArchiveBase and subclasses, theoretically this class could be used for a server or gateway app with no UI.
+     Fields:
+    itemid: Archive.org reference for object
+    item:   Metadata decoded from JSON from metadata search.
+    items:  Array of data from a search.
+    _list:  Will hold a list of files when its a single item, TODO-REFACTOR maybe this holds a array of ArchiveItem when its a search BUT only have partial metadata info
+     Once subclass SmartDict
+    _urls:  Will be list of places to retrieve this data (not quite a metadata call)
+     */
+
+    constructor({ itemid = undefined, item = undefined } = {}) {
+        this.itemid = itemid;
+        this.item = item; // Havent fetched yet, subclass constructors may override
+    }
+
+    _listLoad() {
+        /*
+         After set this.item, load the _list with an array for ArchiveFile
+        */
+        this._list = this.item && this.item.files ? this.item.files.map(f => new __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__["a" /* default */]({ itemid: this.itemid, metadata: f })) // Allow methods on files of item
+        : []; // Default to empty, so usage simpler.
+    }
+
+    async fetch() {
+        /* Fetch what we can about this item, it might be an item or something we have to search for.
+            Fetch item metadata as JSON by talking to Metadata API
+            Fetch collection info by an advanced search.
+            Goes through gateway.dweb.me so that we can work around a CORS issue (general approach & security questions confirmed with Sam!)
+             this.itemid Archive Item identifier
+            throws: TypeError or Error if fails
+            resolves to: this
+         */
+        if (this.itemid && !this.item) {
+            console.log('get metadata for ' + this.itemid);
+            //this.item = await Util.fetch_json(`https://archive.org/metadata/${this.itemid}`);
+            this.item = await __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}`);
+            this._listLoad(); // Load _list with ArchiveFile
+        }
+        if (this.query) {
+            // This is for Search, Collection and Home.
+            let url =
+            //`https://archive.org/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`; // Archive (CORS fail)
+            `https://gateway.dweb.me/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}&and[]=${this.and}`;
+            //`http://localhost:4244/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`; //Testing
+            console.log(url);
+            let j = await __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].fetch_json(url);
+            this.items = j.response.docs;
+        }
+        return this; // For chaining, but note will need to do an "await fetch"
+    }
+
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = ArchiveItem;
+
+
+/***/ }),
+/* 65 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
+//import React from 'react';
+
+
+
+class Tile {
+  render(item) {
+    //xxx shorten/safify certain title usages (compared to Lists.inc)
+    const collections = Array.isArray(item.collection) ? item.collection : typeof item.collection === 'string' ? [item.collection] : [];
+    const collection = collections[0];
+    const nFavorites = collections.filter(e => e.startsWith('fav-')).length;
+    const is_collection = item.mediatype === 'collection';
+    const classes = 'item-ia' + (is_collection ? ' collection-ia' : '');
+    //ARCHIVE-BROWSER on browser, want to load links locally (via APIs) rather than rebuilding HTML page
+    // ARCHIVE-BROWSER added key= to keep react happy (I hope)
+    return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+      'div',
+      { className: classes, 'data-id': item.identifier, key: item.identifier },
+      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+        'a',
+        { className: 'stealth', tabIndex: '-1', onClick: `Nav.nav_details("${collection}");` },
+        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+          'div',
+          { className: 'item-parent' },
+          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            { className: 'item-parent-img' },
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { src: 'https://archive.org/services/img/' + collection })
+          ),
+          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            { className: 'item-parent-ttl' },
+            'xxx parent title'
+          )
+        )
+      ),
+      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+        'div',
+        { className: 'hidden-tiles views C C1' },
+        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+          'nobr',
+          { className: 'hidden-xs' },
+          __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].number_format(item.downloads)
+        ),
+        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+          'nobr',
+          { className: 'hidden-sm hidden-md hidden-lg' },
+          __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].number_format(item.downloads)
+        )
+      ),
+      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+        'div',
+        { className: 'C234' },
+        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+          'div',
+          { className: 'item-ttl C C2' },
+          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'a',
+            { onClick: `Nav.nav_details("${item.identifier}");`, title: item.title },
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+              'div',
+              { className: 'tile-img' },
+              __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { className: 'item-img', xxxstyle: 'height:180px', src: 'https://archive.org/services/img/' + item.identifier })
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+              'div',
+              { className: 'ttl' },
+              item.title
+            )
+          )
+        ),
+        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+          'div',
+          { className: 'hidden-tiles pubdate C C3' },
+          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'nobr',
+            { className: 'hidden-xs' },
+            'Dec 3, 2012'
+          ),
+          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'nobr',
+            { className: 'hidden-sm hidden-md hidden-lg' },
+            '12/12'
+          )
+        ),
+        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+          'div',
+          { className: 'by C C4' },
+          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'span',
+            { className: 'hidden-lists' },
+            item.creator && 'by '
+          ),
+          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'span',
+            { title: Array.isArray(item.creator) ? item.creator.join(',') : item.creator },
+            item.creator
+          )
+        )
+      ),
+      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+        'div',
+        { className: 'mt-icon C C5' },
+        __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].mediatype_icon(item.mediatype)
+      ),
+      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+        'h6',
+        { className: 'stat ' },
+        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-eye', 'aria-hidden': 'true' }),
+        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+          'span',
+          { className: 'sr-only' },
+          'eye'
+        ),
+        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+          'nobr',
+          null,
+          __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].number_format(item.downloads)
+        )
+      ),
+      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+        'h6',
+        { className: 'stat' },
+        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-favorite', 'aria-hidden': 'true' }),
+        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+          'span',
+          { className: 'sr-only' },
+          'favorite'
+        ),
+        nFavorites
+      ),
+      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+        'h6',
+        { className: 'stat' },
+        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-comment', 'aria-hidden': 'true' }),
+        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+          'span',
+          { className: 'sr-only' },
+          'comment'
+        ),
+        item.num_reviews || "0"
+      )
+    );
+  }
+
+  collection_stats(item) {
+    return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+      'div',
+      { className: 'collection-stats' },
+      __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].glyph({ name: 'collection', classes: 'topinblock hidden-lists' }),
+      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+        'div',
+        { className: 'num-items topinblock' },
+        '0',
+        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+          'div',
+          { className: 'micro-label' },
+          'ITEMS'
+        )
+      ),
+      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+        'div',
+        { className: 'num-items hidden-tiles' },
+        __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].number_format(item.downloads),
+        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+          'div',
+          { className: 'micro-label' },
+          'VIEWS'
+        )
+      )
+    );
+  }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = Tile;
+
+
+/***/ }),
+/* 66 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Search__ = __webpack_require__(14);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Details__ = __webpack_require__(6);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__Home__ = __webpack_require__(67);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__Collection__ = __webpack_require__(68);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__Texts__ = __webpack_require__(69);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__Image__ = __webpack_require__(70);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__AV__ = __webpack_require__(71);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_9__DetailsError__ = __webpack_require__(72);
+//import ReactDOM from "react-dom";
+
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
+// https://ponyfoo.com/articles/universal-react-babel
+
+
+
+
+
+
+
+
+
+
+
+
+class Nav {
+  //extends React.Component
+  constructor() {
+    //super();
+    this.mts = ['web', 'texts', 'movies', 'audio', 'software', 'image'];
+  }
+
+  navwrapJSX() {
+    /* The navigation stuff.   Order is navwrapJSX : maincontent : itemDetailsAbout */
+    {/*--TODO-DETAILS update navwrap to match actual code in both search.html and commute.html--*/}
+    return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+      'div',
+      { id: 'navwrap1' },
+      __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+        'div',
+        { id: 'navwrap2' },
+        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+          'div',
+          { className: 'navbar navbar-inverse navbar-static-top', role: 'navigation' },
+          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'nav-tophat-helper', className: 'hidden-xs' }),
+          __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'ul',
+            { className: 'nav navbar-nav' },
+            this.mts.map((mt, n) => __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+              'li',
+              { key: 'mikey' + n, className: 'dropdown dropdown-ia pull-left' },
+              __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'a',
+                { title: mt, className: 'navia-link ' + mt,
+                  onClick: `Nav.nav_details("${mt}")`,
+                  'data-top-kind': mt, 'data-toggle': 'tooltip', target: '_top', 'data-placement': 'bottom' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-' + mt, 'aria-hidden': 'true' }),
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                  'span',
+                  { className: 'sr-only' },
+                  mt
+                )
+              )
+            )),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+              'li',
+              { className: 'navbar-brand-li' },
+              __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'a',
+                { className: 'navbar-brand', onClick: 'Nav.nav_home();', target: '_top' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-logo', 'aria-hidden': 'true' }),
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                  'span',
+                  { className: 'sr-only' },
+                  'logo'
+                )
+              )
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+              'li',
+              { id: 'nav-search', className: 'dropdown dropdown-ia pull-right' },
+              __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'a',
+                { onClick: '$(this).parents(\'#nav-search\').find(\'form\').submit(); return false;' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-search', 'aria-hidden': 'true' }),
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                  'span',
+                  { className: 'sr-only' },
+                  'search'
+                )
+              ),
+              __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'div',
+                null,
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                  'form',
+                  { role: 'search', onSubmit: 'Nav.nav_search(this.elements[0].value); return 0;', target: '_top' },
+                  __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'label',
+                    { htmlFor: 'search-bar-2', className: 'sr-only' },
+                    'Search the Archive'
+                  ),
+                  __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { id: 'search-bar-2', placeholder: 'Search', type: 'text', name: 'query', value: '' }),
+                  __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'submit', value: 'Search' })
+                )
+              )
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+              'li',
+              { className: 'dropdown dropdown-ia pull-right' },
+              __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'a',
+                { id: 'glyphme', href: 'https://archive.org/donate', _target: 'top',
+                  'data-toggle': 'tooltip', 'data-placement': 'bottom', title: 'Donate' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { src: 'https://archive.org/images/gift.png' })
+              )
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+              'li',
+              { className: 'dropdown dropdown-ia pull-right' },
+              __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'a',
+                { href: 'https://archive.org/create', _target: 'top', 'data-toggle': 'tooltip', 'data-placement': 'bottom', title: 'Upload' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: 'iconochive-upload', 'aria-hidden': 'true' }),
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                  'span',
+                  { className: 'sr-only' },
+                  'upload'
+                )
+              )
+            )
+          )
+        )
+      ),
+      ' ',
+      ' '
+    );
+  }
+
+  static clear(destn) {
+    // Clear the screen to give confidence that action under way
+    // Leaves Nav, clears rest
+    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].domrender(new __WEBPACK_IMPORTED_MODULE_9__DetailsError__["a" /* default */](undefined, undefined, __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+      'span',
+      null,
+      ' "Loading" '
+    )).navwrapped(false), destn);
+  }
+  static async nav_home() {
+    console.log("Navigating to Home");
+    return await Nav.nav_details(undefined);
+  }
+
+  static async nav_details(id) {
+    console.log("Navigating to Details", id);
+    let destn = document.getElementById('main'); // Blank window (except Nav) as loading
+    Nav.clear(destn);
+    await Nav.factory(id, destn, ""); // Not sure what returning ....
+    return false; // Dont follow anchor link - unfortunately React ignores this
+  }
+
+  static async nav_search(q) {
+    console.log("Navigating to Search");
+    let destn = document.getElementById('main'); // Blank window (except Nav) as loading
+    Nav.clear(destn);
+    let s = await new __WEBPACK_IMPORTED_MODULE_2__Search__["default"](typeof q === "object" ? q : typeof q === "string" ? { query: encodeURIComponent(q) } : undefined).fetch();
+    s.render(destn, "");
+  }
+
+  static async factory(itemid, res, htm) {
+    if (!itemid) {
+      (await new __WEBPACK_IMPORTED_MODULE_4__Home__["a" /* default */](itemid, undefined).fetch()).render(res, htm);
+    } else {
+      let obj = await new __WEBPACK_IMPORTED_MODULE_3__Details__["default"](itemid).fetch();
+      item = obj.item;
+      if (!item.metadata) {
+        new __WEBPACK_IMPORTED_MODULE_9__DetailsError__["a" /* default */](itemid, item, `item ${itemid} cannot be found or does not have metadata`).render(res, htm);
+      } else {
+        if (verbose) console.log("Found mediatype", item.metadata.mediatype);
+        switch (item.metadata.mediatype) {
+          case "collection":
+            return (await new __WEBPACK_IMPORTED_MODULE_5__Collection__["a" /* default */](itemid, item).fetch()).render(res, htm); //fetch will do search
+            break;
+          case "texts":
+            new __WEBPACK_IMPORTED_MODULE_6__Texts__["a" /* default */](itemid, item).render(res, htm);
+            break;
+          case "image":
+            new __WEBPACK_IMPORTED_MODULE_7__Image__["a" /* default */](itemid, item).render(res, htm);
+            break;
+          case "audio": // Intentionally drop thru to movies
+          case "movies":
+            new __WEBPACK_IMPORTED_MODULE_8__AV__["a" /* default */](itemid, item).render(res, htm);
+            break;
+          default:
+            new __WEBPACK_IMPORTED_MODULE_9__DetailsError__["a" /* default */](itemid, item, `Unsupported mediatype: ${item.metadata.mediatype}`).render(res, htm);
+          //    return new Nav(")
+        }
+      }
+    }
+  }
+
+}
+/* harmony export (immutable) */ __webpack_exports__["default"] = Nav;
+
+
+/***/ }),
+/* 67 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Search__ = __webpack_require__(14);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
+
+
+class Home extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
+    constructor(itemid, item) {
+        const NOT = ['what_cd', 'cd', 'vinyl', 'librarygenesis', 'bibalex', // per alexis
+        'movies', 'audio', 'texts', 'software', 'image', 'data', 'web', // per alexis/tracey
+        'additional_collections', 'animationandcartoons', 'artsandmusicvideos', 'audio_bookspoetry', 'audio_foreign', 'audio_music', 'audio_news', 'audio_podcast', 'audio_religion', 'audio_tech', 'computersandtechvideos', 'coverartarchive', 'culturalandacademicfilms', 'ephemera', 'gamevideos', 'inlibrary', 'moviesandfilms', 'newsandpublicaffairs', 'ourmedia', 'radioprograms', 'samples_only', 'spiritualityandreligion', 'stream_only', 'television', 'test_collection', 'usgovfilms', 'vlogs', 'youth_media'];
+
+        const query = 'mediatype:collection AND NOT noindex:true AND NOT collection:web AND NOT identifier:fav-* AND NOT identifier:' + NOT.join(' AND NOT identifier:');
+        super({
+            query: query,
+            sort: '-downloads',
+            itemid: itemid,
+            item: item
+        });
+    }
+    banner() {
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'center',
+            { style: { margin: "35px" } },
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { style: { fontSize: "125px" }, className: 'iconochive-logo' })
+        );
+    }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = Home;
+
+
+/***/ }),
+/* 68 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Search__ = __webpack_require__(14);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
+
+
+class Collection extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
+    constructor(itemid, item) {
+        super({
+            query: 'collection:' + itemid,
+            sort: '-downloads',
+            itemid: itemid,
+            item: item
+        });
+    }
+
+    banner() {
+        item = this.item;
+        //TODO-DETAILS probably move this to the Search class after move to use the approach taken in template_image.js
+        const creator = item.metadata.creator && item.metadata.creator != item.metadata.title ? item.metadata.creator : '';
+        //ARCHIVE-BROWSER note the elements below were converted to HTML 3 times in original version
+        //TODO-DETAILS on prelinger, banner description is getting truncated.
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            { className: 'welcome container container-ia width-max', style: { 'backgroundColor': 'white' } },
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'div',
+                { className: 'container' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { className: 'row' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { className: 'col-xs-11 col-sm-10 welcome-left' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { id: 'file-dropper-wrap' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'file-dropper' }),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { id: 'file-dropper-img', className: 'img-responsive', style: { 'maxWidth': "350px", margin: '0 10px 5px 0' }, src: 'https://archive.org/services/img/' + this.itemid })
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'h1',
+                            null,
+                            item.metadata.title
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'h4',
+                            null,
+                            creator
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { id: 'descript', style: { maxHeight: "43px", cursor: 'pointer' } },
+                            item.metadata.description,
+                            ' '
+                        )
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { className: 'col-xs-1 col-sm-2 welcome-right' },
+                        'xxx'
+                    )
+                )
+            )
+        );
+    }
+    browserBefore() {
+        $('body').addClass('bgEEE');
+        // Note the archive_setup.push stuff is subtly different from that for 'search'
+        archive_setup.push(function () {
+            //TODO-DETAILS check not pushing on top of existing (it probably is)
+            AJS.lists_v_tiles_setup('collection');
+            $('div.ikind').css({ visibility: 'visible' });
+            AJS.popState('');
+            AJS.tiler();
+            $(window).on('resize  orientationchange', function (evt) {
+                clearTimeout(AJS.tiles_wrap_throttler);
+                AJS.tiles_wrap_throttler = setTimeout(AJS.tiler, 250);
+            });
+            // register for scroll updates (for infinite search results)
+            $(window).scroll(AJS.scrolled);
+        });
+    }
+
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = Collection;
+
+
+/***/ }),
+/* 69 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(6);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
+
+
+
+class Texts extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
+    constructor(itemid, item) {
+        super(itemid, item);
+        this.itemtype = "http://schema.org/TextDigitalDocument";
+    }
+    archive_setup_push() {
+        super.archive_setup_push(); // On eample images the theatre & carosel came before the parts common to AV, Image and Text
+        archive_setup.push(function () {
+            AJS.booksize();
+        });
+    }
+    theatreIaWrap() {
+        let item = this.item;
+        let metadata = item.metadata;
+        let detailsURL = `https://archive.org/details/${this.itemid}`; // Probably correct as archive.org/details since used as itemProp
+        let imageURL = `https://archive.org/services/img/${this.itemid}`;
+        //TODO-DETAILS-DWEB use alternative URLS via IPFS
+        //TODO-STREAM pass as stream
+        let streamURL = `https://archive.org/stream/${this.itemid}`; //{1992.Zandvoorts.Nieuwsblad}`; //TODO-TEXTS Cant find 2nd part of URL
+        //let streamURL = `https://archive.org/stream/${this.itemid}/1992.Zandvoorts.Nieuwsblad`;   // In archive.org but needs looking for this string in file names
+        //let iframeURL = `${streamURL}?ui=embed#mode/2up`;   //This comes from Traceys code and works
+        let iframeURL = `${streamURL}?ui=embed`; //This works and matches archive.org
+        let shortEmbedURL = `https://archive.org/stream/${this.itemid}?ui=embed`; //Note on archive.org/details this is different from iframeURL and not clear if that is intentional
+        let helpURL = `https://archive.org/help/audio.php?identifier=${this.itemid}`;
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            { id: 'theatre-ia-wrap', 'class': 'container container-ia width-max' },
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemprop: 'url', href: detailsURL }),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemprop: 'image', href: imageURL }),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'h1',
+                { 'class': 'sr-only' },
+                metadata.title
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'h2',
+                { 'class': 'sr-only' },
+                'Item Preview'
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'div',
+                { id: 'theatre-ia', 'class': 'container' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { 'class': 'row' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { 'class': 'xs-col-12' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { id: 'theatre-controls' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { href: streamURL },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { title: 'fullscreen view', 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left',
+                                    'class': 'iconochive-fullscreen' })
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { href: streamURL },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { title: 'search inside', 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left',
+                                    'class': 'iconochive-search' })
+                            )
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { id: 'texty', style: 'font-size:0px', 'class': '' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('iframe', { src: iframeURL,
+                                width: '100%', height: '480', frameborder: '0', webkitallowfullscreen: 'true',
+                                mozallowfullscreen: 'true', allowfullscreen: true })
+                        ),
+                        this.cherModal("audio"),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('center', { style: 'color:white;margin-bottom:10px' })
+                    )
+                )
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'flag-overlay', 'class': 'center-area ' })
+        );
+    }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = Texts;
+
+
+/***/ }),
+/* 70 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(6);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Util__ = __webpack_require__(4);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
+
+
+
+
+class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
+    constructor(itemid, item) {
+        /*
+        Construct an Image object before rendering it to a HTML page
+        item = metadata from a metadata fetch
+         */
+        super(itemid, item);
+        this.itemtype = "http://schema.org/VisualArtwork";
+    }
+    archive_setup_push() {
+        AJS.theatresize();
+        AJS.carouselsize('#ia-carousel', true);
+        super.archive_setup_push(); // On eample images the theatre & carosel came before the parts common to AV, Image and Text
+    }
+
+    theatreIaWrap() {
+        let item = this.item;
+        let itemid = item.metadata.identifier; // Shortcut as used a lot
+        let mainArchiveFile = this._list.find(fi => __WEBPACK_IMPORTED_MODULE_2__Util__["a" /* default */].imageFormats.includes(fi.metadata.format)); // Can be undefined if none included
+        let detailsURL = `https://archive.org/details/${itemid}`; //This is probably correct to remain pointed at archive.org since used as an itemprop
+        let embedurl = `https://archive.org/embed/${itemid}`;
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            { id: 'theatre-ia-wrap', className: 'container container-ia width-max  resized', style: { height: "600px" } },
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemProp: 'url', href: detailsURL }),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemProp: 'thumbnailUrl', href: 'https://archive.org/services/img/{itemid}' }),
+            item.files.filter(fi => fi.source !== "metadata").map(fi => //TODO-DETAILS-LIST Maybe use _list instead of .files
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemProp: 'associatedMedia', href: `https://archive.org/download/${itemid}/${fi.name}`, key: `${itemid}/${fi.name}` })),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'h1',
+                { className: 'sr-only' },
+                item.metadata.title
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'h2',
+                { className: 'sr-only' },
+                'Item Preview'
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'div',
+                { id: 'theatre-ia', className: 'container' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { className: 'row' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { className: 'xs-col-12' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'theatre-controls' }),
+                        ' ',
+                        mainArchiveFile ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { className: 'details-carousel-wrapper' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'section',
+                                { id: 'ia-carousel', className: 'carousel slide', 'data-ride': 'carousel', 'data-interval': 'false',
+                                    'aria-label': 'Item image slideshow', style: { maxHeight: "600px" } },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'ol',
+                                    { className: 'carousel-indicators', style: { display: "none" } },
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('li', { 'data-target': '#ia-carousel', 'data-slide-to': '0', className: ' active', role: 'button', tabIndex: '0',
+                                        'aria-label': 'Go to image 1' })
+                                ),
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'div',
+                                    { className: 'carousel-inner' },
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'div',
+                                        { className: 'item active' },
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'a',
+                                            { className: 'carousel-image-wrapper',
+                                                href: `http://archive.org/download/${itemid}/${mainArchiveFile.metadata.name}`,
+                                                title: 'Open full sized image' },
+                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { id: 'streamContainer', src: mainArchiveFile, className: 'rot0 carousel-image', alt: 'item image #1' })
+                                        ),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'div',
+                                            { className: 'carousel-caption' },
+                                            mainArchiveFile.metadata.name
+                                        )
+                                    )
+                                )
+                            )
+                        ) : __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { className: 'row', style: { color: "white" } },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'div',
+                                { className: 'col-md-10 col-md-offset-1 no-preview' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'p',
+                                    { className: 'theatre-title' },
+                                    'There Is No Preview Available For This Item'
+                                ),
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'p',
+                                    null,
+                                    'This item does not appear to have any files that can be experienced on Archive.org',
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'span',
+                                        { className: 'hidden-xs hidden-sm' },
+                                        'Please download files in this item to interact with them on your computer.'
+                                    ),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'a',
+                                        { className: 'show-all', href: `https://archive.org/download/${itemid}`, target: '_blank' },
+                                        'Show all files'
+                                    )
+                                )
+                            )
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'webtorrentStats', style: 'color: white; text-align: center;' }),
+                        this.cherModal("audio")
+                    )
+                )
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'flag-overlay', className: 'center-area ' })
+        );
+    }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = Image;
+
+
+/***/ }),
+/* 71 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Details__ = __webpack_require__(6);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_render_media__ = __webpack_require__(19);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_render_media___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_3_render_media__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit__ = __webpack_require__(28);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_4_throttleit__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_prettier_bytes__ = __webpack_require__(18);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_prettier_bytes___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_5_prettier_bytes__);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
+
+
+
+
+
+
+
+class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
+    constructor(itemid, item) {
+        super(itemid, item);
+        this.itemtype = "http://schema.org/VideoObject";
+    }
+    setupPlaylist() {
+        this.playlist = [];
+        //TODO-DETAILS put these formats in a list in Utils.config
+        this.avs = this._list.filter(fi => fi.metadata.format == 'h.264' || fi.metadata.format == '512Kb MPEG4');
+        if (!this.avs.length) this.avs = this._list.filter(fi => fi.metadata.format == 'VBR MP3');
+
+        if (this.avs.length) {
+            this.avs.sort((a, b) => __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].natcompare(a.name, b.name)); //Unsure why sorting names, presumably tracks are named alphabetically ?
+
+            this.playlist.push({ name: this.avs[0].name,
+                urls: [item.metadata.magnetlink + '/' + this.avs[0].name] });
+        }
+    }
+    archive_setup_push() {
+        let self = this;
+        super.archive_setup_push(); // On commute.html the Play came after the parts common to AV, Image and Text
+        // archive_setup.push(function() { //TODO-ARCHIVE_SETUP move Play from browserAfter to here
+        //    Play('jw6', self.playlist, self.cfg);
+        // });
+    }
+
+    theatreIaWrap() {
+        let item = this.item;
+        let itemid = this.itemid;
+        let detailsurl = `https://archive.org/details/${itemid}`;
+        let title = item.title;
+        //let cfg  = {"aspectratio": 4/3 }; // Old version in Traceys code which was missign other parts of cfg below
+        let cfg = { "start": 0, "embed": null, "so": false, "autoplay": false, "width": 0, "height": 0, "list_height": 0, "audio": false,
+            "responsive": true, "flash": false, "hide_list": true,
+            "identifier": this.itemid, //TODO-DETAILS-ONLINE check another example and see if identifier should be itemid or title
+            "collection": this.item.metadata.collection[0]
+        };
+        /*
+        [{"title":"commute","orig":"commute.avi","image":"/download/commute/commute.thumbs%2Fcommute_000005.jpg",
+            "duration":"115.61",
+            "sources":[
+                {"file":"/download/commute/commute.mp4","type":"mp4","height":"480", "width":"640","label":"480p"},
+                {"file":"/download/commute/commute.ogv","type":"ogg","height":"304","width":"400","label":"304p"}],
+            "tracks":[{"file":"https://archive.org/stream/commute/commute.thumbs/commute_000005.jpg&vtt=vtt.vtt","kind":"thumbnails"}]}],
+        */
+        this.setupPlaylist();
+
+        //TODO-DETAILS make next few lines between theatre-ia-wrap and theatre-ia not commute specific
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            { id: 'theatre-ia-wrap', 'class': 'container container-ia width-max ' },
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemprop: 'url', href: detailsurl }),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'h1',
+                { 'class': 'sr-only' },
+                title
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'h2',
+                { 'class': 'sr-only' },
+                'Movies Preview'
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'div',
+                { id: 'theatre-ia', 'class': 'container' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { 'class': 'row' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { 'class': 'xs-col-12' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { id: 'theatre-controls' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { href: '#', id: 'gofullscreen', onclick: '' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left', 'class': 'iconochive-fullscreen',
+                                    title: 'fullscreen view' })
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { href: '#', onclick: 'return AJS.flash_click(0)' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left', 'class': 'iconochive-flash',
+                                    title: 'Click to have player try flash first, then HTML5 second' })
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { href: '#', onclick: 'return AJS.mute_click()' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left', 'class': 'iconochive-unmute',
+                                    title: 'sound is on.  click to mute sound.' })
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { href: '#', onclick: 'return AJS.mute_click()' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left', 'class': 'iconochive-mute',
+                                    style: 'display:none', title: 'sound is off.  click for sound.' })
+                            )
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'noscript',
+                            null,
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'div',
+                                { 'class': 'alert alert-danger alert-dismissable', 'data-dismiss': 'alert' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'button',
+                                    { type: 'button', 'class': 'close', 'data-dismiss': 'alert', 'aria-hidden': 'true' },
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', {
+                                        'class': 'iconochive-remove-circle', 'aria-hidden': 'true' }),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'span',
+                                        { 'class': 'sr-only' },
+                                        'remove-circle'
+                                    )
+                                ),
+                                'Internet Archive\'s in-browser video player requires JavaScript to be enabled. It appears your browser does not have it turned on. Please see your browser settings for this feature.'
+                            )
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { id: 'videoContainerX', style: 'text-align: center;' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('video', { id: 'streamContainer', src: this.avs[0] })
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'webtorrentStats', style: 'color: white; text-align: center;' }),
+                        this.cherModal("video")
+                    ),
+                    ' '
+                )
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'flag-overlay', 'class': 'center-area ' })
+        );
+    }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = AV;
 
 
 /***/ }),
