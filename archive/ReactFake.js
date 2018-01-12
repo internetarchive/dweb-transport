@@ -42,9 +42,8 @@ export default class React  {
                 delete attrs.dangerouslySetInnerHTML;
             }
             if (["img.src", "a.href"].includes(tag+"."+name) && (typeof attrs[name] === "string") && attrs[name].startsWith('/')) {
-                if (!React._config.root) console.error("Need to React.config({root: 'https://xxx.yyy'");
+                if (!React._config.root) console.error("Need to React.config({root: 'https://xyz.abc'");
                 attrs[name] = React._config.root + attrs[name];  // e.g. /foo => https://bar.com/foo
-                console.log("XXX@43",attrs[name])
             }
             if (["img.src"].includes(tag+"."+name) && attrs[name] instanceof ArchiveFile) {
                 attrs[name].loadImg(element);

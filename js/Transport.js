@@ -133,7 +133,7 @@ class Transport {
     p_newlisturls(cl, verbose) {
         /*
         Must be implemented by any list, return a pair of URLS that may be the same, private and public links to the list.
-        returns: ( privateurl, publicurl) e.g. yjs:xxx/yyy or orbitdb:a123
+        returns: ( privateurl, publicurl) e.g. yjs:xyz/abc or orbitdb:a123
          */
         throw new Error("undefined function Transport.p_newlisturls");
     }

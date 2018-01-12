@@ -34,7 +34,6 @@ export default class Collection extends Search {
                             </div>
                         </div>
                         <div className="col-xs-1 col-sm-2 welcome-right">
-                            xxx
                         </div>
                     </div>
                 </div>

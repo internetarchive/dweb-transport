@@ -5,7 +5,7 @@ import React from './ReactFake';    // Note React is used by the JSX compiler th
 
 
 export default class Util {
-    static number_format(nStr)//xxx this is just addCommas now
+    static number_format(nStr)//this is just addCommas now
     {
         //http://www.mredkj.com/javascript/numberFormat.html
         nStr += '';

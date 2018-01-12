@@ -99,7 +99,7 @@ class TransportWEBTORRENT extends Transport {
         const index = url.href.indexOf('/');
 
         if (index === -1) {
-            throw new Dweb.errors.CodingError("TransportWEBTORRENT.p_rawfetch: invalid url - missing path component. Should look like magnet:XXXXXX/path/to/file");
+            throw new Dweb.errors.CodingError("TransportWEBTORRENT.p_rawfetch: invalid url - missing path component. Should look like magnet:xyzabc/path/to/file");
         }
 
         const torrentId = url.href.slice(0, index);
@@ -162,9 +162,9 @@ class TransportWEBTORRENT extends Transport {
         /*
         Fetch some bytes based on a url of the form:
 
-            magnet:XXXXXX/path/to/file
+            magnet:xyzabc/path/to/file
 
-        (Where XXXXXX is the typical magnet uri contents)
+        (Where xyzabc is the typical magnet uri contents)
 
         No assumption is made about the data in terms of size or structure.         Returns a new Promise that resolves to a buffer.
 
@@ -195,9 +195,9 @@ class TransportWEBTORRENT extends Transport {
         /*
         Fetch bytes progressively, using a node.js readable stream, based on a url of the form:
 
-            magnet:XXXXXX/path/to/file
+            magnet:xyzabc/path/to/file
 
-        (Where XXXXXX is the typical magnet uri contents)
+        (Where xyzabc is the typical magnet uri contents)
 
         No assumption is made about the data in terms of size or structure.         Returns a new Promise that resolves to a node.js readable stream.
 
