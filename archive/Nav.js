@@ -12,7 +12,7 @@ import Home from './Home'
 import Collection from './Collection'
 import Texts from './Texts'
 import Image from './Image'
-import AV from './AV'
+import './AV'   /*AV,Audio,Vido*/
 import DetailsError from './DetailsError'
 
 
@@ -130,8 +130,10 @@ export default class Nav { //extends React.Component
                         new Image(itemid, item).render(res, htm);
                         break;
                     case "audio": // Intentionally drop thru to movies
+                        new Audio(itemid, item).render(res, htm);
+                        break;
                     case "movies":
-                        new AV(itemid, item).render(res, htm);
+                        new Video(itemid, item).render(res, htm);
                         break;
                     default:
                         new DetailsError(itemid, item, `Unsupported mediatype: ${item.metadata.mediatype}`).render(res, htm);

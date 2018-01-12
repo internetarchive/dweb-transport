@@ -60,7 +60,7 @@
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 30);
+/******/ 	return __webpack_require__(__webpack_require__.s = 27);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -69,7 +69,7 @@
 
 /* eslint max-len: 0 */
 // TODO: eventually deprecate this console.trace("use the `babel-register` package instead of `babel-core/register`");
-module.exports = __webpack_require__(31);
+module.exports = __webpack_require__(28);
 
 
 /***/ }),
@@ -128,7 +128,7 @@ class React {
             }
             if (["img.src"].includes(tag + "." + name) && attrs[name] instanceof __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__["a" /* default */]) {
                 attrs[name].loadImg(element);
-            } else if (["video.src", "img.src"].includes(tag + "." + name) && attrs[name] instanceof __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__["a" /* default */]) {
+            } else if (["video.src", "audio.src"].includes(tag + "." + name) && attrs[name] instanceof __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__["a" /* default */]) {
                 attrs[name].loadStream(element);
             } else if (name && attrs.hasOwnProperty(name)) {
                 let value = attrs[name];
@@ -211,9 +211,9 @@ if (typeof Object.create === 'function') {
 
 
 
-var base64 = __webpack_require__(37)
-var ieee754 = __webpack_require__(38)
-var isArray = __webpack_require__(22)
+var base64 = __webpack_require__(36)
+var ieee754 = __webpack_require__(37)
+var isArray = __webpack_require__(20)
 
 exports.Buffer = Buffer
 exports.SlowBuffer = SlowBuffer
@@ -2408,13 +2408,143 @@ process.umask = function() { return 0; };
 
 /***/ }),
 /* 6 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+// a duplex stream is just a stream that is both readable and writable.
+// Since JS doesn't have multiple prototypal inheritance, this class
+// prototypally inherits from Readable, and then parasitically from
+// Writable.
+
+
+
+/*<replacement>*/
+
+var processNextTick = __webpack_require__(11);
+/*</replacement>*/
+
+/*<replacement>*/
+var objectKeys = Object.keys || function (obj) {
+  var keys = [];
+  for (var key in obj) {
+    keys.push(key);
+  }return keys;
+};
+/*</replacement>*/
+
+module.exports = Duplex;
+
+/*<replacement>*/
+var util = __webpack_require__(9);
+util.inherits = __webpack_require__(2);
+/*</replacement>*/
+
+var Readable = __webpack_require__(19);
+var Writable = __webpack_require__(23);
+
+util.inherits(Duplex, Readable);
+
+var keys = objectKeys(Writable.prototype);
+for (var v = 0; v < keys.length; v++) {
+  var method = keys[v];
+  if (!Duplex.prototype[method]) Duplex.prototype[method] = Writable.prototype[method];
+}
+
+function Duplex(options) {
+  if (!(this instanceof Duplex)) return new Duplex(options);
+
+  Readable.call(this, options);
+  Writable.call(this, options);
+
+  if (options && options.readable === false) this.readable = false;
+
+  if (options && options.writable === false) this.writable = false;
+
+  this.allowHalfOpen = true;
+  if (options && options.allowHalfOpen === false) this.allowHalfOpen = false;
+
+  this.once('end', onend);
+}
+
+// the no-half-open enforcer
+function onend() {
+  // if we allow half-open state, or if the writable side ended,
+  // then we're ok.
+  if (this.allowHalfOpen || this._writableState.ended) return;
+
+  // no more data can be written.
+  // But allow more writes to happen in this tick.
+  processNextTick(onEndNT, this);
+}
+
+function onEndNT(self) {
+  self.end();
+}
+
+Object.defineProperty(Duplex.prototype, 'destroyed', {
+  get: function () {
+    if (this._readableState === undefined || this._writableState === undefined) {
+      return false;
+    }
+    return this._readableState.destroyed && this._writableState.destroyed;
+  },
+  set: function (value) {
+    // we ignore the value if the stream
+    // has not been initialized yet
+    if (this._readableState === undefined || this._writableState === undefined) {
+      return;
+    }
+
+    // backward compatibility, the user is explicitly
+    // managing destroyed
+    this._readableState.destroyed = value;
+    this._writableState.destroyed = value;
+  }
+});
+
+Duplex.prototype._destroy = function (err, cb) {
+  this.push(null);
+  this.end();
+
+  processNextTick(cb, err);
+};
+
+function forEach(xs, f) {
+  for (var i = 0, l = xs.length; i < l; i++) {
+    f(xs[i], i);
+  }
+}
+
+/***/ }),
+/* 7 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__ = __webpack_require__(29);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__ = __webpack_require__(26);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__ArchiveFile__ = __webpack_require__(15);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
@@ -3258,136 +3388,6 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
 
 
 /***/ }),
-/* 7 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-// a duplex stream is just a stream that is both readable and writable.
-// Since JS doesn't have multiple prototypal inheritance, this class
-// prototypally inherits from Readable, and then parasitically from
-// Writable.
-
-
-
-/*<replacement>*/
-
-var processNextTick = __webpack_require__(11);
-/*</replacement>*/
-
-/*<replacement>*/
-var objectKeys = Object.keys || function (obj) {
-  var keys = [];
-  for (var key in obj) {
-    keys.push(key);
-  }return keys;
-};
-/*</replacement>*/
-
-module.exports = Duplex;
-
-/*<replacement>*/
-var util = __webpack_require__(9);
-util.inherits = __webpack_require__(2);
-/*</replacement>*/
-
-var Readable = __webpack_require__(21);
-var Writable = __webpack_require__(25);
-
-util.inherits(Duplex, Readable);
-
-var keys = objectKeys(Writable.prototype);
-for (var v = 0; v < keys.length; v++) {
-  var method = keys[v];
-  if (!Duplex.prototype[method]) Duplex.prototype[method] = Writable.prototype[method];
-}
-
-function Duplex(options) {
-  if (!(this instanceof Duplex)) return new Duplex(options);
-
-  Readable.call(this, options);
-  Writable.call(this, options);
-
-  if (options && options.readable === false) this.readable = false;
-
-  if (options && options.writable === false) this.writable = false;
-
-  this.allowHalfOpen = true;
-  if (options && options.allowHalfOpen === false) this.allowHalfOpen = false;
-
-  this.once('end', onend);
-}
-
-// the no-half-open enforcer
-function onend() {
-  // if we allow half-open state, or if the writable side ended,
-  // then we're ok.
-  if (this.allowHalfOpen || this._writableState.ended) return;
-
-  // no more data can be written.
-  // But allow more writes to happen in this tick.
-  processNextTick(onEndNT, this);
-}
-
-function onEndNT(self) {
-  self.end();
-}
-
-Object.defineProperty(Duplex.prototype, 'destroyed', {
-  get: function () {
-    if (this._readableState === undefined || this._writableState === undefined) {
-      return false;
-    }
-    return this._readableState.destroyed && this._writableState.destroyed;
-  },
-  set: function (value) {
-    // we ignore the value if the stream
-    // has not been initialized yet
-    if (this._readableState === undefined || this._writableState === undefined) {
-      return;
-    }
-
-    // backward compatibility, the user is explicitly
-    // managing destroyed
-    this._readableState.destroyed = value;
-    this._writableState.destroyed = value;
-  }
-});
-
-Duplex.prototype._destroy = function (err, cb) {
-  this.push(null);
-  this.end();
-
-  processNextTick(cb, err);
-};
-
-function forEach(xs, f) {
-  for (var i = 0, l = xs.length; i < l; i++) {
-    f(xs[i], i);
-  }
-}
-
-/***/ }),
 /* 8 */
 /***/ (function(module, exports) {
 
@@ -3532,13 +3532,13 @@ function objectToString(o) {
 /* 10 */
 /***/ (function(module, exports, __webpack_require__) {
 
-exports = module.exports = __webpack_require__(21);
+exports = module.exports = __webpack_require__(19);
 exports.Stream = exports;
 exports.Readable = exports;
-exports.Writable = __webpack_require__(25);
-exports.Duplex = __webpack_require__(7);
-exports.Transform = __webpack_require__(27);
-exports.PassThrough = __webpack_require__(44);
+exports.Writable = __webpack_require__(23);
+exports.Duplex = __webpack_require__(6);
+exports.Transform = __webpack_require__(25);
+exports.PassThrough = __webpack_require__(43);
 
 
 /***/ }),
@@ -3665,9 +3665,9 @@ SafeBuffer.allocUnsafeSlow = function (size) {
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {// var assert = require('assert')
-var uint64be = __webpack_require__(59)
+var uint64be = __webpack_require__(58)
 
-var boxes = __webpack_require__(60)
+var boxes = __webpack_require__(59)
 
 var UINT32_MAX = 4294967295
 
@@ -3900,7 +3900,7 @@ Box.encodingLength = function (obj) {
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__ = __webpack_require__(29);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__ = __webpack_require__(26);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Tile__ = __webpack_require__(65);
 
 
@@ -4023,13 +4023,13 @@ class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default *
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_prettier_bytes__ = __webpack_require__(18);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_prettier_bytes__ = __webpack_require__(29);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_prettier_bytes___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_prettier_bytes__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_render_media__ = __webpack_require__(19);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_render_media__ = __webpack_require__(30);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_render_media___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1_render_media__);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ReactFake__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Util__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit__ = __webpack_require__(28);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit__ = __webpack_require__(63);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_4_throttleit__);
 
 
@@ -4432,7 +4432,7 @@ function isUndefined(arg) {
 /* 17 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var wrappy = __webpack_require__(49)
+var wrappy = __webpack_require__(48)
 module.exports = wrappy(once)
 module.exports.strict = wrappy(onceStrict)
 
@@ -4478,405 +4478,13 @@ function onceStrict (fn) {
 
 /***/ }),
 /* 18 */
-/***/ (function(module, exports) {
-
-module.exports = prettierBytes
-
-function prettierBytes (num) {
-  if (typeof num !== 'number' || isNaN(num)) {
-    throw new TypeError('Expected a number, got ' + typeof num)
-  }
-
-  var neg = num < 0
-  var units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
-
-  if (neg) {
-    num = -num
-  }
-
-  if (num < 1) {
-    return (neg ? '-' : '') + num + ' B'
-  }
-
-  var exponent = Math.min(Math.floor(Math.log(num) / Math.log(1000)), units.length - 1)
-  num = Number(num / Math.pow(1000, exponent))
-  var unit = units[exponent]
-
-  if (num >= 10 || num % 1 === 0) {
-    // Do not show decimals when the number is two-digit, or if the number has no
-    // decimal component.
-    return (neg ? '-' : '') + num.toFixed(0) + ' ' + unit
-  } else {
-    return (neg ? '-' : '') + num.toFixed(1) + ' ' + unit
-  }
-}
-
-
-/***/ }),
-/* 19 */
-/***/ (function(module, exports, __webpack_require__) {
-
-exports.render = render
-exports.append = append
-exports.mime = __webpack_require__(32)
-
-var debug = __webpack_require__(33)('render-media')
-var isAscii = __webpack_require__(36)
-var MediaElementWrapper = __webpack_require__(20)
-var path = __webpack_require__(46)
-var streamToBlobURL = __webpack_require__(47)
-var videostream = __webpack_require__(50)
-
-var VIDEOSTREAM_EXTS = [
-  '.m4a',
-  '.m4v',
-  '.mp4'
-]
-
-var MEDIASOURCE_VIDEO_EXTS = [
-  '.m4v',
-  '.mkv',
-  '.mp4',
-  '.webm'
-]
-
-var MEDIASOURCE_AUDIO_EXTS = [
-  '.m4a',
-  '.mp3'
-]
-
-var MEDIASOURCE_EXTS = [].concat(
-  MEDIASOURCE_VIDEO_EXTS,
-  MEDIASOURCE_AUDIO_EXTS
-)
-
-var AUDIO_EXTS = [
-  '.aac',
-  '.oga',
-  '.ogg',
-  '.wav'
-]
-
-var IMAGE_EXTS = [
-  '.bmp',
-  '.gif',
-  '.jpeg',
-  '.jpg',
-  '.png',
-  '.svg'
-]
-
-var IFRAME_EXTS = [
-  '.css',
-  '.html',
-  '.js',
-  '.md',
-  '.pdf',
-  '.txt'
-]
-
-// Maximum file length for which the Blob URL strategy will be attempted
-// See: https://github.com/feross/render-media/issues/18
-var MAX_BLOB_LENGTH = 200 * 1000 * 1000 // 200 MB
-
-var MediaSource = typeof window !== 'undefined' && window.MediaSource
-
-function render (file, elem, opts, cb) {
-  if (typeof opts === 'function') {
-    cb = opts
-    opts = {}
-  }
-  if (!opts) opts = {}
-  if (!cb) cb = function () {}
-
-  validateFile(file)
-  parseOpts(opts)
-
-  if (typeof elem === 'string') elem = document.querySelector(elem)
-
-  renderMedia(file, function (tagName) {
-    if (elem.nodeName !== tagName.toUpperCase()) {
-      var extname = path.extname(file.name).toLowerCase()
-
-      throw new Error(
-        'Cannot render "' + extname + '" inside a "' +
-        elem.nodeName.toLowerCase() + '" element, expected "' + tagName + '"'
-      )
-    }
-
-    return elem
-  }, opts, cb)
-}
-
-function append (file, rootElem, opts, cb) {
-  if (typeof opts === 'function') {
-    cb = opts
-    opts = {}
-  }
-  if (!opts) opts = {}
-  if (!cb) cb = function () {}
-
-  validateFile(file)
-  parseOpts(opts)
-
-  if (typeof rootElem === 'string') rootElem = document.querySelector(rootElem)
-
-  if (rootElem && (rootElem.nodeName === 'VIDEO' || rootElem.nodeName === 'AUDIO')) {
-    throw new Error(
-      'Invalid video/audio node argument. Argument must be root element that ' +
-      'video/audio tag will be appended to.'
-    )
-  }
-
-  renderMedia(file, getElem, opts, done)
-
-  function getElem (tagName) {
-    if (tagName === 'video' || tagName === 'audio') return createMedia(tagName)
-    else return createElem(tagName)
-  }
-
-  function createMedia (tagName) {
-    var elem = createElem(tagName)
-    if (opts.controls) elem.controls = true
-    if (opts.autoplay) elem.autoplay = true
-    rootElem.appendChild(elem)
-    return elem
-  }
-
-  function createElem (tagName) {
-    var elem = document.createElement(tagName)
-    rootElem.appendChild(elem)
-    return elem
-  }
-
-  function done (err, elem) {
-    if (err && elem) elem.remove()
-    cb(err, elem)
-  }
-}
-
-function renderMedia (file, getElem, opts, cb) {
-  var extname = path.extname(file.name).toLowerCase()
-  var currentTime = 0
-  var elem
-
-  if (MEDIASOURCE_EXTS.indexOf(extname) >= 0) {
-    renderMediaSource()
-  } else if (AUDIO_EXTS.indexOf(extname) >= 0) {
-    renderAudio()
-  } else if (IMAGE_EXTS.indexOf(extname) >= 0) {
-    renderImage()
-  } else if (IFRAME_EXTS.indexOf(extname) >= 0) {
-    renderIframe()
-  } else {
-    tryRenderIframe()
-  }
-
-  function renderMediaSource () {
-    var tagName = MEDIASOURCE_VIDEO_EXTS.indexOf(extname) >= 0 ? 'video' : 'audio'
-
-    if (MediaSource) {
-      if (VIDEOSTREAM_EXTS.indexOf(extname) >= 0) {
-        useVideostream()
-      } else {
-        useMediaSource()
-      }
-    } else {
-      useBlobURL()
-    }
-
-    function useVideostream () {
-      debug('Use `videostream` package for ' + file.name)
-      prepareElem()
-      elem.addEventListener('error', fallbackToMediaSource)
-      elem.addEventListener('loadstart', onLoadStart)
-      elem.addEventListener('canplay', onCanPlay)
-      videostream(file, elem)
-    }
-
-    function useMediaSource () {
-      debug('Use MediaSource API for ' + file.name)
-      prepareElem()
-      elem.addEventListener('error', fallbackToBlobURL)
-      elem.addEventListener('loadstart', onLoadStart)
-      elem.addEventListener('canplay', onCanPlay)
-
-      var wrapper = new MediaElementWrapper(elem)
-      var writable = wrapper.createWriteStream(getCodec(file.name))
-      file.createReadStream().pipe(writable)
-
-      if (currentTime) elem.currentTime = currentTime
-    }
-
-    function useBlobURL () {
-      debug('Use Blob URL for ' + file.name)
-      prepareElem()
-      elem.addEventListener('error', fatalError)
-      elem.addEventListener('loadstart', onLoadStart)
-      elem.addEventListener('canplay', onCanPlay)
-      getBlobURL(file, function (err, url) {
-        if (err) return fatalError(err)
-        elem.src = url
-        if (currentTime) elem.currentTime = currentTime
-      })
-    }
-
-    function fallbackToMediaSource (err) {
-      debug('videostream error: fallback to MediaSource API: %o', err.message || err)
-      elem.removeEventListener('error', fallbackToMediaSource)
-      elem.removeEventListener('canplay', onCanPlay)
-
-      useMediaSource()
-    }
-
-    function fallbackToBlobURL (err) {
-      debug('MediaSource API error: fallback to Blob URL: %o', err.message || err)
-
-      if (typeof file.length === 'number' && file.length > opts.maxBlobLength) {
-        debug(
-          'File length too large for Blob URL approach: %d (max: %d)',
-          file.length, opts.maxBlobLength
-        )
-        return fatalError(new Error(
-          'File length too large for Blob URL approach: ' + file.length +
-          ' (max: ' + opts.maxBlobLength + ')'
-        ))
-      }
-
-      elem.removeEventListener('error', fallbackToBlobURL)
-      elem.removeEventListener('canplay', onCanPlay)
-
-      useBlobURL()
-    }
-
-    function prepareElem () {
-      if (!elem) {
-        elem = getElem(tagName)
-
-        elem.addEventListener('progress', function () {
-          currentTime = elem.currentTime
-        })
-      }
-    }
-  }
-
-  function renderAudio () {
-    elem = getElem('audio')
-    getBlobURL(file, function (err, url) {
-      if (err) return fatalError(err)
-      elem.addEventListener('error', fatalError)
-      elem.addEventListener('loadstart', onLoadStart)
-      elem.addEventListener('canplay', onCanPlay)
-      elem.src = url
-    })
-  }
-
-  function onLoadStart () {
-    elem.removeEventListener('loadstart', onLoadStart)
-    if (opts.autoplay) elem.play()
-  }
-
-  function onCanPlay () {
-    elem.removeEventListener('canplay', onCanPlay)
-    cb(null, elem)
-  }
-
-  function renderImage () {
-    elem = getElem('img')
-    getBlobURL(file, function (err, url) {
-      if (err) return fatalError(err)
-      elem.src = url
-      elem.alt = file.name
-      cb(null, elem)
-    })
-  }
-
-  function renderIframe () {
-    elem = getElem('iframe')
-
-    getBlobURL(file, function (err, url) {
-      if (err) return fatalError(err)
-      elem.src = url
-      if (extname !== '.pdf') elem.sandbox = 'allow-forms allow-scripts'
-      cb(null, elem)
-    })
-  }
-
-  function tryRenderIframe () {
-    debug('Unknown file extension "%s" - will attempt to render into iframe', extname)
-
-    var str = ''
-    file.createReadStream({ start: 0, end: 1000 })
-      .setEncoding('utf8')
-      .on('data', function (chunk) {
-        str += chunk
-      })
-      .on('end', done)
-      .on('error', cb)
-
-    function done () {
-      if (isAscii(str)) {
-        debug('File extension "%s" appears ascii, so will render.', extname)
-        renderIframe()
-      } else {
-        debug('File extension "%s" appears non-ascii, will not render.', extname)
-        cb(new Error('Unsupported file type "' + extname + '": Cannot append to DOM'))
-      }
-    }
-  }
-
-  function fatalError (err) {
-    err.message = 'Error rendering file "' + file.name + '": ' + err.message
-    debug(err.message)
-    cb(err)
-  }
-}
-
-function getBlobURL (file, cb) {
-  var extname = path.extname(file.name).toLowerCase()
-  streamToBlobURL(file.createReadStream(), exports.mime[extname], cb)
-}
-
-function validateFile (file) {
-  if (file == null) {
-    throw new Error('file cannot be null or undefined')
-  }
-  if (typeof file.name !== 'string') {
-    throw new Error('missing or invalid file.name property')
-  }
-  if (typeof file.createReadStream !== 'function') {
-    throw new Error('missing or invalid file.createReadStream property')
-  }
-}
-
-function getCodec (name) {
-  var extname = path.extname(name).toLowerCase()
-  return {
-    '.m4a': 'audio/mp4; codecs="mp4a.40.5"',
-    '.m4v': 'video/mp4; codecs="avc1.640029, mp4a.40.5"',
-    '.mkv': 'video/webm; codecs="avc1.640029, mp4a.40.5"',
-    '.mp3': 'audio/mpeg',
-    '.mp4': 'video/mp4; codecs="avc1.640029, mp4a.40.5"',
-    '.webm': 'video/webm; codecs="vorbis, vp8"'
-  }[extname]
-}
-
-function parseOpts (opts) {
-  if (opts.autoplay == null) opts.autoplay = true
-  if (opts.controls == null) opts.controls = true
-  if (opts.maxBlobLength == null) opts.maxBlobLength = MAX_BLOB_LENGTH
-}
-
-
-/***/ }),
-/* 20 */
 /***/ (function(module, exports, __webpack_require__) {
 
 module.exports = MediaElementWrapper
 
 var inherits = __webpack_require__(2)
 var stream = __webpack_require__(10)
-var toArrayBuffer = __webpack_require__(45)
+var toArrayBuffer = __webpack_require__(44)
 
 var MediaSource = typeof window !== 'undefined' && window.MediaSource
 
@@ -5120,7 +4728,7 @@ MediaSourceStream.prototype._getBufferDuration = function () {
 
 
 /***/ }),
-/* 21 */
+/* 19 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5155,7 +4763,7 @@ var processNextTick = __webpack_require__(11);
 module.exports = Readable;
 
 /*<replacement>*/
-var isArray = __webpack_require__(22);
+var isArray = __webpack_require__(20);
 /*</replacement>*/
 
 /*<replacement>*/
@@ -5173,7 +4781,7 @@ var EElistenerCount = function (emitter, type) {
 /*</replacement>*/
 
 /*<replacement>*/
-var Stream = __webpack_require__(23);
+var Stream = __webpack_require__(21);
 /*</replacement>*/
 
 // TODO(bmeurer): Change this back to const once hole checks are
@@ -5195,7 +4803,7 @@ util.inherits = __webpack_require__(2);
 /*</replacement>*/
 
 /*<replacement>*/
-var debugUtil = __webpack_require__(39);
+var debugUtil = __webpack_require__(38);
 var debug = void 0;
 if (debugUtil && debugUtil.debuglog) {
   debug = debugUtil.debuglog('stream');
@@ -5204,8 +4812,8 @@ if (debugUtil && debugUtil.debuglog) {
 }
 /*</replacement>*/
 
-var BufferList = __webpack_require__(40);
-var destroyImpl = __webpack_require__(24);
+var BufferList = __webpack_require__(39);
+var destroyImpl = __webpack_require__(22);
 var StringDecoder;
 
 util.inherits(Readable, Stream);
@@ -5227,7 +4835,7 @@ function prependListener(emitter, event, fn) {
 }
 
 function ReadableState(options, stream) {
-  Duplex = Duplex || __webpack_require__(7);
+  Duplex = Duplex || __webpack_require__(6);
 
   options = options || {};
 
@@ -5288,14 +4896,14 @@ function ReadableState(options, stream) {
   this.decoder = null;
   this.encoding = null;
   if (options.encoding) {
-    if (!StringDecoder) StringDecoder = __webpack_require__(26).StringDecoder;
+    if (!StringDecoder) StringDecoder = __webpack_require__(24).StringDecoder;
     this.decoder = new StringDecoder(options.encoding);
     this.encoding = options.encoding;
   }
 }
 
 function Readable(options) {
-  Duplex = Duplex || __webpack_require__(7);
+  Duplex = Duplex || __webpack_require__(6);
 
   if (!(this instanceof Readable)) return new Readable(options);
 
@@ -5444,7 +5052,7 @@ Readable.prototype.isPaused = function () {
 
 // backwards compatibility.
 Readable.prototype.setEncoding = function (enc) {
-  if (!StringDecoder) StringDecoder = __webpack_require__(26).StringDecoder;
+  if (!StringDecoder) StringDecoder = __webpack_require__(24).StringDecoder;
   this._readableState.decoder = new StringDecoder(enc);
   this._readableState.encoding = enc;
   return this;
@@ -6134,7 +5742,7 @@ function indexOf(xs, x) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(8), __webpack_require__(5)))
 
 /***/ }),
-/* 22 */
+/* 20 */
 /***/ (function(module, exports) {
 
 var toString = {}.toString;
@@ -6145,14 +5753,14 @@ module.exports = Array.isArray || function (arr) {
 
 
 /***/ }),
-/* 23 */
+/* 21 */
 /***/ (function(module, exports, __webpack_require__) {
 
 module.exports = __webpack_require__(16).EventEmitter;
 
 
 /***/ }),
-/* 24 */
+/* 22 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -6230,7 +5838,7 @@ module.exports = {
 };
 
 /***/ }),
-/* 25 */
+/* 23 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -6306,12 +5914,12 @@ util.inherits = __webpack_require__(2);
 
 /*<replacement>*/
 var internalUtil = {
-  deprecate: __webpack_require__(43)
+  deprecate: __webpack_require__(42)
 };
 /*</replacement>*/
 
 /*<replacement>*/
-var Stream = __webpack_require__(23);
+var Stream = __webpack_require__(21);
 /*</replacement>*/
 
 /*<replacement>*/
@@ -6325,14 +5933,14 @@ function _isUint8Array(obj) {
 }
 /*</replacement>*/
 
-var destroyImpl = __webpack_require__(24);
+var destroyImpl = __webpack_require__(22);
 
 util.inherits(Writable, Stream);
 
 function nop() {}
 
 function WritableState(options, stream) {
-  Duplex = Duplex || __webpack_require__(7);
+  Duplex = Duplex || __webpack_require__(6);
 
   options = options || {};
 
@@ -6472,7 +6080,7 @@ if (typeof Symbol === 'function' && Symbol.hasInstance && typeof Function.protot
 }
 
 function Writable(options) {
-  Duplex = Duplex || __webpack_require__(7);
+  Duplex = Duplex || __webpack_require__(6);
 
   // Writable ctor is applied to Duplexes, too.
   // `realHasInstance` is necessary because using plain `instanceof`
@@ -6898,10 +6506,10 @@ Writable.prototype._destroy = function (err, cb) {
   this.end();
   cb(err);
 };
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5), __webpack_require__(41).setImmediate, __webpack_require__(8)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5), __webpack_require__(40).setImmediate, __webpack_require__(8)))
 
 /***/ }),
-/* 26 */
+/* 24 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -7179,7 +6787,7 @@ function simpleEnd(buf) {
 }
 
 /***/ }),
-/* 27 */
+/* 25 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -7250,7 +6858,7 @@ function simpleEnd(buf) {
 
 module.exports = Transform;
 
-var Duplex = __webpack_require__(7);
+var Duplex = __webpack_require__(6);
 
 /*<replacement>*/
 var util = __webpack_require__(9);
@@ -7399,45 +7007,7 @@ function done(stream, er, data) {
 }
 
 /***/ }),
-/* 28 */
-/***/ (function(module, exports) {
-
-module.exports = throttle;
-
-/**
- * Returns a new function that, when invoked, invokes `func` at most once per `wait` milliseconds.
- *
- * @param {Function} func Function to wrap.
- * @param {Number} wait Number of milliseconds that must elapse between `func` invocations.
- * @return {Function} A new function that wraps the `func` function passed in.
- */
-
-function throttle (func, wait) {
-  var ctx, args, rtn, timeoutID; // caching
-  var last = 0;
-
-  return function throttled () {
-    ctx = this;
-    args = arguments;
-    var delta = new Date() - last;
-    if (!timeoutID)
-      if (delta >= wait) call();
-      else timeoutID = setTimeout(call, wait - delta);
-    return rtn;
-  };
-
-  function call () {
-    timeoutID = 0;
-    last = +new Date();
-    rtn = func.apply(ctx, args);
-    ctx = null;
-    args = null;
-  }
-}
-
-
-/***/ }),
-/* 29 */
+/* 26 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -7501,12 +7071,12 @@ class ArchiveBase extends __WEBPACK_IMPORTED_MODULE_2__ArchiveItem__["a" /* defa
 
 
 /***/ }),
-/* 30 */
+/* 27 */
 /***/ (function(module, exports, __webpack_require__) {
 
 //var React = require('react');
 //var ReactDOM = require('react-dom');
-var Details = __webpack_require__(6).default;
+var Details = __webpack_require__(7).default;
 var Search = __webpack_require__(14).default;
 var Nav = __webpack_require__(66).default;
 //window.Dweb = require('../js/Dweb');
@@ -7560,7 +7130,7 @@ LISTS - support for multiple list transports
 */
 
 /***/ }),
-/* 31 */
+/* 28 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -7573,13 +7143,405 @@ exports.default = function () {};
 module.exports = exports["default"];
 
 /***/ }),
-/* 32 */
+/* 29 */
+/***/ (function(module, exports) {
+
+module.exports = prettierBytes
+
+function prettierBytes (num) {
+  if (typeof num !== 'number' || isNaN(num)) {
+    throw new TypeError('Expected a number, got ' + typeof num)
+  }
+
+  var neg = num < 0
+  var units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
+
+  if (neg) {
+    num = -num
+  }
+
+  if (num < 1) {
+    return (neg ? '-' : '') + num + ' B'
+  }
+
+  var exponent = Math.min(Math.floor(Math.log(num) / Math.log(1000)), units.length - 1)
+  num = Number(num / Math.pow(1000, exponent))
+  var unit = units[exponent]
+
+  if (num >= 10 || num % 1 === 0) {
+    // Do not show decimals when the number is two-digit, or if the number has no
+    // decimal component.
+    return (neg ? '-' : '') + num.toFixed(0) + ' ' + unit
+  } else {
+    return (neg ? '-' : '') + num.toFixed(1) + ' ' + unit
+  }
+}
+
+
+/***/ }),
+/* 30 */
+/***/ (function(module, exports, __webpack_require__) {
+
+exports.render = render
+exports.append = append
+exports.mime = __webpack_require__(31)
+
+var debug = __webpack_require__(32)('render-media')
+var isAscii = __webpack_require__(35)
+var MediaElementWrapper = __webpack_require__(18)
+var path = __webpack_require__(45)
+var streamToBlobURL = __webpack_require__(46)
+var videostream = __webpack_require__(49)
+
+var VIDEOSTREAM_EXTS = [
+  '.m4a',
+  '.m4v',
+  '.mp4'
+]
+
+var MEDIASOURCE_VIDEO_EXTS = [
+  '.m4v',
+  '.mkv',
+  '.mp4',
+  '.webm'
+]
+
+var MEDIASOURCE_AUDIO_EXTS = [
+  '.m4a',
+  '.mp3'
+]
+
+var MEDIASOURCE_EXTS = [].concat(
+  MEDIASOURCE_VIDEO_EXTS,
+  MEDIASOURCE_AUDIO_EXTS
+)
+
+var AUDIO_EXTS = [
+  '.aac',
+  '.oga',
+  '.ogg',
+  '.wav'
+]
+
+var IMAGE_EXTS = [
+  '.bmp',
+  '.gif',
+  '.jpeg',
+  '.jpg',
+  '.png',
+  '.svg'
+]
+
+var IFRAME_EXTS = [
+  '.css',
+  '.html',
+  '.js',
+  '.md',
+  '.pdf',
+  '.txt'
+]
+
+// Maximum file length for which the Blob URL strategy will be attempted
+// See: https://github.com/feross/render-media/issues/18
+var MAX_BLOB_LENGTH = 200 * 1000 * 1000 // 200 MB
+
+var MediaSource = typeof window !== 'undefined' && window.MediaSource
+
+function render (file, elem, opts, cb) {
+  if (typeof opts === 'function') {
+    cb = opts
+    opts = {}
+  }
+  if (!opts) opts = {}
+  if (!cb) cb = function () {}
+
+  validateFile(file)
+  parseOpts(opts)
+
+  if (typeof elem === 'string') elem = document.querySelector(elem)
+
+  renderMedia(file, function (tagName) {
+    if (elem.nodeName !== tagName.toUpperCase()) {
+      var extname = path.extname(file.name).toLowerCase()
+
+      throw new Error(
+        'Cannot render "' + extname + '" inside a "' +
+        elem.nodeName.toLowerCase() + '" element, expected "' + tagName + '"'
+      )
+    }
+
+    return elem
+  }, opts, cb)
+}
+
+function append (file, rootElem, opts, cb) {
+  if (typeof opts === 'function') {
+    cb = opts
+    opts = {}
+  }
+  if (!opts) opts = {}
+  if (!cb) cb = function () {}
+
+  validateFile(file)
+  parseOpts(opts)
+
+  if (typeof rootElem === 'string') rootElem = document.querySelector(rootElem)
+
+  if (rootElem && (rootElem.nodeName === 'VIDEO' || rootElem.nodeName === 'AUDIO')) {
+    throw new Error(
+      'Invalid video/audio node argument. Argument must be root element that ' +
+      'video/audio tag will be appended to.'
+    )
+  }
+
+  renderMedia(file, getElem, opts, done)
+
+  function getElem (tagName) {
+    if (tagName === 'video' || tagName === 'audio') return createMedia(tagName)
+    else return createElem(tagName)
+  }
+
+  function createMedia (tagName) {
+    var elem = createElem(tagName)
+    if (opts.controls) elem.controls = true
+    if (opts.autoplay) elem.autoplay = true
+    rootElem.appendChild(elem)
+    return elem
+  }
+
+  function createElem (tagName) {
+    var elem = document.createElement(tagName)
+    rootElem.appendChild(elem)
+    return elem
+  }
+
+  function done (err, elem) {
+    if (err && elem) elem.remove()
+    cb(err, elem)
+  }
+}
+
+function renderMedia (file, getElem, opts, cb) {
+  var extname = path.extname(file.name).toLowerCase()
+  var currentTime = 0
+  var elem
+
+  if (MEDIASOURCE_EXTS.indexOf(extname) >= 0) {
+    renderMediaSource()
+  } else if (AUDIO_EXTS.indexOf(extname) >= 0) {
+    renderAudio()
+  } else if (IMAGE_EXTS.indexOf(extname) >= 0) {
+    renderImage()
+  } else if (IFRAME_EXTS.indexOf(extname) >= 0) {
+    renderIframe()
+  } else {
+    tryRenderIframe()
+  }
+
+  function renderMediaSource () {
+    var tagName = MEDIASOURCE_VIDEO_EXTS.indexOf(extname) >= 0 ? 'video' : 'audio'
+
+    if (MediaSource) {
+      if (VIDEOSTREAM_EXTS.indexOf(extname) >= 0) {
+        useVideostream()
+      } else {
+        useMediaSource()
+      }
+    } else {
+      useBlobURL()
+    }
+
+    function useVideostream () {
+      debug('Use `videostream` package for ' + file.name)
+      prepareElem()
+      elem.addEventListener('error', fallbackToMediaSource)
+      elem.addEventListener('loadstart', onLoadStart)
+      elem.addEventListener('canplay', onCanPlay)
+      videostream(file, elem)
+    }
+
+    function useMediaSource () {
+      debug('Use MediaSource API for ' + file.name)
+      prepareElem()
+      elem.addEventListener('error', fallbackToBlobURL)
+      elem.addEventListener('loadstart', onLoadStart)
+      elem.addEventListener('canplay', onCanPlay)
+
+      var wrapper = new MediaElementWrapper(elem)
+      var writable = wrapper.createWriteStream(getCodec(file.name))
+      file.createReadStream().pipe(writable)
+
+      if (currentTime) elem.currentTime = currentTime
+    }
+
+    function useBlobURL () {
+      debug('Use Blob URL for ' + file.name)
+      prepareElem()
+      elem.addEventListener('error', fatalError)
+      elem.addEventListener('loadstart', onLoadStart)
+      elem.addEventListener('canplay', onCanPlay)
+      getBlobURL(file, function (err, url) {
+        if (err) return fatalError(err)
+        elem.src = url
+        if (currentTime) elem.currentTime = currentTime
+      })
+    }
+
+    function fallbackToMediaSource (err) {
+      debug('videostream error: fallback to MediaSource API: %o', err.message || err)
+      elem.removeEventListener('error', fallbackToMediaSource)
+      elem.removeEventListener('canplay', onCanPlay)
+
+      useMediaSource()
+    }
+
+    function fallbackToBlobURL (err) {
+      debug('MediaSource API error: fallback to Blob URL: %o', err.message || err)
+
+      if (typeof file.length === 'number' && file.length > opts.maxBlobLength) {
+        debug(
+          'File length too large for Blob URL approach: %d (max: %d)',
+          file.length, opts.maxBlobLength
+        )
+        return fatalError(new Error(
+          'File length too large for Blob URL approach: ' + file.length +
+          ' (max: ' + opts.maxBlobLength + ')'
+        ))
+      }
+
+      elem.removeEventListener('error', fallbackToBlobURL)
+      elem.removeEventListener('canplay', onCanPlay)
+
+      useBlobURL()
+    }
+
+    function prepareElem () {
+      if (!elem) {
+        elem = getElem(tagName)
+
+        elem.addEventListener('progress', function () {
+          currentTime = elem.currentTime
+        })
+      }
+    }
+  }
+
+  function renderAudio () {
+    elem = getElem('audio')
+    getBlobURL(file, function (err, url) {
+      if (err) return fatalError(err)
+      elem.addEventListener('error', fatalError)
+      elem.addEventListener('loadstart', onLoadStart)
+      elem.addEventListener('canplay', onCanPlay)
+      elem.src = url
+    })
+  }
+
+  function onLoadStart () {
+    elem.removeEventListener('loadstart', onLoadStart)
+    if (opts.autoplay) elem.play()
+  }
+
+  function onCanPlay () {
+    elem.removeEventListener('canplay', onCanPlay)
+    cb(null, elem)
+  }
+
+  function renderImage () {
+    elem = getElem('img')
+    getBlobURL(file, function (err, url) {
+      if (err) return fatalError(err)
+      elem.src = url
+      elem.alt = file.name
+      cb(null, elem)
+    })
+  }
+
+  function renderIframe () {
+    elem = getElem('iframe')
+
+    getBlobURL(file, function (err, url) {
+      if (err) return fatalError(err)
+      elem.src = url
+      if (extname !== '.pdf') elem.sandbox = 'allow-forms allow-scripts'
+      cb(null, elem)
+    })
+  }
+
+  function tryRenderIframe () {
+    debug('Unknown file extension "%s" - will attempt to render into iframe', extname)
+
+    var str = ''
+    file.createReadStream({ start: 0, end: 1000 })
+      .setEncoding('utf8')
+      .on('data', function (chunk) {
+        str += chunk
+      })
+      .on('end', done)
+      .on('error', cb)
+
+    function done () {
+      if (isAscii(str)) {
+        debug('File extension "%s" appears ascii, so will render.', extname)
+        renderIframe()
+      } else {
+        debug('File extension "%s" appears non-ascii, will not render.', extname)
+        cb(new Error('Unsupported file type "' + extname + '": Cannot append to DOM'))
+      }
+    }
+  }
+
+  function fatalError (err) {
+    err.message = 'Error rendering file "' + file.name + '": ' + err.message
+    debug(err.message)
+    cb(err)
+  }
+}
+
+function getBlobURL (file, cb) {
+  var extname = path.extname(file.name).toLowerCase()
+  streamToBlobURL(file.createReadStream(), exports.mime[extname], cb)
+}
+
+function validateFile (file) {
+  if (file == null) {
+    throw new Error('file cannot be null or undefined')
+  }
+  if (typeof file.name !== 'string') {
+    throw new Error('missing or invalid file.name property')
+  }
+  if (typeof file.createReadStream !== 'function') {
+    throw new Error('missing or invalid file.createReadStream property')
+  }
+}
+
+function getCodec (name) {
+  var extname = path.extname(name).toLowerCase()
+  return {
+    '.m4a': 'audio/mp4; codecs="mp4a.40.5"',
+    '.m4v': 'video/mp4; codecs="avc1.640029, mp4a.40.5"',
+    '.mkv': 'video/webm; codecs="avc1.640029, mp4a.40.5"',
+    '.mp3': 'audio/mpeg',
+    '.mp4': 'video/mp4; codecs="avc1.640029, mp4a.40.5"',
+    '.webm': 'video/webm; codecs="vorbis, vp8"'
+  }[extname]
+}
+
+function parseOpts (opts) {
+  if (opts.autoplay == null) opts.autoplay = true
+  if (opts.controls == null) opts.controls = true
+  if (opts.maxBlobLength == null) opts.maxBlobLength = MAX_BLOB_LENGTH
+}
+
+
+/***/ }),
+/* 31 */
 /***/ (function(module, exports) {
 
 module.exports = {".3gp":"video/3gpp",".aac":"audio/aac",".aif":"audio/x-aiff",".aiff":"audio/x-aiff",".atom":"application/atom+xml",".avi":"video/x-msvideo",".bmp":"image/bmp",".bz2":"application/x-bzip2",".conf":"text/plain",".css":"text/css",".csv":"text/plain",".diff":"text/x-diff",".doc":"application/msword",".flv":"video/x-flv",".gif":"image/gif",".gz":"application/x-gzip",".htm":"text/html",".html":"text/html",".ico":"image/vnd.microsoft.icon",".ics":"text/calendar",".iso":"application/octet-stream",".jar":"application/java-archive",".jpeg":"image/jpeg",".jpg":"image/jpeg",".js":"application/javascript",".json":"application/json",".less":"text/css",".log":"text/plain",".m3u":"audio/x-mpegurl",".m4a":"audio/mp4",".m4v":"video/mp4",".manifest":"text/cache-manifest",".markdown":"text/x-markdown",".mathml":"application/mathml+xml",".md":"text/x-markdown",".mid":"audio/midi",".midi":"audio/midi",".mov":"video/quicktime",".mp3":"audio/mpeg",".mp4":"video/mp4",".mp4v":"video/mp4",".mpeg":"video/mpeg",".mpg":"video/mpeg",".odp":"application/vnd.oasis.opendocument.presentation",".ods":"application/vnd.oasis.opendocument.spreadsheet",".odt":"application/vnd.oasis.opendocument.text",".oga":"audio/ogg",".ogg":"application/ogg",".pdf":"application/pdf",".png":"image/png",".pps":"application/vnd.ms-powerpoint",".ppt":"application/vnd.ms-powerpoint",".ps":"application/postscript",".psd":"image/vnd.adobe.photoshop",".qt":"video/quicktime",".rar":"application/x-rar-compressed",".rdf":"application/rdf+xml",".rss":"application/rss+xml",".rtf":"application/rtf",".svg":"image/svg+xml",".svgz":"image/svg+xml",".swf":"application/x-shockwave-flash",".tar":"application/x-tar",".tbz":"application/x-bzip-compressed-tar",".text":"text/plain",".tif":"image/tiff",".tiff":"image/tiff",".torrent":"application/x-bittorrent",".ttf":"application/x-font-ttf",".txt":"text/plain",".wav":"audio/wav",".webm":"video/webm",".wma":"audio/x-ms-wma",".wmv":"video/x-ms-wmv",".xls":"application/vnd.ms-excel",".xml":"application/xml",".yaml":"text/yaml",".yml":"text/yaml",".zip":"application/zip"}
 
 /***/ }),
-/* 33 */
+/* 32 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(process) {/**
@@ -7588,7 +7550,7 @@ module.exports = {".3gp":"video/3gpp",".aac":"audio/aac",".aif":"audio/x-aiff","
  * Expose `debug()` as the module.
  */
 
-exports = module.exports = __webpack_require__(34);
+exports = module.exports = __webpack_require__(33);
 exports.log = log;
 exports.formatArgs = formatArgs;
 exports.save = save;
@@ -7771,7 +7733,7 @@ function localstorage() {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5)))
 
 /***/ }),
-/* 34 */
+/* 33 */
 /***/ (function(module, exports, __webpack_require__) {
 
 
@@ -7787,7 +7749,7 @@ exports.coerce = coerce;
 exports.disable = disable;
 exports.enable = enable;
 exports.enabled = enabled;
-exports.humanize = __webpack_require__(35);
+exports.humanize = __webpack_require__(34);
 
 /**
  * The currently active debug mode names, and names to skip.
@@ -7979,7 +7941,7 @@ function coerce(val) {
 
 
 /***/ }),
-/* 35 */
+/* 34 */
 /***/ (function(module, exports) {
 
 /**
@@ -8137,7 +8099,7 @@ function plural(ms, n, name) {
 
 
 /***/ }),
-/* 36 */
+/* 35 */
 /***/ (function(module, exports) {
 
 /* (c) 2016 Ari Porad (@ariporad) <http://ariporad.com>. License: ariporad.mit-license.org */
@@ -8156,7 +8118,7 @@ module.exports = function isAscii(str) {
 
 
 /***/ }),
-/* 37 */
+/* 36 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8277,7 +8239,7 @@ function fromByteArray (uint8) {
 
 
 /***/ }),
-/* 38 */
+/* 37 */
 /***/ (function(module, exports) {
 
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
@@ -8367,13 +8329,13 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
 
 
 /***/ }),
-/* 39 */
+/* 38 */
 /***/ (function(module, exports) {
 
 /* (ignored) */
 
 /***/ }),
-/* 40 */
+/* 39 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8453,7 +8415,7 @@ module.exports = function () {
 }();
 
 /***/ }),
-/* 41 */
+/* 40 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var apply = Function.prototype.apply;
@@ -8506,13 +8468,13 @@ exports._unrefActive = exports.active = function(item) {
 };
 
 // setimmediate attaches itself to the global object
-__webpack_require__(42);
+__webpack_require__(41);
 exports.setImmediate = setImmediate;
 exports.clearImmediate = clearImmediate;
 
 
 /***/ }),
-/* 42 */
+/* 41 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global, process) {(function (global, undefined) {
@@ -8705,7 +8667,7 @@ exports.clearImmediate = clearImmediate;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(8), __webpack_require__(5)))
 
 /***/ }),
-/* 43 */
+/* 42 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global) {
@@ -8779,7 +8741,7 @@ function config (name) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(8)))
 
 /***/ }),
-/* 44 */
+/* 43 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8812,7 +8774,7 @@ function config (name) {
 
 module.exports = PassThrough;
 
-var Transform = __webpack_require__(27);
+var Transform = __webpack_require__(25);
 
 /*<replacement>*/
 var util = __webpack_require__(9);
@@ -8832,7 +8794,7 @@ PassThrough.prototype._transform = function (chunk, encoding, cb) {
 };
 
 /***/ }),
-/* 45 */
+/* 44 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var Buffer = __webpack_require__(3).Buffer
@@ -8865,7 +8827,7 @@ module.exports = function (buf) {
 
 
 /***/ }),
-/* 46 */
+/* 45 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(process) {// Copyright Joyent, Inc. and other Node contributors.
@@ -9096,12 +9058,12 @@ var substr = 'ab'.substr(-1) === 'b'
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5)))
 
 /***/ }),
-/* 47 */
+/* 46 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* global URL */
 
-var getBlob = __webpack_require__(48)
+var getBlob = __webpack_require__(47)
 
 module.exports = function getBlobURL (stream, mimeType, cb) {
   if (typeof mimeType === 'function') return getBlobURL(stream, null, mimeType)
@@ -9114,7 +9076,7 @@ module.exports = function getBlobURL (stream, mimeType, cb) {
 
 
 /***/ }),
-/* 48 */
+/* 47 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* global Blob */
@@ -9140,7 +9102,7 @@ module.exports = function getBlob (stream, mimeType, cb) {
 
 
 /***/ }),
-/* 49 */
+/* 48 */
 /***/ (function(module, exports) {
 
 // Returns a wrapper function that returns a wrapped callback
@@ -9179,13 +9141,13 @@ function wrappy (fn, cb) {
 
 
 /***/ }),
-/* 50 */
+/* 49 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var MediaElementWrapper = __webpack_require__(20)
-var pump = __webpack_require__(51)
+var MediaElementWrapper = __webpack_require__(18)
+var pump = __webpack_require__(50)
 
-var MP4Remuxer = __webpack_require__(54)
+var MP4Remuxer = __webpack_require__(53)
 
 module.exports = VideoStream
 
@@ -9308,12 +9270,12 @@ VideoStream.prototype.destroy = function () {
 
 
 /***/ }),
-/* 51 */
+/* 50 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var once = __webpack_require__(17)
-var eos = __webpack_require__(52)
-var fs = __webpack_require__(53) // we only need fs to get the ReadStream and WriteStream prototypes
+var eos = __webpack_require__(51)
+var fs = __webpack_require__(52) // we only need fs to get the ReadStream and WriteStream prototypes
 
 var noop = function () {}
 
@@ -9394,7 +9356,7 @@ module.exports = pump
 
 
 /***/ }),
-/* 52 */
+/* 51 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var once = __webpack_require__(17);
@@ -9483,21 +9445,21 @@ module.exports = eos;
 
 
 /***/ }),
-/* 53 */
+/* 52 */
 /***/ (function(module, exports) {
 
 /* (ignored) */
 
 /***/ }),
-/* 54 */
+/* 53 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer) {var bs = __webpack_require__(55)
+/* WEBPACK VAR INJECTION */(function(Buffer) {var bs = __webpack_require__(54)
 var EventEmitter = __webpack_require__(16).EventEmitter
 var inherits = __webpack_require__(2)
-var mp4 = __webpack_require__(56)
+var mp4 = __webpack_require__(55)
 var Box = __webpack_require__(13)
-var RangeSliceStream = __webpack_require__(63)
+var RangeSliceStream = __webpack_require__(62)
 
 module.exports = MP4Remuxer
 
@@ -9967,7 +9929,7 @@ MP4Remuxer.prototype._generateMoof = function (track, firstSample, lastSample) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 55 */
+/* 54 */
 /***/ (function(module, exports) {
 
 module.exports = function(haystack, needle, comparator, low, high) {
@@ -10016,20 +9978,20 @@ module.exports = function(haystack, needle, comparator, low, high) {
 
 
 /***/ }),
-/* 56 */
+/* 55 */
 /***/ (function(module, exports, __webpack_require__) {
 
-exports.decode = __webpack_require__(57)
-exports.encode = __webpack_require__(62)
+exports.decode = __webpack_require__(56)
+exports.encode = __webpack_require__(61)
 
 
 /***/ }),
-/* 57 */
+/* 56 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var stream = __webpack_require__(10)
 var inherits = __webpack_require__(2)
-var nextEvent = __webpack_require__(58)
+var nextEvent = __webpack_require__(57)
 var Box = __webpack_require__(13)
 
 var EMPTY = new Buffer(0)
@@ -10216,7 +10178,7 @@ MediaData.prototype.destroy = function (err) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 58 */
+/* 57 */
 /***/ (function(module, exports) {
 
 module.exports = nextEvent
@@ -10237,7 +10199,7 @@ function nextEvent (emitter, name) {
 
 
 /***/ }),
-/* 59 */
+/* 58 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var UINT_32_MAX = 0xffffffff
@@ -10276,12 +10238,12 @@ exports.decode.bytes = 8
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 60 */
+/* 59 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {// This is an intentionally recursive require. I don't like it either.
 var Box = __webpack_require__(13)
-var Descriptor = __webpack_require__(61)
+var Descriptor = __webpack_require__(60)
 
 var TIME_OFFSET = 2082844800000
 
@@ -11212,7 +11174,7 @@ function readString (buf, offset, length) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 61 */
+/* 60 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var tagToName = {
@@ -11291,7 +11253,7 @@ exports.DecoderConfigDescriptor.decode = function (buf, start, end) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 62 */
+/* 61 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer, process) {var stream = __webpack_require__(10)
@@ -11428,7 +11390,7 @@ MediaData.prototype.destroy = function (err) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer, __webpack_require__(5)))
 
 /***/ }),
-/* 63 */
+/* 62 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -11555,6 +11517,44 @@ RangeSliceStream.prototype.destroy = function (err) {
 	self.destroyed = true
 
 	if (err) self.emit('error', err)
+}
+
+
+/***/ }),
+/* 63 */
+/***/ (function(module, exports) {
+
+module.exports = throttle;
+
+/**
+ * Returns a new function that, when invoked, invokes `func` at most once per `wait` milliseconds.
+ *
+ * @param {Function} func Function to wrap.
+ * @param {Number} wait Number of milliseconds that must elapse between `func` invocations.
+ * @return {Function} A new function that wraps the `func` function passed in.
+ */
+
+function throttle (func, wait) {
+  var ctx, args, rtn, timeoutID; // caching
+  var last = 0;
+
+  return function throttled () {
+    ctx = this;
+    args = arguments;
+    var delta = new Date() - last;
+    if (!timeoutID)
+      if (delta >= wait) call();
+      else timeoutID = setTimeout(call, wait - delta);
+    return rtn;
+  };
+
+  function call () {
+    timeoutID = 0;
+    last = +new Date();
+    rtn = func.apply(ctx, args);
+    ctx = null;
+    args = null;
+  }
 }
 
 
@@ -11826,7 +11826,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Search__ = __webpack_require__(14);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Details__ = __webpack_require__(6);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Details__ = __webpack_require__(7);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__Home__ = __webpack_require__(67);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__Collection__ = __webpack_require__(68);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__Texts__ = __webpack_require__(69);
@@ -11847,7 +11847,7 @@ __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
 
-
+ /*AV,Audio,Vido*/
 
 
 class Nav {
@@ -12014,9 +12014,12 @@ class Nav {
           case "image":
             new __WEBPACK_IMPORTED_MODULE_7__Image__["a" /* default */](itemid, item).render(res, htm);
             break;
-          case "audio": // Intentionally drop thru to movies
+          case "audio":
+            // Intentionally drop thru to movies
+            new Audio(itemid, item).render(res, htm);
+            break;
           case "movies":
-            new __WEBPACK_IMPORTED_MODULE_8__AV__["a" /* default */](itemid, item).render(res, htm);
+            new Video(itemid, item).render(res, htm);
             break;
           default:
             new __WEBPACK_IMPORTED_MODULE_9__DetailsError__["a" /* default */](itemid, item, `Unsupported mediatype: ${item.metadata.mediatype}`).render(res, htm);
@@ -12161,7 +12164,7 @@ class Collection extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(6);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(7);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
@@ -12256,7 +12259,7 @@ class Texts extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(6);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(7);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Util__ = __webpack_require__(4);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
@@ -12396,12 +12399,12 @@ class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Details__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_render_media__ = __webpack_require__(19);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Details__ = __webpack_require__(7);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_render_media__ = __webpack_require__(30);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_render_media___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_3_render_media__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit__ = __webpack_require__(28);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit__ = __webpack_require__(63);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_4_throttleit__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_prettier_bytes__ = __webpack_require__(18);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_prettier_bytes__ = __webpack_require__(29);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_prettier_bytes___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_5_prettier_bytes__);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
@@ -12415,14 +12418,18 @@ __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
     constructor(itemid, item) {
         super(itemid, item);
-        this.itemtype = "http://schema.org/VideoObject";
     }
-    setupPlaylist() {
-        this.playlist = [];
-        //TODO-DETAILS put these formats in a list in Utils.config
-        this.avs = this._list.filter(fi => fi.metadata.format == 'h.264' || fi.metadata.format == '512Kb MPEG4');
-        if (!this.avs.length) this.avs = this._list.filter(fi => fi.metadata.format == 'VBR MP3');
 
+    archive_setup_push() {
+        let self = this;
+        super.archive_setup_push(); // On commute.html the Play came after the parts common to AV, Image and Text
+        // archive_setup.push(function() { //TODO-ARCHIVE_SETUP move Play from browserAfter to here
+        //    Play('jw6', self.playlist, self.cfg);
+        // });
+    }
+    setupPlaylist(preferredTypes) {
+        this.playlist = [];
+        this.avs = this._list.filter(fi => preferredTypes.includes(fi.metadata.format));
         if (this.avs.length) {
             this.avs.sort((a, b) => __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].natcompare(a.metadata.name, b.metadata.name)); //Unsure why sorting names, presumably tracks are named alphabetically ?
 
@@ -12430,12 +12437,17 @@ class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
                 urls: [item.metadata.magnetlink + '/' + this.avs[0].name] });
         }
     }
-    archive_setup_push() {
-        let self = this;
-        super.archive_setup_push(); // On commute.html the Play came after the parts common to AV, Image and Text
-        // archive_setup.push(function() { //TODO-ARCHIVE_SETUP move Play from browserAfter to here
-        //    Play('jw6', self.playlist, self.cfg);
-        // });
+}
+/* unused harmony export default */
+
+
+class Video extends AV {
+    constructor(itemid, item) {
+        super(itemid, item);
+        this.itemtype = "http://schema.org/VideoObject";
+    }
+    setupPlaylist() {
+        super.setupPlaylist(['h.264', '512Kb MPEG4']);
     }
 
     theatreIaWrap() {
@@ -12546,7 +12558,105 @@ class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
         );
     }
 }
-/* harmony export (immutable) */ __webpack_exports__["a"] = AV;
+/* unused harmony export Video */
+
+class Audio extends AV {
+    constructor(itemid, item) {
+        super(itemid, item);
+        this.itemtype = "http://schema.org/AudioObject";
+    }
+
+    setupPlaylist() {
+        super.setupPlaylist(['VBR MP4', "Ogg Vorbis"]); //TODO-AUDIO this is only going to play first track
+    }
+
+    theatreIaWrap() {
+        let item = this.item;
+        let itemid = this.itemid;
+        let detailsurl = `https://archive.org/details/${itemid}`;
+        let title = item.title;
+        let imgurl = `https://archive.org/services/img/${itemid}`;
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            { id: 'theatre-ia-wrap', 'class': 'container container-ia width-max ' },
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemprop: 'url', href: detailsurl }),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemprop: 'image', href: imgurl }),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'h1',
+                { 'class': 'sr-only' },
+                title
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'h2',
+                { 'class': 'sr-only' },
+                'Audio Preview'
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'div',
+                { id: 'theatre-ia', 'class': 'container' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { 'class': 'row' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { 'class': 'xs-col-12' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { id: 'theatre-controls' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { href: '#', onclick: 'return AJS.flash_click(0)' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left', 'class': 'iconochive-flash',
+                                    title: 'Click to have player try flash first, then HTML5 second' })
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { href: '#', onclick: 'return AJS.mute_click()' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left', 'class': 'iconochive-unmute',
+                                    title: 'sound is on.  click to mute sound.' })
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { href: '#', onclick: 'return AJS.mute_click()' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left', 'class': 'iconochive-mute',
+                                    style: 'display:none', title: 'sound is off.  click for sound.' })
+                            )
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'noscript',
+                            null,
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'div',
+                                { 'class': 'alert alert-danger alert-dismissable', 'data-dismiss': 'alert' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'button',
+                                    { type: 'button', 'class': 'close', 'data-dismiss': 'alert', 'aria-hidden': 'true' },
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', {
+                                        'class': 'iconochive-remove-circle', 'aria-hidden': 'true' }),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'span',
+                                        { 'class': 'sr-only' },
+                                        'remove-circle'
+                                    )
+                                ),
+                                'Internet Archive\'s in-browser audio player requires JavaScript to be enabled. It appears your browser does not have it turned on. Please see your browser settings for this feature.'
+                            )
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { id: 'audioContainerX', style: 'text-align: center;' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('audio', { id: 'streamContainer', src: this.avs[0] })
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'webtorrentStats', style: 'color: white; text-align: center;' }),
+                        this.cherModal("audio")
+                    )
+                )
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'flag-overlay', 'class': 'center-area ' })
+        );
+    }
+}
+/* unused harmony export Audio */
 
 
 /***/ }),
@@ -12555,7 +12665,7 @@ class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(6);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(7);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 

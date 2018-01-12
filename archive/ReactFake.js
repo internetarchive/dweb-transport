@@ -47,7 +47,7 @@ export default class React  {
             }
             if (["img.src"].includes(tag+"."+name) && attrs[name] instanceof ArchiveFile) {
                 attrs[name].loadImg(element);
-            } else if (["video.src", "img.src"].includes(tag+"."+name) && attrs[name] instanceof ArchiveFile) {
+            } else if (["video.src", "audio.src"].includes(tag+"."+name) && attrs[name] instanceof ArchiveFile) {
                 attrs[name].loadStream(element);
             } else if (name && attrs.hasOwnProperty(name)) {
                 let value = attrs[name];
