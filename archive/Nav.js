@@ -87,7 +87,7 @@ export default class Nav { //extends React.Component
     static clear(destn) {
         // Clear the screen to give confidence that action under way
         // Leaves Nav, clears rest
-        React.domrender(new DetailsError(undefined, undefined, < span > "Loading" < /span>).navwrapped(false), destn)
+        React.domrender(new DetailsError(undefined, undefined, < span >Loading - note this can take a while if no-one else has accessed this item yet< /span>).navwrapped(false), destn)
     }
     static async nav_home() {
         console.log("Navigating to Home");

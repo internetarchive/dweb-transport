@@ -75,7 +75,7 @@ export default class Audio extends AV {
                             </noscript>
 
                             <div id="audioContainerX" style="text-align: center;">
-                                <audio id="streamContainer" src={this.avs[0]}></audio>
+                                <audio id="streamContainer" src={this.avs[0]} controls></audio>
                             </div>
                             <div id="webtorrentStats" style="color: white; text-align: center;"></div>
                             {this.cherModal("audio")}

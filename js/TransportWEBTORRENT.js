@@ -179,6 +179,7 @@ class TransportWEBTORRENT extends Transport {
             const { torrentId, path } = this.webtorrentparseurl(url);
             this.p_webtorrentadd(torrentId)
                 .then((torrent) => {
+                    torrent.deselect(0, torrent.pieces.length - 1, false); // Dont download entire torrent as will pull just the file we want
                     const file = this.webtorrentfindfile(torrent, path);
                     file.getBuffer((err, buffer) => {
                         if (err) {

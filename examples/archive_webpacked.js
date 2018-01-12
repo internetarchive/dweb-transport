@@ -11972,7 +11972,7 @@ class Nav {
     __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].domrender(new __WEBPACK_IMPORTED_MODULE_10__DetailsError__["a" /* default */](undefined, undefined, __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
       'span',
       null,
-      ' "Loading" '
+      'Loading - note this can take a while if no-one else has accessed this item yet'
     )).navwrapped(false), destn);
   }
   static async nav_home() {
@@ -12559,7 +12559,7 @@ class Audio extends __WEBPACK_IMPORTED_MODULE_1__AV__["a" /* default */] {
                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                             'div',
                             { id: 'audioContainerX', style: 'text-align: center;' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('audio', { id: 'streamContainer', src: this.avs[0] })
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('audio', { id: 'streamContainer', src: this.avs[0], controls: true })
                         ),
                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'webtorrentStats', style: 'color: white; text-align: center;' }),
                         this.cherModal("audio")
