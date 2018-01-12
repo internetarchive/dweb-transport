@@ -20,7 +20,7 @@ export default class AV extends Details {
             this.avs = this._list.filter(fi => fi.metadata.format=='VBR MP3');
 
         if (this.avs.length) {
-            this.avs.sort((a, b) => Util.natcompare(a.name, b.name));   //Unsure why sorting names, presumably tracks are named alphabetically ?
+            this.avs.sort((a, b) => Util.natcompare(a.metadata.name, b.metadata.name));   //Unsure why sorting names, presumably tracks are named alphabetically ?
 
             this.playlist.push({ name: this.avs[0].name,
                                  urls: [item.metadata.magnetlink + '/' + this.avs[0].name] })

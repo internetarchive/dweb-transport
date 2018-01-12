@@ -123,9 +123,8 @@ class React {
                 delete attrs.dangerouslySetInnerHTML;
             }
             if (["img.src", "a.href"].includes(tag + "." + name) && typeof attrs[name] === "string" && attrs[name].startsWith('/')) {
-                if (!React._config.root) console.error("Need to React.config({root: 'https://xxx.yyy'");
+                if (!React._config.root) console.error("Need to React.config({root: 'https://xyz.abc'");
                 attrs[name] = React._config.root + attrs[name]; // e.g. /foo => https://bar.com/foo
-                console.log("XXX@43", attrs[name]);
             }
             if (["img.src"].includes(tag + "." + name) && attrs[name] instanceof __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__["a" /* default */]) {
                 attrs[name].loadImg(element);
@@ -2007,7 +2006,7 @@ __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
 class Util {
-    static number_format(nStr) //xxx this is just addCommas now
+    static number_format(nStr) //this is just addCommas now
     {
         //http://www.mredkj.com/javascript/numberFormat.html
         nStr += '';
@@ -12129,11 +12128,7 @@ class Collection extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
                             ' '
                         )
                     ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { className: 'col-xs-1 col-sm-2 welcome-right' },
-                        'xxx'
-                    )
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'col-xs-1 col-sm-2 welcome-right' })
                 )
             )
         );
@@ -12429,7 +12424,7 @@ class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
         if (!this.avs.length) this.avs = this._list.filter(fi => fi.metadata.format == 'VBR MP3');
 
         if (this.avs.length) {
-            this.avs.sort((a, b) => __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].natcompare(a.name, b.name)); //Unsure why sorting names, presumably tracks are named alphabetically ?
+            this.avs.sort((a, b) => __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].natcompare(a.metadata.name, b.metadata.name)); //Unsure why sorting names, presumably tracks are named alphabetically ?
 
             this.playlist.push({ name: this.avs[0].name,
                 urls: [item.metadata.magnetlink + '/' + this.avs[0].name] });
