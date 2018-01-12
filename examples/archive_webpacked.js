@@ -11831,8 +11831,9 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__Collection__ = __webpack_require__(68);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__Texts__ = __webpack_require__(69);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__Image__ = __webpack_require__(70);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__AV__ = __webpack_require__(71);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_9__DetailsError__ = __webpack_require__(72);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__Audio__ = __webpack_require__(73);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_9__Video__ = __webpack_require__(74);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_10__DetailsError__ = __webpack_require__(72);
 //import ReactDOM from "react-dom";
 
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
@@ -11847,7 +11848,8 @@ __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
 
- /*AV,Audio,Vido*/
+
+
 
 
 class Nav {
@@ -11967,7 +11969,7 @@ class Nav {
   static clear(destn) {
     // Clear the screen to give confidence that action under way
     // Leaves Nav, clears rest
-    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].domrender(new __WEBPACK_IMPORTED_MODULE_9__DetailsError__["a" /* default */](undefined, undefined, __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].domrender(new __WEBPACK_IMPORTED_MODULE_10__DetailsError__["a" /* default */](undefined, undefined, __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
       'span',
       null,
       ' "Loading" '
@@ -12001,7 +12003,7 @@ class Nav {
       let obj = await new __WEBPACK_IMPORTED_MODULE_3__Details__["default"](itemid).fetch();
       item = obj.item;
       if (!item.metadata) {
-        new __WEBPACK_IMPORTED_MODULE_9__DetailsError__["a" /* default */](itemid, item, `item ${itemid} cannot be found or does not have metadata`).render(res, htm);
+        new __WEBPACK_IMPORTED_MODULE_10__DetailsError__["a" /* default */](itemid, item, `item ${itemid} cannot be found or does not have metadata`).render(res, htm);
       } else {
         if (verbose) console.log("Found mediatype", item.metadata.mediatype);
         switch (item.metadata.mediatype) {
@@ -12016,13 +12018,13 @@ class Nav {
             break;
           case "audio":
             // Intentionally drop thru to movies
-            new Audio(itemid, item).render(res, htm);
+            new __WEBPACK_IMPORTED_MODULE_8__Audio__["a" /* default */](itemid, item).render(res, htm);
             break;
           case "movies":
-            new Video(itemid, item).render(res, htm);
+            new __WEBPACK_IMPORTED_MODULE_9__Video__["a" /* default */](itemid, item).render(res, htm);
             break;
           default:
-            new __WEBPACK_IMPORTED_MODULE_9__DetailsError__["a" /* default */](itemid, item, `Unsupported mediatype: ${item.metadata.mediatype}`).render(res, htm);
+            new __WEBPACK_IMPORTED_MODULE_10__DetailsError__["a" /* default */](itemid, item, `Unsupported mediatype: ${item.metadata.mediatype}`).render(res, htm);
           //    return new Nav(")
         }
       }
@@ -12400,16 +12402,7 @@ class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Details__ = __webpack_require__(7);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_render_media__ = __webpack_require__(30);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_render_media___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_3_render_media__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit__ = __webpack_require__(63);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_4_throttleit__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_prettier_bytes__ = __webpack_require__(29);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_prettier_bytes___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_5_prettier_bytes__);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
-
-
-
 
 
 
@@ -12438,10 +12431,161 @@ class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
         }
     }
 }
-/* unused harmony export default */
+/* harmony export (immutable) */ __webpack_exports__["a"] = AV;
 
 
-class Video extends AV {
+/***/ }),
+/* 72 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(7);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
+
+
+class DetailsError extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
+    constructor(itemid, item, message) {
+        super(itemid, item);
+        this.message = message;
+    }
+    theatreIaWrap() {
+        return this.message;
+    }
+    render(res, htm) {
+        super.render(res, htm);
+    }
+    itemDetailsAboutJSX() {}
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = DetailsError;
+
+
+/***/ }),
+/* 73 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__AV__ = __webpack_require__(71);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
+
+
+
+class Audio extends __WEBPACK_IMPORTED_MODULE_1__AV__["a" /* default */] {
+    constructor(itemid, item) {
+        super(itemid, item);
+        this.itemtype = "http://schema.org/AudioObject";
+    }
+
+    setupPlaylist() {
+        super.setupPlaylist(['VBR MP4', "Ogg Vorbis"]); //TODO-AUDIO this is only going to play first track
+    }
+
+    theatreIaWrap() {
+        let item = this.item;
+        let itemid = this.itemid;
+        let detailsurl = `https://archive.org/details/${itemid}`;
+        let title = item.title;
+        let imgurl = `https://archive.org/services/img/${itemid}`;
+        this.setupPlaylist();
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            { id: 'theatre-ia-wrap', 'class': 'container container-ia width-max ' },
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemprop: 'url', href: detailsurl }),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemprop: 'image', href: imgurl }),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'h1',
+                { 'class': 'sr-only' },
+                title
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'h2',
+                { 'class': 'sr-only' },
+                'Audio Preview'
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'div',
+                { id: 'theatre-ia', 'class': 'container' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { 'class': 'row' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { 'class': 'xs-col-12' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { id: 'theatre-controls' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { href: '#', onclick: 'return AJS.flash_click(0)' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left', 'class': 'iconochive-flash',
+                                    title: 'Click to have player try flash first, then HTML5 second' })
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { href: '#', onclick: 'return AJS.mute_click()' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left', 'class': 'iconochive-unmute',
+                                    title: 'sound is on.  click to mute sound.' })
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { href: '#', onclick: 'return AJS.mute_click()' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left', 'class': 'iconochive-mute',
+                                    style: 'display:none', title: 'sound is off.  click for sound.' })
+                            )
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'noscript',
+                            null,
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'div',
+                                { 'class': 'alert alert-danger alert-dismissable', 'data-dismiss': 'alert' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'button',
+                                    { type: 'button', 'class': 'close', 'data-dismiss': 'alert', 'aria-hidden': 'true' },
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', {
+                                        'class': 'iconochive-remove-circle', 'aria-hidden': 'true' }),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'span',
+                                        { 'class': 'sr-only' },
+                                        'remove-circle'
+                                    )
+                                ),
+                                'Internet Archive\'s in-browser audio player requires JavaScript to be enabled. It appears your browser does not have it turned on. Please see your browser settings for this feature.'
+                            )
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { id: 'audioContainerX', style: 'text-align: center;' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('audio', { id: 'streamContainer', src: this.avs[0] })
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'webtorrentStats', style: 'color: white; text-align: center;' }),
+                        this.cherModal("audio")
+                    )
+                )
+            ),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'flag-overlay', 'class': 'center-area ' })
+        );
+    }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = Audio;
+
+
+/***/ }),
+/* 74 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__AV__ = __webpack_require__(71);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
+
+
+
+class Video extends __WEBPACK_IMPORTED_MODULE_1__AV__["a" /* default */] {
     constructor(itemid, item) {
         super(itemid, item);
         this.itemtype = "http://schema.org/VideoObject";
@@ -12558,132 +12702,7 @@ class Video extends AV {
         );
     }
 }
-/* unused harmony export Video */
-
-class Audio extends AV {
-    constructor(itemid, item) {
-        super(itemid, item);
-        this.itemtype = "http://schema.org/AudioObject";
-    }
-
-    setupPlaylist() {
-        super.setupPlaylist(['VBR MP4', "Ogg Vorbis"]); //TODO-AUDIO this is only going to play first track
-    }
-
-    theatreIaWrap() {
-        let item = this.item;
-        let itemid = this.itemid;
-        let detailsurl = `https://archive.org/details/${itemid}`;
-        let title = item.title;
-        let imgurl = `https://archive.org/services/img/${itemid}`;
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            { id: 'theatre-ia-wrap', 'class': 'container container-ia width-max ' },
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemprop: 'url', href: detailsurl }),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemprop: 'image', href: imgurl }),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'h1',
-                { 'class': 'sr-only' },
-                title
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'h2',
-                { 'class': 'sr-only' },
-                'Audio Preview'
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'div',
-                { id: 'theatre-ia', 'class': 'container' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'div',
-                    { 'class': 'row' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { 'class': 'xs-col-12' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { id: 'theatre-controls' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'a',
-                                { href: '#', onclick: 'return AJS.flash_click(0)' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left', 'class': 'iconochive-flash',
-                                    title: 'Click to have player try flash first, then HTML5 second' })
-                            ),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'a',
-                                { href: '#', onclick: 'return AJS.mute_click()' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left', 'class': 'iconochive-unmute',
-                                    title: 'sound is on.  click to mute sound.' })
-                            ),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'a',
-                                { href: '#', onclick: 'return AJS.mute_click()' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'left', 'class': 'iconochive-mute',
-                                    style: 'display:none', title: 'sound is off.  click for sound.' })
-                            )
-                        ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'noscript',
-                            null,
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'div',
-                                { 'class': 'alert alert-danger alert-dismissable', 'data-dismiss': 'alert' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'button',
-                                    { type: 'button', 'class': 'close', 'data-dismiss': 'alert', 'aria-hidden': 'true' },
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', {
-                                        'class': 'iconochive-remove-circle', 'aria-hidden': 'true' }),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'span',
-                                        { 'class': 'sr-only' },
-                                        'remove-circle'
-                                    )
-                                ),
-                                'Internet Archive\'s in-browser audio player requires JavaScript to be enabled. It appears your browser does not have it turned on. Please see your browser settings for this feature.'
-                            )
-                        ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { id: 'audioContainerX', style: 'text-align: center;' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('audio', { id: 'streamContainer', src: this.avs[0] })
-                        ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'webtorrentStats', style: 'color: white; text-align: center;' }),
-                        this.cherModal("audio")
-                    )
-                )
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'flag-overlay', 'class': 'center-area ' })
-        );
-    }
-}
-/* unused harmony export Audio */
-
-
-/***/ }),
-/* 72 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(7);
-__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
-
-
-
-class DetailsError extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
-    constructor(itemid, item, message) {
-        super(itemid, item);
-        this.message = message;
-    }
-    theatreIaWrap() {
-        return this.message;
-    }
-    render(res, htm) {
-        super.render(res, htm);
-    }
-    itemDetailsAboutJSX() {}
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = DetailsError;
+/* harmony export (immutable) */ __webpack_exports__["a"] = Video;
 
 
 /***/ })

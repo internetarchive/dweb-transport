@@ -12,7 +12,8 @@ import Home from './Home'
 import Collection from './Collection'
 import Texts from './Texts'
 import Image from './Image'
-import './AV'   /*AV,Audio,Vido*/
+import Audio from './Audio'
+import Video from './Video'
 import DetailsError from './DetailsError'
 
 
