@@ -220,7 +220,7 @@ export default class Details extends ArchiveBase {
         let creator = metadata.creator;
         let datePublished = metadata.date;
         let publisher=metadata.publisher;
-        let keywords = metadata.subject ? metadata.subject.split(';') : undefined ;
+        let keywords = metadata.subject ? Array.isArray(metadata.subject) ? metadata.subject : metadata.subject.split(';') : undefined ;
         let licence = metadata.licenseurl; //TODO - handle other licenses - hardwired for CC currently
         let languageAbbrev = metadata.language;
         let languageLong = {eng: "English", dut: "Dutch"}[languageAbbrev]; //TODO-other languages
