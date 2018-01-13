@@ -46,9 +46,9 @@ export default class ArchiveBase extends ArchiveItem {
         Util.AJS_on_dom_loaded(); // Runs code pushed archive_setup - needed for image if "super" this, put it after superclasses
     }
     render(res, htm) {  //TODO-DETAILS remove htm and from calling routines
-        var els = this.navwrapped();
+        var els = this.navwrapped();    // Build the els
         this.browserBefore();
-        React.domrender(els, res);
+        React.domrender(els, res);  //Put the els into the page
         this.browserAfter();
     }
 }

@@ -84,6 +84,6 @@ export default class React  {
 };
 
 //Default configuration
-React.config = {
+React._config = {
     root: "https://archive.org",
 }

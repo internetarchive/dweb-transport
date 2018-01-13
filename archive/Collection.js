@@ -29,8 +29,7 @@ export default class Collection extends Search {
                             </div>
                             <h1>{item.metadata.title}</h1>
                             <h4>{creator}</h4>
-                            <div id="descript" style={{maxHeight:"43px", cursor:'pointer'}}>
-                                {item.metadata.description} {/*--TODO-DETAILS-ONLINE probably needs  <div dangerouslySetInnerHTML={{__html: item.metadata.description}}></div>--*/}
+                            <div id="descript" style={{maxHeight:"43px", cursor:'pointer'}} dangerouslySetInnerHTML={{__html: item.metadata.description}}>
                             </div>
                         </div>
                         <div className="col-xs-1 col-sm-2 welcome-right">
