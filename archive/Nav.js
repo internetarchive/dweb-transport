@@ -29,6 +29,38 @@ export default class Nav { //extends React.Component
       return (
         <div id="navwrap1">
           <div id="navwrap2">
+
+            <div id="nav-tophat" class="collapse">
+
+                <div class="row toprow web" style="max-width:1000px;margin:auto;">
+                    <div class="col-xs-12">
+                        <div class="wayback-txt">
+                            Search the history of over 308 billion
+                            <a style="display:inline" href="https://blog.archive.org/2016/10/23/defining-web-pages-web-sites-and-web-captures/">web pages</a> on the Internet.
+                        </div>
+                        <div class="roundbox7 wayback-main">
+                            <div class="row">
+                                <div class="col-sm-6" style="padding-left:0; padding-right:0;">
+                                    <a style="padding-bottom:0" href="https://archive.org/web/"><img src="https://archive.org/images/WaybackLogoSmall.png" alt="Wayback Machine"/></a>
+                                </div>
+                                <div class="col-sm-6" style="padding-top:13px;">
+                                    <form style="position:relative;">
+                                        <span class="iconochive-search" aria-hidden="true"></span><span
+                                            class="sr-only">search</span> <label for="nav-wb-url" class="sr-only">Search the Wayback
+                                        Machine</label>
+                                        <input id="nav-wb-url" class="form-control input-sm roundbox20" type="text"
+                                               placeholder="enter URL or keywords" name="url" autocomplete="off"
+                                               onclick="$(this).css('padding-left','').parent().find('.iconochive-search').hide()"/>
+                                    </form>
+                                </div>
+                            </div>{/*--/.row--*/}
+                        </div>{/*--/.wayback-main--*/}
+                    </div>
+                </div>{/*--./row--*/}
+
+                {/* TODO-DETAILS-INFOREQD Need to figure out how to auto-generator the other rows of nav-tophat for each media type */}
+            </div>{/*--/#nav-tophat--*/}
+
             <div className="navbar navbar-inverse navbar-static-top" role="navigation">
               <div id="nav-tophat-helper" className="hidden-xs"></div>
               <ul className="nav navbar-nav">
