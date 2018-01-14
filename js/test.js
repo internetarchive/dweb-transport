@@ -36,28 +36,27 @@ async function p_test(verbose) {
 
         // Note the order of these is significant, it will retrieve by preference from the first setup, try with both orders if in doubt.
         //SEE-OTHER-ADDTRANSPORT
-        let t_http = await Dweb.TransportHTTP.p_setup(opts, verbose);
+        //let t_http = await Dweb.TransportHTTP.p_setup(opts, verbose);
         let t_ipfs = await Dweb.TransportIPFS.p_setup(opts, verbose); // Note browser requires indexeddb
         let t_yjs = await Dweb.TransportYJS.p_setup(opts, verbose); // Should find ipfs transport
-        let t_webtorrent = await Dweb.TransportWebTorrent.p_setup(opts, verbose); //
+        //let t_webtorrent = await Dweb.TransportWEBTORRENT.p_setup(opts, verbose); //
         if (verbose) console.log("setup returned and transport set");
 
         // Need to ask status before using as wont update status till then which means wont be used
         //SEE-OTHER-ADDTRANSPORT
-        await t_http.p_status();
+        //await t_http.p_status();
         await t_ipfs.p_status();
         await t_yjs.p_status();
-        await t_webtorrent.p_status();
+        //await t_webtorrent.p_status();
 
         //SEE-OTHER-ADDTRANSPORT
-        await Dweb.TransportHTTP.test(t_http, verbose);
+        //await Dweb.TransportHTTP.test(t_http, verbose);
         await Dweb.TransportIPFS.test(t_ipfs, verbose);
         await Dweb.TransportYJS.test(t_yjs, verbose);
-        await Dweb.TransportWebTorrent.test(t_webtorrent, verbose);
-
+        //await Dweb.TransportWEBTORRENT.test(t_webtorrent, verbose);
         await Dweb.Transports.test(verbose);
         console.log("---EXITING AFTER TRANSPORTTEST") //TODO-KEYVALUE remove this and "return" once done
-        return
+        //return
         if (verbose) console.log("Transports tested");
         await Dweb.Block.p_test(verbose);
         await Dweb.Signature.p_test(verbose);

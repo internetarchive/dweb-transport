@@ -1,24 +1,16 @@
-const SmartDict = require("./SmartDict"); //for extends
+const PublicPrivate = require("./PublicPrivate"); //for extends
 const Dweb = require("./Dweb");
-//https://www.npmjs.com/package/custom-event && https://github.com/webmodules/custom-event
-var CustomEvent = require('custom-event'); // From web, Not present in node - this code uses global.CustomEvent if it exists so safe on browser/node
 
-
-class CommonList extends SmartDict {
+class CommonList extends PublicPrivate {    //TODO-API split CL and PP
     /*
     CommonList is a superclass for anything that manages a storable list of other urls
     e.g. MutableBlock, KeyChain, AccessControlList
 
     Fields:
-    keypair         Holds a KeyPair used to sign items
     _list           Holds an array of signatures of items put on the list
-    _master         True if this is a master list, i.e. can add things
-    _publicurls     Holds the urls of publicly available version of the list.
     listurls       Urls of lists e.g. in YJS or Orbit - this is the private URL, needed for writing and never (unintentionally) stored unencrypted
     listpublicurls Public URL of list, this is the publicurl, used for reading
-    _allowunsafestore True if should override protection against storing unencrypted private keys (usually only during testing)
-    dontstoremaster True if should not store master key
-    _listeners      Any event listeners  //TODO-LISTENER - maybe move to SmartDict as generically useful
+    Inherited from PublicPrivate: keypair, _master, _publicurls, _allowunsafestore, dontstoremaster, _listeners
     */
     //TODO extend to cover array functions, but carefully as the semantics require signing and storing.
     //concat - hard to do well as unclear semantics, do you really want a new list with the contents of both ? The signatures on 2nd might not work
@@ -41,23 +33,13 @@ class CommonList extends SmartDict {
                 seed: Seed to key generation algorithm
             :param options: dict that overrides any fields of data
          */
-        super(data, verbose, options);
-        this._listeners = {};
-        if (key) {
-            this._setkeypair(key, verbose);
-        }
-        this._master = (typeof master === "undefined")  ? this.keypair.has_private() : master;  // Note this must be AFTER _setkeypair since that sets based on keypair found and _p_storepublic for example wants to force !master
-        if (!this._master && (!this._publicurls || !this._publicurls.length)) {
-            this._publicurls = this._urls;  // We aren't master, so publicurl is same as url - note URL will only have been set if constructor called from SmartDict.p_fetch
-        } else {
-            if (!this._publicurls) this._publicurls = [];
-        }
+        super(data, master, key, verbose, options);
         this.listurls = this.listurls || [];
         this.listpublicurls = this.listpublicurls || [];
         this.table = "cl";
     }
     static async p_new(data, master, key, verbose, options) {
-        let obj = new this(data, master, key, verbose, options); // Note will call superclass if called from there.
+        let obj = await super.p_new(data, master, key, verbose, options); // Note will call constructor
         if (obj._master && (!obj.listurls || !obj.listurls.length)) {
             [obj.listurls,obj.listpublicurls] = await Dweb.Transports.p_newlisturls(obj, verbose);
         }
@@ -78,39 +60,6 @@ class CommonList extends SmartDict {
         return Dweb.KeyPair.KEYTYPESIGN;
     }
 
-    __setattr__(name, value) {
-        /*
-        Set a field of the object, this provides the equivalent of Python setters and getters.
-        Call chain is ...  or constructor > _setdata > _setproperties > __setattr__
-        Subclasses SmartDict
-
-        Default passes "keypair" to _setkeypair
-        :param name: string - name of attribute to set
-        :param value: anything but usually string from retrieving - what to set name to.
-         */
-        let verbose = false;
-        if (name === "keypair") {
-            this._setkeypair(value, verbose);
-        } else {
-            super.__setattr__(name, value);
-        }
-    }
-
-    _setkeypair(value, verbose) {
-        /*
-        Set the keypair attribute, converts value into KeyPair if not already
-        Call chain is ...  or constructor > _setdata > _setproperties > __setattr__ > _setkeypair
-        Sets _master if value has a private key (note that is overridden in the constructor)
-
-        :param value: KeyPair, or Dict like _key field of KeyPair
-         */
-        if (value && ! (value instanceof Dweb.KeyPair)) {
-            value = new Dweb.KeyPair({ key: value }, verbose) // Note ignoring keytype for now
-        }
-        this.keypair = value;
-        this._master = value && value.has_private();
-    }
-
     preflight(dd) {
         /*
         p_store, p_storepublic and preflight work in tandem to store private and public versions of the data
@@ -124,20 +73,9 @@ class CommonList extends SmartDict {
         :return: dict of attributes ready for storage.
          */
 
-        if (dd.keypair) {
-            // Check that we don't unintentionally store an unencrypted version with a private key
-            if (dd._master && !dd._acl && !this._allowunsafestore) {
-                throw new Dweb.errors.SecurityWarning("Probably shouldnt be storing private key" + JSON.stringify(dd));
-            }
-            dd.keypair = dd._master ? dd.keypair.privateexport() : dd.keypair.publicexport();
-        }
-        // Note same code on KeyPair
-        let publicurls = dd._publicurls; // Save before preflight
-        let master = dd._master;
+        let master = dd._master; //Save before super.preflight
         dd = super.preflight(dd);  // Edits dd in place, in particular deletes anything starting with _
-        if (master) { // Only store on Master, on !Master will be None and override storing urls as _publicurls
-            dd._publicurls = publicurls;   // May be None, have to do this AFTER the super call as super filters out "_*"
-        } else { // !master
+        if (! master) {
             delete dd.listurls
         }
         return dd;
@@ -173,36 +111,6 @@ class CommonList extends SmartDict {
         } catch(err) {
             console.log("CL.p_list_then_elements: failed",err.message);
             throw err;
-        }
-    }
-
-    async _p_storepublic(verbose) {
-        // Build a copy of the data, then create a new !master version - preflight takes care of hiding master urls
-        let oo = Object.assign({}, this, {_master: false});
-        let ee = new this.constructor(this.preflight(oo), false, null, verbose);
-        await ee.p_store(verbose);
-        this._publicurls = ee._urls;
-    }
-
-    storedpublic() {
-        return this._publicurls.length > 0
-    }
-    stored() {
-        // Its stored if:
-        //  its either !master or we've stored the !master version
-        //  and we've either stored it already, OR  its a master flagged as dontstoremaster
-        return (!this._master || this._publicurls.length) && ((this._master && this.dontstoremaster) || super.stored())
-    }
-    async p_store(verbose) {
-        /*
-            Store on Dweb, if _master will ensure that stores a public version as well, and saves in _publicurls
-            Will store master unless dontstoremaster is set.
-         */
-        if (this._master && ! this.storedpublic()) {
-            await this._p_storepublic(verbose);
-        }
-        if ( ! (this._master && this.dontstoremaster)) {
-            await super.p_store(verbose);    // Transportable.store(verbose)
         }
     }
 
@@ -243,21 +151,6 @@ class CommonList extends SmartDict {
         }
     }
 
-    async p_sign(urls, verbose) {
-        /*
-        Create a signature -
-        Note - its normally better to use p_push as stores signature and puts on _list and on Dweb
-
-        :param urls:    URL of object to sign
-        :returns:       Signature
-        */
-        if (!urls || !urls.length) throw new Dweb.errors.CodingError("Empty url is a coding error");
-        if (!this._master) throw new Dweb.errors.ForbiddenError("Must be master to sign something");
-        let sig = await Dweb.Signature.p_sign(this, urls, verbose); //returns a new Signature
-        if (!sig.signature) throw new Dweb.errors.CodingError("Must be a signature");
-        return sig
-    }
-
     p_add(sig, verbose) {
         /*
         Add a signature to the Dweb for this list
@@ -284,42 +177,6 @@ class CommonList extends SmartDict {
             && this.keypair.verify(sig.signable(), sig.signature)    //TODO currently throws assertion error if doesnt - not sure thats correct
     }
     // ----- Listener interface ----- see https://developer.mozilla.org/en-US/docs/Web/API/EventTarget for the pattern
-
-    addEventListener(type, callback) {
-        /*
-        Add an event monitor for this list, for example if the UI wants to monitor when things are added.
-        type:  Currently supports "insert"
-        callback:   function({target: this, detail: sig})
-         */
-        if (!(type in this._listeners)) this._listeners[type] = [];
-        this._listeners[type].push(callback);
-    }
-
-    removeEventListener(type, callback) {
-        /*
-        Remove an eventListener,
-        type, callback should be as supplied to addEventListener
-         */
-        if (!(type in this._listeners)) return;
-        let stack = this._listeners[type];
-        for (let i = 0, l = stack.length; i < l; i++) {
-            if (stack[i] === callback) {
-                stack.splice(i, 1);
-                return;
-            }
-        }
-    }
-    dispatchEvent(event) {
-        console.log("CL.dispatchEvent",event);
-        if (!(event.type in this._listeners)) return true;
-        let stack = this._listeners[event.type];
-        console.log("THIS=",this, "event.target=",event.target);
-        //event.target = this;   //https://developer.mozilla.org/en-US/docs/Web/API/EventTarget but fails because target is readonly, with no apparant way to set it
-        for (let i = 0, l = stack.length; i < l; i++) {
-            stack[i].call(this, event);
-        }
-        return !event.defaultPrevented;
-    }
 
     listmonitor(verbose) {
         /*

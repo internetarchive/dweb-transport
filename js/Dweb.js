@@ -10,6 +10,7 @@ exports.Block = require('./Block');
 exports.SmartDict = require("./SmartDict");
 exports.KeyPair = require("./KeyPair");
 exports.Signature = require("./Signature");
+exports.PublicPrivate = require("./PublicPrivate");
 exports.CommonList = require("./CommonList");
 exports.AccessControlList = require("./AccessControlList");
 exports.KeyChain = require('./KeyChain');
@@ -19,6 +20,7 @@ exports.EventListenerHandler = require("./EventListenerHandler")
 
 exports.table2class = { // Each of these needs a constructor that takes data and is ok with no other parameters, (otherwise define a set of these methods as factories)
     "cl": "CommonList",
+    "pp": "PublicPrivate",
     "sb": "StructuredBlock",
     "kc": "KeyChain",
     "kp": "KeyPair",

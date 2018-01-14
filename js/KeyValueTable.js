@@ -1,27 +1,23 @@
 const Dweb = require("./Dweb");
 
-class KeyValue extends SmartDict {
+class KeyValueTable extends SmartDict {
     /*
-    Manages a KeyValue object intended to be stored as a single item,
+    Manages a KeyValue object intended for each field to be a separate item
 
+    Fields:
+    _tableurl    Is the url of the table at which fields are stored
     //TODO-KEYVALUE - incomplete
      */
 
     constructor(data, verbose, options) {
         super(data, verbose, options);
-        this._dirty = true;
+        if (! this._tablepublicurls) {
+            [this._tableurls, this._tablepublicurls] = Transports.newtable(this.pubkey..., this.table)
+        }
     }
 
-    //TODO-KEYVALUE make sure to clear _dirty in p_store()
-
-    dirty() {  // Overrides Transportable.dirty()
-        this._dirty = true;
-    }
-    stored() { // Overrides Transportable.stored()
-        return ! this._dirty;
-    }
 
 }
 
 
-exports = module.exports = SmartDict;
+exports = module.exports = KeyValueTable;

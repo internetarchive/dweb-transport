@@ -1,6 +1,12 @@
 const Dweb = require("./Dweb");
 
 class KeyValue extends SmartDict {
+    /*
+    Manages a KeyValue object intended to be stored as a single item,
+
+    //TODO-KEYVALUE - incomplete
+     */
+
     constructor(data, verbose, options) {
         super(data, verbose, options);
         this._dirty = true;
@@ -14,7 +20,8 @@ class KeyValue extends SmartDict {
     stored() { // Overrides Transportable.stored()
         return ! this._dirty;
     }
+
 }
 
 
-exports = module.exports = SmartDict;
+exports = module.exports = KeyValue;

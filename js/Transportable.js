@@ -32,7 +32,7 @@ class Transportable {
         return this._data;  // Default behavior - opaque bytes
     }
 
-    stored() {  // Check if stored
+    stored() {  // Check if stored (Note overridden in KeyValue to use a _dirty flag)
         return !!(this._urls && this._urls.length);
     }
 
@@ -56,7 +56,7 @@ class Transportable {
         }
     }
 
-    dirty() {
+    dirty() {  //(Note overridden in KeyValue to use a _dirty flag)
         /*
         Mark an object as needing storing again, for example because one of its fields changed.
         Flag as dirty so needs uploading - subclasses may delete other, now invalid, info like signatures
