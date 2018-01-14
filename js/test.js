@@ -55,6 +55,9 @@ async function p_test(verbose) {
         await Dweb.TransportYJS.test(t_yjs, verbose);
         await Dweb.TransportWebTorrent.test(t_webtorrent, verbose);
 
+        await Dweb.Transports.test(verbose);
+        console.log("---EXITING AFTER TRANSPORTTEST") //TODO-KEYVALUE remove this and "return" once done
+        return
         if (verbose) console.log("Transports tested");
         await Dweb.Block.p_test(verbose);
         await Dweb.Signature.p_test(verbose);

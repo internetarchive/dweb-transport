@@ -165,7 +165,7 @@ class TransportYJS extends Transport {
                     obj is same format as p_rawlist or p_rawreverse
          :param verbose:     boolean - True for debugging output
           */
-        let y = this.yarrays[url];
+        let y = this.yarrays[typeof url === "string" ? url : url.href];
         console.assert(y,"Should always exist before calling listmonitor - async call p__yarray(url) to create");
         y.share.array.observe((event) => {
             if (event.type === 'insert') { // Currently ignoring deletions.
@@ -225,7 +225,7 @@ class TransportYJS extends Transport {
 
     // Support for Key-Value pairs as per
     // https://docs.google.com/document/d/1yfmLRqKPxKwB939wIy9sSaa7GKOzM5PrCZ4W1jRGW6M/edit#
-    p_newdatabase(pubkey, verbose) {
+    async p_newdatabase(pubkey, verbose) {
         if (pubkey instanceof Dweb.CommonList)  //TODO-KEYVALUE support KVP etc
             pubkey = pubkey.keypair
         if (pubkey instanceof Dweb.KeyPair)
@@ -240,24 +240,43 @@ class TransportYJS extends Transport {
 
     //TODO-KEYVALUE add observe as a method, maybe same as listmonitor or better to use "on" and the structure of hte other monitor I build then migrate listmonitor to that.
     //TODO-KEYVALUE but note https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy about Proxy
-    async p_newtable(database, table, verbose) {
-        if (!database) throw new Dweb.errors.CodingError("p_newtable currently requires a database")
+    async p_newtable(pubkey, table, verbose) {
+        if (!pubkey) throw new Dweb.errors.CodingError("p_newtable currently requires a pubkey")
+        let database = await this.p_newdatabase(pubkey, verbose)
         // If have use cases without a database, then call p_newdatabase first
-        return Object.assign({}, database, {table: table})   // No action required to create it
-    }
-    async p_set(url, key, value, verbose) {  // url = yjs:/yjs/database/table/key   //TODO-KEYVALUE-API
-        let y = await this.p__ymap(url, verbose);
-        y.share.map.set(key, value);
+        return { privateurl: `${database.privateurl}/${table}`,  publicurl: `${database.publicurl}/${table}`}  // No action required to create it
     }
 
-    async p_get(url, key, verbose) {  //TODO-KEYVALUE-API
+    async p_set(url, keyvalues, value, verbose) {  // url = yjs:/yjs/database/table/key   //TODO-KEYVALUE-API
         let y = await this.p__ymap(url, verbose);
-        return y.share.map.get(key);   // Surprisingly this is sync, the p__ymap should have synchronised
+        if (typeof keyvalues === "string") {
+            y.share.map.set(keyvalues, value);
+        } else {
+            Object.keys(keyvalues).map((key) => y.share.map.set(key, keyvalues[key]));
+        }
+    }
+    _p_get(y, keys, verbose) {
+        if (Array.isArray(keys)) {
+            return keys.reduce(function(previous, key) {
+                previous[key] = y.share.map.get(key);
+                return previous;
+            }, {});
+        } else {
+            return y.share.map.get(keys);   // Surprisingly this is sync, the p__ymap should have synchronised
+        }
+    }
+    async p_get(url, keys, verbose) {  //TODO-KEYVALUE-API - return dict or single
+        let y = await this.p__ymap(url, verbose);
+        return this._p_get(y, keys);
     }
 
-    async p_delete(url, key, verbose) {  //TODO-KEYVALUE-API
+    async p_delete(url, keys, verbose) {  //TODO-KEYVALUE-API
         let y = await this.p__ymap(url, verbose);
-        return y.share.map.delete(key);   // Surprisingly this is sync, the p__ymap should have synchronised
+        if (typeof keys === "string") {
+            y.share.map.delete(keys);
+        } else {
+            keys.map((key) => y.share.map.delete(key));  // Surprisingly this is sync, the p__ymap should have synchronised
+        }
     }
 
     async p_keys(url, verbose) {
@@ -267,10 +286,7 @@ class TransportYJS extends Transport {
     async p_getall(url, verbose) {
         let y = await this.p__ymap(url, verbose);
         let keys = y.share.map.keys();   // Surprisingly this is sync, the p__ymap should have synchronised
-        return keys.reduce(function(previous, key) {
-            previous[key] = y.share.map.get(key);
-            return previous;
-        }, {});
+        return this._p_get(y, keys);
     }
     static async test(transport, verbose) {
         if (verbose) {console.log("TransportYJS.test")}
@@ -290,8 +306,8 @@ class TransportYJS extends Transport {
             console.assert(res.length === listlen + 1, "Should have added one item");
             //console.log("TransportYJS test complete");
             let db = await transport.p_newdatabase("TESTNOTREALLYAKEY");
-            let table = await transport.p_newtable(db,"TESTTABLE");
-            let mapurl = `${table.privateurl}/${table.table}`;
+            let table = await transport.p_newtable("TESTNOTREALLYAKEY","TESTTABLE");
+            let mapurl = table.publicurl;
             console.assert(mapurl === "yjs:/yjs/TESTNOTREALLYAKEY/TESTTABLE");
             await transport.p_set(mapurl, "testkey", "testvalue", verbose);
             res = await transport.p_get(mapurl, "testkey", verbose);

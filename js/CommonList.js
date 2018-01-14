@@ -31,6 +31,7 @@ class CommonList extends SmartDict {
         /*
             Create a new instance of CommonList
             Note that in almost all cases should use p_new rather than constructor as constructor cant setup listurls and listpublicurls
+            Also note that when called from SmartDict.p_fetch ONLY the data is passed.
 
             :param data: json string or dict to load fields from
             :param master: boolean, true if should create a master list with private key etc
