@@ -28,6 +28,7 @@
     "y-indexeddb": "^8.1.9",
     "y-ipfs-connector": "^1.6.0",
     "y-leveldb": "0.0.1",
+    "y-map": "^10.1.3",
     "y-memory": "^8.0.9",
     "y-text": "^9.5.1",
     "yjs": "^12.3.3"

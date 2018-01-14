@@ -185,17 +185,20 @@ class Transport {
         console.log("Undefined function Transport.listmonitor");    // Note intentionally a log, as legitamte to not implement it
     }
 
-    static mergeoptions(a, b) {
+    static mergeoptions(a) {
         /*
         Deep merge options dictionaries
          */
-        let c = Object.assign(a);
-        for (let key in b) {
-            let val = b[key];
-            if ((typeof val === "object") && !Array.isArray(val) && a[key]) {
-                c[key] = Transport.mergeoptions(a[key], b[key]);
-            } else {
-                c[key] = b[key];
+        let c = {};
+        for (let i = 0; i < arguments.length; i++) {
+            let b = arguments[i];
+            for (let key in b) {
+                let val = b[key];
+                if ((typeof val === "object") && !Array.isArray(val) && c[key]) {
+                    c[key] = Transport.mergeoptions(a[key], b[key]);
+                } else {
+                    c[key] = b[key];
+                }
             }
         }
         return c;

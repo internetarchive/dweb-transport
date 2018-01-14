@@ -8,6 +8,7 @@ const Y = require('yjs');
 require('y-memory')(Y);
 require('y-array')(Y);
 require('y-text')(Y);
+require('y-map')(Y);
 require('y-ipfs-connector')(Y);
 require('y-indexeddb')(Y);
 //require('y-leveldb')(Y); //- can't be there for browser, node seems to find it ok without this, though not sure why..
@@ -28,10 +29,6 @@ let defaultoptions = {
             name: 'ipfs',
             //ipfs: ipfs,   // Need to link IPFS here once created
         },
-        share: {
-            //textfield: 'Text'
-            array: 'Array'
-        }
     }
 }
 
@@ -49,23 +46,27 @@ class TransportYJS extends Transport {
         this.options = options;         // Dictionary of options { ipfs: {...}, "yarrays", yarray: {...} }
         this.name = "YJS";             // For console log etc
         this.supportURLs = ['yjs'];
-        this.supportFunctions = ['add', 'list', 'listmonitor', 'newlisturls'];   // Only does list functions, Does not support reverse,
+        this.supportFunctions = ['add', 'list', 'listmonitor', 'newlisturls',
+            'get', 'set', 'getall', 'keys', 'newdatabase', 'newtable'];   // Only does list functions, Does not support reverse,
         this.status = Dweb.Transport.STATUS_LOADED;
     }
 
-    async p__yarray(url, verbose) {
+    async p__y(url, opts, verbose) {
         /*
-        Utility function to get Yarray for this URL and open a new connection if not already
+        Utility function to get Y for this URL with appropriate options and open a new connection if not already
 
         url:        URL string to find list of
+        opts:       Options to add to defaults
         resolves:   Y
         */
+        if (!(typeof(url) === "string")) { url = url.href; } // Convert if its a parsed URL
+        console.assert(url.startsWith("yjs:/yjs/"));
         try {
             if (this.yarrays[url]) {
                 if (verbose) console.log("Found Y for", url);
                 return this.yarrays[url];
             } else {
-                let options = Transport.mergeoptions(this.options.yarray, {connector: {room: url}}); // Copies options, ipfs will be set already
+                let options = Transport.mergeoptions(this.options.yarray, {connector: {room: url}}, opts); // Copies options, ipfs will be set already
                 if (verbose) console.log("Creating Y for", url); //"options=",options);
                 return this.yarrays[url] = await Y(options);
             }
@@ -74,6 +75,25 @@ class TransportYJS extends Transport {
             throw err;
         }
     }
+
+    async p__yarray(url, verbose) {
+        /*
+        Utility function to get Yarray for this URL and open a new connection if not already
+        url:        URL string to find list of
+        resolves:   Y
+        */
+        return this.p__y(url, { share: {array: "Array"}}); // Copies options, ipfs will be set already
+    }
+    async p__ymap(url, verbose) {
+        /*
+        Utility function to get Yarray for this URL and open a new connection if not already
+        url:        URL string to find list of
+        resolves:   Y
+        */
+        return this.p__y(url, { share: {map: "Map"}}); // Copies options, ipfs will be set already
+    }
+
+
 
     static setup0(options, verbose) {
         /*
@@ -112,7 +132,7 @@ class TransportYJS extends Transport {
         return this.status;
     }
 
-   async p_rawlist(url, verbose) {
+    async p_rawlist(url, verbose) {
     /*
     Fetch all the objects in a list, these are identified by the url of the public key used for signing.
     (Note this is the 'signedby' parameter of the p_rawadd call, not the 'url' parameter
@@ -125,7 +145,6 @@ class TransportYJS extends Transport {
     :resolve array: An array of objects as stored on the list.
      */
         try {
-            if (!(typeof(url) === "string")) { url = url.href; } // Convert if its a parsed URL
             let y = await this.p__yarray(url, verbose);
             let res = y.share.array.toArray()
             // .filter((obj) => (obj.signedby.includes(url))); Cant filter since url is the YJS URL, not the URL of the CL that signed it. (upper layers verify, which fiters)
@@ -146,13 +165,14 @@ class TransportYJS extends Transport {
                     obj is same format as p_rawlist or p_rawreverse
          :param verbose:     boolean - True for debugging output
           */
-        if (!(typeof(url) === "string")) { url = url.href; } // Convert if its a parsed URL
         let y = this.yarrays[url];
         console.assert(y,"Should always exist before calling listmonitor - async call p__yarray(url) to create");
         y.share.array.observe((event) => {
             if (event.type === 'insert') { // Currently ignoring deletions.
                 if (verbose) console.log('resources inserted', event.values);
-                event.values.filter((obj) => obj.signedby.includes(url)).map(callback);
+                //cant filter because url is YJS local, not signer, callback should filter
+                //event.values.filter((obj) => obj.signedby.includes(url)).map(callback);
+                event.values.map(callback);
             }
         })
     }
@@ -185,9 +205,8 @@ class TransportYJS extends Transport {
         :param boolean verbose: True for debugging output
         :resolve undefined:
         */
-        if (typeof url !== "string") url = url.href; // Assume its an Url if its not a string
         console.assert(url && sig.urls.length && sig.signature && sig.signedby.length, "TransportIPFS.p_rawadd args", url, sig);
-        if (verbose) console.log("TransportYJS.p_rawadd", url, sig);
+        if (verbose) console.log("TransportYJS.p_rawadd", typeof url === "string" ? url : url.href, sig);
         let value = sig.preflight(Object.assign({}, sig));
         let y = await this.p__yarray(url, verbose);
         y.share.array.push([value]);
@@ -204,11 +223,59 @@ class TransportYJS extends Transport {
         return [u,u];
     }
 
+    // Support for Key-Value pairs as per
+    // https://docs.google.com/document/d/1yfmLRqKPxKwB939wIy9sSaa7GKOzM5PrCZ4W1jRGW6M/edit#
+    p_newdatabase(pubkey, verbose) {
+        if (pubkey instanceof Dweb.CommonList)  //TODO-KEYVALUE support KVP etc
+            pubkey = pubkey.keypair
+        if (pubkey instanceof Dweb.KeyPair)
+            pubkey = pubkey.publicexport()
+        if (Array.isArray(pubkey))
+            pubkey = pubkey.find(k => k.startsWith("NACL VERIFY:"))
+        // By this point pubkey should be an export of a public key of form xyz:abc where xyz
+        // specifies the type of public key (NACL VERIFY being the only kind we expect currently)
+        let u = `yjs:/yjs/${pubkey}`;
+        return {"publicurl": u, "privateurl": u};   // TODO-KEYVALUE Returned as an untyped object here may need to change
+    }
 
+    //TODO-KEYVALUE add observe as a method, maybe same as listmonitor or better to use "on" and the structure of hte other monitor I build then migrate listmonitor to that.
+    //TODO-KEYVALUE but note https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy about Proxy
+    async p_newtable(database, table, verbose) {
+        if (!database) throw new Dweb.errors.CodingError("p_newtable currently requires a database")
+        // If have use cases without a database, then call p_newdatabase first
+        return Object.assign({}, database, {table: table})   // No action required to create it
+    }
+    async p_set(url, key, value, verbose) {  // url = yjs:/yjs/database/table/key   //TODO-KEYVALUE-API
+        let y = await this.p__ymap(url, verbose);
+        y.share.map.set(key, value);
+    }
+
+    async p_get(url, key, verbose) {  //TODO-KEYVALUE-API
+        let y = await this.p__ymap(url, verbose);
+        return y.share.map.get(key);   // Surprisingly this is sync, the p__ymap should have synchronised
+    }
+
+    async p_delete(url, key, verbose) {  //TODO-KEYVALUE-API
+        let y = await this.p__ymap(url, verbose);
+        return y.share.map.delete(key);   // Surprisingly this is sync, the p__ymap should have synchronised
+    }
+
+    async p_keys(url, verbose) {
+        let y = await this.p__ymap(url, verbose);
+        return y.share.map.keys();   // Surprisingly this is sync, the p__ymap should have synchronised
+    }
+    async p_getall(url, verbose) {
+        let y = await this.p__ymap(url, verbose);
+        let keys = y.share.map.keys();   // Surprisingly this is sync, the p__ymap should have synchronised
+        return keys.reduce(function(previous, key) {
+            previous[key] = y.share.map.get(key);
+            return previous;
+        }, {});
+    }
     static async test(transport, verbose) {
         if (verbose) {console.log("TransportYJS.test")}
         try {
-            let testurl = "1114";  // Just a predictable number can work with
+            let testurl = "yjs:/yjs/THISATEST";  // Just a predictable number can work with
             let res = await transport.p_rawlist(testurl, verbose);
             let listlen = res.length;   // Holds length of list run intermediate
             if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res));
@@ -222,6 +289,26 @@ class TransportYJS extends Transport {
             res = await transport.p_rawlist(testurl, verbose);
             console.assert(res.length === listlen + 1, "Should have added one item");
             //console.log("TransportYJS test complete");
+            let db = await transport.p_newdatabase("TESTNOTREALLYAKEY");
+            let table = await transport.p_newtable(db,"TESTTABLE");
+            let mapurl = `${table.privateurl}/${table.table}`;
+            console.assert(mapurl === "yjs:/yjs/TESTNOTREALLYAKEY/TESTTABLE");
+            await transport.p_set(mapurl, "testkey", "testvalue", verbose);
+            res = await transport.p_get(mapurl, "testkey", verbose);
+            console.assert(res === "testvalue");
+            await transport.p_set(mapurl, "testkey2", {foo: "bar"}, verbose);
+            res = await transport.p_get(mapurl, "testkey2", verbose);
+            console.assert(res.foo === "bar");
+            await transport.p_set(mapurl, "testkey3", [1,2,3], verbose);
+            res = await transport.p_get(mapurl, "testkey3", verbose);
+            console.assert(res[1] === 2);
+            res = await transport.p_keys(mapurl);
+            console.assert(res.length == 3 && res.includes("testkey3"))
+            res = await transport.p_getall(mapurl, verbose)
+            console.log(res)
+            console.assert(res.testkey2.foo === "bar")
+
+
         } catch(err) {
             console.log("Exception thrown in TransportYJS.test:", err.message);
             throw err;
