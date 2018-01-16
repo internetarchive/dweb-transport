@@ -68,7 +68,7 @@ class Transportable {
         /*
         Fetch the data for a url, subclasses act on the data, typically storing it.
         urls:	array of urls to retrieve (any are valid)
-        returns:	string - arbitrary bytes retrieved.
+        returns:	string - arbitrary bytes retrieved or possibly Buffer or sometimes even an object (like a dictionary)
         throws:     TransportError with messages of any errors if none succeeded
          */
         return Dweb.Transports.p_rawfetch(urls, verbose);

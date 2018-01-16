@@ -1,12 +1,10 @@
 const SmartDict = require("./SmartDict"); //for extends
 const Dweb = require("./Dweb");
-//https://www.npmjs.com/package/custom-event && https://github.com/webmodules/custom-event
-var CustomEvent = require('custom-event'); // From web, Not present in node - this code uses global.CustomEvent if it exists so safe on browser/node
 
 
 class PublicPrivate extends SmartDict {
     /*
-    PublicPrivate is a superclass for anything that has both private and publicly stored components
+    PublicPrivate is a superclass for anything (except KeyPair) that has both private and publicly stored components because it has a KeyPair.
     e.g. CommonList KeyValue*
 
     Fields:
@@ -16,6 +14,18 @@ class PublicPrivate extends SmartDict {
     _allowunsafestore True if should override protection against storing unencrypted private keys (usually only during testing)
     dontstoremaster True if should not store master key
     _listeners      Any event listeners  //TODO-LISTENER - maybe move to SmartDict as generically useful
+
+    CL.p_store, KVP.p_store, _p_storepublic, _getdata and preflight work closely together as summarised below.
+    CL.p_store:  this._p_storepublic; Transportable.p_store
+    KVP.p_store: Transportable.p_store
+    _p_storepublic: constructor(preflight, false) -> p_store -> set _publicurls
+    Transportable.p_store: this._getdata -> Transports.p_rawstore
+        SD._getdata: build dd -> preflight -> JSON.stringify
+            SD.preflight: filter out _*
+            <class>.preflight: other filters
+    Most subclassing is done either at preflight to filter specific fields, or at p_store if dont have separate public/private versions.
+
+
     */
 
     constructor(data, master, key, verbose, options) {
@@ -142,19 +152,6 @@ class PublicPrivate extends SmartDict {
         return (!this._master || this._publicurls.length) && ((this._master && this.dontstoremaster) || super.stored())
     }
 
-    async p_store(verbose) {
-        /*
-            Store on Dweb, if _master will ensure that stores a public version as well, and saves in _publicurls
-            Will store master unless dontstoremaster is set.
-         */
-        if (this._master && !this.storedpublic()) {
-            await this._p_storepublic(verbose);
-        }
-        if (!(this._master && this.dontstoremaster)) {
-            await super.p_store(verbose);    // Transportable.store(verbose)
-        }
-    }
-
     async p_sign(urls, verbose) {
         /*
         Create a signature -
@@ -173,7 +170,7 @@ class PublicPrivate extends SmartDict {
 
     verify(sig, verbose) {
         /*
-        Check that a signature is vald for this list, i.e. signed by this keypair.
+        Check that a signature is valid for this list, i.e. signed by this keypair.
         TODO-KEYVALUE its unclear if this is specific to CL and do differently on KV etc, if so move to CL from PP
 
         sig:    Signature object
@@ -181,7 +178,7 @@ class PublicPrivate extends SmartDict {
         throws:     assertion error if doesn't //TODO handle that gracefully depending on caller
          */
         return Dweb.utils.intersects(this._publicurls, sig.signedby)    // Check signedby assertion is for this list -
-            && this.keypair.verify(sig.signable(), sig.signature)    //TODO currently throws assertion error if doesnt - not sure thats correct
+            && this.keypair.verify(sig.signable(), sig.signature)    //TODO currently throws assertion error if doesnt - not sure that is correct
     }
 
     // ----- Listener interface ----- see https://developer.mozilla.org/en-US/docs/Web/API/EventTarget for the pattern
@@ -212,11 +209,11 @@ class PublicPrivate extends SmartDict {
     }
 
     dispatchEvent(event) {
-        console.log("CL.dispatchEvent", event);
+        console.log("PP.dispatchEvent", event);
         if (!(event.type in this._listeners)) return true;
         let stack = this._listeners[event.type];
         console.log("THIS=", this, "event.target=", event.target);
-        //event.target = this;   //https://developer.mozilla.org/en-US/docs/Web/API/EventTarget but fails because target is readonly, with no apparant way to set it
+        //event.target = this;   //https://developer.mozilla.org/en-US/docs/Web/API/EventTarget but fails because target is readonly, with no apparent way to set it
         for (let i = 0, l = stack.length; i < l; i++) {
             stack[i].call(this, event);
         }

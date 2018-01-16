@@ -1,5 +1,7 @@
 const PublicPrivate = require("./PublicPrivate"); //for extends
 const Dweb = require("./Dweb");
+//https://www.npmjs.com/package/custom-event && https://github.com/webmodules/custom-event
+const CustomEvent = require('custom-event'); // From web, Not present in node - this code uses global.CustomEvent if it exists so safe on browser/node
 
 class CommonList extends PublicPrivate {    //TODO-API split CL and PP
     /*
@@ -50,14 +52,19 @@ class CommonList extends PublicPrivate {    //TODO-API split CL and PP
         super._setdata(value);
         this._list = this._list || [];        // Clear list (not undefined field) if setting data
     }
-    keytype() {
-        /*
-        Return the type of key to use from Dweb.KeyPair.KEYTYPE* constants
-        By default its KEYTYPESIGN, but KeyChain subclasses
 
-        :return: constant
+    async p_store(verbose) {
+        /*
+            Store on Dweb, if _master will ensure that stores a public version as well, and saves in _publicurls
+            Will store master unless dontstoremaster is set.
+            Subclassed in KeyValueTable
          */
-        return Dweb.KeyPair.KEYTYPESIGN;
+        if (this._master && !this.storedpublic()) {
+            await this._p_storepublic(verbose);
+        }
+        if (!(this._master && this.dontstoremaster)) {
+            await super.p_store(verbose);    // Transportable.store(verbose)
+        }
     }
 
     preflight(dd) {
@@ -128,7 +135,7 @@ class CommonList extends PublicPrivate {    //TODO-API split CL and PP
                 throw new Dweb.errors.CodingError("CL.p_push obj should never be non-empty");
             }
             let sig;
-            console.assert(this.listpublicurls.length)  // Should be set by now
+            console.assert(this.listpublicurls.length); // Should be set by now
             await this.p_store(verbose);        // Make sure list is stored before store anything on it.
             if (verbose) console.log("CL.p_push", obj._urls, "onto", this._urls);
             let urls = obj;
@@ -161,21 +168,10 @@ class CommonList extends PublicPrivate {    //TODO-API split CL and PP
         :resolves:  undefined
          */
         if (!sig) throw new Dweb.errors.CodingError("CommonList.p_add is meaningless without a sig");
-        if (! Dweb.utils.intersects(sig.signedby, this._publicurls)) throw new Dweb.errors.CodingError(`CL.p_add: sig.signedby ${sig.signedby} should overlap with this._publicurls ${this._publicurls}`)
+        if (! Dweb.utils.intersects(sig.signedby, this._publicurls)) throw new Dweb.errors.CodingError(`CL.p_add: sig.signedby ${sig.signedby} should overlap with this._publicurls ${this._publicurls}`);
         return Dweb.Transports.p_rawadd(this.listpublicurls, sig, verbose);
     }
 
-    verify(sig, verbose) {
-        /*
-        Check that a signature is vald for this list, i.e. signed by this keypair.
-
-        sig:    Signature object
-        returns:    True if verifies
-        throws:     assertion error if doesn't //TODO handle that gracefully depending on caller
-         */
-        return Dweb.utils.intersects(this._publicurls, sig.signedby)    // Check signedby assertion is for this list -
-            && this.keypair.verify(sig.signable(), sig.signature)    //TODO currently throws assertion error if doesnt - not sure thats correct
-    }
     // ----- Listener interface ----- see https://developer.mozilla.org/en-US/docs/Web/API/EventTarget for the pattern
 
     listmonitor(verbose) {

@@ -55,9 +55,10 @@ async function p_test(verbose) {
         await Dweb.TransportYJS.test(t_yjs, verbose);
         //await Dweb.TransportWEBTORRENT.test(t_webtorrent, verbose);
         await Dweb.Transports.test(verbose);
-        console.log("---EXITING AFTER TRANSPORTTEST") //TODO-KEYVALUE remove this and "return" once done
-        //return
         if (verbose) console.log("Transports tested");
+        await Dweb.KeyValueTable.p_test(verbose);
+        //console.log("---EXITING AFTER TRANSPORTTEST") //TODO-KEYVALUE remove this and "return" once done
+        //return
         await Dweb.Block.p_test(verbose);
         await Dweb.Signature.p_test(verbose);
         await Dweb.KeyPair.test(verbose);
@@ -70,7 +71,7 @@ async function p_test(verbose) {
         console.log("------AWAITED ANY BACKGROUND OUTPUT STARTING NEXT TEST =====");
         console.log("------END OF NEW TESTING PAUSING=====");
         await delay(1000);
-        console.log("------AND FINISHED WAITING =====")
+        console.log("------AND FINISHED WAITING =====");
         //let sb = (await Dweb.StructuredBlock.test(document, verbose)).sb;
         console.log("Completed test - running IPFS in background, hit Ctrl-C to exit");
     } catch (err) {

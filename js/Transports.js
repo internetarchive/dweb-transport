@@ -40,7 +40,7 @@ class Transports {
 
     static async p_rawstore(data, verbose) {
         /*
-        data: Raw data to store
+        data: Raw data to store - typically a string, but its passed on unmodified here
         returns:    Array of urls of where stored
         throws: TransportError with message being concatenated messages of transports if NONE of them succeed.
          */
@@ -336,6 +336,16 @@ class Transports {
         return { privateurls: uuu.map(uu=>uu.privateurl), publicurls: uuu.map(uu=>uu.publicurl)};    // {privateurls: [ priv priv priv ], publicurls: [ pub pub pub ] }
     }
 
+    static monitor(urls, cb, verbose) {
+        /*
+        Add a listmonitor for each transport - note this means if multiple transports support it, then will get duplicate events back if everyone else is notifying all of them.
+         */
+        Dweb.Transports.validFor(urls, "monitor")
+            .map(([u, t]) => t.monitor(u, cb, verbose));
+    }
+
+
+
     static addtransport(t) {
         /*
         Add a transport to _transports,
@@ -410,10 +420,9 @@ class Transports {
             res = await this.p_get(mapurls, "testkey3", verbose);
             console.assert(res[1] === 2);
             res = await this.p_keys(mapurls);
-            console.assert(res.length == 3 && res.includes("testkey3"))
-            res = await this.p_getall(mapurls, verbose)
-            console.log(res)
-            console.assert(res.testkey2.foo === "bar")
+            console.assert(res.length === 3 && res.includes("testkey3"));
+            res = await this.p_getall(mapurls, verbose);
+            console.assert(res.testkey2.foo === "bar");
 
 
         } catch(err) {

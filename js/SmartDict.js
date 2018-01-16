@@ -14,6 +14,8 @@ class SmartDict extends Transportable {
 
     The hooks for encrypting and decrypting data are at this level, depending on the _acl field, but are implemented by code in CryptoLib.
 
+    See PublicPrivate header for how PP.p_store, PP._p_storepublic, _getdata and preflight work closely together
+
     Fields:
     _acl    if set (on master) to a AccessControlList or KeyChain, defines storage as encrypted -
      */
@@ -69,7 +71,7 @@ class SmartDict extends Transportable {
         return res
     }
 
-    _getdata() {
+    _getdata(wantstring=true) {
         /*
         Prepares data for sending. Retrieves attributes, runs through preflight.
             If there is an _acl field then it passes data through it for encrypting (see AccessControl library)
@@ -80,11 +82,12 @@ class SmartDict extends Transportable {
             //noinspection JSUnfilteredForInLoop don't use "of" because want inherited attributes
             dd[i] = this[i];    // This just copies the attributes not functions
         }
-        let res = JSON.stringify(this.preflight(dd));   // This is where fields get deleted or updated (in subclasses etc)
+        dd = this.preflight(dd);
+        let res = (wantstring || this._acl) ? JSON.stringify(dd) : dd ;   // This is where fields get deleted or updated (in subclasses etc)
         if (this._acl) { //Need to encrypt, _acl is an object, not a url
             let encdata = this._acl.encrypt(res, true);  // data, b64
             let dic = { "encrypted": encdata, "acl": this._acl._publicurls, "table": this.table};
-            res = JSON.stringify(dic);
+            res = wantstring ? JSON.stringify(dic) : dic;
         }
         return res
     }    // Should be being called on outgoing _data includes dumps and encoding etc
@@ -143,7 +146,7 @@ class SmartDict extends Transportable {
         try {
             if (verbose) console.log("SmartDict.p_fetch", urls);
             let data = await super.p_fetch(urls, verbose);  // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
-            let maybeencrypted = JSON.parse(data);          // Parse JSON
+            let maybeencrypted = (typeof data === "string" || data instanceof Buffer) ? JSON.parse(data) : data;          // Parse JSON (dont parse if p_fetch has returned object (e.g. from KeyValueTable
             let table = maybeencrypted.table;               // Find the class it belongs to
             let cls = Dweb[Dweb.table2class[table]];        // Gets class name, then looks up in Dweb - avoids dependency
             if (!cls) { // noinspection ExceptionCaughtLocallyJS

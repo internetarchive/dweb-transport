@@ -3,7 +3,8 @@ This Transport layers builds on the YJS DB and uses IPFS as its transport.
 
 Y Lists have listeners and generate events - see docs at ...
 */
-// The following only required for Y version
+const Url = require('url');
+
 const Y = require('yjs');
 require('y-memory')(Y);
 require('y-array')(Y);
@@ -30,7 +31,7 @@ let defaultoptions = {
             //ipfs: ipfs,   // Need to link IPFS here once created
         },
     }
-}
+};
 
 class TransportYJS extends Transport {
     /*
@@ -46,8 +47,8 @@ class TransportYJS extends Transport {
         this.options = options;         // Dictionary of options { ipfs: {...}, "yarrays", yarray: {...} }
         this.name = "YJS";             // For console log etc
         this.supportURLs = ['yjs'];
-        this.supportFunctions = ['add', 'list', 'listmonitor', 'newlisturls',
-            'get', 'set', 'getall', 'keys', 'newdatabase', 'newtable'];   // Only does list functions, Does not support reverse,
+        this.supportFunctions = ['fetch', 'add', 'list', 'listmonitor', 'newlisturls',
+            'get', 'set', 'getall', 'keys', 'newdatabase', 'newtable', 'monitor'];   // Only does list functions, Does not support reverse,
         this.status = Dweb.Transport.STATUS_LOADED;
     }
 
@@ -146,8 +147,8 @@ class TransportYJS extends Transport {
      */
         try {
             let y = await this.p__yarray(url, verbose);
-            let res = y.share.array.toArray()
-            // .filter((obj) => (obj.signedby.includes(url))); Cant filter since url is the YJS URL, not the URL of the CL that signed it. (upper layers verify, which fiters)
+            let res = y.share.array.toArray();
+            // .filter((obj) => (obj.signedby.includes(url))); Cant filter since url is the YJS URL, not the URL of the CL that signed it. (upper layers verify, which filters)
             if (verbose) console.log("p_rawlist found", ...Dweb.utils.consolearr(res));
             return res;
         } catch(err) {
@@ -193,7 +194,7 @@ class TransportYJS extends Transport {
     async p_rawadd(url, sig, verbose) {
         /*
         Store a new list item, it should be stored so that it can be retrieved either by "signedby" (using p_rawlist) or
-        by "url" (with p_rawreverse). The underlying transport does not need to guarrantee the signature,
+        by "url" (with p_rawreverse). The underlying transport does not need to guarantee the signature,
         an invalid item on a list should be rejected on higher layers.
 
         :param string url: String identifying list to post to
@@ -226,23 +227,23 @@ class TransportYJS extends Transport {
     // Support for Key-Value pairs as per
     // https://docs.google.com/document/d/1yfmLRqKPxKwB939wIy9sSaa7GKOzM5PrCZ4W1jRGW6M/edit#
     async p_newdatabase(pubkey, verbose) {
-        if (pubkey instanceof Dweb.CommonList)  //TODO-KEYVALUE support KVP etc
-            pubkey = pubkey.keypair
+        if (pubkey instanceof Dweb.PublicPrivate)
+            pubkey = pubkey.keypair;
         if (pubkey instanceof Dweb.KeyPair)
-            pubkey = pubkey.publicexport()
+            pubkey = pubkey.publicexport();
         if (Array.isArray(pubkey))
-            pubkey = pubkey.find(k => k.startsWith("NACL VERIFY:"))
+            pubkey = pubkey.find(k => k.startsWith("NACL VERIFY:"));
         // By this point pubkey should be an export of a public key of form xyz:abc where xyz
         // specifies the type of public key (NACL VERIFY being the only kind we expect currently)
-        let u = `yjs:/yjs/${pubkey}`;
-        return {"publicurl": u, "privateurl": u};   // TODO-KEYVALUE Returned as an untyped object here may need to change
+        let u =  `yjs:/yjs/${encodeURIComponent(pubkey)}`;
+        return {"publicurl": u, "privateurl": u};
     }
 
-    //TODO-KEYVALUE add observe as a method, maybe same as listmonitor or better to use "on" and the structure of hte other monitor I build then migrate listmonitor to that.
-    //TODO-KEYVALUE but note https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy about Proxy
+    //TODO maybe change the listmonitor / monitor code for to use "on" and the structure of PP.events
+    //TODO but note https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy about Proxy which might be suitable, prob not as doesnt map well to lists
     async p_newtable(pubkey, table, verbose) {
-        if (!pubkey) throw new Dweb.errors.CodingError("p_newtable currently requires a pubkey")
-        let database = await this.p_newdatabase(pubkey, verbose)
+        if (!pubkey) throw new Dweb.errors.CodingError("p_newtable currently requires a pubkey");
+        let database = await this.p_newdatabase(pubkey, verbose);
         // If have use cases without a database, then call p_newdatabase first
         return { privateurl: `${database.privateurl}/${table}`,  publicurl: `${database.publicurl}/${table}`}  // No action required to create it
     }
@@ -288,6 +289,36 @@ class TransportYJS extends Transport {
         let keys = y.share.map.keys();   // Surprisingly this is sync, the p__ymap should have synchronised
         return this._p_get(y, keys);
     }
+    async p_rawfetch(url, verbose) {
+        return await this.p_getall(url, verbose);   // Data struc is ok as SmartDict.p_fetch will pass to KVT constructor
+    }
+    async monitor(url, callback, verbose) {
+        /*
+         Setup a callback called whenever an item is added to a list, typically it would be called immediately after a p_rawlist to get any more items not returned by p_rawlist.
+
+         :param url:         string Identifier of list (as used by p_rawlist and "signedby" parameter of p_rawadd
+         :param callback:    function(obj)  Callback for each new item added to the list
+                    obj is same format as p_rawlist or p_rawreverse
+         :param verbose:     boolean - True for debugging output
+          */
+        url = typeof url === "string" ? url : url.href;
+        let y = this.yarrays[url];
+        console.assert(y,"Should always exist before calling listmonitor - async call p__yarray(url) to create");
+        y.share.map.observe((event) => {
+            if (['add','update'].includes(event.type)) { // Currently ignoring deletions.
+                if (verbose) console.log("YJS monitor:", url, event.type, event.name, event.value);
+                // ignores event.path (only in observeDeep) and event.object
+                let newevent = {
+                    "type":  {"add": "set", "update": "set", "delete": "delete" }[event.type],
+                    "value": event.value,
+                    "name": event.name,
+                };
+                callback(newevent);
+            }
+        })
+    }
+
+
     static async test(transport, verbose) {
         if (verbose) {console.log("TransportYJS.test")}
         try {
@@ -319,9 +350,9 @@ class TransportYJS extends Transport {
             res = await transport.p_get(mapurl, "testkey3", verbose);
             console.assert(res[1] === 2);
             res = await transport.p_keys(mapurl);
-            console.assert(res.length == 3 && res.includes("testkey3"))
-            res = await transport.p_getall(mapurl, verbose)
-            console.log(res)
+            console.assert(res.length === 3 && res.includes("testkey3"));
+            res = await transport.p_getall(mapurl, verbose);
+            console.log(res);
             console.assert(res.testkey2.foo === "bar")
 
 

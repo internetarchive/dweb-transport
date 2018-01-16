@@ -12,11 +12,12 @@ exports.KeyPair = require("./KeyPair");
 exports.Signature = require("./Signature");
 exports.PublicPrivate = require("./PublicPrivate");
 exports.CommonList = require("./CommonList");
+exports.KeyValueTable = require("./KeyValueTable");
 exports.AccessControlList = require("./AccessControlList");
 exports.KeyChain = require('./KeyChain');
 exports.VersionList = require('./VersionList');
 exports.StructuredBlock = require('./StructuredBlock'); //TODO - will remove SB once have path traversal.
-exports.EventListenerHandler = require("./EventListenerHandler")
+exports.EventListenerHandler = require("./EventListenerHandler");
 
 exports.table2class = { // Each of these needs a constructor that takes data and is ok with no other parameters, (otherwise define a set of these methods as factories)
     "cl": "CommonList",
@@ -24,6 +25,7 @@ exports.table2class = { // Each of these needs a constructor that takes data and
     "sb": "StructuredBlock",
     "kc": "KeyChain",
     "kp": "KeyPair",
+    "kvt": "KeyValueTable",
     "acl": "AccessControlList",
     "sd": "SmartDict",
     "vl": "VersionList",
@@ -51,7 +53,7 @@ exports.eventHandler = new exports.EventListenerHandler();
 exports.utils.consolearr  = (arr) => ((arr && arr.length >0) ? [arr.length+" items inc:", arr[arr.length-1]] : arr );
 //Return true if two shortish arrays a and b intersect or if b is not an array, then if b is in a
 //Note there are better solutions exist for longer arrays
-//This is intended for comparing two sets of probably equal, but possibly just interesecting URLs
+//This is intended for comparing two sets of probably equal, but possibly just intersecting URLs
 exports.utils.intersects = (a,b) =>  (Array.isArray(b) ? a.some(x => b.includes(x)) : a.includes(b));
 
 // Utility functions
@@ -85,7 +87,7 @@ exports.utils.p_streamToBuffer = function(stream, verbose) {
             reject(err);
         }
     })
-}
+};
 //TODO-STREAM, use this code and return stream from p_rawfetch that this can be applied to
 //TODO-STREAM debugging in streamToBuffer above, copy to here when fixed above
 exports.utils.p_streamToBlob = function(stream, mimeType, verbose) {
@@ -102,12 +104,24 @@ exports.utils.p_streamToBlob = function(stream, mimeType, verbose) {
                 .on('error', (err) => { // Note error behavior untested currently
                     console.log("Error event in p_streamToBuffer",err);
                     reject(new Dweb.errors.TransportError('Error in stream'))
-                })
+                });
             stream.resume();
         } catch(err) {
             console.log("Error thrown in p_streamToBlob",err);
             reject(err);
         }
     })
-}
+};
 
+exports.utils.stringfrom = function(foo, hints={}) {
+    try {
+        // Generic way to turn anything into a string
+        if (foo.constructor.name === "Url") // Can't use instanceof for some bizarre reason
+            return foo.href;
+        if (typeof foo === "string")
+            return foo;
+        return foo.toString();  // Last chance try and convert to a string based on a method of the object (could check for its existence)
+    } catch (err) {
+        throw new Dweb.errors.CodingError(`Unable to turn ${foo} into a string ${err.message}`)
+    }
+};
