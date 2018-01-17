@@ -82,7 +82,7 @@ export default class Video extends AV {
                             </noscript>
 
                             <div id="videoContainerX" style="text-align: center;">
-                                <video id="streamContainer" src={this.avs[0] controls}></video>
+                                <video id="streamContainer" src={this.avs[0]} controls></video>
                             </div>
                             <div id="webtorrentStats" style="color: white; text-align: center;"></div>
                             {this.cherModal("video")}

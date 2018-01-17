@@ -60,11 +60,115 @@
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 25);
+/******/ 	return __webpack_require__(__webpack_require__.s = 28);
 /******/ })
 /************************************************************************/
 /******/ ([
 /* 0 */
+/***/ (function(module, exports, __webpack_require__) {
+
+/* eslint max-len: 0 */
+// TODO: eventually deprecate this console.trace("use the `babel-register` package instead of `babel-core/register`");
+module.exports = __webpack_require__(29);
+
+
+/***/ }),
+/* 1 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__ = __webpack_require__(15);
+/*
+Based on https://stackoverflow.com/questions/30430982/can-i-use-jsx-without-react-to-inline-html-in-script
+I wanted this because React was doing nasty things at run-time (like catching events) and stopping Search box working
+
+This expanded in use to make it easier to use HTML in as unchanged form from existing react in particular.
+- URLs in image tags are re-rooted, i.e. <img src="/foo"> => <img src="https://bar.com/foo">
+- look at onClick's especially if set window.location
+ */
+
+
+
+function deletechildren(el, keeptemplate) {
+    //TODO-DETAILS-REACT copied from htmlutils, maybe include that instead
+    /*
+    Remove all children from a node
+    :param el:  An HTML element, or a string with id of an HTML element
+    */
+    if (typeof keeptemplate === "undefined") keeptemplate = true;
+    el = typeof el === "string" ? document.getElementById(el) : el;
+    // Carefull - this deletes from the end, because template if it exists will be firstChild
+    while (el.lastChild && !(keeptemplate && el.lastChild.classList && el.lastChild.classList.contains("template"))) {
+        // Note that deletechildren is also used on Span's to remove the children before replacing with text.
+        el.removeChild(el.lastChild);
+    }
+    return el; // For chaining
+}
+
+class React {
+    static config(options) {
+        /*
+            Configure ReachFake
+             root: protocol and host to insert before URLs (currently in img tags only) e.g. "https://archive.org"
+         */
+        for (x of options) React._config[x] = options[x];
+    }
+    static createElement(tag, attrs, children) {
+        // Note arguments is set to tag, attrs, child1, child2 etc
+        var element = document.createElement(tag);
+        for (let name in attrs) {
+            let attrname = name.toLowerCase() === "classname" ? "class" : name;
+            if (name === "dangerouslySetInnerHTML") {
+                element.innerHTML = attrs[name]["__html"];
+                delete attrs.dangerouslySetInnerHTML;
+            }
+            if (["img.src", "a.href"].includes(tag + "." + name) && typeof attrs[name] === "string" && attrs[name].startsWith('/')) {
+                if (!React._config.root) console.error("Need to React.config({root: 'https://xyz.abc'");
+                attrs[name] = React._config.root + attrs[name]; // e.g. /foo => https://bar.com/foo
+            }
+            if (["img.src"].includes(tag + "." + name) && attrs[name] instanceof __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__["a" /* default */]) {
+                attrs[name].loadImg(element);
+            } else if (["video.src", "audio.src"].includes(tag + "." + name) && attrs[name] instanceof __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__["a" /* default */]) {
+                attrs[name].loadStream(element);
+            } else if (name && attrs.hasOwnProperty(name)) {
+                let value = attrs[name];
+                if (value === true) {
+                    element.setAttribute(attrname, name);
+                } else if (typeof value === "object" && !Array.isArray(value)) {
+                    // e.g. style: {{fontSize: "124px"}}
+                    for (let k in value) {
+                        element[attrname][k] = value[k];
+                    }
+                } else if (value !== false && value != null) {
+                    element.setAttribute(attrname, value.toString());
+                }
+            }
+        }
+        for (let i = 2; i < arguments.length; i++) {
+            let child = arguments[i];
+            if (!child) {} else if (Array.isArray(child)) {
+                child.map(c => element.appendChild(c.nodeType == null ? document.createTextNode(c.toString()) : c));
+            } else {
+                element.appendChild(child.nodeType == null ? document.createTextNode(child.toString()) : child);
+            }
+        }
+        return element;
+    }
+    static domrender(els, node) {
+        deletechildren(node, false);
+        node.appendChild(els);
+    }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = React;
+;
+
+//Default configuration
+React._config = {
+    root: "https://archive.org"
+};
+
+/***/ }),
+/* 2 */
 /***/ (function(module, exports) {
 
 if (typeof Object.create === 'function') {
@@ -93,7 +197,7 @@ if (typeof Object.create === 'function') {
 
 
 /***/ }),
-/* 1 */
+/* 3 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -107,9 +211,9 @@ if (typeof Object.create === 'function') {
 
 
 
-var base64 = __webpack_require__(35)
-var ieee754 = __webpack_require__(36)
-var isArray = __webpack_require__(18)
+var base64 = __webpack_require__(37)
+var ieee754 = __webpack_require__(38)
+var isArray = __webpack_require__(20)
 
 exports.Buffer = Buffer
 exports.SlowBuffer = SlowBuffer
@@ -1887,439 +1991,15 @@ function isnan (val) {
   return val !== val // eslint-disable-line no-self-compare
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(7)))
-
-/***/ }),
-/* 2 */
-/***/ (function(module, exports, __webpack_require__) {
-
-/* eslint max-len: 0 */
-// TODO: eventually deprecate this console.trace("use the `babel-register` package instead of `babel-core/register`");
-module.exports = __webpack_require__(27);
-
-
-/***/ }),
-/* 3 */
-/***/ (function(module, exports) {
-
-// shim for using process in browser
-var process = module.exports = {};
-
-// cached from whatever global is present so that test runners that stub it
-// don't break things.  But we need to wrap it in a try catch in case it is
-// wrapped in strict mode code which doesn't define any globals.  It's inside a
-// function because try/catches deoptimize in certain engines.
-
-var cachedSetTimeout;
-var cachedClearTimeout;
-
-function defaultSetTimout() {
-    throw new Error('setTimeout has not been defined');
-}
-function defaultClearTimeout () {
-    throw new Error('clearTimeout has not been defined');
-}
-(function () {
-    try {
-        if (typeof setTimeout === 'function') {
-            cachedSetTimeout = setTimeout;
-        } else {
-            cachedSetTimeout = defaultSetTimout;
-        }
-    } catch (e) {
-        cachedSetTimeout = defaultSetTimout;
-    }
-    try {
-        if (typeof clearTimeout === 'function') {
-            cachedClearTimeout = clearTimeout;
-        } else {
-            cachedClearTimeout = defaultClearTimeout;
-        }
-    } catch (e) {
-        cachedClearTimeout = defaultClearTimeout;
-    }
-} ())
-function runTimeout(fun) {
-    if (cachedSetTimeout === setTimeout) {
-        //normal enviroments in sane situations
-        return setTimeout(fun, 0);
-    }
-    // if setTimeout wasn't available but was latter defined
-    if ((cachedSetTimeout === defaultSetTimout || !cachedSetTimeout) && setTimeout) {
-        cachedSetTimeout = setTimeout;
-        return setTimeout(fun, 0);
-    }
-    try {
-        // when when somebody has screwed with setTimeout but no I.E. maddness
-        return cachedSetTimeout(fun, 0);
-    } catch(e){
-        try {
-            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
-            return cachedSetTimeout.call(null, fun, 0);
-        } catch(e){
-            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
-            return cachedSetTimeout.call(this, fun, 0);
-        }
-    }
-
-
-}
-function runClearTimeout(marker) {
-    if (cachedClearTimeout === clearTimeout) {
-        //normal enviroments in sane situations
-        return clearTimeout(marker);
-    }
-    // if clearTimeout wasn't available but was latter defined
-    if ((cachedClearTimeout === defaultClearTimeout || !cachedClearTimeout) && clearTimeout) {
-        cachedClearTimeout = clearTimeout;
-        return clearTimeout(marker);
-    }
-    try {
-        // when when somebody has screwed with setTimeout but no I.E. maddness
-        return cachedClearTimeout(marker);
-    } catch (e){
-        try {
-            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
-            return cachedClearTimeout.call(null, marker);
-        } catch (e){
-            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
-            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
-            return cachedClearTimeout.call(this, marker);
-        }
-    }
-
-
-
-}
-var queue = [];
-var draining = false;
-var currentQueue;
-var queueIndex = -1;
-
-function cleanUpNextTick() {
-    if (!draining || !currentQueue) {
-        return;
-    }
-    draining = false;
-    if (currentQueue.length) {
-        queue = currentQueue.concat(queue);
-    } else {
-        queueIndex = -1;
-    }
-    if (queue.length) {
-        drainQueue();
-    }
-}
-
-function drainQueue() {
-    if (draining) {
-        return;
-    }
-    var timeout = runTimeout(cleanUpNextTick);
-    draining = true;
-
-    var len = queue.length;
-    while(len) {
-        currentQueue = queue;
-        queue = [];
-        while (++queueIndex < len) {
-            if (currentQueue) {
-                currentQueue[queueIndex].run();
-            }
-        }
-        queueIndex = -1;
-        len = queue.length;
-    }
-    currentQueue = null;
-    draining = false;
-    runClearTimeout(timeout);
-}
-
-process.nextTick = function (fun) {
-    var args = new Array(arguments.length - 1);
-    if (arguments.length > 1) {
-        for (var i = 1; i < arguments.length; i++) {
-            args[i - 1] = arguments[i];
-        }
-    }
-    queue.push(new Item(fun, args));
-    if (queue.length === 1 && !draining) {
-        runTimeout(drainQueue);
-    }
-};
-
-// v8 likes predictible objects
-function Item(fun, array) {
-    this.fun = fun;
-    this.array = array;
-}
-Item.prototype.run = function () {
-    this.fun.apply(null, this.array);
-};
-process.title = 'browser';
-process.browser = true;
-process.env = {};
-process.argv = [];
-process.version = ''; // empty string to avoid regexp issues
-process.versions = {};
-
-function noop() {}
-
-process.on = noop;
-process.addListener = noop;
-process.once = noop;
-process.off = noop;
-process.removeListener = noop;
-process.removeAllListeners = noop;
-process.emit = noop;
-process.prependListener = noop;
-process.prependOnceListener = noop;
-
-process.listeners = function (name) { return [] }
-
-process.binding = function (name) {
-    throw new Error('process.binding is not supported');
-};
-
-process.cwd = function () { return '/' };
-process.chdir = function (dir) {
-    throw new Error('process.chdir is not supported');
-};
-process.umask = function() { return 0; };
-
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(8)))
 
 /***/ }),
 /* 4 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__ = __webpack_require__(13);
-/*
-Based on https://stackoverflow.com/questions/30430982/can-i-use-jsx-without-react-to-inline-html-in-script
-I wanted this because React was doing nasty things at run-time (like catching events) and stopping Search box working
-
-This expanded in use to make it easier to use HTML in as unchanged form from existing react in particular.
-- URLs in image tags are re-rooted, i.e. <img src="/foo"> => <img src="https://bar.com/foo">
-- look at onClick's especially if set window.location
- */
-
-
-
-function deletechildren(el, keeptemplate) {
-    //TODO-DETAILS-REACT copied from htmlutils, maybe include that instead
-    /*
-    Remove all children from a node
-    :param el:  An HTML element, or a string with id of an HTML element
-    */
-    if (typeof keeptemplate === "undefined") keeptemplate = true;
-    el = typeof el === "string" ? document.getElementById(el) : el;
-    // Carefull - this deletes from the end, because template if it exists will be firstChild
-    while (el.lastChild && !(keeptemplate && el.lastChild.classList && el.lastChild.classList.contains("template"))) {
-        // Note that deletechildren is also used on Span's to remove the children before replacing with text.
-        el.removeChild(el.lastChild);
-    }
-    return el; // For chaining
-}
-
-class React {
-    static config(options) {
-        /*
-            Configure ReachFake
-             root: protocol and host to insert before URLs (currently in img tags only) e.g. "https://archive.org"
-         */
-        for (x of options) React._config[x] = options[x];
-    }
-    static createElement(tag, attrs, children) {
-        // Note arguments is set to tag, attrs, child1, child2 etc
-        var element = document.createElement(tag);
-        for (let name in attrs) {
-            let attrname = name.toLowerCase() === "classname" ? "class" : name;
-            if (name === "dangerouslySetInnerHTML") {
-                element.innerHTML = attrs[name]["__html"];
-                delete attrs.dangerouslySetInnerHTML;
-            }
-            if (["img.src", "a.href"].includes(tag + "." + name) && typeof attrs[name] === "string" && attrs[name].startsWith('/')) {
-                if (!React._config.root) console.error("Need to React.config({root: 'https://xyz.abc'");
-                attrs[name] = React._config.root + attrs[name]; // e.g. /foo => https://bar.com/foo
-            }
-            if (["img.src"].includes(tag + "." + name) && attrs[name] instanceof __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__["a" /* default */]) {
-                attrs[name].loadImg(element);
-            } else if (["video.src", "audio.src"].includes(tag + "." + name) && attrs[name] instanceof __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__["a" /* default */]) {
-                attrs[name].loadStream(element);
-            } else if (name && attrs.hasOwnProperty(name)) {
-                let value = attrs[name];
-                if (value === true) {
-                    element.setAttribute(attrname, name);
-                } else if (typeof value === "object" && !Array.isArray(value)) {
-                    // e.g. style: {{fontSize: "124px"}}
-                    for (let k in value) {
-                        element[attrname][k] = value[k];
-                    }
-                } else if (value !== false && value != null) {
-                    element.setAttribute(attrname, value.toString());
-                }
-            }
-        }
-        for (let i = 2; i < arguments.length; i++) {
-            let child = arguments[i];
-            if (!child) {} else if (Array.isArray(child)) {
-                child.map(c => element.appendChild(c.nodeType == null ? document.createTextNode(c.toString()) : c));
-            } else {
-                element.appendChild(child.nodeType == null ? document.createTextNode(child.toString()) : child);
-            }
-        }
-        return element;
-    }
-    static domrender(els, node) {
-        deletechildren(node, false);
-        node.appendChild(els);
-    }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = React;
-;
-
-//Default configuration
-React._config = {
-    root: "https://archive.org"
-};
-
-/***/ }),
-/* 5 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-// a duplex stream is just a stream that is both readable and writable.
-// Since JS doesn't have multiple prototypal inheritance, this class
-// prototypally inherits from Readable, and then parasitically from
-// Writable.
-
-
-
-/*<replacement>*/
-
-var processNextTick = __webpack_require__(10);
-/*</replacement>*/
-
-/*<replacement>*/
-var objectKeys = Object.keys || function (obj) {
-  var keys = [];
-  for (var key in obj) {
-    keys.push(key);
-  }return keys;
-};
-/*</replacement>*/
-
-module.exports = Duplex;
-
-/*<replacement>*/
-var util = __webpack_require__(8);
-util.inherits = __webpack_require__(0);
-/*</replacement>*/
-
-var Readable = __webpack_require__(17);
-var Writable = __webpack_require__(21);
-
-util.inherits(Duplex, Readable);
-
-var keys = objectKeys(Writable.prototype);
-for (var v = 0; v < keys.length; v++) {
-  var method = keys[v];
-  if (!Duplex.prototype[method]) Duplex.prototype[method] = Writable.prototype[method];
-}
-
-function Duplex(options) {
-  if (!(this instanceof Duplex)) return new Duplex(options);
-
-  Readable.call(this, options);
-  Writable.call(this, options);
-
-  if (options && options.readable === false) this.readable = false;
-
-  if (options && options.writable === false) this.writable = false;
-
-  this.allowHalfOpen = true;
-  if (options && options.allowHalfOpen === false) this.allowHalfOpen = false;
-
-  this.once('end', onend);
-}
-
-// the no-half-open enforcer
-function onend() {
-  // if we allow half-open state, or if the writable side ended,
-  // then we're ok.
-  if (this.allowHalfOpen || this._writableState.ended) return;
-
-  // no more data can be written.
-  // But allow more writes to happen in this tick.
-  processNextTick(onEndNT, this);
-}
-
-function onEndNT(self) {
-  self.end();
-}
-
-Object.defineProperty(Duplex.prototype, 'destroyed', {
-  get: function () {
-    if (this._readableState === undefined || this._writableState === undefined) {
-      return false;
-    }
-    return this._readableState.destroyed && this._writableState.destroyed;
-  },
-  set: function (value) {
-    // we ignore the value if the stream
-    // has not been initialized yet
-    if (this._readableState === undefined || this._writableState === undefined) {
-      return;
-    }
-
-    // backward compatibility, the user is explicitly
-    // managing destroyed
-    this._readableState.destroyed = value;
-    this._writableState.destroyed = value;
-  }
-});
-
-Duplex.prototype._destroy = function (err, cb) {
-  this.push(null);
-  this.end();
-
-  processNextTick(cb, err);
-};
-
-function forEach(xs, f) {
-  for (var i = 0, l = xs.length; i < l; i++) {
-    f(xs[i], i);
-  }
-}
-
-/***/ }),
-/* 6 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(4);
-__webpack_require__(2)({ presets: ['env', 'react'] }); // ES6 JS below!
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 //import React from 'react';
  // Note React is used by the JSX compiler that handles the HTML below this fakes the React.createElement
@@ -2537,7 +2217,1178 @@ Util.downloadableFormats = {
 };
 
 /***/ }),
+/* 5 */
+/***/ (function(module, exports) {
+
+// shim for using process in browser
+var process = module.exports = {};
+
+// cached from whatever global is present so that test runners that stub it
+// don't break things.  But we need to wrap it in a try catch in case it is
+// wrapped in strict mode code which doesn't define any globals.  It's inside a
+// function because try/catches deoptimize in certain engines.
+
+var cachedSetTimeout;
+var cachedClearTimeout;
+
+function defaultSetTimout() {
+    throw new Error('setTimeout has not been defined');
+}
+function defaultClearTimeout () {
+    throw new Error('clearTimeout has not been defined');
+}
+(function () {
+    try {
+        if (typeof setTimeout === 'function') {
+            cachedSetTimeout = setTimeout;
+        } else {
+            cachedSetTimeout = defaultSetTimout;
+        }
+    } catch (e) {
+        cachedSetTimeout = defaultSetTimout;
+    }
+    try {
+        if (typeof clearTimeout === 'function') {
+            cachedClearTimeout = clearTimeout;
+        } else {
+            cachedClearTimeout = defaultClearTimeout;
+        }
+    } catch (e) {
+        cachedClearTimeout = defaultClearTimeout;
+    }
+} ())
+function runTimeout(fun) {
+    if (cachedSetTimeout === setTimeout) {
+        //normal enviroments in sane situations
+        return setTimeout(fun, 0);
+    }
+    // if setTimeout wasn't available but was latter defined
+    if ((cachedSetTimeout === defaultSetTimout || !cachedSetTimeout) && setTimeout) {
+        cachedSetTimeout = setTimeout;
+        return setTimeout(fun, 0);
+    }
+    try {
+        // when when somebody has screwed with setTimeout but no I.E. maddness
+        return cachedSetTimeout(fun, 0);
+    } catch(e){
+        try {
+            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
+            return cachedSetTimeout.call(null, fun, 0);
+        } catch(e){
+            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
+            return cachedSetTimeout.call(this, fun, 0);
+        }
+    }
+
+
+}
+function runClearTimeout(marker) {
+    if (cachedClearTimeout === clearTimeout) {
+        //normal enviroments in sane situations
+        return clearTimeout(marker);
+    }
+    // if clearTimeout wasn't available but was latter defined
+    if ((cachedClearTimeout === defaultClearTimeout || !cachedClearTimeout) && clearTimeout) {
+        cachedClearTimeout = clearTimeout;
+        return clearTimeout(marker);
+    }
+    try {
+        // when when somebody has screwed with setTimeout but no I.E. maddness
+        return cachedClearTimeout(marker);
+    } catch (e){
+        try {
+            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
+            return cachedClearTimeout.call(null, marker);
+        } catch (e){
+            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
+            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
+            return cachedClearTimeout.call(this, marker);
+        }
+    }
+
+
+
+}
+var queue = [];
+var draining = false;
+var currentQueue;
+var queueIndex = -1;
+
+function cleanUpNextTick() {
+    if (!draining || !currentQueue) {
+        return;
+    }
+    draining = false;
+    if (currentQueue.length) {
+        queue = currentQueue.concat(queue);
+    } else {
+        queueIndex = -1;
+    }
+    if (queue.length) {
+        drainQueue();
+    }
+}
+
+function drainQueue() {
+    if (draining) {
+        return;
+    }
+    var timeout = runTimeout(cleanUpNextTick);
+    draining = true;
+
+    var len = queue.length;
+    while(len) {
+        currentQueue = queue;
+        queue = [];
+        while (++queueIndex < len) {
+            if (currentQueue) {
+                currentQueue[queueIndex].run();
+            }
+        }
+        queueIndex = -1;
+        len = queue.length;
+    }
+    currentQueue = null;
+    draining = false;
+    runClearTimeout(timeout);
+}
+
+process.nextTick = function (fun) {
+    var args = new Array(arguments.length - 1);
+    if (arguments.length > 1) {
+        for (var i = 1; i < arguments.length; i++) {
+            args[i - 1] = arguments[i];
+        }
+    }
+    queue.push(new Item(fun, args));
+    if (queue.length === 1 && !draining) {
+        runTimeout(drainQueue);
+    }
+};
+
+// v8 likes predictible objects
+function Item(fun, array) {
+    this.fun = fun;
+    this.array = array;
+}
+Item.prototype.run = function () {
+    this.fun.apply(null, this.array);
+};
+process.title = 'browser';
+process.browser = true;
+process.env = {};
+process.argv = [];
+process.version = ''; // empty string to avoid regexp issues
+process.versions = {};
+
+function noop() {}
+
+process.on = noop;
+process.addListener = noop;
+process.once = noop;
+process.off = noop;
+process.removeListener = noop;
+process.removeAllListeners = noop;
+process.emit = noop;
+process.prependListener = noop;
+process.prependOnceListener = noop;
+
+process.listeners = function (name) { return [] }
+
+process.binding = function (name) {
+    throw new Error('process.binding is not supported');
+};
+
+process.cwd = function () { return '/' };
+process.chdir = function (dir) {
+    throw new Error('process.chdir is not supported');
+};
+process.umask = function() { return 0; };
+
+
+/***/ }),
+/* 6 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__ = __webpack_require__(26);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__ArchiveFile__ = __webpack_require__(15);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
+//Not needed on client - kept so script can run in both cases
+//import ReactDOMServer from 'react-dom/server';
+//Next line is for client, not needed on server but doesnt hurt
+//import ReactDOM from 'react-dom';
+
+
+// Notes on use of JSX (embedded HTML) for when converting HTML to JSX
+// Anything that is to be parameterised gets {} and code between is javascript executed in context (this has the expected meaning)
+// By implication an embedded object is {{foo: bar}}
+// All comments have to be quoted <!--foo--> becomes {/*--foo--*}
+// The "ReactFake code is a little more tolerant than React, specifically
+// React requires style={{display: none}} ReactFake can also handle quoted style="display: none"
+// React requires className= rather than class=, ReactFake supports both
+
+
+
+
+
+class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default */] {
+    constructor(id, item = undefined) {
+        super(id);
+        this.item = item;
+        this._listLoad();
+    }
+
+    navwrapped() {
+        /* Wrap the content up checked on mbid (Red Shift) image:  wrap( TODO-TODO-DONATEBANNER | nav-wrap1 | maincontent | theatre-ia-wrap | item-details-about | TODO-ACTIONBUTTONS | TODO-ALSOFOUND  | TODO-ANALYTICS )
+        returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
+         */
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            { id: 'wrap', itemscope: true, itemtype: this.itemtype },
+            new Nav().navwrapJSX(),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'div',
+                { 'class': 'container container-ia' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('a', { name: 'maincontent', id: 'maincontent' })
+            ),
+            this.theatreIaWrap(),
+            ' ',
+            this.itemDetailsAboutJSX()
+        );
+    }
+
+    archive_setup_push() {
+        archive_setup.push(function () {
+            // This is common to Text, AV and image - though some have stuff before this and some a
+            AJS.tilebars(); // page load
+            $(window).on('resize  orientationchange', function (evt) {
+                clearTimeout(AJS.also_found_throttler);
+                AJS.also_found_throttler = setTimeout(AJS.tilebars, 250);
+            });
+        });
+    }
+    browserAfter() {
+        // initialize_flag
+        // overlay related
+        $(".toggle-flag-overlay").click(function (e) {
+            e.preventDefault();
+            $("#theatre-ia-wrap").removeClass("flagged");
+        });
+        // overlay - checkboxes
+        $("#flag-checkboxes a").on("click", function (e) {
+            e.preventDefault();
+            $(this).children(".my-checkbox").toggleClass("checked");
+            $.get($(this).attr("href"));
+        });
+        super.browserAfter(); // runs archive_setup_push and Util.AJS_on_dom_loaded(); Do this after the scripts above - which means put this browserAfter AFTER superclasses
+    }
+
+    cherModal(type) {
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            { id: 'cher-modal', className: 'modal fade', role: 'dialog', 'aria-hidden': 'true' },
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'div',
+                { 'class': 'modal-dialog modal-lg' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { 'class': 'modal-content', style: 'padding:10px;' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { 'class': 'modal-header' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'button',
+                            { type: 'button', 'class': 'close', 'data-dismiss': 'modal', 'aria-hidden': 'true' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', {
+                                'class': 'iconochive-remove-circle', 'aria-hidden': 'true' }),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'span',
+                                { 'class': 'sr-only' },
+                                'remove-circle'
+                            )
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'h3',
+                            { 'class': 'modal-title' },
+                            'Share or Embed This Item'
+                        )
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { id: 'cher-body' },
+                        this.sharing(),
+                        this.embed(),
+                        this.embedWordpress(),
+                        this.embedAdvanced(type)
+                    )
+                )
+            )
+        );
+    }
+
+    sharing() {
+        //Common text across Image and Text and possibly other subclasses
+        let item = this.item;
+        let itemid = item.metadata.identifier; // Shortcut as used a lot
+        let metadata = item.metadata; // Shortcut as used a lot
+        let detailsURL = `https://archive.org/details/${itemid}`; // Note this should remain as pointing at details/itemid since its only used in sharing - FB, Twitter etc
+        let sharingText = `${metadata.title} : ${metadata.creator}`; //String used
+        let sharingTextUriEncoded = encodeURIComponent(sharingText);
+
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            { style: { textAlign: "center", margin: "50px auto" } },
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'div',
+                { className: 'topinblock' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { id: 'sharer' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `https://twitter.com/intent/tweet?url=${detailsURL}&amp;via=internetarchive&amp;text=${sharingTextUriEncoded}+%3A+${metadata.creator}+%3A+Free+Download+%26+Streaming+%3A+Internet+Archive`,
+                            target: '_blank' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-twitter', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share to Twitter' })
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `https://www.facebook.com/sharer/sharer.php?u=${detailsURL}`,
+                            target: '_blank' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-facebook', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share to Facebook' })
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `https://plus.google.com/share?url=${detailsURL}`,
+                            target: '_blank' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-googleplus', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share to Google+' })
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `http://www.reddit.com/submit?url=${detailsURL}&amp;title=${sharingTextUriEncoded}+%3A+${metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`,
+                            target: '_blank' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-reddit', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share to Reddit' })
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `https://www.tumblr.com/share/video?embed=%3Ciframe+width%3D%22640%22+height%3D%22480%22+frameborder%3D%220%22+allowfullscreen+src%3D%22https%3A%2F%2Farchive.org%2Fembed%2F%22+webkitallowfullscreen%3D%22true%22+mozallowfullscreen%3D%22true%22%26gt%3B%26lt%3B%2Fiframe%3E&;name=${itemid}+%3A+${item.metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`,
+                            target: '_blank' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-tumblr', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share to Tumblr' })
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `http://www.pinterest.com/pin/create/button/?url=${detailsURL}&amp;description=${sharingTextUriEncoded}+%3A+${metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`,
+                            target: '_blank' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-pinterest', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share to Pinterest' })
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `https://archive.org/pop/editor.html?initialMedia=${detailsURL}`,
+                            target: '_blank' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'sharee iconochive-popcorn', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: 'Share to Popcorn Maker' })
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'a',
+                        { href: `mailto:?body=${detailsURL}&amp;subject=${sharingText} : ${metadata.creator} : Free Download &amp; Streaming : Internet Archive` },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-email', 'data-toggle': 'tooltip',
+                            'data-placement': 'bottom', title: '',
+                            'data-original-title': 'Share via email' })
+                    )
+                ),
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', { clear: 'all', className: 'clearfix' })
+            )
+        );
+    }
+    embedWordpress() {
+        // THis appeared on image and movie examples
+        let item = this.item;
+        let itemid = item.metadata.identifier; // Shortcut as used a lot
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            null,
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'form',
+                { className: 'form', role: 'form' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { className: 'form-group' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'label',
+                        null,
+                        'EMBED (for wordpress.com hosted blogs)'
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'textarea',
+                        { id: 'embedcodehereWP', className: 'form-control textarea-invert-readonly',
+                            rows: '3', readOnly: 'readonly' },
+                        `[archiveorg ${itemid} width=560 height=384 frameborder=0 webkitallowfullscreen=true mozallowfullscreen=true]`
+                    )
+                )
+            )
+        );
+    }
+    embedAdvanced(type) {
+        // From text, video, image
+        let item = this.item;
+        let itemid = item.metadata.identifier; // Shortcut as used a lot
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            null,
+            'Want more?',
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'a',
+                { href: `https://archive.org/help/${type}.php?identifier=${itemid}` },
+                'Advanced embedding details, examples, and help'
+            ),
+            '!'
+        );
+    }
+    embed() {
+        // Same on text, video, image
+        let shortEmbedURL = `https://archive.org/stream/${this.itemid}?ui=embed`; //Note on archive.org/details this is different from iframeURL and not clear if that is intentional
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            null,
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'form',
+                { 'class': 'form', role: 'form' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { 'class': 'form-group' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'label',
+                        null,
+                        'EMBED'
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'textarea',
+                        { id: 'embedcodehere', 'class': 'form-control textarea-invert-readonly',
+                            rows: '3', readonly: 'readonly' },
+                        `<iframe 
+                                src=${shortEmbedURL}
+                                width="480" height="430" frameborder="0"
+                                webkitallowfullscreen="true" mozallowfullscreen="true"
+                                allowfullscreen></iframe>`
+                    )
+                )
+            )
+        );
+    }
+
+    itemDetailsAboutJSX() {
+        /* This builds a JSX tht sits underneth theatre-ia-wrap DIV that is built by theatreIaWrap */
+        let itemid = this.itemid;
+        let item = this.item;
+        let metadata = item.metadata;
+        let title = metadata.title;
+        let creator = metadata.creator;
+        let datePublished = metadata.date;
+        let publisher = metadata.publisher;
+        let keywords = metadata.subject ? Array.isArray(metadata.subject) ? metadata.subject : metadata.subject.split(';') : undefined;
+        let licence = metadata.licenseurl; //TODO - handle other licenses - hardwired for CC currently
+        let languageAbbrev = metadata.language;
+        let languageLong = { eng: "English", dut: "Dutch" }[languageAbbrev]; //TODO-other languages
+        let description = metadata.description; // Contains HTML (supposedly safe) inserted via innerHTML thing
+        let metadataListPossible = { color: "Color", coverage: "Location", director: "Director", identifier: "Identifier",
+            "identifier-ark": "Identifier-ark", ocr: "Ocr", runtime: "Run time", ppi: "Ppi", sound: "Sound", year: "Year" }; /*TODO expand to longer list*/
+        let metadataListFound = Object.keys(metadataListPossible).filter(k => metadata[k]); // List of keys in the metadata
+        let downloadableFiles = this._list.filter(f => f.downloadable()); // Note on image it EXCLUDED JPEG Thumb, but included JPEG*Thumb
+        //TODO  Replace "a" with onclicks to download function on f
+        //TODO Need f.sizePretty property of ArchiveFile (see prettierbytes used in WebTorrent)
+        let filesCount = item.files_count;
+        let originalFilesCount = item.files.filter(f => f.source === "original").length + 1; // Adds in Archive Bittorrent
+        let downloadURL = `https://archive.org/download/${itemid}`;
+        let compressURL = `https://archive.org/compress/${itemid}`;
+        let compressAllURL = `https://archive.org/compress/${itemid}/formats=JSON,METADATA,JPEG,ARCHIVE BITTORRENT,MUSICBRAINZ METADATA`;
+        let collections = Array.isArray(metadata.collection) ? metadata.collection : [metadata.collection];
+        let mediatype = metadata.mediatype;
+        let iconochiveIcon = "iconochive-" + mediatype;
+        let contributor = metadata.contributor;
+        let reviews = item.reviews;
+        let writeReviewsURL = `https://archive.org/write-review.php?identifier=${itemid}`;
+        let loginURL = "https://archive.org/account/login.php";
+        let bookmarksAddURL = `https://archive.org/bookmarks.php?add_bookmark=1&amp;mediatype=image&amp;identifier=${itemid}&amp;title=${title}`;
+        let credits = metadata.credits;
+        //TODO-DETAILS much of below doesn't work (yet)
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            { 'class': 'container container-ia item-details-about' },
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'div',
+                { 'class': 'relative-row row' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { 'class': 'action-buttons' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { 'class': 'topinblock' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'a',
+                            { 'class': 'button ', href: bookmarksAddURL, id: 'favorite-button', 'aria-haspopup': 'true',
+                                onclick: 'return AJS.modal_go(this,{{favorite:1}})', 'data-target': '#confirm-modal', 'data-toggle': 'tooltip',
+                                'data-container': 'body', 'data-placement': 'bottom', title: 'Favorite this item' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-favorite', 'aria-hidden': 'true' }),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'span',
+                                { 'class': 'sr-only' },
+                                'favorite'
+                            )
+                        )
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { 'class': 'topinblock' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'button',
+                            { id: 'share-button', 'class': 'button', type: 'button', 'aria-haspopup': 'true',
+                                onclick: 'return AJS.modal_go(this,{{ignore_lnk:1,shown:AJS.embed_codes_adjust}})',
+                                'data-target': '#cher-modal', 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'bottom',
+                                title: 'Share this item' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-share', 'aria-hidden': 'true' }),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'span',
+                                { 'class': 'sr-only' },
+                                'share'
+                            )
+                        )
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        {
+                            id: 'flag-button-container', 'class': 'topinblock', 'data-toggle': 'tooltip', 'data-placement': 'bottom',
+                            'data-container': 'body', title: 'Flag this item' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { 'class': 'dropup' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'button',
+                                { id: 'flag-button', 'class': ' button', type: 'button', 'data-toggle': 'dropdown', 'aria-haspopup': 'true',
+                                    'aria-expanded': 'false' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-Flag', 'aria-hidden': 'true' }),
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'span',
+                                    {
+                                        'class': 'sr-only' },
+                                    'flag'
+                                )
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'div',
+                                { id: 'flag-popover', 'class': 'dropdown-menu', 'aria-labelledby': 'flag-button' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'h3',
+                                    { 'class': 'dropdown-title' },
+                                    'Flag this item for'
+                                ),
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'ul',
+                                    { role: 'menu' },
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'li',
+                                        { 'class': '' },
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'a',
+                                            { href: loginURL, role: 'menuitem' },
+                                            'Graphic Violence '
+                                        )
+                                    ),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'li',
+                                        { 'class': '' },
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'a',
+                                            { href: loginURL, role: 'menuitem' },
+                                            'Graphic Sexual Content '
+                                        )
+                                    ),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'li',
+                                        { 'class': '' },
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'a',
+                                            { href: loginURL, role: 'menuitem' },
+                                            'Spam, Scam or Fraud '
+                                        )
+                                    ),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'li',
+                                        { 'class': '' },
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'a',
+                                            { href: loginURL, role: 'menuitem' },
+                                            'Broken or Empty Data                '
+                                        )
+                                    )
+                                )
+                            ),
+                            ' '
+                        ),
+                        ' '
+                    )
+                ),
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { 'class': 'col-sm-8 thats-left item-details-metadata' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'h1',
+                        { style: { fontSize: "30px", "marginBottom": 0 } },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { 'class': 'left-icon' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: `${iconochiveIcon} ${mediatype}`, 'aria-hidden': 'true' }),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'span',
+                                {
+                                    'class': 'sr-only' },
+                                mediatype
+                            )
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'span',
+                            { itemprop: 'name' },
+                            title
+                        )
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'actions-ia' }),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { 'class': 'key-val-big' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            null,
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'span',
+                                { 'class': 'key' },
+                                'by'
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'span',
+                                { 'class': 'value' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'span',
+                                    null,
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'a',
+                                        { onClick: `Nav.nav_search('creator=\"${creator}\"')` },
+                                        creator
+                                    )
+                                )
+                            )
+                        )
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { 'class': 'key-val-big' },
+                        'Publication date ',
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'a',
+                            { onClick: 'Nav.nav_search(\'date:{datePublished}\')' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'span',
+                                { itemprop: 'datePublished' },
+                                datePublished
+                            )
+                        )
+                    ),
+                    licence ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { 'class': 'key-val-big' },
+                        'Usage ',
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'a',
+                            { rel: 'license', title: 'http://creativecommons.org/licenses/by-nc-nd/2.0/',
+                                href: 'http://creativecommons.org/licenses/by-nc-nd/2.0/', target: '_blank' },
+                            'http://creativecommons.org/licenses/by-nc-nd/2.0/',
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', {
+                                'class': 'cclic', src: 'https://archive.org/images/cc/cc.png' }),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { 'class': 'cclic', src: 'https://archive.org/images/cc/by.png' }),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', {
+                                'class': 'cclic', src: 'https://archive.org/images/cc/nc.png' }),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { 'class': 'cclic', src: 'https://archive.org/images/cc/nd.png' })
+                        )
+                    ) : undefined,
+                    keywords ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { 'class': 'key-val-big' },
+                        'Topics ',
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'span',
+                            { itemprop: 'keywords' },
+                            keywords.map(keyword => __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { onClick: `Nav.nav_search('subject=\"${keyword}\"')` },
+                                keyword
+                            ))
+                        ),
+                        ' '
+                    ) : undefined,
+                    publisher ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        null,
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'span',
+                            { 'class': 'key' },
+                            'Publisher'
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'span',
+                            {
+                                'class': 'value'
+                            },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { onClick: `Nav.nav_search('publisher=\"${publisher}\"')` },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'span',
+                                    {
+                                        itemprop: 'publisher' },
+                                    publisher
+                                )
+                            )
+                        )
+                    ) : undefined,
+                    contributor ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        null,
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'span',
+                            { 'class': 'key' },
+                            'Contributor'
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'span',
+                            { 'class': 'value' },
+                            contributor
+                        )
+                    ) : undefined,
+                    languageAbbrev ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { 'class': 'key-val-big' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            null,
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'span',
+                                { 'class': 'key' },
+                                'Language'
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'span',
+                                { 'class': 'value' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'span',
+                                    null,
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'a',
+                                        { onClick: `Nav.nav_search('language=(\"${languageAbbrev}\"+OR+language=\"${languageLong}\")')` },
+                                        languageLong
+                                    )
+                                )
+                            )
+                        )
+                    ) : undefined,
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'clearfix' }),
+                    description ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'descript', itemprop: 'description', dangerouslySetInnerHTML: { __html: description } }) : undefined,
+                    credits ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'h2',
+                        { style: 'font-size:18px' },
+                        'Credits'
+                    ) : undefined,
+                    credits ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'p',
+                        { 'class': 'content' },
+                        credits
+                    ) : undefined,
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { 'class': 'metadata-expandable-list', role: 'list' },
+                        metadataListFound.map(k => __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { role: 'listitem' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'span',
+                                { 'class': 'key' },
+                                metadataListPossible[k]
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'span',
+                                { 'class': 'value' },
+                                metadata[k]
+                            )
+                        ))
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { id: 'reviews' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'h2',
+                            { style: 'font-size:36px;font-weight:200;border-bottom:1px solid #979797; padding-bottom:5px; margin-top:50px;' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'div',
+                                { 'class': 'pull-right', style: 'font-size:14px;font-weight:500;padding-top:14px;' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'a',
+                                    { 'class': 'stealth', href: writeReviewsURL },
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-plus-circle',
+                                        'aria-hidden': 'true' }),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'span',
+                                        { 'class': 'sr-only' },
+                                        'plus-circle'
+                                    ),
+                                    'Add Review'
+                                ),
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null)
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'div',
+                                { 'class': 'left-icon', style: 'margin-top:3px' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-comment',
+                                    'aria-hidden': 'true' }),
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'span',
+                                    { 'class': 'sr-only' },
+                                    'comment'
+                                )
+                            ),
+                            'Reviews'
+                        ),
+                        reviews && reviews.length ? reviews.map(review => __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { 'class': 'aReview' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'b',
+                                null,
+                                'Reviewer:'
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { onClick: `Nav.nav_details('@${review.reviewer}')`,
+                                    'data-event-click-tracking': 'ItemReviews|ReviewerLink' },
+                                review.reviewer
+                            ),
+                            '-',
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'span',
+                                { alt: `${review.stars} out of 5 stars`, title: `${review.stars} out of 5 stars` },
+                                ['*', '*', '*', '*', '*'].slice(0, review.stars).map(x => __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-favorite size-75-percent', 'aria-hidden': 'true' }), __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'span',
+                                    { 'class': 'sr-only' },
+                                    'favorite'
+                                ))
+                            ),
+                            '- ',
+                            review.reviewdate,
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'b',
+                                null,
+                                'Subject:'
+                            ),
+                            review.reviewtitle,
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'div',
+                                { 'class': 'breaker-breaker' },
+                                review.reviewbody
+                            )
+                        )) : __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { 'class': 'small-label' },
+                            'There are no reviews yet. Be the first one to ',
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { href: writeReviewsURL },
+                                'write a review'
+                            ),
+                            '.'
+                        )
+                    )
+                ),
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { 'class': 'col-sm-4 thats-right item-details-archive-info' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { 'class': 'boxy quick-down' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { 'class': 'download-button' },
+                            'DOWNLOAD OPTIONS'
+                        ),
+                        downloadableFiles.map(f => __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { 'class': 'format-group' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'div',
+                                { 'class': 'summary-rite' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'a',
+                                    { 'class': 'stealth', href: `https://archive.org/download/${f.itemid}/${f.metadata.name}`,
+                                        title: f.sizePretty },
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'span',
+                                        { 'class': 'hover-badge-stealth' },
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-download', 'aria-hidden': 'true' }),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'span',
+                                            { 'class': 'sr-only' },
+                                            'download'
+                                        ),
+                                        '1 file'
+                                    )
+                                )
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { 'class': 'format-summary download-pill',
+                                    href: 'https://archive.org/download/${f.itemid}/${f.metadata.name}', title: f.sizePretty,
+                                    'data-toggle': 'tooltip', 'data-placement': 'auto left', 'data-container': 'body' },
+                                __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].downloadableFormats[f.metadata.format],
+                                ' ',
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-download', 'aria-hidden': 'true' }),
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'span',
+                                    { 'class': 'sr-only' },
+                                    'download'
+                                )
+                            )
+                        )),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { 'class': 'show-all' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'div',
+                                { 'class': 'pull-right' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'a',
+                                    { 'class': 'boxy-ttl hover-badge', href: compressURL },
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-download',
+                                        'aria-hidden': 'true' }),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'span',
+                                        {
+                                            'class': 'sr-only' },
+                                        'download'
+                                    ),
+                                    ' ',
+                                    filesCount,
+                                    ' Files'
+                                ),
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null),
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'a',
+                                    { 'class': 'boxy-ttl hover-badge', href: compressAllURL },
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-download',
+                                        'aria-hidden': 'true' }),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'span',
+                                        {
+                                            'class': 'sr-only' },
+                                        'download'
+                                    ),
+                                    ' ',
+                                    originalFilesCount,
+                                    ' Original'
+                                ),
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null)
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { 'class': 'boxy-ttl', href: downloadURL },
+                                'SHOW ALL'
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', { clear: 'all', 'class': 'clearfix' })
+                        )
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { 'class': 'boxy collection-list' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'section',
+                            { 'class': 'quick-down collection-list' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'h5',
+                                { 'class': 'collection-title' },
+                                'IN COLLECTIONS'
+                            ),
+                            collections.map(collection => __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'div',
+                                { 'class': 'collection-item' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'a',
+                                    {
+                                        onClick: `Nav.nav_details("${collection}")`,
+                                        'data-event-click-tracking': `CollectionList|${collection}`
+                                    },
+                                    collection
+                                ),
+                                ' '
+                            ))
+                        )
+                    )
+                )
+            ),
+            ' '
+        );
+    }
+
+    alsoFoundJSX() {
+        //TODO-DETAILS this needs implementing, but its another API call - it goes beneath itemDetailsAboutJSX
+    }
+}
+/* harmony export (immutable) */ __webpack_exports__["default"] = Details;
+
+
+/***/ }),
 /* 7 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+// a duplex stream is just a stream that is both readable and writable.
+// Since JS doesn't have multiple prototypal inheritance, this class
+// prototypally inherits from Readable, and then parasitically from
+// Writable.
+
+
+
+/*<replacement>*/
+
+var processNextTick = __webpack_require__(11);
+/*</replacement>*/
+
+/*<replacement>*/
+var objectKeys = Object.keys || function (obj) {
+  var keys = [];
+  for (var key in obj) {
+    keys.push(key);
+  }return keys;
+};
+/*</replacement>*/
+
+module.exports = Duplex;
+
+/*<replacement>*/
+var util = __webpack_require__(9);
+util.inherits = __webpack_require__(2);
+/*</replacement>*/
+
+var Readable = __webpack_require__(19);
+var Writable = __webpack_require__(23);
+
+util.inherits(Duplex, Readable);
+
+var keys = objectKeys(Writable.prototype);
+for (var v = 0; v < keys.length; v++) {
+  var method = keys[v];
+  if (!Duplex.prototype[method]) Duplex.prototype[method] = Writable.prototype[method];
+}
+
+function Duplex(options) {
+  if (!(this instanceof Duplex)) return new Duplex(options);
+
+  Readable.call(this, options);
+  Writable.call(this, options);
+
+  if (options && options.readable === false) this.readable = false;
+
+  if (options && options.writable === false) this.writable = false;
+
+  this.allowHalfOpen = true;
+  if (options && options.allowHalfOpen === false) this.allowHalfOpen = false;
+
+  this.once('end', onend);
+}
+
+// the no-half-open enforcer
+function onend() {
+  // if we allow half-open state, or if the writable side ended,
+  // then we're ok.
+  if (this.allowHalfOpen || this._writableState.ended) return;
+
+  // no more data can be written.
+  // But allow more writes to happen in this tick.
+  processNextTick(onEndNT, this);
+}
+
+function onEndNT(self) {
+  self.end();
+}
+
+Object.defineProperty(Duplex.prototype, 'destroyed', {
+  get: function () {
+    if (this._readableState === undefined || this._writableState === undefined) {
+      return false;
+    }
+    return this._readableState.destroyed && this._writableState.destroyed;
+  },
+  set: function (value) {
+    // we ignore the value if the stream
+    // has not been initialized yet
+    if (this._readableState === undefined || this._writableState === undefined) {
+      return;
+    }
+
+    // backward compatibility, the user is explicitly
+    // managing destroyed
+    this._readableState.destroyed = value;
+    this._writableState.destroyed = value;
+  }
+});
+
+Duplex.prototype._destroy = function (err, cb) {
+  this.push(null);
+  this.end();
+
+  processNextTick(cb, err);
+};
+
+function forEach(xs, f) {
+  for (var i = 0, l = xs.length; i < l; i++) {
+    f(xs[i], i);
+  }
+}
+
+/***/ }),
+/* 8 */
 /***/ (function(module, exports) {
 
 var g;
@@ -2564,7 +3415,7 @@ module.exports = g;
 
 
 /***/ }),
-/* 8 */
+/* 9 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {// Copyright Joyent, Inc. and other Node contributors.
@@ -2675,23 +3526,23 @@ function objectToString(o) {
   return Object.prototype.toString.call(o);
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
-
-/***/ }),
-/* 9 */
-/***/ (function(module, exports, __webpack_require__) {
-
-exports = module.exports = __webpack_require__(17);
-exports.Stream = exports;
-exports.Readable = exports;
-exports.Writable = __webpack_require__(21);
-exports.Duplex = __webpack_require__(5);
-exports.Transform = __webpack_require__(23);
-exports.PassThrough = __webpack_require__(42);
-
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
 /* 10 */
+/***/ (function(module, exports, __webpack_require__) {
+
+exports = module.exports = __webpack_require__(19);
+exports.Stream = exports;
+exports.Readable = exports;
+exports.Writable = __webpack_require__(23);
+exports.Duplex = __webpack_require__(7);
+exports.Transform = __webpack_require__(25);
+exports.PassThrough = __webpack_require__(44);
+
+
+/***/ }),
+/* 11 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2739,14 +3590,14 @@ function nextTick(fn, arg1, arg2, arg3) {
   }
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5)))
 
 /***/ }),
-/* 11 */
+/* 12 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* eslint-disable node/no-deprecated-api */
-var buffer = __webpack_require__(1)
+var buffer = __webpack_require__(3)
 var Buffer = buffer.Buffer
 
 // alternative to using Object.keys for old browsers
@@ -2810,13 +3661,13 @@ SafeBuffer.allocUnsafeSlow = function (size) {
 
 
 /***/ }),
-/* 12 */
+/* 13 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {// var assert = require('assert')
-var uint64be = __webpack_require__(57)
+var uint64be = __webpack_require__(59)
 
-var boxes = __webpack_require__(58)
+var boxes = __webpack_require__(60)
 
 var UINT32_MAX = 4294967295
 
@@ -3039,25 +3890,530 @@ Box.encodingLength = function (obj) {
   return len
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 13 */
+/* 14 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_prettier_bytes__ = __webpack_require__(28);
+Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__ = __webpack_require__(26);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Tile__ = __webpack_require__(66);
+
+
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
+
+
+
+
+/* Section to ensure node and browser able to use Headers, Request and Fetch */
+/*
+var fetch,Headers,Request;
+if (typeof(Window) === "undefined") {
+    //var fetch = require('whatwg-fetch').fetch; //Not as good as node-fetch-npm, but might be the polyfill needed for browser.safari
+    //XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;  // Note this doesnt work if set to a var or const, needed by whatwg-fetch
+    console.log("Node loaded");
+    fetch = nodefetch;
+    Headers = fetch.Headers;      // A class
+    Request = fetch.Request;      // A class
+} else {
+    // If on a browser, need to find fetch,Headers,Request in window
+    console.log("Loading browser version of fetch,Headers,Request");
+    fetch = window.fetch;
+    Headers = window.Headers;
+    Request = window.Request;
+}
+*/
+
+class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default */] {
+    /*
+    Superclass for Searches - including Collections & Home
+     Fields:
+    Inherited from ArchiveBase: item
+    items   List of items found
+     */
+    constructor({ query = '*:*', sort = '', and = '', limit = 75, banner = '', page = 1, item = undefined, itemid = undefined } = {}) {
+        super(itemid, { item: item });
+        this.query = query;
+        this.limit = limit;
+        this.sort = sort;
+        this.and = and;
+        this.page = page;
+    }
+
+    navwrapped() {
+        /* Wrap the content up: wrap ( TODO-DONATE | navwrap |
+        TODO-DETAILS need stuff before nav-wrap1 and after detailsabout and need to check this against Search and Collection examples
+        returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
+         */
+        //TODO-DETAILS is putting the description (in 'htm' in as raw html which would be a nasty security hole since that comes from user !
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            { id: 'wrap' },
+            new Nav().navwrapJSX(),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'div',
+                { 'class': 'container container-ia' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('a', { name: 'maincontent', id: 'maincontent' })
+            ),
+            this.banner(),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'div',
+                { 'class': 'container container-ia nopad' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { 'class': 'row' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { 'class': 'columns-items', style: 'margin-left: 0px;' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { 'class': 'sortbar' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { href: '#', 'class': 'focus-on-child-only pull-right', onclick: 'return AJS.tiles_toggle(this,\'search\')' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'lists-button topinblock iconochive-list', 'data-toggle': 'tooltip',
+                                    title: 'Show\xA0as\xA0list' })
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'a',
+                                { href: '#', 'class': 'focus-on-child-only pull-right', onclick: 'return AJS.tiles_toggle(this,\'search\')' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'tiles-button topinblock iconochive-tiles', 'data-toggle': 'tooltip',
+                                    title: 'Show\xA0thumbnails' })
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'hidden-xs hidden-sm pull-right', style: 'height:50px;width:30px;' }),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'div',
+                                { 'class': 'micro-label pull-right hidden-tiles' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'checkbox', name: 'showdetails', onchange: 'AJS.showdetails_toggle(this,\'search\')' }),
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'span',
+                                    { 'class': 'hidden-xs-span' },
+                                    'SHOW '
+                                ),
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'span',
+                                    null,
+                                    'DETAILS'
+                                )
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'div',
+                                { 'class': 'up-down' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'iconochive-up-solid disabled', 'aria-hidden': 'true' }),
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'span',
+                                    { 'class': 'sr-only' },
+                                    'up-solid'
+                                ),
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'iconochive-down-solid disabled', 'aria-hidden': 'true' }),
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'span',
+                                    { 'class': 'sr-only' },
+                                    'down-solid'
+                                )
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'div',
+                                { 'class': 'topinblock' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'div',
+                                    { 'class': 'hidden-md hidden-lg' },
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'select',
+                                        { 'class': 'ikind-mobile form-control', onchange: 'AJS.ikind_mobile_change(this)' },
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'option',
+                                            { 'data-id': 'relevance', selected: 'selected' },
+                                            'RELEVANCE'
+                                        ),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'option',
+                                            { 'data-id': 'views' },
+                                            'VIEWS'
+                                        ),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'option',
+                                            { 'data-id': 'title' },
+                                            'TITLE'
+                                        ),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'option',
+                                            { 'data-id': 'date-archived' },
+                                            'DATE ARCHIVED'
+                                        ),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'option',
+                                            { 'data-id': 'date-published' },
+                                            'DATE PUBLISHED'
+                                        ),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'option',
+                                            { 'data-id': 'date-reviewed' },
+                                            'DATE REVIEWED'
+                                        ),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'option',
+                                            { 'data-id': 'creator' },
+                                            'CREATOR'
+                                        )
+                                    )
+                                )
+                            ),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'div',
+                                { 'class': 'topinblock' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'div',
+                                    { 'class': 'hidden-xs hidden-sm' },
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'div',
+                                        { 'class': 'sort-by' },
+                                        'SORT BY'
+                                    ),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'span',
+                                        { 'class': 'big-label blue-pop' },
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'a',
+                                            { 'class': 'ikind stealth in', 'data-id': 'relevance', onClick: `Nav.nav_search({query:query)` },
+                                            'RELEVANCE'
+                                        ),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'iconochive-dot ikind-sep' }),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'a',
+                                            { 'class': 'ikind stealth', 'data-id': 'views', onClick: `Nav.nav_search({query:query, "sort": "-downloads"})` },
+                                            'VIEWS'
+                                        ),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'iconochive-dot ikind-sep' }),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'a',
+                                            { 'class': 'ikind stealth', 'data-id': 'title', onClick: `Nav.nav_earch({query:query. "sort": "titleSorter"})` },
+                                            'TITLE'
+                                        ),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'iconochive-dot ikind-sep' }),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'a',
+                                            { 'class': 'ikind stealth', id: 'date_switcher', 'data-id': 'date-archived',
+                                                onClick: `Nav.nav_search({query:query, sort="-publicdate" })` },
+                                            'DATE ARCHIVED'
+                                        ),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'iconochive-dot ikind-sep hidden' }),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'a',
+                                            { 'class': 'ikind stealth hidden', 'data-id': 'date-published',
+                                                onClick: `Nav.nav_search{query:query, "sort": "-date"})` },
+                                            'DATE PUBLISHED'
+                                        ),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'iconochive-dot ikind-sep hidden' }),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'a',
+                                            { 'class': 'ikind stealth hidden', 'data-id': 'date-reviewed',
+                                                onClick: `Nav.nav_search({query:query, "sort": "-reviewdate"})` },
+                                            'DATE REVIEWED'
+                                        ),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'iconochive-dot ikind-sep' }),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'a',
+                                            { 'class': 'ikind stealth', 'data-id': 'creator',
+                                                onClick: `Nav.nav_search(${query + "&amp;sort=creatorSorter"})` },
+                                            'CREATOR'
+                                        )
+                                    )
+                                )
+                            )
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'sortbar-rule' }),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { style: 'position:relative' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'div',
+                                { id: 'ikind-search', 'class': 'ikind in' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'div',
+                                    { 'class': 'results' },
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'div',
+                                        { 'class': 'item-ia mobile-header hidden-tiles', 'data-id': '__mobile_header__' },
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'div',
+                                            { 'class': 'views C C1' },
+                                            ' ',
+                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-eye', 'aria-hidden': 'true' }),
+                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                'span',
+                                                { 'class': 'sr-only' },
+                                                'eye'
+                                            ),
+                                            ' '
+                                        ),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'div',
+                                            { 'class': 'C234' },
+                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                'div',
+                                                { 'class': 'C C2' },
+                                                'Title'
+                                            ),
+                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                'div',
+                                                { 'class': 'pubdate C C3' },
+                                                ' ',
+                                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                    'div',
+                                                    null,
+                                                    ' ',
+                                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                        'div',
+                                                        null,
+                                                        'Date Archived'
+                                                    ),
+                                                    ' '
+                                                ),
+                                                ' '
+                                            ),
+                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                'div',
+                                                { 'class': 'by C C4' },
+                                                'Creator'
+                                            )
+                                        ),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'C C5' })
+                                    ),
+                                    this.items.map(function (item, n) {
+                                        // Note rendering tiles is quick, its the fetch of the img (async) which is slow.
+                                        return new __WEBPACK_IMPORTED_MODULE_3__Tile__["a" /* default */]().render(item);
+                                    })
+                                ),
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'center',
+                                    { 'class': 'more_search' },
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'a',
+                                        { 'class': 'btn btn-info btn-sm', style: 'visibility:hidden',
+                                            onclick: 'return AJS.more_search(this,{`/search.php?query=${query}&page=`},1)', href: '#' },
+                                        'MORE RESULTS'
+                                    ),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'span',
+                                        { 'class': 'more-search-fetching' },
+                                        'Fetching more results ',
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { src: '/images/loading.gif' })
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        );
+    }
+
+    archive_setup_push() {
+        archive_setup.push(function () {
+            AJS.date_switcher(`&nbsp;<a href="/search.php?query=${query}&amp;sort=-publicdate"><div class="date_switcher in">Date Archived</div></a> <a href="/search.php?query=${query}&amp;sort=-date"><div class="date_switcher">Date Published</div></a> <a href="/search.php?query=${query}&amp;sort=-reviewdate"><div class="date_switcher">Date Reviewed</div></a> `);
+        });
+        archive_setup.push(function () {
+            //TODO-DETAILS check not pushing on top of existing (it probably is)
+            AJS.lists_v_tiles_setup('search');
+            AJS.popState('search');
+            $('div.ikind').css({ visibility: 'visible' });
+            AJS.tiler(); // Note Traceys code had AJS.tiler('#ikind-search') but Search and Collections examples have it with no args
+            $(window).on('resize  orientationchange', function (evt) {
+                clearTimeout(AJS.node_search_throttler);
+                AJS.node_search_throttler = setTimeout(AJS.tiler, 250);
+            });
+            // register for scroll updates (for infinite search results)
+            $(window).scroll(AJS.scrolled);
+        });
+    }
+    browserBefore() {
+        $('body').addClass('bgEEE');
+    }
+
+    banner() {
+        // On Search "banner" is a search form
+        let query = this.query;
+        let searchURL = `https://archive.org/advancedsearch.php?q={query}`;
+        let addBookmarkURL = `https://archive.org/bookmarks.php?add_bookmark=1&amp;mediatype=search&amp;identifier={query}&amp;title={query}`;
+        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+            'div',
+            { 'class': 'container container-ia width-max',
+                style: 'background-color:#d8d8d8; padding-top:60px; border:1px solid #979797; padding-bottom:25px;' },
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                'div',
+                { 'class': 'container' },
+                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                    'div',
+                    { 'class': 'row' },
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { 'class': 'col-sm-2 col-md-2 col-lg-1 hidden-xs' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'h3',
+                            { style: 'margin:3px 0 0 0; text-align:right;' },
+                            'Search'
+                        )
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { 'class': 'col-sm-8 col-md-8 col-lg-9' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'div',
+                            { 'class': 'searchbar', style: 'margin-bottom:10px; margin-right:60px;' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'form',
+                                { 'class': 'form search-form js-search-form',
+                                    id: 'searchform',
+                                    method: 'get',
+                                    role: 'search',
+                                    action: 'https://archive.org/searchresults.php',
+                                    'data-event-form-tracking': 'Search|SearchForm',
+                                    'data-wayback-machine-search-url': 'https://web.archive.org/web/*/' },
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                    'div',
+                                    { 'class': 'form-group', style: 'position:relative' },
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'div',
+                                        { style: 'position:relative' },
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'span',
+                                            { 'aria-hidden': 'true' },
+                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-search', style: 'position:absolute;left:4px;top:7px;color:#999;font-size:125%',
+                                                'aria-hidden': 'true' }),
+                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                'span',
+                                                { 'class': 'sr-only' },
+                                                'search'
+                                            ),
+                                            '            '
+                                        ),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { 'class': 'form-control input-sm roundbox20 js-search-bar', size: '25', name: 'search',
+                                            placeholder: 'Search', type: 'text', value: query,
+                                            style: 'font-size:125%;padding-left:30px;',
+                                            onclick: '$(this).css(\'padding-left\',\'\').parent().find(\'.iconochive-search\').hide()',
+                                            'aria-controls': 'search_options',
+                                            'aria-label': 'Search the Archive. Filters and Advanced Search available below.'
+                                        })
+                                    ),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'div',
+                                        {
+                                            id: 'search_options',
+                                            'class': 'search-options js-search-options is-open',
+                                            'aria-expanded': 'true',
+                                            'aria-label': 'Search Options',
+                                            'data-keep-open-when-changed': 'true'
+                                        },
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'fieldset',
+                                            null,
+                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                'label',
+                                                null,
+                                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'radio', name: 'sin', value: '', checked: true }),
+                                                'Search metadata'
+                                            ),
+                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                'label',
+                                                null,
+                                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'radio', name: 'sin', value: 'TXT' }),
+                                                'Search full text of books'
+                                            ),
+                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                'label',
+                                                null,
+                                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'radio', name: 'sin', value: 'TV' }),
+                                                'Search TV captions'
+                                            ),
+                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                                'label',
+                                                null,
+                                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'radio', name: 'sin', value: 'WEB' }),
+                                                'Search archived web sites'
+                                            )
+                                        ),
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                            'a',
+                                            { href: searchURL, 'class': 'search-options__advanced-search-link' },
+                                            'Advanced Search'
+                                        )
+                                    ),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                        'button',
+                                        { 'class': 'btn btn-gray label-primary input-sm',
+                                            style: 'position:absolute;right:-60px;top:0;',
+                                            type: 'submit' },
+                                        'GO'
+                                    ),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'hidden', name: 'limit', value: '100' }),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'hidden', name: 'start', value: '0' }),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'hidden', name: 'searchAll', value: 'yes' }),
+                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'hidden', name: 'submit', value: 'this was submitted' })
+                                )
+                            )
+                        )
+                    ),
+                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                        'div',
+                        { id: 'search-actions', 'class': 'col-sm-2 col-md-2 col-lg-2' },
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-share', 'aria-hidden': 'true' }),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'span',
+                            { 'class': 'sr-only' },
+                            'share'
+                        ),
+                        ' Share',
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                            'a',
+                            { 'class': 'stealth',
+                                href: addBookmarkURL,
+                                onclick: 'return AJS.modal_go(this,{favorite:1})',
+                                'data-target': '#confirm-modal' },
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-favorite', 'aria-hidden': 'true' }),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
+                                'span',
+                                {
+                                    'class': 'sr-only' },
+                                'favorite'
+                            ),
+                            ' Favorite'
+                        ),
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null)
+                    )
+                )
+            )
+        );
+    }
+
+}
+/* harmony export (immutable) */ __webpack_exports__["default"] = Search;
+
+
+/***/ }),
+/* 15 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_prettier_bytes__ = __webpack_require__(30);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_prettier_bytes___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_prettier_bytes__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_render_media__ = __webpack_require__(29);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_render_media__ = __webpack_require__(31);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_render_media___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1_render_media__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ReactFake__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Util__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit__ = __webpack_require__(62);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Util__ = __webpack_require__(4);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit__ = __webpack_require__(64);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_4_throttleit__);
 
 
 
-__webpack_require__(2)({ presets: ['env', 'react'] }); // ES6 JS below!
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
 
@@ -3144,7 +4500,7 @@ class ArchiveFile {
 
 
 /***/ }),
-/* 14 */
+/* 16 */
 /***/ (function(module, exports) {
 
 // Copyright Joyent, Inc. and other Node contributors.
@@ -3452,10 +4808,10 @@ function isUndefined(arg) {
 
 
 /***/ }),
-/* 15 */
+/* 17 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var wrappy = __webpack_require__(47)
+var wrappy = __webpack_require__(49)
 module.exports = wrappy(once)
 module.exports.strict = wrappy(onceStrict)
 
@@ -3500,14 +4856,14 @@ function onceStrict (fn) {
 
 
 /***/ }),
-/* 16 */
+/* 18 */
 /***/ (function(module, exports, __webpack_require__) {
 
 module.exports = MediaElementWrapper
 
-var inherits = __webpack_require__(0)
-var stream = __webpack_require__(9)
-var toArrayBuffer = __webpack_require__(43)
+var inherits = __webpack_require__(2)
+var stream = __webpack_require__(10)
+var toArrayBuffer = __webpack_require__(45)
 
 var MediaSource = typeof window !== 'undefined' && window.MediaSource
 
@@ -3751,7 +5107,7 @@ MediaSourceStream.prototype._getBufferDuration = function () {
 
 
 /***/ }),
-/* 17 */
+/* 19 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3780,13 +5136,13 @@ MediaSourceStream.prototype._getBufferDuration = function () {
 
 /*<replacement>*/
 
-var processNextTick = __webpack_require__(10);
+var processNextTick = __webpack_require__(11);
 /*</replacement>*/
 
 module.exports = Readable;
 
 /*<replacement>*/
-var isArray = __webpack_require__(18);
+var isArray = __webpack_require__(20);
 /*</replacement>*/
 
 /*<replacement>*/
@@ -3796,7 +5152,7 @@ var Duplex;
 Readable.ReadableState = ReadableState;
 
 /*<replacement>*/
-var EE = __webpack_require__(14).EventEmitter;
+var EE = __webpack_require__(16).EventEmitter;
 
 var EElistenerCount = function (emitter, type) {
   return emitter.listeners(type).length;
@@ -3804,13 +5160,13 @@ var EElistenerCount = function (emitter, type) {
 /*</replacement>*/
 
 /*<replacement>*/
-var Stream = __webpack_require__(19);
+var Stream = __webpack_require__(21);
 /*</replacement>*/
 
 // TODO(bmeurer): Change this back to const once hole checks are
 // properly optimized away early in Ignition+TurboFan.
 /*<replacement>*/
-var Buffer = __webpack_require__(11).Buffer;
+var Buffer = __webpack_require__(12).Buffer;
 var OurUint8Array = global.Uint8Array || function () {};
 function _uint8ArrayToBuffer(chunk) {
   return Buffer.from(chunk);
@@ -3821,12 +5177,12 @@ function _isUint8Array(obj) {
 /*</replacement>*/
 
 /*<replacement>*/
-var util = __webpack_require__(8);
-util.inherits = __webpack_require__(0);
+var util = __webpack_require__(9);
+util.inherits = __webpack_require__(2);
 /*</replacement>*/
 
 /*<replacement>*/
-var debugUtil = __webpack_require__(37);
+var debugUtil = __webpack_require__(39);
 var debug = void 0;
 if (debugUtil && debugUtil.debuglog) {
   debug = debugUtil.debuglog('stream');
@@ -3835,8 +5191,8 @@ if (debugUtil && debugUtil.debuglog) {
 }
 /*</replacement>*/
 
-var BufferList = __webpack_require__(38);
-var destroyImpl = __webpack_require__(20);
+var BufferList = __webpack_require__(40);
+var destroyImpl = __webpack_require__(22);
 var StringDecoder;
 
 util.inherits(Readable, Stream);
@@ -3858,7 +5214,7 @@ function prependListener(emitter, event, fn) {
 }
 
 function ReadableState(options, stream) {
-  Duplex = Duplex || __webpack_require__(5);
+  Duplex = Duplex || __webpack_require__(7);
 
   options = options || {};
 
@@ -3919,14 +5275,14 @@ function ReadableState(options, stream) {
   this.decoder = null;
   this.encoding = null;
   if (options.encoding) {
-    if (!StringDecoder) StringDecoder = __webpack_require__(22).StringDecoder;
+    if (!StringDecoder) StringDecoder = __webpack_require__(24).StringDecoder;
     this.decoder = new StringDecoder(options.encoding);
     this.encoding = options.encoding;
   }
 }
 
 function Readable(options) {
-  Duplex = Duplex || __webpack_require__(5);
+  Duplex = Duplex || __webpack_require__(7);
 
   if (!(this instanceof Readable)) return new Readable(options);
 
@@ -4075,7 +5431,7 @@ Readable.prototype.isPaused = function () {
 
 // backwards compatibility.
 Readable.prototype.setEncoding = function (enc) {
-  if (!StringDecoder) StringDecoder = __webpack_require__(22).StringDecoder;
+  if (!StringDecoder) StringDecoder = __webpack_require__(24).StringDecoder;
   this._readableState.decoder = new StringDecoder(enc);
   this._readableState.encoding = enc;
   return this;
@@ -4762,10 +6118,10 @@ function indexOf(xs, x) {
   }
   return -1;
 }
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(7), __webpack_require__(3)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(8), __webpack_require__(5)))
 
 /***/ }),
-/* 18 */
+/* 20 */
 /***/ (function(module, exports) {
 
 var toString = {}.toString;
@@ -4776,14 +6132,14 @@ module.exports = Array.isArray || function (arr) {
 
 
 /***/ }),
-/* 19 */
+/* 21 */
 /***/ (function(module, exports, __webpack_require__) {
 
-module.exports = __webpack_require__(14).EventEmitter;
+module.exports = __webpack_require__(16).EventEmitter;
 
 
 /***/ }),
-/* 20 */
+/* 22 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4791,7 +6147,7 @@ module.exports = __webpack_require__(14).EventEmitter;
 
 /*<replacement>*/
 
-var processNextTick = __webpack_require__(10);
+var processNextTick = __webpack_require__(11);
 /*</replacement>*/
 
 // undocumented cb() API, needed for core, not for public API
@@ -4861,7 +6217,7 @@ module.exports = {
 };
 
 /***/ }),
-/* 21 */
+/* 23 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4894,7 +6250,7 @@ module.exports = {
 
 /*<replacement>*/
 
-var processNextTick = __webpack_require__(10);
+var processNextTick = __webpack_require__(11);
 /*</replacement>*/
 
 module.exports = Writable;
@@ -4931,22 +6287,22 @@ var Duplex;
 Writable.WritableState = WritableState;
 
 /*<replacement>*/
-var util = __webpack_require__(8);
-util.inherits = __webpack_require__(0);
+var util = __webpack_require__(9);
+util.inherits = __webpack_require__(2);
 /*</replacement>*/
 
 /*<replacement>*/
 var internalUtil = {
-  deprecate: __webpack_require__(41)
+  deprecate: __webpack_require__(43)
 };
 /*</replacement>*/
 
 /*<replacement>*/
-var Stream = __webpack_require__(19);
+var Stream = __webpack_require__(21);
 /*</replacement>*/
 
 /*<replacement>*/
-var Buffer = __webpack_require__(11).Buffer;
+var Buffer = __webpack_require__(12).Buffer;
 var OurUint8Array = global.Uint8Array || function () {};
 function _uint8ArrayToBuffer(chunk) {
   return Buffer.from(chunk);
@@ -4956,14 +6312,14 @@ function _isUint8Array(obj) {
 }
 /*</replacement>*/
 
-var destroyImpl = __webpack_require__(20);
+var destroyImpl = __webpack_require__(22);
 
 util.inherits(Writable, Stream);
 
 function nop() {}
 
 function WritableState(options, stream) {
-  Duplex = Duplex || __webpack_require__(5);
+  Duplex = Duplex || __webpack_require__(7);
 
   options = options || {};
 
@@ -5103,7 +6459,7 @@ if (typeof Symbol === 'function' && Symbol.hasInstance && typeof Function.protot
 }
 
 function Writable(options) {
-  Duplex = Duplex || __webpack_require__(5);
+  Duplex = Duplex || __webpack_require__(7);
 
   // Writable ctor is applied to Duplexes, too.
   // `realHasInstance` is necessary because using plain `instanceof`
@@ -5529,16 +6885,16 @@ Writable.prototype._destroy = function (err, cb) {
   this.end();
   cb(err);
 };
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(39).setImmediate, __webpack_require__(7)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5), __webpack_require__(41).setImmediate, __webpack_require__(8)))
 
 /***/ }),
-/* 22 */
+/* 24 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var Buffer = __webpack_require__(11).Buffer;
+var Buffer = __webpack_require__(12).Buffer;
 
 var isEncoding = Buffer.isEncoding || function (encoding) {
   encoding = '' + encoding;
@@ -5810,7 +7166,7 @@ function simpleEnd(buf) {
 }
 
 /***/ }),
-/* 23 */
+/* 25 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5881,11 +7237,11 @@ function simpleEnd(buf) {
 
 module.exports = Transform;
 
-var Duplex = __webpack_require__(5);
+var Duplex = __webpack_require__(7);
 
 /*<replacement>*/
-var util = __webpack_require__(8);
-util.inherits = __webpack_require__(0);
+var util = __webpack_require__(9);
+util.inherits = __webpack_require__(2);
 /*</replacement>*/
 
 util.inherits(Transform, Duplex);
@@ -6030,14 +7386,14 @@ function done(stream, er, data) {
 }
 
 /***/ }),
-/* 24 */
+/* 26 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveItem__ = __webpack_require__(63);
-__webpack_require__(2)({ presets: ['env', 'react'] }); // ES6 JS below!
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveItem__ = __webpack_require__(65);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 //Not needed on client - kept so script can run in both cases
 //import ReactDOMServer from 'react-dom/server';
@@ -6094,14 +7450,54 @@ class ArchiveBase extends __WEBPACK_IMPORTED_MODULE_2__ArchiveItem__["a" /* defa
 
 
 /***/ }),
-/* 25 */
+/* 27 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Details__ = __webpack_require__(6);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
+
+
+
+
+class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
+    constructor(itemid, item) {
+        super(itemid, item);
+    }
+
+    archive_setup_push() {
+        let self = this;
+        super.archive_setup_push(); // On commute.html the Play came after the parts common to AV, Image and Text
+        // archive_setup.push(function() { //TODO-ARCHIVE_SETUP move Play from browserAfter to here
+        //    Play('jw6', self.playlist, self.cfg);
+        // });
+    }
+    setupPlaylist(preferredTypes) {
+        this.playlist = [];
+        this.avs = this._list.filter(fi => preferredTypes.includes(fi.metadata.format));
+        if (this.avs.length) {
+            this.avs.sort((a, b) => __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].natcompare(a.metadata.name, b.metadata.name)); //Unsure why sorting names, presumably tracks are named alphabetically ?
+
+            this.playlist.push({ name: this.avs[0].name,
+                urls: [item.metadata.magnetlink + '/' + this.avs[0].name] });
+        }
+    }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = AV;
+
+
+/***/ }),
+/* 28 */
 /***/ (function(module, exports, __webpack_require__) {
 
 //var React = require('react');
 //var ReactDOM = require('react-dom');
-var Details = __webpack_require__(26).default;
-var Search = __webpack_require__(64).default;
-var Nav = __webpack_require__(66).default;
+var Details = __webpack_require__(6).default;
+var Search = __webpack_require__(14).default;
+var Nav = __webpack_require__(67).default;
 //window.Dweb = require('../js/Dweb');
 window.Nav = Nav;
 /*
@@ -6153,858 +7549,7 @@ LISTS - support for multiple list transports
 */
 
 /***/ }),
-/* 26 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__ = __webpack_require__(24);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__ArchiveFile__ = __webpack_require__(13);
-__webpack_require__(2)({ presets: ['env', 'react'] }); // ES6 JS below!
-
-//Not needed on client - kept so script can run in both cases
-//import ReactDOMServer from 'react-dom/server';
-//Next line is for client, not needed on server but doesnt hurt
-//import ReactDOM from 'react-dom';
-
-
-// Notes on use of JSX (embedded HTML) for when converting HTML to JSX
-// Anything that is to be parameterised gets {} and code between is javascript executed in context (this has the expected meaning)
-// By implication an embedded object is {{foo: bar}}
-// All comments have to be quoted <!--foo--> becomes {/*--foo--*}
-// The "ReactFake code is a little more tolerant than React, specifically
-// React requires style={{display: none}} ReactFake can also handle quoted style="display: none"
-// React requires className= rather than class=, ReactFake supports both
-
-
-
-
-
-class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default */] {
-    constructor(id, item = undefined) {
-        super(id);
-        this.item = item;
-        this._listLoad();
-    }
-
-    navwrapped() {
-        /* Wrap the content up checked on mbid (Red Shift) image:  wrap( TODO-TODO-DONATEBANNER | nav-wrap1 | maincontent | theatre-ia-wrap | item-details-about | TODO-ACTIONBUTTONS | TODO-ALSOFOUND  | TODO-ANALYTICS )
-        returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
-         */
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            { id: 'wrap', itemscope: true, itemtype: this.itemtype },
-            new Nav().navwrapJSX(),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'div',
-                { 'class': 'container container-ia' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('a', { name: 'maincontent', id: 'maincontent' })
-            ),
-            this.theatreIaWrap(),
-            ' ',
-            this.itemDetailsAboutJSX()
-        );
-    }
-
-    archive_setup_push() {
-        archive_setup.push(function () {
-            // This is common to Text, AV and image - though some have stuff before this and some a
-            AJS.tilebars(); // page load
-            $(window).on('resize  orientationchange', function (evt) {
-                clearTimeout(AJS.also_found_throttler);
-                AJS.also_found_throttler = setTimeout(AJS.tilebars, 250);
-            });
-        });
-    }
-    browserAfter() {
-        // initialize_flag
-        // overlay related
-        $(".toggle-flag-overlay").click(function (e) {
-            e.preventDefault();
-            $("#theatre-ia-wrap").removeClass("flagged");
-        });
-        // overlay - checkboxes
-        $("#flag-checkboxes a").on("click", function (e) {
-            e.preventDefault();
-            $(this).children(".my-checkbox").toggleClass("checked");
-            $.get($(this).attr("href"));
-        });
-        super.browserAfter(); // runs archive_setup_push and Util.AJS_on_dom_loaded(); Do this after the scripts above - which means put this browserAfter AFTER superclasses
-    }
-
-    cherModal(type) {
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            { id: 'cher-modal', className: 'modal fade', role: 'dialog', 'aria-hidden': 'true' },
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'div',
-                { 'class': 'modal-dialog modal-lg' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'div',
-                    { 'class': 'modal-content', style: 'padding:10px;' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { 'class': 'modal-header' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'button',
-                            { type: 'button', 'class': 'close', 'data-dismiss': 'modal', 'aria-hidden': 'true' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', {
-                                'class': 'iconochive-remove-circle', 'aria-hidden': 'true' }),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'span',
-                                { 'class': 'sr-only' },
-                                'remove-circle'
-                            )
-                        ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'h3',
-                            { 'class': 'modal-title' },
-                            'Share or Embed This Item'
-                        )
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { id: 'cher-body' },
-                        this.sharing(),
-                        this.embed(),
-                        this.embedWordpress(),
-                        this.embedAdvanced(type)
-                    )
-                )
-            )
-        );
-    }
-
-    sharing() {
-        //Common text across Image and Text and possibly other subclasses
-        let item = this.item;
-        let itemid = item.metadata.identifier; // Shortcut as used a lot
-        let metadata = item.metadata; // Shortcut as used a lot
-        let detailsURL = `https://archive.org/details/${itemid}`; // Note this should remain as pointing at details/itemid since its only used in sharing - FB, Twitter etc
-        let sharingText = `${metadata.title} : ${metadata.creator}`; //String used
-        let sharingTextUriEncoded = encodeURIComponent(sharingText);
-
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            { style: { textAlign: "center", margin: "50px auto" } },
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'div',
-                { className: 'topinblock' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'div',
-                    { id: 'sharer' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'a',
-                        { href: `https://twitter.com/intent/tweet?url=${detailsURL}&amp;via=internetarchive&amp;text=${sharingTextUriEncoded}+%3A+${metadata.creator}+%3A+Free+Download+%26+Streaming+%3A+Internet+Archive`,
-                            target: '_blank' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-twitter', 'data-toggle': 'tooltip',
-                            'data-placement': 'bottom', title: '',
-                            'data-original-title': 'Share to Twitter' })
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'a',
-                        { href: `https://www.facebook.com/sharer/sharer.php?u=${detailsURL}`,
-                            target: '_blank' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-facebook', 'data-toggle': 'tooltip',
-                            'data-placement': 'bottom', title: '',
-                            'data-original-title': 'Share to Facebook' })
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'a',
-                        { href: `https://plus.google.com/share?url=${detailsURL}`,
-                            target: '_blank' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-googleplus', 'data-toggle': 'tooltip',
-                            'data-placement': 'bottom', title: '',
-                            'data-original-title': 'Share to Google+' })
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'a',
-                        { href: `http://www.reddit.com/submit?url=${detailsURL}&amp;title=${sharingTextUriEncoded}+%3A+${metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`,
-                            target: '_blank' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-reddit', 'data-toggle': 'tooltip',
-                            'data-placement': 'bottom', title: '',
-                            'data-original-title': 'Share to Reddit' })
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'a',
-                        { href: `https://www.tumblr.com/share/video?embed=%3Ciframe+width%3D%22640%22+height%3D%22480%22+frameborder%3D%220%22+allowfullscreen+src%3D%22https%3A%2F%2Farchive.org%2Fembed%2F%22+webkitallowfullscreen%3D%22true%22+mozallowfullscreen%3D%22true%22%26gt%3B%26lt%3B%2Fiframe%3E&;name=${itemid}+%3A+${item.metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`,
-                            target: '_blank' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-tumblr', 'data-toggle': 'tooltip',
-                            'data-placement': 'bottom', title: '',
-                            'data-original-title': 'Share to Tumblr' })
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'a',
-                        { href: `http://www.pinterest.com/pin/create/button/?url=${detailsURL}&amp;description=${sharingTextUriEncoded}+%3A+${metadata.creator}+%3A+Free+Download+%26amp%3B+Streaming+%3A+Internet+Archive`,
-                            target: '_blank' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-pinterest', 'data-toggle': 'tooltip',
-                            'data-placement': 'bottom', title: '',
-                            'data-original-title': 'Share to Pinterest' })
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'a',
-                        { href: `https://archive.org/pop/editor.html?initialMedia=${detailsURL}`,
-                            target: '_blank' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'sharee iconochive-popcorn', 'data-toggle': 'tooltip',
-                            'data-placement': 'bottom', title: 'Share to Popcorn Maker' })
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'a',
-                        { href: `mailto:?body=${detailsURL}&amp;subject=${sharingText} : ${metadata.creator} : Free Download &amp; Streaming : Internet Archive` },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'sharee iconochive-email', 'data-toggle': 'tooltip',
-                            'data-placement': 'bottom', title: '',
-                            'data-original-title': 'Share via email' })
-                    )
-                ),
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', { clear: 'all', className: 'clearfix' })
-            )
-        );
-    }
-    embedWordpress() {
-        // THis appeared on image and movie examples
-        let item = this.item;
-        let itemid = item.metadata.identifier; // Shortcut as used a lot
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            null,
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'form',
-                { className: 'form', role: 'form' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'div',
-                    { className: 'form-group' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'label',
-                        null,
-                        'EMBED (for wordpress.com hosted blogs)'
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'textarea',
-                        { id: 'embedcodehereWP', className: 'form-control textarea-invert-readonly',
-                            rows: '3', readOnly: 'readonly' },
-                        `[archiveorg ${itemid} width=560 height=384 frameborder=0 webkitallowfullscreen=true mozallowfullscreen=true]`
-                    )
-                )
-            )
-        );
-    }
-    embedAdvanced(type) {
-        // From text, video, image
-        let item = this.item;
-        let itemid = item.metadata.identifier; // Shortcut as used a lot
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            null,
-            'Want more?',
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'a',
-                { href: `https://archive.org/help/${type}.php?identifier=${itemid}` },
-                'Advanced embedding details, examples, and help'
-            ),
-            '!'
-        );
-    }
-    embed() {
-        // Same on text, video, image
-        let shortEmbedURL = `https://archive.org/stream/${this.itemid}?ui=embed`; //Note on archive.org/details this is different from iframeURL and not clear if that is intentional
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            null,
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'form',
-                { 'class': 'form', role: 'form' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'div',
-                    { 'class': 'form-group' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'label',
-                        null,
-                        'EMBED'
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'textarea',
-                        { id: 'embedcodehere', 'class': 'form-control textarea-invert-readonly',
-                            rows: '3', readonly: 'readonly' },
-                        `<iframe 
-                                src=${shortEmbedURL}
-                                width="480" height="430" frameborder="0"
-                                webkitallowfullscreen="true" mozallowfullscreen="true"
-                                allowfullscreen></iframe>`
-                    )
-                )
-            )
-        );
-    }
-
-    itemDetailsAboutJSX() {
-        /* This builds a JSX tht sits underneth theatre-ia-wrap DIV that is built by theatreIaWrap */
-        let itemid = this.itemid;
-        let item = this.item;
-        let metadata = item.metadata;
-        let title = metadata.title;
-        let creator = metadata.creator;
-        let datePublished = metadata.date;
-        let publisher = metadata.publisher;
-        let keywords = metadata.subject ? metadata.subject.split(';') : undefined;
-        let licence = metadata.licenseurl; //TODO - handle other licenses - hardwired for CC currently
-        let languageAbbrev = metadata.language;
-        let languageLong = { eng: "English", dut: "Dutch" }[languageAbbrev]; //TODO-other languages
-        let description = metadata.description; // Contains HTML (supposedly safe) inserted via innerHTML thing
-        let metadataListPossible = { color: "Color", coverage: "Location", director: "Director", identifier: "Identifier",
-            "identifier-ark": "Identifier-ark", ocr: "Ocr", runtime: "Run time", ppi: "Ppi", sound: "Sound", year: "Year" }; /*TODO expand to longer list*/
-        let metadataListFound = Object.keys(metadataListPossible).filter(k => metadata[k]); // List of keys in the metadata
-        let downloadableFiles = this._list.filter(f => f.downloadable()); // Note on image it EXCLUDED JPEG Thumb, but included JPEG*Thumb
-        //TODO  Replace "a" with onclicks to download function on f
-        //TODO Need f.sizePretty property of ArchiveFile (see prettierbytes used in WebTorrent)
-        let filesCount = item.files_count;
-        let originalFilesCount = item.files.filter(f => f.source === "original").length + 1; // Adds in Archive Bittorrent
-        let downloadURL = `https://archive.org/download/${itemid}`;
-        let compressURL = `https://archive.org/compress/${itemid}`;
-        let compressAllURL = `https://archive.org/compress/${itemid}/formats=JSON,METADATA,JPEG,ARCHIVE BITTORRENT,MUSICBRAINZ METADATA`;
-        let collections = Array.isArray(metadata.collection) ? metadata.collection : [metadata.collection];
-        let mediatype = metadata.mediatype;
-        let iconochiveIcon = "iconochive-" + mediatype;
-        let contributor = metadata.contributor;
-        let reviews = item.reviews;
-        let writeReviewsURL = `https://archive.org/write-review.php?identifier=${itemid}`;
-        let loginURL = "https://archive.org/account/login.php";
-        let bookmarksAddURL = `https://archive.org/bookmarks.php?add_bookmark=1&amp;mediatype=image&amp;identifier=${itemid}&amp;title=${title}`;
-        let credits = metadata.credits;
-        //TODO-DETAILS much of below doesn't work (yet)
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            { 'class': 'container container-ia item-details-about' },
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'div',
-                { 'class': 'relative-row row' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'div',
-                    { 'class': 'action-buttons' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { 'class': 'topinblock' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'a',
-                            { 'class': 'button ', href: bookmarksAddURL, id: 'favorite-button', 'aria-haspopup': 'true',
-                                onclick: 'return AJS.modal_go(this,{{favorite:1}})', 'data-target': '#confirm-modal', 'data-toggle': 'tooltip',
-                                'data-container': 'body', 'data-placement': 'bottom', title: 'Favorite this item' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-favorite', 'aria-hidden': 'true' }),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'span',
-                                { 'class': 'sr-only' },
-                                'favorite'
-                            )
-                        )
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { 'class': 'topinblock' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'button',
-                            { id: 'share-button', 'class': 'button', type: 'button', 'aria-haspopup': 'true',
-                                onclick: 'return AJS.modal_go(this,{{ignore_lnk:1,shown:AJS.embed_codes_adjust}})',
-                                'data-target': '#cher-modal', 'data-toggle': 'tooltip', 'data-container': 'body', 'data-placement': 'bottom',
-                                title: 'Share this item' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-share', 'aria-hidden': 'true' }),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'span',
-                                { 'class': 'sr-only' },
-                                'share'
-                            )
-                        )
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        {
-                            id: 'flag-button-container', 'class': 'topinblock', 'data-toggle': 'tooltip', 'data-placement': 'bottom',
-                            'data-container': 'body', title: 'Flag this item' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { 'class': 'dropup' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'button',
-                                { id: 'flag-button', 'class': ' button', type: 'button', 'data-toggle': 'dropdown', 'aria-haspopup': 'true',
-                                    'aria-expanded': 'false' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-Flag', 'aria-hidden': 'true' }),
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'span',
-                                    {
-                                        'class': 'sr-only' },
-                                    'flag'
-                                )
-                            ),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'div',
-                                { id: 'flag-popover', 'class': 'dropdown-menu', 'aria-labelledby': 'flag-button' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'h3',
-                                    { 'class': 'dropdown-title' },
-                                    'Flag this item for'
-                                ),
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'ul',
-                                    { role: 'menu' },
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'li',
-                                        { 'class': '' },
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'a',
-                                            { href: loginURL, role: 'menuitem' },
-                                            'Graphic Violence '
-                                        )
-                                    ),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'li',
-                                        { 'class': '' },
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'a',
-                                            { href: loginURL, role: 'menuitem' },
-                                            'Graphic Sexual Content '
-                                        )
-                                    ),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'li',
-                                        { 'class': '' },
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'a',
-                                            { href: loginURL, role: 'menuitem' },
-                                            'Spam, Scam or Fraud '
-                                        )
-                                    ),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'li',
-                                        { 'class': '' },
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'a',
-                                            { href: loginURL, role: 'menuitem' },
-                                            'Broken or Empty Data                '
-                                        )
-                                    )
-                                )
-                            ),
-                            ' '
-                        ),
-                        ' '
-                    )
-                ),
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'div',
-                    { 'class': 'col-sm-8 thats-left item-details-metadata' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'h1',
-                        { style: { fontSize: "30px", "marginBottom": 0 } },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { 'class': 'left-icon' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { className: `${iconochiveIcon} ${mediatype}`, 'aria-hidden': 'true' }),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'span',
-                                {
-                                    'class': 'sr-only' },
-                                mediatype
-                            )
-                        ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'span',
-                            { itemprop: 'name' },
-                            title
-                        )
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'actions-ia' }),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { 'class': 'key-val-big' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            null,
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'span',
-                                { 'class': 'key' },
-                                'by'
-                            ),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'span',
-                                { 'class': 'value' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'span',
-                                    null,
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'a',
-                                        { onClick: `Nav.nav_search('creator=\"${creator}\"')` },
-                                        creator
-                                    )
-                                )
-                            )
-                        )
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { 'class': 'key-val-big' },
-                        'Publication date ',
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'a',
-                            { onClick: 'Nav.nav_search(\'date:{datePublished}\')' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'span',
-                                { itemprop: 'datePublished' },
-                                datePublished
-                            )
-                        )
-                    ),
-                    licence ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { 'class': 'key-val-big' },
-                        'Usage ',
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'a',
-                            { rel: 'license', title: 'http://creativecommons.org/licenses/by-nc-nd/2.0/',
-                                href: 'http://creativecommons.org/licenses/by-nc-nd/2.0/', target: '_blank' },
-                            'http://creativecommons.org/licenses/by-nc-nd/2.0/',
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', {
-                                'class': 'cclic', src: 'https://archive.org/images/cc/cc.png' }),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { 'class': 'cclic', src: 'https://archive.org/images/cc/by.png' }),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', {
-                                'class': 'cclic', src: 'https://archive.org/images/cc/nc.png' }),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { 'class': 'cclic', src: 'https://archive.org/images/cc/nd.png' })
-                        )
-                    ) : undefined,
-                    keywords ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { 'class': 'key-val-big' },
-                        'Topics ',
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'span',
-                            { itemprop: 'keywords' },
-                            keywords.map(keyword => __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'a',
-                                { onClick: `Nav.nav_search('subject=\"${keyword}\"')` },
-                                keyword
-                            ))
-                        ),
-                        ' '
-                    ) : undefined,
-                    publisher ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        null,
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'span',
-                            { 'class': 'key' },
-                            'Publisher'
-                        ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'span',
-                            {
-                                'class': 'value'
-                            },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'a',
-                                { onClick: `Nav.nav_search('publisher=\"${publisher}\"')` },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'span',
-                                    {
-                                        itemprop: 'publisher' },
-                                    publisher
-                                )
-                            )
-                        )
-                    ) : undefined,
-                    contributor ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        null,
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'span',
-                            { 'class': 'key' },
-                            'Contributor'
-                        ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'span',
-                            { 'class': 'value' },
-                            contributor
-                        )
-                    ) : undefined,
-                    languageAbbrev ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { 'class': 'key-val-big' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            null,
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'span',
-                                { 'class': 'key' },
-                                'Language'
-                            ),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'span',
-                                { 'class': 'value' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'span',
-                                    null,
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'a',
-                                        { onClick: `Nav.nav_search('language=(\"${languageAbbrev}\"+OR+language=\"${languageLong}\")')` },
-                                        languageLong
-                                    )
-                                )
-                            )
-                        )
-                    ) : undefined,
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'clearfix' }),
-                    description ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'descript', itemprop: 'description', dangerouslySetInnerHTML: { __html: description } }) : undefined,
-                    credits ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'h2',
-                        { style: 'font-size:18px' },
-                        'Credits'
-                    ) : undefined,
-                    credits ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'p',
-                        { 'class': 'content' },
-                        credits
-                    ) : undefined,
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { 'class': 'metadata-expandable-list', role: 'list' },
-                        metadataListFound.map(k => __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { role: 'listitem' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'span',
-                                { 'class': 'key' },
-                                metadataListPossible[k]
-                            ),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'span',
-                                { 'class': 'value' },
-                                metadata[k]
-                            )
-                        ))
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { id: 'reviews' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'h2',
-                            { style: 'font-size:36px;font-weight:200;border-bottom:1px solid #979797; padding-bottom:5px; margin-top:50px;' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'div',
-                                { 'class': 'pull-right', style: 'font-size:14px;font-weight:500;padding-top:14px;' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'a',
-                                    { 'class': 'stealth', href: writeReviewsURL },
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-plus-circle',
-                                        'aria-hidden': 'true' }),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'span',
-                                        { 'class': 'sr-only' },
-                                        'plus-circle'
-                                    ),
-                                    'Add Review'
-                                ),
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null)
-                            ),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'div',
-                                { 'class': 'left-icon', style: 'margin-top:3px' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-comment',
-                                    'aria-hidden': 'true' }),
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'span',
-                                    { 'class': 'sr-only' },
-                                    'comment'
-                                )
-                            ),
-                            'Reviews'
-                        ),
-                        reviews && reviews.length ? reviews.map(review => __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { 'class': 'aReview' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'b',
-                                null,
-                                'Reviewer:'
-                            ),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'a',
-                                { onClick: `Nav.nav_details('@${review.reviewer}')`,
-                                    'data-event-click-tracking': 'ItemReviews|ReviewerLink' },
-                                review.reviewer
-                            ),
-                            '-',
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'span',
-                                { alt: `${review.stars} out of 5 stars`, title: `${review.stars} out of 5 stars` },
-                                ['*', '*', '*', '*', '*'].slice(0, review.stars).map(x => __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-favorite size-75-percent', 'aria-hidden': 'true' }), __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'span',
-                                    { 'class': 'sr-only' },
-                                    'favorite'
-                                ))
-                            ),
-                            '- ',
-                            review.reviewdate,
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'b',
-                                null,
-                                'Subject:'
-                            ),
-                            review.reviewtitle,
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'div',
-                                { 'class': 'breaker-breaker' },
-                                review.reviewbody
-                            )
-                        )) : __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { 'class': 'small-label' },
-                            'There are no reviews yet. Be the first one to ',
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'a',
-                                { href: writeReviewsURL },
-                                'write a review'
-                            ),
-                            '.'
-                        )
-                    )
-                ),
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'div',
-                    { 'class': 'col-sm-4 thats-right item-details-archive-info' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { 'class': 'boxy quick-down' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { 'class': 'download-button' },
-                            'DOWNLOAD OPTIONS'
-                        ),
-                        downloadableFiles.map(f => __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { 'class': 'format-group' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'div',
-                                { 'class': 'summary-rite' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'a',
-                                    { 'class': 'stealth', href: `https://archive.org/download/${f.itemid}/${f.metadata.name}`,
-                                        title: f.sizePretty },
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'span',
-                                        { 'class': 'hover-badge-stealth' },
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-download', 'aria-hidden': 'true' }),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'span',
-                                            { 'class': 'sr-only' },
-                                            'download'
-                                        ),
-                                        '1 file'
-                                    )
-                                )
-                            ),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'a',
-                                { 'class': 'format-summary download-pill',
-                                    href: 'https://archive.org/download/${f.itemid}/${f.metadata.name}', title: f.sizePretty,
-                                    'data-toggle': 'tooltip', 'data-placement': 'auto left', 'data-container': 'body' },
-                                __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].downloadableFormats[f.metadata.format],
-                                ' ',
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-download', 'aria-hidden': 'true' }),
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'span',
-                                    { 'class': 'sr-only' },
-                                    'download'
-                                )
-                            )
-                        )),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { 'class': 'show-all' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'div',
-                                { 'class': 'pull-right' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'a',
-                                    { 'class': 'boxy-ttl hover-badge', href: compressURL },
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-download',
-                                        'aria-hidden': 'true' }),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'span',
-                                        {
-                                            'class': 'sr-only' },
-                                        'download'
-                                    ),
-                                    ' ',
-                                    filesCount,
-                                    ' Files'
-                                ),
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null),
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'a',
-                                    { 'class': 'boxy-ttl hover-badge', href: compressAllURL },
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-download',
-                                        'aria-hidden': 'true' }),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'span',
-                                        {
-                                            'class': 'sr-only' },
-                                        'download'
-                                    ),
-                                    ' ',
-                                    originalFilesCount,
-                                    ' Original'
-                                ),
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null)
-                            ),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'a',
-                                { 'class': 'boxy-ttl', href: downloadURL },
-                                'SHOW ALL'
-                            ),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', { clear: 'all', 'class': 'clearfix' })
-                        )
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { 'class': 'boxy collection-list' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'section',
-                            { 'class': 'quick-down collection-list' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'h5',
-                                { 'class': 'collection-title' },
-                                'IN COLLECTIONS'
-                            ),
-                            collections.map(collection => __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'div',
-                                { 'class': 'collection-item' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'a',
-                                    {
-                                        onClick: `Nav.nav_details("${collection}")`,
-                                        'data-event-click-tracking': `CollectionList|${collection}`
-                                    },
-                                    collection
-                                ),
-                                ' '
-                            ))
-                        )
-                    )
-                )
-            ),
-            ' '
-        );
-    }
-
-    alsoFoundJSX() {
-        //TODO-DETAILS this needs implementing, but its another API call - it goes beneath itemDetailsAboutJSX
-    }
-}
-/* harmony export (immutable) */ __webpack_exports__["default"] = Details;
-
-
-/***/ }),
-/* 27 */
+/* 29 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -7017,7 +7562,7 @@ exports.default = function () {};
 module.exports = exports["default"];
 
 /***/ }),
-/* 28 */
+/* 30 */
 /***/ (function(module, exports) {
 
 module.exports = prettierBytes
@@ -7053,19 +7598,19 @@ function prettierBytes (num) {
 
 
 /***/ }),
-/* 29 */
+/* 31 */
 /***/ (function(module, exports, __webpack_require__) {
 
 exports.render = render
 exports.append = append
-exports.mime = __webpack_require__(30)
+exports.mime = __webpack_require__(32)
 
-var debug = __webpack_require__(31)('render-media')
-var isAscii = __webpack_require__(34)
-var MediaElementWrapper = __webpack_require__(16)
-var path = __webpack_require__(44)
-var streamToBlobURL = __webpack_require__(45)
-var videostream = __webpack_require__(48)
+var debug = __webpack_require__(33)('render-media')
+var isAscii = __webpack_require__(36)
+var MediaElementWrapper = __webpack_require__(18)
+var path = __webpack_require__(46)
+var streamToBlobURL = __webpack_require__(47)
+var videostream = __webpack_require__(50)
 
 var VIDEOSTREAM_EXTS = [
   '.m4a',
@@ -7409,13 +7954,13 @@ function parseOpts (opts) {
 
 
 /***/ }),
-/* 30 */
+/* 32 */
 /***/ (function(module, exports) {
 
 module.exports = {".3gp":"video/3gpp",".aac":"audio/aac",".aif":"audio/x-aiff",".aiff":"audio/x-aiff",".atom":"application/atom+xml",".avi":"video/x-msvideo",".bmp":"image/bmp",".bz2":"application/x-bzip2",".conf":"text/plain",".css":"text/css",".csv":"text/plain",".diff":"text/x-diff",".doc":"application/msword",".flv":"video/x-flv",".gif":"image/gif",".gz":"application/x-gzip",".htm":"text/html",".html":"text/html",".ico":"image/vnd.microsoft.icon",".ics":"text/calendar",".iso":"application/octet-stream",".jar":"application/java-archive",".jpeg":"image/jpeg",".jpg":"image/jpeg",".js":"application/javascript",".json":"application/json",".less":"text/css",".log":"text/plain",".m3u":"audio/x-mpegurl",".m4a":"audio/mp4",".m4v":"video/mp4",".manifest":"text/cache-manifest",".markdown":"text/x-markdown",".mathml":"application/mathml+xml",".md":"text/x-markdown",".mid":"audio/midi",".midi":"audio/midi",".mov":"video/quicktime",".mp3":"audio/mpeg",".mp4":"video/mp4",".mp4v":"video/mp4",".mpeg":"video/mpeg",".mpg":"video/mpeg",".odp":"application/vnd.oasis.opendocument.presentation",".ods":"application/vnd.oasis.opendocument.spreadsheet",".odt":"application/vnd.oasis.opendocument.text",".oga":"audio/ogg",".ogg":"application/ogg",".pdf":"application/pdf",".png":"image/png",".pps":"application/vnd.ms-powerpoint",".ppt":"application/vnd.ms-powerpoint",".ps":"application/postscript",".psd":"image/vnd.adobe.photoshop",".qt":"video/quicktime",".rar":"application/x-rar-compressed",".rdf":"application/rdf+xml",".rss":"application/rss+xml",".rtf":"application/rtf",".svg":"image/svg+xml",".svgz":"image/svg+xml",".swf":"application/x-shockwave-flash",".tar":"application/x-tar",".tbz":"application/x-bzip-compressed-tar",".text":"text/plain",".tif":"image/tiff",".tiff":"image/tiff",".torrent":"application/x-bittorrent",".ttf":"application/x-font-ttf",".txt":"text/plain",".wav":"audio/wav",".webm":"video/webm",".wma":"audio/x-ms-wma",".wmv":"video/x-ms-wmv",".xls":"application/vnd.ms-excel",".xml":"application/xml",".yaml":"text/yaml",".yml":"text/yaml",".zip":"application/zip"}
 
 /***/ }),
-/* 31 */
+/* 33 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(process) {/**
@@ -7424,7 +7969,7 @@ module.exports = {".3gp":"video/3gpp",".aac":"audio/aac",".aif":"audio/x-aiff","
  * Expose `debug()` as the module.
  */
 
-exports = module.exports = __webpack_require__(32);
+exports = module.exports = __webpack_require__(34);
 exports.log = log;
 exports.formatArgs = formatArgs;
 exports.save = save;
@@ -7604,10 +8149,10 @@ function localstorage() {
   } catch (e) {}
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5)))
 
 /***/ }),
-/* 32 */
+/* 34 */
 /***/ (function(module, exports, __webpack_require__) {
 
 
@@ -7623,7 +8168,7 @@ exports.coerce = coerce;
 exports.disable = disable;
 exports.enable = enable;
 exports.enabled = enabled;
-exports.humanize = __webpack_require__(33);
+exports.humanize = __webpack_require__(35);
 
 /**
  * The currently active debug mode names, and names to skip.
@@ -7815,7 +8360,7 @@ function coerce(val) {
 
 
 /***/ }),
-/* 33 */
+/* 35 */
 /***/ (function(module, exports) {
 
 /**
@@ -7973,7 +8518,7 @@ function plural(ms, n, name) {
 
 
 /***/ }),
-/* 34 */
+/* 36 */
 /***/ (function(module, exports) {
 
 /* (c) 2016 Ari Porad (@ariporad) <http://ariporad.com>. License: ariporad.mit-license.org */
@@ -7992,7 +8537,7 @@ module.exports = function isAscii(str) {
 
 
 /***/ }),
-/* 35 */
+/* 37 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8113,7 +8658,7 @@ function fromByteArray (uint8) {
 
 
 /***/ }),
-/* 36 */
+/* 38 */
 /***/ (function(module, exports) {
 
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
@@ -8203,13 +8748,13 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
 
 
 /***/ }),
-/* 37 */
+/* 39 */
 /***/ (function(module, exports) {
 
 /* (ignored) */
 
 /***/ }),
-/* 38 */
+/* 40 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8219,7 +8764,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var Buffer = __webpack_require__(11).Buffer;
+var Buffer = __webpack_require__(12).Buffer;
 /*</replacement>*/
 
 function copyBuffer(src, target, offset) {
@@ -8289,7 +8834,7 @@ module.exports = function () {
 }();
 
 /***/ }),
-/* 39 */
+/* 41 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var apply = Function.prototype.apply;
@@ -8342,13 +8887,13 @@ exports._unrefActive = exports.active = function(item) {
 };
 
 // setimmediate attaches itself to the global object
-__webpack_require__(40);
+__webpack_require__(42);
 exports.setImmediate = setImmediate;
 exports.clearImmediate = clearImmediate;
 
 
 /***/ }),
-/* 40 */
+/* 42 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global, process) {(function (global, undefined) {
@@ -8538,10 +9083,10 @@ exports.clearImmediate = clearImmediate;
     attachTo.clearImmediate = clearImmediate;
 }(typeof self === "undefined" ? typeof global === "undefined" ? this : global : self));
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(7), __webpack_require__(3)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(8), __webpack_require__(5)))
 
 /***/ }),
-/* 41 */
+/* 43 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global) {
@@ -8612,10 +9157,10 @@ function config (name) {
   return String(val).toLowerCase() === 'true';
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(7)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(8)))
 
 /***/ }),
-/* 42 */
+/* 44 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8648,11 +9193,11 @@ function config (name) {
 
 module.exports = PassThrough;
 
-var Transform = __webpack_require__(23);
+var Transform = __webpack_require__(25);
 
 /*<replacement>*/
-var util = __webpack_require__(8);
-util.inherits = __webpack_require__(0);
+var util = __webpack_require__(9);
+util.inherits = __webpack_require__(2);
 /*</replacement>*/
 
 util.inherits(PassThrough, Transform);
@@ -8668,10 +9213,10 @@ PassThrough.prototype._transform = function (chunk, encoding, cb) {
 };
 
 /***/ }),
-/* 43 */
+/* 45 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var Buffer = __webpack_require__(1).Buffer
+var Buffer = __webpack_require__(3).Buffer
 
 module.exports = function (buf) {
 	// If the buffer is backed by a Uint8Array, a faster version will work
@@ -8701,7 +9246,7 @@ module.exports = function (buf) {
 
 
 /***/ }),
-/* 44 */
+/* 46 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(process) {// Copyright Joyent, Inc. and other Node contributors.
@@ -8929,15 +9474,15 @@ var substr = 'ab'.substr(-1) === 'b'
     }
 ;
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5)))
 
 /***/ }),
-/* 45 */
+/* 47 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* global URL */
 
-var getBlob = __webpack_require__(46)
+var getBlob = __webpack_require__(48)
 
 module.exports = function getBlobURL (stream, mimeType, cb) {
   if (typeof mimeType === 'function') return getBlobURL(stream, null, mimeType)
@@ -8950,12 +9495,12 @@ module.exports = function getBlobURL (stream, mimeType, cb) {
 
 
 /***/ }),
-/* 46 */
+/* 48 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* global Blob */
 
-var once = __webpack_require__(15)
+var once = __webpack_require__(17)
 
 module.exports = function getBlob (stream, mimeType, cb) {
   if (typeof mimeType === 'function') return getBlob(stream, null, mimeType)
@@ -8976,7 +9521,7 @@ module.exports = function getBlob (stream, mimeType, cb) {
 
 
 /***/ }),
-/* 47 */
+/* 49 */
 /***/ (function(module, exports) {
 
 // Returns a wrapper function that returns a wrapped callback
@@ -9015,13 +9560,13 @@ function wrappy (fn, cb) {
 
 
 /***/ }),
-/* 48 */
+/* 50 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var MediaElementWrapper = __webpack_require__(16)
-var pump = __webpack_require__(49)
+var MediaElementWrapper = __webpack_require__(18)
+var pump = __webpack_require__(51)
 
-var MP4Remuxer = __webpack_require__(52)
+var MP4Remuxer = __webpack_require__(54)
 
 module.exports = VideoStream
 
@@ -9144,12 +9689,12 @@ VideoStream.prototype.destroy = function () {
 
 
 /***/ }),
-/* 49 */
+/* 51 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var once = __webpack_require__(15)
-var eos = __webpack_require__(50)
-var fs = __webpack_require__(51) // we only need fs to get the ReadStream and WriteStream prototypes
+var once = __webpack_require__(17)
+var eos = __webpack_require__(52)
+var fs = __webpack_require__(53) // we only need fs to get the ReadStream and WriteStream prototypes
 
 var noop = function () {}
 
@@ -9230,10 +9775,10 @@ module.exports = pump
 
 
 /***/ }),
-/* 50 */
+/* 52 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var once = __webpack_require__(15);
+var once = __webpack_require__(17);
 
 var noop = function() {};
 
@@ -9319,21 +9864,21 @@ module.exports = eos;
 
 
 /***/ }),
-/* 51 */
+/* 53 */
 /***/ (function(module, exports) {
 
 /* (ignored) */
 
 /***/ }),
-/* 52 */
+/* 54 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer) {var bs = __webpack_require__(53)
-var EventEmitter = __webpack_require__(14).EventEmitter
-var inherits = __webpack_require__(0)
-var mp4 = __webpack_require__(54)
-var Box = __webpack_require__(12)
-var RangeSliceStream = __webpack_require__(61)
+/* WEBPACK VAR INJECTION */(function(Buffer) {var bs = __webpack_require__(55)
+var EventEmitter = __webpack_require__(16).EventEmitter
+var inherits = __webpack_require__(2)
+var mp4 = __webpack_require__(56)
+var Box = __webpack_require__(13)
+var RangeSliceStream = __webpack_require__(63)
 
 module.exports = MP4Remuxer
 
@@ -9800,10 +10345,10 @@ MP4Remuxer.prototype._generateMoof = function (track, firstSample, lastSample) {
 	return moof
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 53 */
+/* 55 */
 /***/ (function(module, exports) {
 
 module.exports = function(haystack, needle, comparator, low, high) {
@@ -9852,21 +10397,21 @@ module.exports = function(haystack, needle, comparator, low, high) {
 
 
 /***/ }),
-/* 54 */
+/* 56 */
 /***/ (function(module, exports, __webpack_require__) {
 
-exports.decode = __webpack_require__(55)
-exports.encode = __webpack_require__(60)
+exports.decode = __webpack_require__(57)
+exports.encode = __webpack_require__(62)
 
 
 /***/ }),
-/* 55 */
+/* 57 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer) {var stream = __webpack_require__(9)
-var inherits = __webpack_require__(0)
-var nextEvent = __webpack_require__(56)
-var Box = __webpack_require__(12)
+/* WEBPACK VAR INJECTION */(function(Buffer) {var stream = __webpack_require__(10)
+var inherits = __webpack_require__(2)
+var nextEvent = __webpack_require__(58)
+var Box = __webpack_require__(13)
 
 var EMPTY = new Buffer(0)
 
@@ -10049,10 +10594,10 @@ MediaData.prototype.destroy = function (err) {
   this.emit('close')
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 56 */
+/* 58 */
 /***/ (function(module, exports) {
 
 module.exports = nextEvent
@@ -10073,7 +10618,7 @@ function nextEvent (emitter, name) {
 
 
 /***/ }),
-/* 57 */
+/* 59 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var UINT_32_MAX = 0xffffffff
@@ -10109,15 +10654,15 @@ exports.decode = function (buf, offset) {
 exports.encode.bytes = 8
 exports.decode.bytes = 8
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 58 */
+/* 60 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {// This is an intentionally recursive require. I don't like it either.
-var Box = __webpack_require__(12)
-var Descriptor = __webpack_require__(59)
+var Box = __webpack_require__(13)
+var Descriptor = __webpack_require__(61)
 
 var TIME_OFFSET = 2082844800000
 
@@ -11045,10 +11590,10 @@ function readString (buf, offset, length) {
   return buf.toString('utf8', offset, offset + i)
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 59 */
+/* 61 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var tagToName = {
@@ -11124,15 +11669,15 @@ exports.DecoderConfigDescriptor.decode = function (buf, start, end) {
   return obj
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 60 */
+/* 62 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer, process) {var stream = __webpack_require__(9)
-var inherits = __webpack_require__(0)
-var Box = __webpack_require__(12)
+/* WEBPACK VAR INJECTION */(function(Buffer, process) {var stream = __webpack_require__(10)
+var inherits = __webpack_require__(2)
+var Box = __webpack_require__(13)
 
 module.exports = Encoder
 
@@ -11261,10 +11806,10 @@ MediaData.prototype.destroy = function (err) {
   this.emit('close')
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1).Buffer, __webpack_require__(3)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer, __webpack_require__(5)))
 
 /***/ }),
-/* 61 */
+/* 63 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -11276,8 +11821,8 @@ emits 'stalled' once everything is written
 
 
 */
-var inherits = __webpack_require__(0)
-var stream = __webpack_require__(9)
+var inherits = __webpack_require__(2)
+var stream = __webpack_require__(10)
 
 module.exports = RangeSliceStream
 
@@ -11395,7 +11940,7 @@ RangeSliceStream.prototype.destroy = function (err) {
 
 
 /***/ }),
-/* 62 */
+/* 64 */
 /***/ (function(module, exports) {
 
 module.exports = throttle;
@@ -11433,16 +11978,16 @@ function throttle (func, wait) {
 
 
 /***/ }),
-/* 63 */
+/* 65 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__ = __webpack_require__(13);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(6);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__ = __webpack_require__(15);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
 
 
 
-__webpack_require__(2)({ presets: ['env', 'react'] }); // ES6 JS below!
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 //const Dweb = require('../js/Dweb');     // Gets SmartDict and the Transports
 //TODO-REFACTOR extends SmartDict to eventually allow loading via URL - having problems with webpack ... libsodium -> fs
@@ -11508,518 +12053,13 @@ class ArchiveItem {
 
 
 /***/ }),
-/* 64 */
+/* 66 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__ = __webpack_require__(24);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Tile__ = __webpack_require__(65);
-
-
-__webpack_require__(2)({ presets: ['env', 'react'] }); // ES6 JS below!
-
-
-
-
-
-/* Section to ensure node and browser able to use Headers, Request and Fetch */
-/*
-var fetch,Headers,Request;
-if (typeof(Window) === "undefined") {
-    //var fetch = require('whatwg-fetch').fetch; //Not as good as node-fetch-npm, but might be the polyfill needed for browser.safari
-    //XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;  // Note this doesnt work if set to a var or const, needed by whatwg-fetch
-    console.log("Node loaded");
-    fetch = nodefetch;
-    Headers = fetch.Headers;      // A class
-    Request = fetch.Request;      // A class
-} else {
-    // If on a browser, need to find fetch,Headers,Request in window
-    console.log("Loading browser version of fetch,Headers,Request");
-    fetch = window.fetch;
-    Headers = window.Headers;
-    Request = window.Request;
-}
-*/
-
-class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default */] {
-    /*
-    Superclass for Searches - including Collections & Home
-     Fields:
-    Inherited from ArchiveBase: item
-    items   List of items found
-     */
-    constructor({ query = '*:*', sort = '', and = '', limit = 75, banner = '', page = 1, item = undefined, itemid = undefined } = {}) {
-        super(itemid, { item: item });
-        this.query = query;
-        this.limit = limit;
-        this.sort = sort;
-        this.and = and;
-        this.page = page;
-    }
-
-    navwrapped() {
-        /* Wrap the content up: wrap ( TODO-DONATE | navwrap |
-        TODO-DETAILS need stuff before nav-wrap1 and after detailsabout and need to check this against Search and Collection examples
-        returns:      JSX elements tree suitable for passing to ReactDOM.render or ReactDOMServer.renderToStaticMarkup
-         */
-        //TODO-DETAILS is putting the description (in 'htm' in as raw html which would be a nasty security hole since that comes from user !
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            { id: 'wrap' },
-            new Nav().navwrapJSX(),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'div',
-                { 'class': 'container container-ia' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('a', { name: 'maincontent', id: 'maincontent' })
-            ),
-            this.banner(),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'div',
-                { 'class': 'container container-ia nopad' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'div',
-                    { 'class': 'row' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { 'class': 'columns-items', style: 'margin-left: 0px;' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { 'class': 'sortbar' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'a',
-                                { href: '#', 'class': 'focus-on-child-only pull-right', onclick: 'return AJS.tiles_toggle(this,\'search\')' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'lists-button topinblock iconochive-list', 'data-toggle': 'tooltip',
-                                    title: 'Show\xA0as\xA0list' })
-                            ),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'a',
-                                { href: '#', 'class': 'focus-on-child-only pull-right', onclick: 'return AJS.tiles_toggle(this,\'search\')' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'tiles-button topinblock iconochive-tiles', 'data-toggle': 'tooltip',
-                                    title: 'Show\xA0thumbnails' })
-                            ),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'hidden-xs hidden-sm pull-right', style: 'height:50px;width:30px;' }),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'div',
-                                { 'class': 'micro-label pull-right hidden-tiles' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'checkbox', name: 'showdetails', onchange: 'AJS.showdetails_toggle(this,\'search\')' }),
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'span',
-                                    { 'class': 'hidden-xs-span' },
-                                    'SHOW '
-                                ),
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'span',
-                                    null,
-                                    'DETAILS'
-                                )
-                            ),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'div',
-                                { 'class': 'up-down' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'iconochive-up-solid disabled', 'aria-hidden': 'true' }),
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'span',
-                                    { 'class': 'sr-only' },
-                                    'up-solid'
-                                ),
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'iconochive-down-solid disabled', 'aria-hidden': 'true' }),
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'span',
-                                    { 'class': 'sr-only' },
-                                    'down-solid'
-                                )
-                            ),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'div',
-                                { 'class': 'topinblock' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'div',
-                                    { 'class': 'hidden-md hidden-lg' },
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'select',
-                                        { 'class': 'ikind-mobile form-control', onchange: 'AJS.ikind_mobile_change(this)' },
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'option',
-                                            { 'data-id': 'relevance', selected: 'selected' },
-                                            'RELEVANCE'
-                                        ),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'option',
-                                            { 'data-id': 'views' },
-                                            'VIEWS'
-                                        ),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'option',
-                                            { 'data-id': 'title' },
-                                            'TITLE'
-                                        ),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'option',
-                                            { 'data-id': 'date-archived' },
-                                            'DATE ARCHIVED'
-                                        ),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'option',
-                                            { 'data-id': 'date-published' },
-                                            'DATE PUBLISHED'
-                                        ),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'option',
-                                            { 'data-id': 'date-reviewed' },
-                                            'DATE REVIEWED'
-                                        ),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'option',
-                                            { 'data-id': 'creator' },
-                                            'CREATOR'
-                                        )
-                                    )
-                                )
-                            ),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'div',
-                                { 'class': 'topinblock' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'div',
-                                    { 'class': 'hidden-xs hidden-sm' },
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'div',
-                                        { 'class': 'sort-by' },
-                                        'SORT BY'
-                                    ),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'span',
-                                        { 'class': 'big-label blue-pop' },
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'a',
-                                            { 'class': 'ikind stealth in', 'data-id': 'relevance', onClick: `Nav.nav_search({query:query)` },
-                                            'RELEVANCE'
-                                        ),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'iconochive-dot ikind-sep' }),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'a',
-                                            { 'class': 'ikind stealth', 'data-id': 'views', onClick: `Nav.nav_search({query:query, "sort": "-downloads"})` },
-                                            'VIEWS'
-                                        ),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'iconochive-dot ikind-sep' }),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'a',
-                                            { 'class': 'ikind stealth', 'data-id': 'title', onClick: `Nav.nav_earch({query:query. "sort": "titleSorter"})` },
-                                            'TITLE'
-                                        ),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'iconochive-dot ikind-sep' }),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'a',
-                                            { 'class': 'ikind stealth', id: 'date_switcher', 'data-id': 'date-archived',
-                                                onClick: `Nav.nav_search({query:query, sort="-publicdate" })` },
-                                            'DATE ARCHIVED'
-                                        ),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'iconochive-dot ikind-sep hidden' }),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'a',
-                                            { 'class': 'ikind stealth hidden', 'data-id': 'date-published',
-                                                onClick: `Nav.nav_search{query:query, "sort": "-date"})` },
-                                            'DATE PUBLISHED'
-                                        ),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'iconochive-dot ikind-sep hidden' }),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'a',
-                                            { 'class': 'ikind stealth hidden', 'data-id': 'date-reviewed',
-                                                onClick: `Nav.nav_search({query:query, "sort": "-reviewdate"})` },
-                                            'DATE REVIEWED'
-                                        ),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'iconochive-dot ikind-sep' }),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'a',
-                                            { 'class': 'ikind stealth', 'data-id': 'creator',
-                                                onClick: `Nav.nav_search(${query + "&amp;sort=creatorSorter"})` },
-                                            'CREATOR'
-                                        )
-                                    )
-                                )
-                            )
-                        ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'sortbar-rule' }),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { style: 'position:relative' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'div',
-                                { id: 'ikind-search', 'class': 'ikind in' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'div',
-                                    { 'class': 'results' },
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'div',
-                                        { 'class': 'item-ia mobile-header hidden-tiles', 'data-id': '__mobile_header__' },
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'div',
-                                            { 'class': 'views C C1' },
-                                            ' ',
-                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-eye', 'aria-hidden': 'true' }),
-                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                                'span',
-                                                { 'class': 'sr-only' },
-                                                'eye'
-                                            ),
-                                            ' '
-                                        ),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'div',
-                                            { 'class': 'C234' },
-                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                                'div',
-                                                { 'class': 'C C2' },
-                                                'Title'
-                                            ),
-                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                                'div',
-                                                { 'class': 'pubdate C C3' },
-                                                ' ',
-                                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                                    'div',
-                                                    null,
-                                                    ' ',
-                                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                                        'div',
-                                                        null,
-                                                        'Date Archived'
-                                                    ),
-                                                    ' '
-                                                ),
-                                                ' '
-                                            ),
-                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                                'div',
-                                                { 'class': 'by C C4' },
-                                                'Creator'
-                                            )
-                                        ),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { 'class': 'C C5' })
-                                    ),
-                                    this.items.map(function (item, n) {
-                                        // Note rendering tiles is quick, its the fetch of the img (async) which is slow.
-                                        return new __WEBPACK_IMPORTED_MODULE_3__Tile__["a" /* default */]().render(item);
-                                    })
-                                ),
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'center',
-                                    { 'class': 'more_search' },
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'a',
-                                        { 'class': 'btn btn-info btn-sm', style: 'visibility:hidden',
-                                            onclick: 'return AJS.more_search(this,{`/search.php?query=${query}&page=`},1)', href: '#' },
-                                        'MORE RESULTS'
-                                    ),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'span',
-                                        { 'class': 'more-search-fetching' },
-                                        'Fetching more results ',
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { src: '/images/loading.gif' })
-                                    )
-                                )
-                            )
-                        )
-                    )
-                )
-            )
-        );
-    }
-
-    archive_setup_push() {
-        archive_setup.push(function () {
-            AJS.date_switcher(`&nbsp;<a href="/search.php?query=${query}&amp;sort=-publicdate"><div class="date_switcher in">Date Archived</div></a> <a href="/search.php?query=${query}&amp;sort=-date"><div class="date_switcher">Date Published</div></a> <a href="/search.php?query=${query}&amp;sort=-reviewdate"><div class="date_switcher">Date Reviewed</div></a> `);
-        });
-        archive_setup.push(function () {
-            //TODO-DETAILS check not pushing on top of existing (it probably is)
-            AJS.lists_v_tiles_setup('search');
-            AJS.popState('search');
-            $('div.ikind').css({ visibility: 'visible' });
-            AJS.tiler(); // Note Traceys code had AJS.tiler('#ikind-search') but Search and Collections examples have it with no args
-            $(window).on('resize  orientationchange', function (evt) {
-                clearTimeout(AJS.node_search_throttler);
-                AJS.node_search_throttler = setTimeout(AJS.tiler, 250);
-            });
-            // register for scroll updates (for infinite search results)
-            $(window).scroll(AJS.scrolled);
-        });
-    }
-    browserBefore() {
-        $('body').addClass('bgEEE');
-    }
-
-    banner() {
-        // On Search "banner" is a search form
-        let query = this.query;
-        let searchURL = `https://archive.org/advancedsearch.php?q={query}`;
-        let addBookmarkURL = `https://archive.org/bookmarks.php?add_bookmark=1&amp;mediatype=search&amp;identifier={query}&amp;title={query}`;
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            { 'class': 'container container-ia width-max',
-                style: 'background-color:#d8d8d8; padding-top:60px; border:1px solid #979797; padding-bottom:25px;' },
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'div',
-                { 'class': 'container' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'div',
-                    { 'class': 'row' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { 'class': 'col-sm-2 col-md-2 col-lg-1 hidden-xs' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'h3',
-                            { style: 'margin:3px 0 0 0; text-align:right;' },
-                            'Search'
-                        )
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { 'class': 'col-sm-8 col-md-8 col-lg-9' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { 'class': 'searchbar', style: 'margin-bottom:10px; margin-right:60px;' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'form',
-                                { 'class': 'form search-form js-search-form',
-                                    id: 'searchform',
-                                    method: 'get',
-                                    role: 'search',
-                                    action: 'https://archive.org/searchresults.php',
-                                    'data-event-form-tracking': 'Search|SearchForm',
-                                    'data-wayback-machine-search-url': 'https://web.archive.org/web/*/' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'div',
-                                    { 'class': 'form-group', style: 'position:relative' },
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'div',
-                                        { style: 'position:relative' },
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'span',
-                                            { 'aria-hidden': 'true' },
-                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-search', style: 'position:absolute;left:4px;top:7px;color:#999;font-size:125%',
-                                                'aria-hidden': 'true' }),
-                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                                'span',
-                                                { 'class': 'sr-only' },
-                                                'search'
-                                            ),
-                                            '            '
-                                        ),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { 'class': 'form-control input-sm roundbox20 js-search-bar', size: '25', name: 'search',
-                                            placeholder: 'Search', type: 'text', value: query,
-                                            style: 'font-size:125%;padding-left:30px;',
-                                            onclick: '$(this).css(\'padding-left\',\'\').parent().find(\'.iconochive-search\').hide()',
-                                            'aria-controls': 'search_options',
-                                            'aria-label': 'Search the Archive. Filters and Advanced Search available below.'
-                                        })
-                                    ),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'div',
-                                        {
-                                            id: 'search_options',
-                                            'class': 'search-options js-search-options is-open',
-                                            'aria-expanded': 'true',
-                                            'aria-label': 'Search Options',
-                                            'data-keep-open-when-changed': 'true'
-                                        },
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'fieldset',
-                                            null,
-                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                                'label',
-                                                null,
-                                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'radio', name: 'sin', value: '', checked: true }),
-                                                'Search metadata'
-                                            ),
-                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                                'label',
-                                                null,
-                                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'radio', name: 'sin', value: 'TXT' }),
-                                                'Search full text of books'
-                                            ),
-                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                                'label',
-                                                null,
-                                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'radio', name: 'sin', value: 'TV' }),
-                                                'Search TV captions'
-                                            ),
-                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                                'label',
-                                                null,
-                                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'radio', name: 'sin', value: 'WEB' }),
-                                                'Search archived web sites'
-                                            )
-                                        ),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'a',
-                                            { href: searchURL, 'class': 'search-options__advanced-search-link' },
-                                            'Advanced Search'
-                                        )
-                                    ),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'button',
-                                        { 'class': 'btn btn-gray label-primary input-sm',
-                                            style: 'position:absolute;right:-60px;top:0;',
-                                            type: 'submit' },
-                                        'GO'
-                                    ),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'hidden', name: 'limit', value: '100' }),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'hidden', name: 'start', value: '0' }),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'hidden', name: 'searchAll', value: 'yes' }),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('input', { type: 'hidden', name: 'submit', value: 'this was submitted' })
-                                )
-                            )
-                        )
-                    ),
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { id: 'search-actions', 'class': 'col-sm-2 col-md-2 col-lg-2' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-share', 'aria-hidden': 'true' }),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'span',
-                            { 'class': 'sr-only' },
-                            'share'
-                        ),
-                        ' Share',
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'a',
-                            { 'class': 'stealth',
-                                href: addBookmarkURL,
-                                onclick: 'return AJS.modal_go(this,{favorite:1})',
-                                'data-target': '#confirm-modal' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-favorite', 'aria-hidden': 'true' }),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'span',
-                                {
-                                    'class': 'sr-only' },
-                                'favorite'
-                            ),
-                            ' Favorite'
-                        ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null)
-                    )
-                )
-            )
-        );
-    }
-
-}
-/* harmony export (immutable) */ __webpack_exports__["default"] = Search;
-
-
-/***/ }),
-/* 65 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(6);
-__webpack_require__(2)({ presets: ['env', 'react'] }); // ES6 JS below!
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 //import React from 'react';
 
@@ -12197,15 +12237,15 @@ class Tile {
 
 
 /***/ }),
-/* 66 */
+/* 67 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Search__ = __webpack_require__(64);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Details__ = __webpack_require__(26);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Search__ = __webpack_require__(14);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Details__ = __webpack_require__(6);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__Home__ = __webpack_require__(68);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__Collection__ = __webpack_require__(69);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__Texts__ = __webpack_require__(70);
@@ -12215,7 +12255,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_10__DetailsError__ = __webpack_require__(74);
 //import ReactDOM from "react-dom";
 
-__webpack_require__(2)({ presets: ['env', 'react'] }); // ES6 JS below!
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 // https://ponyfoo.com/articles/universal-react-babel
 
@@ -12479,53 +12519,13 @@ class Nav {
 
 
 /***/ }),
-/* 67 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Details__ = __webpack_require__(26);
-__webpack_require__(2)({ presets: ['env', 'react'] }); // ES6 JS below!
-
-
-
-
-
-class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
-    constructor(itemid, item) {
-        super(itemid, item);
-    }
-
-    archive_setup_push() {
-        let self = this;
-        super.archive_setup_push(); // On commute.html the Play came after the parts common to AV, Image and Text
-        // archive_setup.push(function() { //TODO-ARCHIVE_SETUP move Play from browserAfter to here
-        //    Play('jw6', self.playlist, self.cfg);
-        // });
-    }
-    setupPlaylist(preferredTypes) {
-        this.playlist = [];
-        this.avs = this._list.filter(fi => preferredTypes.includes(fi.metadata.format));
-        if (this.avs.length) {
-            this.avs.sort((a, b) => __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].natcompare(a.metadata.name, b.metadata.name)); //Unsure why sorting names, presumably tracks are named alphabetically ?
-
-            this.playlist.push({ name: this.avs[0].name,
-                urls: [item.metadata.magnetlink + '/' + this.avs[0].name] });
-        }
-    }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = AV;
-
-
-/***/ }),
 /* 68 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Search__ = __webpack_require__(64);
-__webpack_require__(2)({ presets: ['env', 'react'] }); // ES6 JS below!
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Search__ = __webpack_require__(14);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
 
@@ -12559,9 +12559,9 @@ class Home extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Search__ = __webpack_require__(64);
-__webpack_require__(2)({ presets: ['env', 'react'] }); // ES6 JS below!
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Search__ = __webpack_require__(14);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
 
@@ -12643,9 +12643,9 @@ class Collection extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(26);
-__webpack_require__(2)({ presets: ['env', 'react'] }); // ES6 JS below!
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(6);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
 
@@ -12738,10 +12738,10 @@ class Texts extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(26);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Util__ = __webpack_require__(6);
-__webpack_require__(2)({ presets: ['env', 'react'] }); // ES6 JS below!
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(6);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Util__ = __webpack_require__(4);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
 
@@ -12877,9 +12877,9 @@ class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__AV__ = __webpack_require__(67);
-__webpack_require__(2)({ presets: ['env', 'react'] }); // ES6 JS below!
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__AV__ = __webpack_require__(27);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
 
@@ -12989,9 +12989,9 @@ class Audio extends __WEBPACK_IMPORTED_MODULE_1__AV__["a" /* default */] {
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__AV__ = __webpack_require__(67);
-__webpack_require__(2)({ presets: ['env', 'react'] }); // ES6 JS below!
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__AV__ = __webpack_require__(27);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
 
@@ -13101,7 +13101,7 @@ class Video extends __WEBPACK_IMPORTED_MODULE_1__AV__["a" /* default */] {
                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                             'div',
                             { id: 'videoContainerX', style: 'text-align: center;' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('video', { id: 'streamContainer', src: this.avs[0] })
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('video', { id: 'streamContainer', src: this.avs[0], controls: true })
                         ),
                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'webtorrentStats', style: 'color: white; text-align: center;' }),
                         this.cherModal("video")
@@ -13121,9 +13121,9 @@ class Video extends __WEBPACK_IMPORTED_MODULE_1__AV__["a" /* default */] {
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(26);
-__webpack_require__(2)({ presets: ['env', 'react'] }); // ES6 JS below!
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(6);
+__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
 
