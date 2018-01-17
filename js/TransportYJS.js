@@ -290,7 +290,10 @@ class TransportYJS extends Transport {
         return this._p_get(y, keys);
     }
     async p_rawfetch(url, verbose) {
-        return await this.p_getall(url, verbose);   // Data struc is ok as SmartDict.p_fetch will pass to KVT constructor
+        return {
+            table: "keyvaluetable",
+            _map: await this.p_getall(url, verbose)
+        };   // Data struc is ok as SmartDict.p_fetch will pass to KVT constructor
     }
     async monitor(url, callback, verbose) {
         /*

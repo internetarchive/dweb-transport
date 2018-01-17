@@ -47,7 +47,7 @@ class PublicPrivate extends SmartDict {
         if (key) {
             this._setkeypair(key, verbose);
         }
-        this._master = (typeof master === "undefined") ? this.keypair.has_private() : master;  // Note this must be AFTER _setkeypair since that sets based on keypair found and _p_storepublic for example wants to force !master
+        this._master = (typeof master === "undefined") ? (this.keypair && this.keypair.has_private()) : master;  // Note this must be AFTER _setkeypair since that sets based on keypair found and _p_storepublic for example wants to force !master
         if (!this._master && (!this._publicurls || !this._publicurls.length)) {
             this._publicurls = this._urls;  // We aren't master, so publicurl is same as url - note URL will only have been set if constructor called from SmartDict.p_fetch
         } else {

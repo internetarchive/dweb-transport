@@ -25,10 +25,10 @@ exports.table2class = { // Each of these needs a constructor that takes data and
     "sb": "StructuredBlock",
     "kc": "KeyChain",
     "kp": "KeyPair",
-    "kvt": "KeyValueTable",
     "acl": "AccessControlList",
     "sd": "SmartDict",
     "vl": "VersionList",
+    "keyvaluetable": "KeyValueTable",
 };
 
 
