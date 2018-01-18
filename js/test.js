@@ -18,7 +18,7 @@ function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { reso
 
 
 require('y-leveldb')(Dweb.TransportYJS.Y); //- can't be there for browser, node seems to find it ok without this, though not sure why, though its the cause of the warning: YJS: Please do not depend on automatic requiring of modules anymore! Extend modules as follows `require('y-modulename')(Y)`
-let verbose = true;
+let verbose = false;
 let acl;
     // Note that this test setup is being mirror in test_ipfs.html
     // In general it should be possible to comment out failing tests EXCEPT where they provide a value to the next */
@@ -57,8 +57,11 @@ async function p_test(verbose) {
         await Dweb.Transports.test(verbose);
         if (verbose) console.log("Transports tested");
         await Dweb.KeyValueTable.p_test(verbose);
-        //console.log("---EXITING AFTER TRANSPORTTEST") //TODO-KEYVALUE remove this and "return" once done
-        //return
+        verbose=true;
+        console.log("XXX@61");
+        await Dweb.Domain.p_test(verbose);
+        console.log("---EXITING AFTER TRANSPORTTEST") //TODO-KEYVALUE remove this and "return" once done
+        return
         await Dweb.Block.p_test(verbose);
         await Dweb.Signature.p_test(verbose);
         await Dweb.KeyPair.test(verbose);

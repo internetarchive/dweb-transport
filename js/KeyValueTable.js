@@ -74,15 +74,33 @@ class KeyValueTable extends PublicPrivate {
         await Dweb.Transports.p_set(this._urls, this._map, null, verbose )   // Set whole dictionary
     }
 
-    set(name, value, verbose) {
+    async p_set(name, value, verbose) {
         if (this._autoset && (this._map[name] !== value)) {
             Dweb.Transports.p_set(this._urls, name, value, verbose); // Note this is aync and not waiting for result
         }
         this._map[name] = value;
         //TODO_KEYVALUE copy semantics from __setattr_ for handling Dates, maybe other types
     }
+    async p_get(keys, verbose) {
+        /*
+        keys:   single key or array of keys
+         */
+        return await Transports.p_get(this._publicurls, keys, verbose)
+    }
+    async p_keys(verbose) {
+        /*
+        returns array of all keys
+         */
+        return await Dweb.Transports.p_keys(this._publicurls, verbose)
+    }
+    async p_getall(verbose) {
+        /*
+        returns dictionary of all keys
+         */
+        return Dweb.Transports.p_getall(this._publicurls, verbose)
+    }
 
-    delete(name) {
+    async p_delete(name) {
         delete this._map[name];
     }
     //get(name, default) cant be defined as overrides this.get()
@@ -98,11 +116,11 @@ class KeyValueTable extends PublicPrivate {
                 if (verbose) console.log("KVT monitor",event,this._publicurls);
                 switch (event.type) {
                     case "set": // YJS mapped from ad
-                        this.set(event.name, event.value); // Loop broken in set if value unchanged
+                        this.p_set(event.name, event.value); // Loop broken in set if value unchanged
                         break;
                     case "delete":
                         if (!["_publicurls", "_urls"].includes(name)) { //Potentially damaging, may need to check other fields
-                            this.delete(name);
+                            this.p_delete(name);
                         }
                         break;
                 }
@@ -119,8 +137,8 @@ class KeyValueTable extends PublicPrivate {
             let privateurls = masterobj._urls;
             let publicurls = masterobj._publicurls;
             let publicobj = await Dweb.SmartDict.p_fetch(publicurls, verbose);
-            console.assert(typeof publicobj["address"] === "undefined"); // Shouldnt be set yet
-            masterobj.set("address","Everywhere", verbose);
+            console.assert(typeof publicobj._map["address"] === "undefined"); // Shouldnt be set yet
+            await masterobj.p_set("address","Everywhere", verbose);
             await delay(500);
             console.assert(publicobj._map["address"] === "Everywhere"); // Should be set after allow time for monitor event
         } catch (err) {

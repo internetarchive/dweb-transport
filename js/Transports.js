@@ -199,7 +199,7 @@ class Transports {
         /*
         Fetch the values for a url and one or more keys, transports act on the data, typically storing it.
         urls:	array of urls to retrieve (any are valid)
-        keys:   array of keys wanted
+        keys:   array of keys wanted or single key
         returns:	string - arbitrary bytes retrieved or dict of key: value
         throws:     TransportError with concatenated error messages if none succeed.
          */
@@ -302,7 +302,7 @@ class Transports {
         Fetch the values for a url and one or more keys, transports act on the data, typically storing it.
         urls:	array of urls to retrieve (any are valid)
         keys:   array of keys wanted
-        returns:	string - arbitrary bytes retrieved or dict of key: value
+        returns:	array of strings returned for the keys. //TODO consider issues around return a data type rather than array of strings
         throws:     TransportError with concatenated error messages if none succeed.
          */
         let tt = this.validFor(urls, "getall"); //[ [Url,t],[Url,t]]
@@ -398,7 +398,7 @@ class Transports {
     static async test(verbose) {
         if (verbose) {console.log("Transports.test")}
         try {
-            /*
+            /* Could convert this - copied fom YJS to do a test at the "Transports" level
             let testurl = "yjs:/yjs/THISATEST";  // Just a predictable number can work with
             let res = await transport.p_rawlist(testurl, verbose);
             let listlen = res.length;   // Holds length of list run intermediate

@@ -99,7 +99,7 @@ class TransportIPFS extends Transport {
             First part of setup, create obj, add to Transports but dont attempt to connect, typically called instead of p_setup if want to parallelize connections.
         */
         let combinedoptions = Transport.mergeoptions(defaultoptions, options);
-        console.log("IPFS options %o", combinedoptions);
+        if (verbose) console.log("IPFS options %o", combinedoptions);
         let t = new TransportIPFS(combinedoptions, verbose);   // Note doesnt start IPFS
         Dweb.Transports.addtransport(t);
         return t;

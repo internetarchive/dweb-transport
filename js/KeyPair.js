@@ -195,13 +195,17 @@ class KeyPair extends SmartDict {
         }
     }
 
+    signingexport() {
+        /* Usefull to be able to export the signing key */
+        return "NACL VERIFY:"+sodium.to_urlsafebase64(this._key.sign.publicKey)
+    }
     publicexport() {    // TODO-BACKPORT probably change this on Python version as well
         /*
         :return: an array include one or more "NACL PUBLIC:abc123", or "NACL VERIFY:abc123" urlsafebase64 string.
          */
         let res = [];
         if (this._key.encrypt) { res.push("NACL PUBLIC:"+sodium.to_urlsafebase64(this._key.encrypt.publicKey)) }
-        if (this._key.sign) { res.push("NACL VERIFY:"+sodium.to_urlsafebase64(this._key.sign.publicKey)) }
+        if (this._key.sign) { res.push(this.signingexport()) }
         return res;
     }
 

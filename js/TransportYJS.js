@@ -101,7 +101,7 @@ class TransportYJS extends Transport {
             First part of setup, create obj, add to Transports but dont attempt to connect, typically called instead of p_setup if want to parallelize connections.
         */
         let combinedoptions = Transport.mergeoptions(defaultoptions, options);
-        console.log("YJS options %o", combinedoptions); // Log even if !verbose
+        if (verbose) console.log("YJS options %o", combinedoptions); // Log even if !verbose
         let t = new TransportYJS(combinedoptions, verbose);   // Note doesnt start IPFS or Y
         Dweb.Transports.addtransport(t);
         return t;
@@ -329,13 +329,15 @@ class TransportYJS extends Transport {
             let res = await transport.p_rawlist(testurl, verbose);
             let listlen = res.length;   // Holds length of list run intermediate
             if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res));
-            transport.listmonitor(testurl, (obj) => console.log("Monitored", obj), verbose);
+            let monitoredobj;
+            transport.listmonitor(testurl, (obj) => (monitoredobj = obj), verbose);
             let sig = new Dweb.Signature({urls: ["123"], date: new Date(Date.now()), signature: "Joe Smith", signedby: [testurl]}, verbose);
             await transport.p_rawadd(testurl, sig, verbose);
             if (verbose) console.log("TransportIPFS.p_rawadd returned ");
             res = await transport.p_rawlist(testurl, verbose);
             if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res)); // Note not showing return
             await delay(500);
+            console.assert(monitoredobj.urls[0] === "123"); // Should have been caught by the listmonitor above
             res = await transport.p_rawlist(testurl, verbose);
             console.assert(res.length === listlen + 1, "Should have added one item");
             //console.log("TransportYJS test complete");
