@@ -4437,7 +4437,7 @@ class ArchiveFile {
         It gets a static (non stream) content and puts in an existing IMG tag.
          Note it can't be inside load_img which has to be synchronous and return a jsx tree.
          */
-        let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash]; // Multiple potential sources
+        let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f => !!f); // Multiple potential sources elimate any empty
         let blk = await Dweb.Block.p_fetch(urls, verbose); //Typically will be a Uint8Array
         let blob = new Blob([blk._data], { type: __WEBPACK_IMPORTED_MODULE_3__Util__["a" /* default */].archiveMimeTypeFromFormat[this.metadata.format] }); // Works for data={Uint8Array|Blob}
         // This next code is bizarre combination needed to open a blob from within an HTML window.
@@ -12032,7 +12032,8 @@ class ArchiveItem {
         if (this.itemid && !this.item) {
             console.log('get metadata for ' + this.itemid);
             //this.item = await Util.fetch_json(`https://archive.org/metadata/${this.itemid}`);
-            this.item = await __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}`);
+            let transports = Dweb.Transports.connectedNames().map(n => "transport=" + n).join('&');
+            this.item = await __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}?${transports}`);
             this._listLoad(); // Load _list with ArchiveFile
         }
         if (this.query) {
