@@ -10,7 +10,7 @@ export default class Video extends AV {
         this.itemtype = "http://schema.org/VideoObject";
     }
     setupPlaylist() {
-        super.setupPlaylist(['h.264','512Kb MPEG4'])
+        super.setupPlaylist(['h.264','512Kb MPEG4', 'MPEG4'])
     }
 
     theatreIaWrap() {
