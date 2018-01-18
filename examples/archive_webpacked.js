@@ -7438,7 +7438,7 @@ class ArchiveBase extends __WEBPACK_IMPORTED_MODULE_2__ArchiveItem__["a" /* defa
         this.archive_setup_push(); // Subclassed function to setup stuff for after loading.
         __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].AJS_on_dom_loaded(); // Runs code pushed archive_setup - needed for image if "super" this, put it after superclasses
     }
-    render(res, htm) {
+    render(res) {
         //TODO-DETAILS remove htm and from calling routines
         var els = this.navwrapped(); // Build the els
         this.browserBefore();
@@ -12459,56 +12459,65 @@ class Nav {
             'Loading - note this can take a while if no-one else has accessed this item yet'
         )).navwrapped(false), destn);
     }
-    static async nav_home() {
+    static async nav_home(wanthistory = true) {
         console.log("Navigating to Home");
-        return await Nav.nav_details(undefined);
+        return await Nav.nav_details(undefined, wanthistory);
     }
 
-    static async nav_details(id) {
+    static async nav_details(id, wanthistory = true) {
         console.log("Navigating to Details", id);
         let destn = document.getElementById('main'); // Blank window (except Nav) as loading
         Nav.clear(destn);
-        await Nav.factory(id, destn, ""); // Not sure what returning ....
+        await Nav.factory(id, destn, wanthistory); // Not sure what returning ....
         return false; // Dont follow anchor link - unfortunately React ignores this
     }
 
-    static async nav_search(q) {
+    static async nav_search(q, wanthistory = true) {
         console.log("Navigating to Search");
+        if (wanthistory) {
+            let historystate = { query: q }; //TODO-HISTORY may want  to store verbose, transports etc here
+            history.pushState(historystate, `Internet Archive search ${q}`, `?query=${q}&verbose=${verbose}`); //TODO-HISTORY need to save state of transports
+        }
         let destn = document.getElementById('main'); // Blank window (except Nav) as loading
         Nav.clear(destn);
         let s = await new __WEBPACK_IMPORTED_MODULE_2__Search__["default"](typeof q === "object" ? q : typeof q === "string" ? { query: encodeURIComponent(q) } : undefined).fetch();
-        s.render(destn, "");
+        s.render(destn);
     }
 
-    static async factory(itemid, res, htm) {
+    static async factory(itemid, res, wanthistory = true) {
+        console.log("XXX@Nav.factory", itemid);
+        if (wanthistory) {
+            let historystate = { itemid }; //TODO-HISTORY may want  to store verbose, transports etc here
+            history.pushState(historystate, `Internet Archive item ${itemid}`, `?item=${itemid}&verbose=${verbose}`); //TODO-HISTORY need to save state of transports
+        }
         if (!itemid) {
-            (await new __WEBPACK_IMPORTED_MODULE_4__Home__["a" /* default */](itemid, undefined).fetch()).render(res, htm);
+            (await new __WEBPACK_IMPORTED_MODULE_4__Home__["a" /* default */](itemid, undefined).fetch()).render(res);
         } else {
             let obj = await new __WEBPACK_IMPORTED_MODULE_3__Details__["default"](itemid).fetch();
             item = obj.item;
             if (!item.metadata) {
-                new __WEBPACK_IMPORTED_MODULE_10__DetailsError__["a" /* default */](itemid, item, `item ${itemid} cannot be found or does not have metadata`).render(res, htm);
+                new __WEBPACK_IMPORTED_MODULE_10__DetailsError__["a" /* default */](itemid, item, `item ${itemid} cannot be found or does not have metadata`).render(res);
             } else {
                 if (verbose) console.log("Found mediatype", item.metadata.mediatype);
                 switch (item.metadata.mediatype) {
                     case "collection":
-                        return (await new __WEBPACK_IMPORTED_MODULE_5__Collection__["a" /* default */](itemid, item).fetch()).render(res, htm); //fetch will do search
+                        return (await new __WEBPACK_IMPORTED_MODULE_5__Collection__["a" /* default */](itemid, item).fetch()).render(res); //fetch will do search
                         break;
                     case "texts":
-                        new __WEBPACK_IMPORTED_MODULE_6__Texts__["a" /* default */](itemid, item).render(res, htm);
+                        new __WEBPACK_IMPORTED_MODULE_6__Texts__["a" /* default */](itemid, item).render(res);
                         break;
                     case "image":
-                        new __WEBPACK_IMPORTED_MODULE_7__Image__["a" /* default */](itemid, item).render(res, htm);
+                        new __WEBPACK_IMPORTED_MODULE_7__Image__["a" /* default */](itemid, item).render(res);
                         break;
                     case "audio":
                         // Intentionally drop thru to movies
-                        new __WEBPACK_IMPORTED_MODULE_8__Audio__["a" /* default */](itemid, item).render(res, htm);
+                        new __WEBPACK_IMPORTED_MODULE_8__Audio__["a" /* default */](itemid, item).render(res);
                         break;
                     case "movies":
-                        new __WEBPACK_IMPORTED_MODULE_9__Video__["a" /* default */](itemid, item).render(res, htm);
+                        new __WEBPACK_IMPORTED_MODULE_9__Video__["a" /* default */](itemid, item).render(res);
                         break;
                     default:
-                        new __WEBPACK_IMPORTED_MODULE_10__DetailsError__["a" /* default */](itemid, item, `Unsupported mediatype: ${item.metadata.mediatype}`).render(res, htm);
+                        new __WEBPACK_IMPORTED_MODULE_10__DetailsError__["a" /* default */](itemid, item, `Unsupported mediatype: ${item.metadata.mediatype}`).render(res);
                     //    return new Nav(")
                 }
             }
@@ -12518,6 +12527,16 @@ class Nav {
 }
 /* harmony export (immutable) */ __webpack_exports__["default"] = Nav;
 
+window.onpopstate = function (event) {
+    console.log("XXX@popstate", document.location, "state=", event.state);
+    if (event.state.query) {
+        Nav.nav_search(event.state.query, false);
+    } else if (event.state.itemid) {
+        Nav.nav_details(event.state.itemid, false);
+    } else {
+        Nav.nav_home(false);
+    }
+};
 
 /***/ }),
 /* 68 */
@@ -13136,8 +13155,8 @@ class DetailsError extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
     theatreIaWrap() {
         return this.message;
     }
-    render(res, htm) {
-        super.render(res, htm);
+    render(res) {
+        super.render(res);
     }
     itemDetailsAboutJSX() {}
 }

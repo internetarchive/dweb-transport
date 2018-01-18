@@ -10,8 +10,8 @@ export default class DetailsError extends Details {
     theatreIaWrap() {
         return this.message;
     }
-    render(res, htm) {
-        super.render(res,htm)
+    render(res) {
+        super.render(res)
     }
     itemDetailsAboutJSX() { }
 }

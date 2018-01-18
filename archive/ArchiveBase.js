@@ -45,7 +45,7 @@ export default class ArchiveBase extends ArchiveItem {
         this.archive_setup_push(); // Subclassed function to setup stuff for after loading.
         Util.AJS_on_dom_loaded(); // Runs code pushed archive_setup - needed for image if "super" this, put it after superclasses
     }
-    render(res, htm) {  //TODO-DETAILS remove htm and from calling routines
+    render(res) {  //TODO-DETAILS remove htm and from calling routines
         var els = this.navwrapped();    // Build the els
         this.browserBefore();
         React.domrender(els, res);  //Put the els into the page
