@@ -37,7 +37,7 @@ export default class ArchiveFile {
         jsx.src = objectURL;
     }
     async p_loadStream(jsx) {
-        let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash];   // Multiple potential sources
+        let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f=>!!f);   // Multiple potential sources
         var file = {
             name: this.metadata.name,
             createReadStream: function (opts) {
