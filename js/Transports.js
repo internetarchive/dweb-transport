@@ -11,6 +11,15 @@ class Transports {
         if (verbose) console.log("Transports(%o)",options);
     }
 
+    static _connected() {
+        /*
+        Get an array of transports that are connected, i.e. currently usable
+         */
+        return this._transports.filter((t) => (!t.status));
+    }
+    static connectedNames() {
+        return this._connected().map(t => t.name);
+    }
     static validFor(urls, func) {
         /*
         Finds an array or Transports that can support this URL.
@@ -23,13 +32,13 @@ class Transports {
          */
         console.assert((urls && urls[0]) || ["store", "newlisturls", "newdatabase", "newtable"].includes(func), "Transports.validFor failed - coding error - urls=", urls, "func=", func); // FOr debugging old calling patterns with [ undefined ]
         if (!(urls && urls.length > 0)) {
-            return Dweb.Transports._transports.filter((t) => (!t.status && t.supports(undefined, func)))
+            return this._connected().filter((t) => (t.supports(undefined, func)))
                 .map((t) => [undefined, t]);
         } else {
             return [].concat(
                 ...urls.map((url) => typeof url === 'string' ? Url.parse(url) : url) // parse URLs once
                     .map((url) =>
-                        Dweb.Transports._transports.filter((t) => (!t.status && t.supports(url, func))) // [ t1, t2 ]
+                        this._connected().filter((t) => (t.supports(url, func))) // [ t1, t2 ]
                             .map((t) => [url, t]))); // [[ u, t1], [u, t2]]
         }
     }
@@ -44,7 +53,7 @@ class Transports {
         returns:    Array of urls of where stored
         throws: TransportError with message being concatenated messages of transports if NONE of them succeed.
          */
-        let tt = Dweb.Transports.validFor(undefined, "store"); // Valid connected transports that support "store"
+        let tt = this.validFor(undefined, "store"); // Valid connected transports that support "store"
         if (!tt.length) {
             throw new Dweb.errors.TransportError('Transports.p_rawstore: Cant find transport for store');
         }
@@ -65,7 +74,7 @@ class Transports {
         return rr;
     }
     static async p_rawlist(urls, verbose) {
-        let tt = Dweb.Transports.validFor(urls, "list"); // Valid connected transports that support "store"
+        let tt = this.validFor(urls, "list"); // Valid connected transports that support "store"
         if (!tt.length) {
             throw new Dweb.errors.TransportError('Transports.p_rawlist: Cant find transport for urls:'+urls.join(','));
         }
@@ -95,7 +104,7 @@ class Transports {
         returns:	string - arbitrary bytes retrieved.
         throws:     TransportError with concatenated error messages if none succeed.
          */
-        let tt = Dweb.Transports.validFor(urls, "fetch"); //[ [Url,t],[Url,t]]
+        let tt = this.validFor(urls, "fetch"); //[ [Url,t],[Url,t]]
         if (!tt.length) {
             throw new Dweb.errors.TransportError("Transports.p_fetch cant find any transport for urls: " + urls);
         }
@@ -122,7 +131,7 @@ class Transports {
         throws: TransportError with message being concatenated messages of transports if NONE of them succeed.
          */
         //TODO-MULTI-GATEWAY might be smarter about not waiting but Promise.race is inappropriate as returns after a failure as well.
-        let tt = Dweb.Transports.validFor(urls, "add"); // Valid connected transports that support "store"
+        let tt = this.validFor(urls, "add"); // Valid connected transports that support "store"
         if (!tt.length) {
             throw new Dweb.errors.TransportError('Transports.p_rawstore: Cant find transport for urls:'+urls.join(','));
         }
@@ -149,7 +158,7 @@ class Transports {
         /*
         Add a listmonitor for each transport - note this means if multiple transports support it, then will get duplicate events back if everyone else is notifying all of them.
          */
-        Dweb.Transports.validFor(urls, "listmonitor")
+        this.validFor(urls, "listmonitor")
             .map(([u, t]) => t.listmonitor(u, cb));
     }
 
@@ -157,7 +166,7 @@ class Transports {
         // Create a new list in any transport layer that supports lists.
         // cl is a CommonList or subclass and can be used by the Transport to get info for choosing the list URL (normally it won't use it)
         // Note that normally the CL will not have been stored yet, so you can't use its urls.
-        let uuu = await Promise.all(Dweb.Transports.validFor(undefined, "newlisturls")
+        let uuu = await Promise.all(this.validFor(undefined, "newlisturls")
             .map(([u, t]) => t.p_newlisturls(cl, verbose)) );   // [ [ priv, pub] [ priv, pub] [priv pub] ]
         return [uuu.map(uu=>uu[0]), uuu.map(uu=>uu[1])];    // [[ priv priv priv ] [ pub pub pub ] ]
     }
@@ -165,7 +174,7 @@ class Transports {
     // Stream handling ===========================================
 
     static createReadStream(urls, options, verbose) {
-        let tt = Dweb.Transports.validFor(urls, "createReadStream", options); //[ [Url,t],[Url,t]]  // Passing options - most callers will ignore TODO-STREAM support options in validFor
+        let tt = this.validFor(urls, "createReadStream", options); //[ [Url,t],[Url,t]]  // Passing options - most callers will ignore TODO-STREAM support options in validFor
         if (!tt.length) {
             throw new Dweb.errors.TransportError("Transports.p_createReadStream cant find any transport for urls: " + urls);
         }
@@ -194,7 +203,7 @@ class Transports {
         returns:	string - arbitrary bytes retrieved or dict of key: value
         throws:     TransportError with concatenated error messages if none succeed.
          */
-        let tt = Dweb.Transports.validFor(urls, "get"); //[ [Url,t],[Url,t]]
+        let tt = this.validFor(urls, "get"); //[ [Url,t],[Url,t]]
         if (!tt.length) {
             throw new Dweb.errors.TransportError("Transports.p_get cant find any transport for urls: " + urls);
         }
@@ -217,7 +226,7 @@ class Transports {
          value: if kv is a string, this is the value to set
         throws: TransportError with message being concatenated messages of transports if NONE of them succeed.
         */
-        let tt = Dweb.Transports.validFor(urls, "set"); //[ [Url,t],[Url,t]]
+        let tt = this.validFor(urls, "set"); //[ [Url,t],[Url,t]]
         if (!tt.length) {
             throw new Dweb.errors.TransportError("Transports.p_set cant find any transport for urls: " + urls);
         }
@@ -243,7 +252,7 @@ class Transports {
          value: if kv is a string, this is the value to set
         throws: TransportError with message being concatenated messages of transports if NONE of them succeed.
         */
-        let tt = Dweb.Transports.validFor(urls, "set"); //[ [Url,t],[Url,t]]
+        let tt = this.validFor(urls, "set"); //[ [Url,t],[Url,t]]
         if (!tt.length) {
             throw new Dweb.errors.TransportError("Transports.p_set cant find any transport for urls: " + urls);
         }
@@ -270,7 +279,7 @@ class Transports {
         returns:	string - arbitrary bytes retrieved or dict of key: value
         throws:     TransportError with concatenated error messages if none succeed.
          */
-        let tt = Dweb.Transports.validFor(urls, "keys"); //[ [Url,t],[Url,t]]
+        let tt = this.validFor(urls, "keys"); //[ [Url,t],[Url,t]]
         if (!tt.length) {
             throw new Dweb.errors.TransportError("Transports.p_keys cant find any transport for urls: " + urls);
         }
@@ -296,7 +305,7 @@ class Transports {
         returns:	string - arbitrary bytes retrieved or dict of key: value
         throws:     TransportError with concatenated error messages if none succeed.
          */
-        let tt = Dweb.Transports.validFor(urls, "getall"); //[ [Url,t],[Url,t]]
+        let tt = this.validFor(urls, "getall"); //[ [Url,t],[Url,t]]
         if (!tt.length) {
             throw new Dweb.errors.TransportError("Transports.p_getall cant find any transport for urls: " + urls);
         }
@@ -320,7 +329,7 @@ class Transports {
             pubkey: CommonList, KeyPair, or exported public key
             resolves to: [ privateurl, publicurl]
          */
-        let uuu = await Promise.all(Dweb.Transports.validFor(undefined, "newdatabase")
+        let uuu = await Promise.all(this.validFor(undefined, "newdatabase")
             .map(([u, t]) => t.p_newdatabase(pubkey, verbose)) );   // [ { privateurl, publicurl} { privateurl, publicurl} { privateurl, publicurl} ]
         return { privateurls: uuu.map(uu=>uu.privateurl), publicurls: uuu.map(uu=>uu.publicurl) };    // { privateurls: [], publicurls: [] }
     }
@@ -331,7 +340,7 @@ class Transports {
             pubkey: CommonList, KeyPair, or exported public key
             resolves to: [ privateurl, publicurl]
          */
-        let uuu = await Promise.all(Dweb.Transports.validFor(undefined, "newtable")
+        let uuu = await Promise.all(this.validFor(undefined, "newtable")
             .map(([u, t]) => t.p_newtable(pubkey, table, verbose)) );   // [ [ priv, pub] [ priv, pub] [priv pub] ]
         return { privateurls: uuu.map(uu=>uu.privateurl), publicurls: uuu.map(uu=>uu.publicurl)};    // {privateurls: [ priv priv priv ], publicurls: [ pub pub pub ] }
     }
@@ -340,7 +349,7 @@ class Transports {
         /*
         Add a listmonitor for each transport - note this means if multiple transports support it, then will get duplicate events back if everyone else is notifying all of them.
          */
-        Dweb.Transports.validFor(urls, "monitor")
+        this.validFor(urls, "monitor")
             .map(([u, t]) => t.monitor(u, cb, verbose));
     }
 

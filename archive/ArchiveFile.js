@@ -27,7 +27,7 @@ export default class ArchiveFile {
 
         Note it can't be inside load_img which has to be synchronous and return a jsx tree.
          */
-        let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash];   // Multiple potential sources
+        let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f=>!!f);   // Multiple potential sources elimate any empty
         let blk = await  Dweb.Block.p_fetch(urls, verbose);  //Typically will be a Uint8Array
         let blob = new Blob([blk._data], {type: Util.archiveMimeTypeFromFormat[this.metadata.format]}) // Works for data={Uint8Array|Blob}
         // This next code is bizarre combination needed to open a blob from within an HTML window.

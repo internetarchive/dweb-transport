@@ -50,7 +50,8 @@ export default class ArchiveItem { //extends SmartDict {  //TODO should extend S
         if (this.itemid && !this.item) {
             console.log('get metadata for ' + this.itemid);
             //this.item = await Util.fetch_json(`https://archive.org/metadata/${this.itemid}`);
-            this.item = await Util.fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}`);
+            let transports = Dweb.Transports.connectedNames().map(n => "transport="+n).join('&')
+            this.item = await Util.fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}?${transports}`);
             this._listLoad();   // Load _list with ArchiveFile
         }
         if (this.query) {   // This is for Search, Collection and Home.

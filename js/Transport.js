@@ -34,6 +34,16 @@ class Transport {
 
             return t.p_setup2(verbose);     // And connect
     }
+    togglePaused() {
+        switch (this.status) {
+            case Transport.STATUS_CONNECTED:
+                this.status = Transport.STATUS_PAUSED;
+                break;
+            case Transport.STATUS_PAUSED:
+                this.status = Transport.STATUS_CONNECTED;   // Superclass might change to STATUS_STARTING if needs to stop/restart
+                break;
+        }
+    }
 
     supports(url, func) {
         /*
@@ -209,5 +219,5 @@ Transport.STATUS_CONNECTED = 0; // Connected - all other numbers are some versio
 Transport.STATUS_FAILED = 1;    // Failed to connect
 Transport.STATUS_STARTING = 2;  // In the process of connecting
 Transport.STATUS_LOADED = 3;    // Code loaded, but haven't tried to connect. (this is typically hard coded in subclasses constructor)
-
+Transport.STATUS_PAUSED = 4;    // It was launched, probably connected, but now paused so will be ignored by validFor
 exports = module.exports = Transport;

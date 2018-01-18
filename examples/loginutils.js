@@ -191,6 +191,12 @@ function refresh_transportstatuses(el) {
             }
         })
 }
+function transportclick(el) { // Similar routines to this could display status, toggle activity etc.
+    t = el.source;
+    console.log("Clicked on Transport",t.name);
+    t.togglePaused();
+    refresh_transportstatuses("transportstatuses");
+}
 async function p_connect(options) {
     /*
         This is a standardish starting process, feel free to copy and reuse !

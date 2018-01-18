@@ -172,14 +172,14 @@ class TransportHTTP extends Transport {
          */
         //if (!(url && url.includes(':') ))
         //    throw new Dweb.errors.CodingError("TransportHTTP.p_rawfetch bad url: "+url);
-        console.assert(url, "TransportHTTP.p_rawlist: requires url");
+        if (!url) throw new Dweb.errors.CodingError("TransportHTTP.p_rawfetch: requires url")
         return this.p_get(servercommands.rawfetch, url, verbose, opts)
     }
 
     p_rawlist(url, verbose) {
         // obj being loaded
         // Locate and return a block, based on its url
-        console.assert(url, "TransportHTTP.p_rawlist: requires url");
+        if (!url) throw new Dweb.errors.CodingError("TransportHTTP.p_rawlist: requires url")
         return this.p_get(servercommands.rawlist, url, verbose);
     }
     rawreverse() { throw new Dweb.errors.ToBeImplementedError("Undefined function TransportHTTP.rawreverse"); }

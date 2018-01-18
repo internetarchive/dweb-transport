@@ -168,7 +168,7 @@ class TransportIPFS extends Transport {
         :resolve buffer: Return the object being fetched. (may in the future return a stream and buffer externally)
         :throws:        TransportError if url invalid - note this happens immediately, not as a catch in the promise
          */
-        if (verbose) console.log("IPFS p_rawfetch", url);
+        if (verbose) console.log("IPFS p_rawfetch", Dweb.utils.stringfrom(url));
         if (!url) throw new Dweb.errors.CodingError("TransportIPFS.p_rawfetch: requires url");
         let cid = TransportIPFS.cidFrom(url);  // Throws TransportError if url bad
 
