@@ -224,7 +224,7 @@ export default class Details extends ArchiveBase {
         let licence = metadata.licenseurl; //TODO - handle other licenses - hardwired for CC currently
         let languageAbbrev = metadata.language;
         let languageLong = {eng: "English", dut: "Dutch"}[languageAbbrev]; //TODO-other languages
-        let description = metadata.description; // Contains HTML (supposedly safe) inserted via innerHTML thing
+        let description = this.preprocessDescription(metadata.description); // Contains HTML (supposedly safe) inserted via innerHTML thing
         let metadataListPossible = { color: "Color", coverage: "Location", director: "Director", identifier: "Identifier",
             "identifier-ark": "Identifier-ark", ocr: "Ocr", runtime: "Run time", ppi: "Ppi", sound: "Sound", year: "Year" }; /*TODO expand to longer list*/
         let metadataListFound = Object.keys(metadataListPossible).filter((k) => metadata[k]);    // List of keys in the metadata

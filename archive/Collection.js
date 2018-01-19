@@ -13,11 +13,14 @@ export default class Collection extends Search {
     }
 
     banner() {
-        item = this.item;
+        let item = this.item;
         //TODO-DETAILS probably move this to the Search class after move to use the approach taken in template_image.js
         const creator = (item.metadata.creator  &&  (item.metadata.creator != item.metadata.title) ? item.metadata.creator : '');
         //ARCHIVE-BROWSER note the elements below were converted to HTML 3 times in original version
         //TODO-DETAILS on prelinger, banner description is getting truncated.
+        let imgurl='https://archive.org/services/img/'+this.itemid; //TODO Dwebify - what is services/img
+        let description = this.preprocessDescription(item.metadata.description); // Contains HTML (supposedly safe) inserted via innerHTML thing
+
         return (
             <div className="welcome container container-ia width-max" style={{'backgroundColor':'white'}}>
                 <div className="container">
@@ -29,7 +32,7 @@ export default class Collection extends Search {
                             </div>
                             <h1>{item.metadata.title}</h1>
                             <h4>{creator}</h4>
-                            <div id="descript" style={{maxHeight:"43px", cursor:'pointer'}} dangerouslySetInnerHTML={{__html: item.metadata.description}}>
+                            <div id="descript" style={{maxHeight:"43px", cursor:'pointer'}} dangerouslySetInnerHTML={{__html: description}}>
                             </div>
                         </div>
                         <div className="col-xs-1 col-sm-2 welcome-right">

@@ -51,5 +51,10 @@ export default class ArchiveBase extends ArchiveItem {
         React.domrender(els, res);  //Put the els into the page
         this.browserAfter();
     }
+    preprocessDescription(description) {
+        //console.log(description)
+        // Now catch some things that often appear in descriptions because it assumes running on archive page
+        return description.replace(/src=(['"])\//gi, 'src=$1'+React._config.root+'/');
+    }
 }
 
