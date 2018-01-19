@@ -7448,7 +7448,8 @@ class ArchiveBase extends __WEBPACK_IMPORTED_MODULE_2__ArchiveItem__["a" /* defa
     preprocessDescription(description) {
         //console.log(description)
         // Now catch some things that often appear in descriptions because it assumes running on archive page
-        return description.replace(/src=(['"])\//gi, 'src=$1' + __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */]._config.root + '/');
+
+        return !description ? description : description.replace(/src=(['"])\//gi, 'src=$1' + __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */]._config.root + '/');
     }
 }
 /* harmony export (immutable) */ __webpack_exports__["a"] = ArchiveBase;
