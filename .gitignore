@@ -1,7 +1,9 @@
-node_modules
+/node_modules
+
 .sync
 Icon?
 npm-debug.log
 dbtestjs
 .cache
 archive_minchanges/build
+archive/node_modules
