@@ -1800,8 +1800,8 @@
       $grafs1.attr('data-id', null)
 
       log('loading grafs')
-      $grafs1.html('<i><small>loading graph <img src="/images/loading.gif"/></small></i>').show()
-      $grafs2.html('<i><small>loading graph <img src="/images/loading.gif"/></small></i>').show()
+      $grafs1.html('<i><small>loading graph <img src="../images/loading.gif"/></small></i>').show()
+      $grafs2.html('<i><small>loading graph <img src="../images/loading.gif"/></small></i>').show()
       const tok = '<h2>'
       $.get('/details/'.concat(identifier, '&grafs=1&v=3'), (htm) => {
         const a = htm.split(tok)
@@ -3641,7 +3641,7 @@
         loadnote = (
           <div style={{ 'font-style': 'italic', margin: '25px', 'text-align': 'center' }}>
             loading filters...
-            <img alt="" style={{ width: '25px' }} key={loading} src="/images/loading.gif" />
+            <img alt="" style={{ width: '25px' }} key={loading} src="../images/loading.gif" />
           </div>)
       } else {
         let page = 1
