@@ -2705,7 +2705,7 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
         let licence = metadata.licenseurl; //TODO - handle other licenses - hardwired for CC currently
         let languageAbbrev = metadata.language;
         let languageLong = { eng: "English", dut: "Dutch" }[languageAbbrev]; //TODO-other languages
-        let description = metadata.description; // Contains HTML (supposedly safe) inserted via innerHTML thing
+        let description = this.preprocessDescription(metadata.description); // Contains HTML (supposedly safe) inserted via innerHTML thing
         let metadataListPossible = { color: "Color", coverage: "Location", director: "Director", identifier: "Identifier",
             "identifier-ark": "Identifier-ark", ocr: "Ocr", runtime: "Run time", ppi: "Ppi", sound: "Sound", year: "Year" }; /*TODO expand to longer list*/
         let metadataListFound = Object.keys(metadataListPossible).filter(k => metadata[k]); // List of keys in the metadata
@@ -2918,11 +2918,11 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
                                 href: 'http://creativecommons.org/licenses/by-nc-nd/2.0/', target: '_blank' },
                             'http://creativecommons.org/licenses/by-nc-nd/2.0/',
                             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', {
-                                'class': 'cclic', src: 'https://archive.org/images/cc/cc.png' }),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { 'class': 'cclic', src: 'https://archive.org/images/cc/by.png' }),
+                                'class': 'cclic', src: './images/cc/cc.png' }),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { 'class': 'cclic', src: './images/cc/by.png' }),
                             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', {
-                                'class': 'cclic', src: 'https://archive.org/images/cc/nc.png' }),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { 'class': 'cclic', src: 'https://archive.org/images/cc/nd.png' })
+                                'class': 'cclic', src: './images/cc/nc.png' }),
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { 'class': 'cclic', src: './images/cc/nd.png' })
                         )
                     ) : undefined,
                     keywords ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
@@ -3160,7 +3160,7 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
                                 'a',
                                 { 'class': 'format-summary download-pill',
                                     href: 'https://archive.org/download/${f.itemid}/${f.metadata.name}', title: f.sizePretty,
-                                    'data-toggle': 'tooltip', 'data-placement': 'auto left', 'data-container': 'body' },
+                                    'data-toggle': 'tooltip', 'data-placement': 'auto left', 'data-container': 'body', target: '_blank' },
                                 __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].downloadableFormats[f.metadata.format],
                                 ' ',
                                 __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('span', { 'class': 'iconochive-download', 'aria-hidden': 'true' }),
@@ -4204,7 +4204,7 @@ class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default *
                                         'span',
                                         { 'class': 'more-search-fetching' },
                                         'Fetching more results ',
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { src: '/images/loading.gif' })
+                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { src: './images/loading.gif' })
                                     )
                                 )
                             )
@@ -7444,6 +7444,11 @@ class ArchiveBase extends __WEBPACK_IMPORTED_MODULE_2__ArchiveItem__["a" /* defa
         this.browserBefore();
         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].domrender(els, res); //Put the els into the page
         this.browserAfter();
+    }
+    preprocessDescription(description) {
+        //console.log(description)
+        // Now catch some things that often appear in descriptions because it assumes running on archive page
+        return description.replace(/src=(['"])\//gi, 'src=$1' + __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */]._config.root + '/');
     }
 }
 /* harmony export (immutable) */ __webpack_exports__["a"] = ArchiveBase;
@@ -12320,7 +12325,7 @@ class Nav {
                                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                                             'a',
                                             { style: 'padding-bottom:0', href: 'https://archive.org/web/' },
-                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { src: 'https://archive.org/images/WaybackLogoSmall.png', alt: 'Wayback Machine' })
+                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { src: './images/WaybackLogoSmall.png', alt: 'Wayback Machine' })
                                         )
                                     ),
                                     __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
@@ -12425,7 +12430,7 @@ class Nav {
                                 'a',
                                 { id: 'glyphme', href: 'https://archive.org/donate', _target: 'top',
                                     'data-toggle': 'tooltip', 'data-placement': 'bottom', title: 'Donate' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { src: 'https://archive.org/images/gift.png' })
+                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { src: './images/gift.png' })
                             )
                         ),
                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
@@ -12596,11 +12601,14 @@ class Collection extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
     }
 
     banner() {
-        item = this.item;
+        let item = this.item;
         //TODO-DETAILS probably move this to the Search class after move to use the approach taken in template_image.js
         const creator = item.metadata.creator && item.metadata.creator != item.metadata.title ? item.metadata.creator : '';
         //ARCHIVE-BROWSER note the elements below were converted to HTML 3 times in original version
         //TODO-DETAILS on prelinger, banner description is getting truncated.
+        let imgurl = 'https://archive.org/services/img/' + this.itemid; //TODO Dwebify - what is services/img
+        let description = this.preprocessDescription(item.metadata.description); // Contains HTML (supposedly safe) inserted via innerHTML thing
+
         return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
             'div',
             { className: 'welcome container container-ia width-max', style: { 'backgroundColor': 'white' } },
@@ -12617,7 +12625,7 @@ class Collection extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
                             'div',
                             { id: 'file-dropper-wrap' },
                             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'file-dropper' }),
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { id: 'file-dropper-img', className: 'img-responsive', style: { 'maxWidth': "350px", margin: '0 10px 5px 0' }, src: 'https://archive.org/services/img/' + this.itemid })
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { id: 'file-dropper-img', className: 'img-responsive', style: { 'maxWidth': "350px", margin: '0 10px 5px 0' }, src: imgurl })
                         ),
                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                             'h1',
@@ -12629,7 +12637,7 @@ class Collection extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
                             null,
                             creator
                         ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'descript', style: { maxHeight: "43px", cursor: 'pointer' }, dangerouslySetInnerHTML: { __html: item.metadata.description } })
+                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'descript', style: { maxHeight: "43px", cursor: 'pointer' }, dangerouslySetInnerHTML: { __html: description } })
                     ),
                     __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { className: 'col-xs-1 col-sm-2 welcome-right' })
                 )
@@ -12787,7 +12795,7 @@ class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
         let itemid = item.metadata.identifier; // Shortcut as used a lot
         let mainArchiveFile = this._list.find(fi => __WEBPACK_IMPORTED_MODULE_2__Util__["a" /* default */].imageFormats.includes(fi.metadata.format)); // Can be undefined if none included
         let detailsURL = `https://archive.org/details/${itemid}`; //This is probably correct to remain pointed at archive.org since used as an itemprop
-        let embedurl = `https://archive.org/embed/${itemid}`;
+        let embedurl = `https://archive.org/embed/${itemid}`; //This is probably correct to remain pointed at archive.org since passed to social media
         return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
             'div',
             { id: 'theatre-ia-wrap', className: 'container container-ia width-max  resized', style: { height: "600px" } },
@@ -12838,9 +12846,10 @@ class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
                                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                                             'a',
                                             { className: 'carousel-image-wrapper',
-                                                href: `http://archive.org/download/${itemid}/${mainArchiveFile.metadata.name}`,
-                                                title: 'Open full sized image' },
-                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { id: 'streamContainer', src: mainArchiveFile, className: 'rot0 carousel-image', alt: 'item image #1' })
+                                                href: `https://archive.org/download/${itemid}/${mainArchiveFile.metadata.name}`,
+                                                title: 'Open full sized image', target: '_blank' },
+                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { id: 'streamContainer', src: mainArchiveFile, className: 'rot0 carousel-image', alt: 'item image #1' }),
+                                            ' '
                                         ),
                                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                                             'div',
@@ -12917,9 +12926,9 @@ class Audio extends __WEBPACK_IMPORTED_MODULE_1__AV__["a" /* default */] {
     theatreIaWrap() {
         let item = this.item;
         let itemid = this.itemid;
-        let detailsurl = `https://archive.org/details/${itemid}`;
+        let detailsurl = `https://archive.org/details/${itemid}`; //OK as absolute URL as only used as itemprop
         let title = item.title;
-        let imgurl = `https://archive.org/services/img/${itemid}`;
+        let imgurl = `https://archive.org/services/img/${itemid}`; //OK as absolute URL as only used as itemprop
         this.setupPlaylist();
         return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
             'div',
@@ -13022,7 +13031,7 @@ class Video extends __WEBPACK_IMPORTED_MODULE_1__AV__["a" /* default */] {
         this.itemtype = "http://schema.org/VideoObject";
     }
     setupPlaylist() {
-        super.setupPlaylist(['h.264', '512Kb MPEG4']);
+        super.setupPlaylist(['h.264', '512Kb MPEG4', 'MPEG4']);
     }
 
     theatreIaWrap() {
