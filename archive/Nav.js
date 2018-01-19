@@ -41,7 +41,7 @@ export default class Nav { //extends React.Component
                         <div class="roundbox7 wayback-main">
                             <div class="row">
                                 <div class="col-sm-6" style="padding-left:0; padding-right:0;">
-                                    <a style="padding-bottom:0" href="https://archive.org/web/"><img src="https://archive.org/images/WaybackLogoSmall.png" alt="Wayback Machine"/></a>
+                                    <a style="padding-bottom:0" href="https://archive.org/web/"><img src="./images/WaybackLogoSmall.png" alt="Wayback Machine"/></a>
                                 </div>
                                 <div class="col-sm-6" style="padding-top:13px;">
                                     <form style="position:relative;">
@@ -99,7 +99,7 @@ export default class Nav { //extends React.Component
                 <li className="dropdown dropdown-ia pull-right">
                   <a id="glyphme" href="https://archive.org/donate" _target="top"
                      data-toggle="tooltip" data-placement="bottom" title="Donate">
-                    <img src="https://archive.org/images/gift.png"/>
+                    <img src="./images/gift.png"/>
                   </a>
                 </li>
 

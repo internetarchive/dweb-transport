@@ -325,8 +325,8 @@ export default class Details extends ArchiveBase {
                         <div class="key-val-big">
                             Usage <a rel="license" title="http://creativecommons.org/licenses/by-nc-nd/2.0/"
                                      href="http://creativecommons.org/licenses/by-nc-nd/2.0/" target="_blank">http://creativecommons.org/licenses/by-nc-nd/2.0/<img
-                                class="cclic" src="https://archive.org/images/cc/cc.png"/><img class="cclic" src="https://archive.org/images/cc/by.png"/><img
-                                class="cclic" src="https://archive.org/images/cc/nc.png"/><img class="cclic" src="https://archive.org/images/cc/nd.png"/></a></div>
+                                class="cclic" src="./images/cc/cc.png"/><img class="cclic" src="./images/cc/by.png"/><img
+                                class="cclic" src="./images/cc/nc.png"/><img class="cclic" src="./images/cc/nd.png"/></a></div>
                         ) : ( undefined ) }
                         {/*TODO-Only show if keywords non-blank*/}
                         {keywords ? (
@@ -426,7 +426,7 @@ export default class Details extends ArchiveBase {
                                     </div>
                                     <a class="format-summary download-pill"
                                         href="https://archive.org/download/${f.itemid}/${f.metadata.name}" title={f.sizePretty}
-                                        data-toggle="tooltip" data-placement="auto left" data-container="body">
+                                        data-toggle="tooltip" data-placement="auto left" data-container="body" target="_blank">{/*--new window to persist dweb--*/}
                                         {Util.downloadableFormats[f.metadata.format]} <span class="iconochive-download" aria-hidden="true"></span><span class="sr-only">download</span>
                                     </a>
                                 </div>

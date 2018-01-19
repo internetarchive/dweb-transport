@@ -154,7 +154,7 @@ export default class Search extends ArchiveBase {
                                     <a class="btn btn-info btn-sm" style="visibility:hidden"
                                        onclick="return AJS.more_search(this,{`/search.php?query=${query}&page=`},1)" href="#">MORE
                                         RESULTS</a><br/>
-                                    <span class="more-search-fetching">Fetching more results <img src="/images/loading.gif"/></span>
+                                    <span class="more-search-fetching">Fetching more results <img src="./images/loading.gif"/></span>
                                     </center>
                                 </div>
                             </div>

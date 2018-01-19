@@ -25,7 +25,7 @@ export default class Collection extends Search {
                         <div className="col-xs-11 col-sm-10 welcome-left">
                             <div id="file-dropper-wrap">
                                 <div id="file-dropper"></div>
-                                <img id="file-dropper-img" className="img-responsive" style={{'maxWidth':"350px", margin:'0 10px 5px 0'}} src={'https://archive.org/services/img/'+this.itemid}/>
+                                <img id="file-dropper-img" className="img-responsive" style={{'maxWidth':"350px", margin:'0 10px 5px 0'}} src={imgurl}/>
                             </div>
                             <h1>{item.metadata.title}</h1>
                             <h4>{creator}</h4>

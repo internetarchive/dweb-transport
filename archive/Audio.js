@@ -17,9 +17,9 @@ export default class Audio extends AV {
     theatreIaWrap() {
         let item = this.item;
         let itemid = this.itemid;
-        let detailsurl = `https://archive.org/details/${itemid}`
+        let detailsurl = `https://archive.org/details/${itemid}`;  //OK as absolute URL as only used as itemprop
         let title = item.title
-        let imgurl = `https://archive.org/services/img/${itemid}`
+        let imgurl = `https://archive.org/services/img/${itemid}`; //OK as absolute URL as only used as itemprop
         this.setupPlaylist();
         return (
             <div id="theatre-ia-wrap" class="container container-ia width-max ">

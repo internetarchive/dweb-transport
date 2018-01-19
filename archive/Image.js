@@ -24,7 +24,7 @@ export default class Image extends Details {
         let itemid = item.metadata.identifier; // Shortcut as used a lot
         let mainArchiveFile = this._list.find((fi) => Util.imageFormats.includes(fi.metadata.format)); // Can be undefined if none included
         let detailsURL = `https://archive.org/details/${itemid}`; //This is probably correct to remain pointed at archive.org since used as an itemprop
-        let embedurl = `https://archive.org/embed/${itemid}`;
+        let embedurl = `https://archive.org/embed/${itemid}`; //This is probably correct to remain pointed at archive.org since passed to social media
         return (
             <div id="theatre-ia-wrap" className="container container-ia width-max  resized" style={{height: "600px"}}>
                 <link itemProp="url" href={detailsURL}/>
@@ -57,9 +57,9 @@ export default class Image extends Details {
                                     <div className="carousel-inner">
                                         <div className="item active">
                                             <a className="carousel-image-wrapper"
-                                               href={`http://archive.org/download/${itemid}/${mainArchiveFile.metadata.name}`}
-                                               title="Open full sized image">
-                                                    <img id="streamContainer" src={mainArchiveFile} className="rot0 carousel-image" alt="item image #1"/>
+                                               href={`https://archive.org/download/${itemid}/${mainArchiveFile.metadata.name}`}
+                                               title="Open full sized image" target="_blank">{/*--Separate window so dont break Dweb--*/}
+                                                    <img id="streamContainer" src={mainArchiveFile} className="rot0 carousel-image" alt="item image #1"/> {/*--TODO Dwebify--*/}
                                             </a>
                                             <div className="carousel-caption">
                                                 {mainArchiveFile.metadata.name}
