@@ -85,7 +85,7 @@ class KeyValueTable extends PublicPrivate {
         /*
         keys:   single key or array of keys
          */
-        return await Transports.p_get(this._publicurls, keys, verbose)
+        return await Dweb.Transports.p_get(this._publicurls, keys, verbose)
     }
     async p_keys(verbose) {
         /*

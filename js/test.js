@@ -58,7 +58,6 @@ async function p_test(verbose) {
         if (verbose) console.log("Transports tested");
         await Dweb.KeyValueTable.p_test(verbose);
         verbose=true;
-        console.log("XXX@61");
         await Dweb.Domain.p_test(verbose);
         console.log("---EXITING AFTER TRANSPORTTEST") //TODO-KEYVALUE remove this and "return" once done
         return
