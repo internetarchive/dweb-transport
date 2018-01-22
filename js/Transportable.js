@@ -8,6 +8,7 @@ class Transportable {
     Fields
     _urls   Array of URLs of data stored
     _data   Data (if its opaque)
+    table   Name of class as looked up in Dweb.table2class
      */
 
     constructor(data) {

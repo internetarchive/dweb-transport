@@ -95,6 +95,11 @@ class Signature extends SmartDict {
         return this.data;
     }
 
+    objbrowser_fields(propname) {
+        let fieldtypes = { date: "str", urls: "urlarray", signature: "str", signedby: "urlarray"};
+        return fieldtypes[propname] || super.objbrowser_fields(propname);
+    }
+
     static async p_test(verbose) {
         // Test Signatures
         //verbose=True

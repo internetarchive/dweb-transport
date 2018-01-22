@@ -425,6 +425,13 @@ class KeyPair extends SmartDict {
         // Base58 of a Multihash of a Sha2_256 of data - as used by IPFS
         return multihashes.toB58String(multihashes.encode(KeyPair.sha256(data), 'sha2-256'));
     }
+    objbrowser_key(el, name, val) {
+        return this.objbrowser_str(el, name, this.has_private() ? this.privateexport() : this.publicexport());
+    }
+    objbrowser_fields(propname) {
+        let fieldtypes = { _key: "key", _publicurls: "urlarray"}
+        return fieldtypes[propname] || super.objbrowser_fields(propname);
+    }
 
 }
 

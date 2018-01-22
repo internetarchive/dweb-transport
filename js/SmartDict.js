@@ -18,6 +18,9 @@ class SmartDict extends Transportable {
 
     Fields:
     _acl    if set (on master) to a AccessControlList or KeyChain, defines storage as encrypted -
+
+    Inherited from Transportable:
+    _urls
      */
 
     constructor(data, verbose, options) {
@@ -132,6 +135,126 @@ class SmartDict extends Transportable {
         return new this.constructor(this, verbose);
     }
 
+    objbrowser_createElement(tag, attrs, children) {        // Note arguments is set to tag, attrs, child1, child2 etc
+        var element = document.createElement(tag);
+        for (let name in attrs) {
+            let attrname = (name.toLowerCase() === "classname" ? "class" : name);
+            if (name === "dangerouslySetInnerHTML") {
+                element.innerHTML = attrs[name]["__html"];
+                delete attrs.dangerouslySetInnerHTML;
+            }
+            if (attrs.hasOwnProperty(name)) {
+                let value = attrs[name];
+                if (value === true) {
+                    element.setAttribute(attrname, name);
+                } else if (typeof value === "object" && !Array.isArray(value)) { // e.g. style: {{fontSize: "124px"}}
+                    if (value instanceof Transportable) {
+                        // We are really trying to set the value to an object, allow it
+                        element[attrname] = value;  // Wont let us use setAttribute(attrname, value) unclear if because unknow attribute or object
+                    } else {
+                        for (let k in value) {
+                            element[attrname][k] = value[k];
+                        }
+                    }
+                } else if (value !== false && value != null) {
+                    element.setAttribute(attrname, value.toString());
+                }
+            }
+        }
+        for (let i = 2; i < arguments.length; i++) { // Everything after attrs
+            let child = arguments[i];
+            if (!child) {
+            } else if (Array.isArray(child)) {
+                child.map((c) => element.appendChild(c.nodeType == null ?
+                    document.createTextNode(c.toString()) : c))
+            }
+            else {
+                element.appendChild(
+                    child.nodeType == null ?
+                        document.createTextNode(child.toString()) : child);
+            }
+        }
+        return element;
+    }
+
+    _objbrowser_row(el, name, valueElement) {
+        el.appendChild(
+            this.objbrowser_createElement('li', {className: 'prop'},
+                this.objbrowser_createElement('span',{className: 'propname'}, name),
+                valueElement ) );
+    }
+    objbrowser_str(el, name, val) {
+        this._objbrowser_row(el, name,
+            this.objbrowser_createElement('span',{className: 'propval'}, val) );
+    }
+    objbrowser_obj(el, name, val) {
+        this._objbrowser_row(el, name,
+            this.objbrowser_createElement('span',{className: 'propval', source: val, onclick: `Dweb.SmartDict.objbrowser_expandurl(this);return false;`}, val.constructor.name));
+    }
+    static async objbrowser_expandurl(el, obj) {
+        if (typeof obj === "undefined") // If dont specify check source, which may also be undefined, but use if there.
+            obj = el.source;
+        if (Array.isArray(obj) && typeof obj[0] === "string")
+            obj = await SmartDict.p_fetch(obj, verbose);
+        else if (typeof obj === "string")
+            obj = await SmartDict.p_fetch([obj], verbose);
+        //else // Expecting its subclass of SmartDict or otherwise has a objbrowser method
+        obj.objbrowser(el,{maxdepth: 2, verbose: false});    // TODO-OBJBROWSER could pass args here but this comes from UI onclick
+        return false;
+    }
+    objbrowser_urlarray(el, name, arr, {links=false}={}) {
+        this._objbrowser_row(el, name,
+            this.objbrowser_createElement('ul',{className: 'propurls propval'},
+                links
+                    ? arr.map(l => this.objbrowser_createElement('li',{className: 'propurl'},
+                        this.objbrowser_createElement('span', {onclick: `Dweb.SmartDict.objbrowser_expandurl(this.parentNode, "${l}"); return false;`},l)
+                    ) )
+                    : arr.map(l => this.objbrowser_createElement('li',{className: 'propurl', onclick: "return false;"},l) )
+            ) );
+    }
+    objbrowser_arrayobj(el, name, arr, {links=false}={}) {
+        this._objbrowser_row(el, name,
+            this.objbrowser_createElement('ul',{className: 'propurls propval'},
+                arr.map((l,i) => this.objbrowser_createElement('li',{className: 'propurl', source: l, onclick: `Dweb.SmartDict.objbrowser_expandurl(this); return false;`},`${i}...`) )
+            ) );
+    }
+    objbrowser_fields(propname) {
+        let fieldtypes = { _acl: "obj", _urls: "urlarray", table: "str", name: "str" } // Note Name is not an explicit field, but is normally set
+        return fieldtypes[propname]; //TODO || super if implement on Transportable
+    }
+    objbrowser(el, {maxdepth=2, verbose=false}={}) {
+        //TODO-OBJBROWSER empty values & condition on option
+        if (typeof el === 'string') { el = document.getElementById(el); }
+        for (let propname in this) {
+            switch(propname) {
+                case "xx":   el.appendChild("XXX"); // This is how to special case a field
+                    break;
+                default:
+                    switch (this.objbrowser_fields(propname)) {  // Note this is just types for this particular superclass, each recursion will look at different set
+                        case "urlarray": this.objbrowser_urlarray(el, propname, this[propname], {links: true});
+                            break;
+                        case "urlarraynolinks": this.objbrowser_urlarray(el, propname, this[propname], {links: false});
+                            break;
+                        case "str": this.objbrowser_str(el, propname, this[propname]);
+                            break;
+                        case "obj": this.objbrowser_obj(el, propname, this[propname]);
+                            break;
+                        case "jsonobj": this.objbrowser_str(el, propname, JSON.stringify(this[propname]));
+                            break;
+                        case "arrayobj": this.objbrowser_arrayobj(el, propname, this[propname], {links: true});
+                            break;
+                        case "key": this.objbrowser_key(el, propname, this[propname]); // Only defined on KeyPair
+                            break;
+                        default:
+                            // Super classes call super.objbrowser(el,options) here
+                            this.objbrowser_str(el, propname, this[propname].toString())
+                            console.log("objbrowser warning, no field type specified for",propname);
+                        //TODO-OBJBROWSER make Transportable.objbrowser
+                        //TODO-OBJBROWSER do superclasses
+                    }
+            }
+        }
+    }
     static async p_fetch(urls, verbose) {
         /*
         Fetches the object from Dweb, passes to p_decrypt in case it needs decrypting,

@@ -90,6 +90,7 @@ function keychain_click(el) {
 }
 async function kcitem_click(el) { //!SEE-OTHER-KC-CLASSES
     // Clicked on a key or a lock, determine which and forward
+    el = elementFrom(el);
     let obj = el.source;
     if (obj instanceof Dweb.AccessControlList)
         await p_lock_click(el);

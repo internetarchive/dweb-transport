@@ -10,6 +10,7 @@ class AccessControlList extends CommonList {
 
     Fields:
     accesskey:  Secret key with which things are encrypted. We are controlling who gets this.
+    publickey:
     _list: Contains a list of signatures, each for a SmartDict each of which is:
         viewer: public URLs of the KeyPair of an authorised viewer
         token:  accesskey encrypted with PublicKey from the KeyPair
@@ -212,6 +213,10 @@ class AccessControlList extends CommonList {
             console.log("Unable to decrypt:", value, err);
             throw(err);
         }
+    }
+    objbrowser_fields(propname) {
+        let fieldtypes = { accesskey: "str", "publickey": "str"}
+        return fieldtypes[propname] || super.objbrowser_fields(propname);
     }
 
     static async p_test(verbose) { //TODO-BACKPORT - copy into Python/test_client

@@ -146,6 +146,12 @@ class KeyChain extends CommonList {
                 (key) => key.match({".instanceof": clstarget}))))   // That are instances of the target
     }
 
+    objbrowser_fields(propname) {
+        let fieldtypes = { _keys: "arrayobj"}
+        return fieldtypes[propname] || super.objbrowser_fields(propname);
+    }
+
+
     static async p_test(acl, verbose) {
         /* Fairly broad test of AccessControlList and KeyChain */
         if (verbose) console.log("KeyChain.test");

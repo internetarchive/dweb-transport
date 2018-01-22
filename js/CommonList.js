@@ -172,6 +172,15 @@ class CommonList extends PublicPrivate {    //TODO-API split CL and PP
         return Dweb.Transports.p_rawadd(this.listpublicurls, sig, verbose);
     }
 
+    objbrowser_fields(propname) {
+        let fieldtypes = { _list: "arrayobj", listurls: "urlarraynolinks", listpublicurls: "urlarraynolinks"}  //TODO-OBJBROWSER check booleans work, and conversion of listners to strings.
+        return fieldtypes[propname] || super.objbrowser_fields(propname);
+    }
+    async objbrowser(el, opts) {
+        await this.p_fetchlist();   // Fetch list before displaying (but not elements)
+        super.objbrowser(el, opts);
+    }
+
     // ----- Listener interface ----- see https://developer.mozilla.org/en-US/docs/Web/API/EventTarget for the pattern
 
     listmonitor(verbose) {

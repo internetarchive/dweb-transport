@@ -180,6 +180,11 @@ class PublicPrivate extends SmartDict {
         return Dweb.utils.intersects(this._publicurls, sig.signedby)    // Check signedby assertion is for this list -
             && this.keypair.verify(sig.signable(), sig.signature)    //TODO currently throws assertion error if doesnt - not sure that is correct
     }
+    objbrowser_fields(propname) {
+        let fieldtypes = { keypair: "obj", _master: "str", _publicurls: "urlarray", _allowunsafestore: "str",
+            dontstoremaster: "str", _listeners: "jsonobj" }  //TODO-OBJBROWSER check booleans work, and conversion of listners to strings.
+        return fieldtypes[propname] || super.objbrowser_fields(propname);
+    }
 
     // ----- Listener interface ----- see https://developer.mozilla.org/en-US/docs/Web/API/EventTarget for the pattern
 
@@ -220,4 +225,5 @@ class PublicPrivate extends SmartDict {
         return !event.defaultPrevented;
     }
 }
+
 exports = module.exports = PublicPrivate;
