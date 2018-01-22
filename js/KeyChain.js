@@ -198,7 +198,6 @@ class KeyChain extends CommonList {
             console.assert(vlm3.name === vlmaster.name, "Names should survive round trip");
             if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
 
-            verbose = true;
             if (verbose) console.log("KEYCHAIN 5: Check can user ViewerKeyPair");
             // Uses acl passed in from AccessControlList.acl
             acl._allowunsafestore = true;
