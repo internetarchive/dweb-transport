@@ -92,18 +92,23 @@ class TransportWEBTORRENT extends Transport {
     }
 
     webtorrentparseurl(url) {
+        /* Parse a URL
+        url:    URL as string or already parsed into Url
+        returns:    torrentid, path
+         */
         if (!url) {
             throw new Dweb.errors.CodingError("TransportWEBTORRENT.p_rawfetch: requires url");
         }
 
-        const index = url.href.indexOf('/');
+        const urlstring = typeof url === "string" ? url : url.href
+        const index = urlstring.indexOf('/');
 
         if (index === -1) {
             throw new Dweb.errors.CodingError("TransportWEBTORRENT.p_rawfetch: invalid url - missing path component. Should look like magnet:xyzabc/path/to/file");
         }
 
-        const torrentId = url.href.slice(0, index);
-        const path = url.href.slice(index + 1);
+        const torrentId = urlstring.slice(0, index);
+        const path = urlstring.slice(index + 1);
 
         return { torrentId, path }
     }
@@ -134,10 +139,12 @@ class TransportWEBTORRENT extends Transport {
                 });
             }
 
-            window.WEBTORRENT_TORRENT = torrent
-            torrent.once('close', () => {
-                window.WEBTORRENT_TORRENT = null
-            })
+            if (typeof window !== "undefined") {   // Check running in browser
+                window.WEBTORRENT_TORRENT = torrent;
+                torrent.once('close', () => {
+                    window.WEBTORRENT_TORRENT = null
+                })
+            }
         });
     }
 
@@ -207,7 +214,7 @@ class TransportWEBTORRENT extends Transport {
 
         :param string url: URL of object being retrieved
         :param boolean verbose: True for debugging output
-        :resolve stream: Return the readable stream.
+        :returns stream: The readable stream.
         :throws:        TransportError if url invalid - note this happens immediately, not as a catch in the promise
          */
         if (verbose) console.log("TransportWEBTORRENT createreadstream %o %o", url, opts);
@@ -229,33 +236,43 @@ class TransportWEBTORRENT extends Transport {
         return through;
     }
 
-    static async test(transport, verbose) {
-        // Creative commons torrent, copied from https://webtorrent.io/free-torrents
-        let bigBuckBunny = 'magnet:?xt=urn:btih:dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c&dn=Big+Buck+Bunny&tr=udp%3A%2F%2Fexplodie.org%3A6969&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Ftracker.empire-js.us%3A1337&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337&tr=wss%3A%2F%2Ftracker.btorrent.xyz&tr=wss%3A%2F%2Ftracker.fastcast.nz&tr=wss%3A%2F%2Ftracker.openwebtorrent.com&ws=https%3A%2F%2Fwebtorrent.io%2Ftorrents%2F&xs=https%3A%2F%2Fwebtorrent.io%2Ftorrents%2Fbig-buck-bunny.torrent/Big Buck Bunny.en.srt';
+    static async p_test(opts, verbose) {
+        try {
+            let transport = await this.p_setup(opts, verbose); // Assumes IPFS already setup
+            if (verbose) console.log(transport.name, "setup");
+            let res = await transport.p_status(verbose);
+            console.assert(res === Dweb.Transport.STATUS_CONNECTED)
 
-        let data1 = await transport.p_rawfetch(bigBuckBunny, verbose);
-        data1 = data1.toString();
-        assertData(data1);
+            // Creative commons torrent, copied from https://webtorrent.io/free-torrents
+            let bigBuckBunny = 'magnet:?xt=urn:btih:dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c&dn=Big+Buck+Bunny&tr=udp%3A%2F%2Fexplodie.org%3A6969&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Ftracker.empire-js.us%3A1337&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337&tr=wss%3A%2F%2Ftracker.btorrent.xyz&tr=wss%3A%2F%2Ftracker.fastcast.nz&tr=wss%3A%2F%2Ftracker.openwebtorrent.com&ws=https%3A%2F%2Fwebtorrent.io%2Ftorrents%2F&xs=https%3A%2F%2Fwebtorrent.io%2Ftorrents%2Fbig-buck-bunny.torrent/Big Buck Bunny.en.srt';
 
-        const stream = await transport.p_createReadStream(bigBuckBunny, verbose);
+            let data1 = await transport.p_rawfetch(bigBuckBunny, verbose);
+            data1 = data1.toString();
+            assertData(data1);
 
-        const chunks = [];
-        stream.on("data", (chunk) => {
-            chunks.push(chunk);
-        });
-        stream.on("end", () => {
-            const data2 = Buffer.concat(chunks).toString();
-            assertData(data2);
-        });
+            const stream = await transport.createReadStream(bigBuckBunny, verbose);
 
-        function assertData (data) {
-            // Test for a string that is contained within the file
-            let expectedWithinData = "00:00:02,000 --> 00:00:05,000";
+            const chunks = [];
+            stream.on("data", (chunk) => {
+                chunks.push(chunk);
+            });
+            stream.on("end", () => {
+                const data2 = Buffer.concat(chunks).toString();
+                assertData(data2);
+            });
 
-            console.assert(data.indexOf(expectedWithinData) !== -1, "Should fetch 'Big Buck Bunny.en.srt' from the torrent");
+            function assertData(data) {
+                // Test for a string that is contained within the file
+                let expectedWithinData = "00:00:02,000 --> 00:00:05,000";
 
-            // Test that the length is what we expect
-            console.assert(data.length, 129, "'Big Buck Bunny.en.srt' was " + data.length);
+                console.assert(data.indexOf(expectedWithinData) !== -1, "Should fetch 'Big Buck Bunny.en.srt' from the torrent");
+
+                // Test that the length is what we expect
+                console.assert(data.length, 129, "'Big Buck Bunny.en.srt' was " + data.length);
+            }
+        } catch (err) {
+            console.log("Exception thrown in TransportWEBTORRENT.p_test:", err.message);
+            throw err;
         }
     }
 

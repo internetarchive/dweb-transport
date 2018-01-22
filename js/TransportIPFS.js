@@ -234,9 +234,14 @@ class TransportIPFS extends Transport {
         return stream;
     }
 
-    static async test(transport, verbose) {
+    static async p_test(opts, verbose) {
         if (verbose) {console.log("TransportIPFS.test")}
         try {
+            let transport = await this.p_setup(opts, verbose); // Assumes IPFS already setup
+            if (verbose) console.log(transport.name,"setup");
+            let res = await transport.p_status(verbose);
+            console.assert(res === Dweb.Transport.STATUS_CONNECTED)
+
             let urlqbf;
             let qbf = "The quick brown fox";
             let qbf_url = "ipfs:/ipfs/zdpuAscRnisRkYnEyJAp1LydQ3po25rCEDPPEDMymYRfN1yPK"; // Expected url
@@ -252,6 +257,7 @@ class TransportIPFS extends Transport {
             let data = await transport.p_rawfetch(urlqbf, verbose);
             console.assert(data.toString() === qbf, "Should fetch block stored above");
             //console.log("TransportIPFS test complete");
+            return transport
         } catch(err) {
             console.log("Exception thrown in TransportIPFS.test:", err.message);
             throw err;

@@ -1,6 +1,9 @@
 const Url = require('url');
 const stream = require('readable-stream');
 
+function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { resolve(val); },ms)})}
+
+
 class Transport {
 
     constructor(options, verbose) {
@@ -280,6 +283,41 @@ class Transport {
         }
         return c;
     }
+
+    async p_test_kvt(urlexpectedsubstring, verbose=false) {
+        /*
+            Test the KeyValue functionality of any transport that supports it.
+            urlexpectedsubstring:   Some string expected in the publicurl of the table.
+         */
+        if (verbose) {console.log(this.name,"p_test_kvt")}
+        try {
+            let table = await this.p_newtable("NACL VERIFY:1234567","mytable", verbose);
+            let mapurl = table.publicurl;
+            if (verbose) console.log("newtable=",mapurl);
+            console.assert(mapurl.includes(urlexpectedsubstring));
+            await this.p_set(mapurl, "testkey", "testvalue", verbose);
+            let res = await this.p_get(mapurl, "testkey", verbose);
+            console.assert(res === "testvalue");
+            await this.p_set(mapurl, "testkey2", {foo: "bar"}, verbose);   // Try setting to an object
+            res = await this.p_get(mapurl, "testkey2", verbose);
+            console.assert(res.foo === "bar");
+            await this.p_set(mapurl, "testkey3", [1,2,3], verbose);    // Try setting to an array
+            res = await this.p_get(mapurl, "testkey3", verbose);
+            console.assert(res[1] === 2);
+            res = await this.p_keys(mapurl);
+            console.assert(res.includes("testkey") && res.includes("testkey3"));
+            res = await this.p_delete(mapurl, ["testkey"]);
+            res = await this.p_getall(mapurl, verbose);
+            if (verbose) console.log("getall=>",res);
+            console.assert(res.testkey2.foo === "bar" && res.testkey3["1"] === 2 && !res.testkey1);
+            await delay(200);
+            if (verbose) console.log(this.name, "p_test_kvt complete")
+        } catch(err) {
+            console.log("Exception thrown in ", this.name, "p_test_kvt:", err.message);
+            throw err;
+        }
+    }
+
 
 }
 Transport.STATUS_CONNECTED = 0; // Connected - all other numbers are some version of not ok to use

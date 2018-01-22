@@ -321,12 +321,16 @@ class TransportYJS extends Transport {
         })
     }
 
-
-    static async test(transport, verbose) {
+    static async p_test(opts={}, verbose) {
         if (verbose) {console.log("TransportYJS.test")}
         try {
+            let transport = await Dweb.TransportYJS.p_setup(opts, verbose); // Assumes IPFS already setup
+            if (verbose) console.log(transport.name, "setup");
+            let res = await transport.p_status(verbose);
+            console.assert(res === Dweb.Transport.STATUS_CONNECTED)
+            //TODO move this to Transport.p_test_list -=-=-=-=
             let testurl = "yjs:/yjs/THISATEST";  // Just a predictable number can work with
-            let res = await transport.p_rawlist(testurl, verbose);
+            res = await transport.p_rawlist(testurl, verbose);
             let listlen = res.length;   // Holds length of list run intermediate
             if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res));
             let monitoredobj;
@@ -341,26 +345,9 @@ class TransportYJS extends Transport {
             res = await transport.p_rawlist(testurl, verbose);
             console.assert(res.length === listlen + 1, "Should have added one item");
             //console.log("TransportYJS test complete");
-            let db = await transport.p_newdatabase("TESTNOTREALLYAKEY");
-            let table = await transport.p_newtable("TESTNOTREALLYAKEY","TESTTABLE");
-            let mapurl = table.publicurl;
-            console.assert(mapurl === "yjs:/yjs/TESTNOTREALLYAKEY/TESTTABLE");
-            await transport.p_set(mapurl, "testkey", "testvalue", verbose);
-            res = await transport.p_get(mapurl, "testkey", verbose);
-            console.assert(res === "testvalue");
-            await transport.p_set(mapurl, "testkey2", {foo: "bar"}, verbose);
-            res = await transport.p_get(mapurl, "testkey2", verbose);
-            console.assert(res.foo === "bar");
-            await transport.p_set(mapurl, "testkey3", [1,2,3], verbose);
-            res = await transport.p_get(mapurl, "testkey3", verbose);
-            console.assert(res[1] === 2);
-            res = await transport.p_keys(mapurl);
-            console.assert(res.length === 3 && res.includes("testkey3"));
-            res = await transport.p_getall(mapurl, verbose);
-            console.log(res);
-            console.assert(res.testkey2.foo === "bar")
-
-
+            // -=-=-=-===-=- Now test KeyValue using common test -=-=-=-=-=-=-
+            await transport.p_test_kvt("yjs:/yjs/NACL%20VERIFY", verbose);
+            return transport;
         } catch(err) {
             console.log("Exception thrown in TransportYJS.test:", err.message);
             throw err;
