@@ -127,3 +127,8 @@ exports.utils.stringfrom = function(foo, hints={}) {
         throw new Dweb.errors.CodingError(`Unable to turn ${foo} into a string ${err.message}`)
     }
 };
+
+exports.objbrowser = function(el, {maxdepth=2, verbose=false}={}) {
+    if (typeof el === 'string') el = document.getElementById(el);
+    (new Dweb.SmartDict()).objbrowser_arrayobj(el, "keychains", Dweb.keychains, {links: true});
+};

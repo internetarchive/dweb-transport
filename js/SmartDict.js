@@ -189,7 +189,10 @@ class SmartDict extends Transportable {
     }
     objbrowser_obj(el, name, val) {
         this._objbrowser_row(el, name,
-            this.objbrowser_createElement('span',{className: 'propval', source: val, onclick: `Dweb.SmartDict.objbrowser_expandurl(this);return false;`}, val.constructor.name));
+            this.objbrowser_createElement('span',{className: 'propval', source: val},
+                this.objbrowser_createElement('span', {onclick: `Dweb.SmartDict.objbrowser_expandurl(this.parentNode); return false;`},val.constructor.name)
+
+            ));
     }
     static async objbrowser_expandurl(el, obj) {
         if (typeof obj === "undefined") // If dont specify check source, which may also be undefined, but use if there.
@@ -206,16 +209,18 @@ class SmartDict extends Transportable {
         this._objbrowser_row(el, name,
             this.objbrowser_createElement('ul',{className: 'propurls propval'},
                 links
-                    ? arr.map(l => this.objbrowser_createElement('li',{className: 'propurl'},
-                        this.objbrowser_createElement('span', {onclick: `Dweb.SmartDict.objbrowser_expandurl(this.parentNode, "${l}"); return false;`},l)
+                    ? arr.map(l => this.objbrowser_createElement('li',{className: 'propurl', source: l},
+                        this.objbrowser_createElement('span', {onclick: `Dweb.SmartDict.objbrowser_expandurl(this.parentNode); return false;`},l)
                     ) )
-                    : arr.map(l => this.objbrowser_createElement('li',{className: 'propurl', onclick: "return false;"},l) )
+                    : arr.map(l => this.objbrowser_createElement('li',{className: 'propurl'},l) )
             ) );
     }
     objbrowser_arrayobj(el, name, arr, {links=false}={}) {
         this._objbrowser_row(el, name,
             this.objbrowser_createElement('ul',{className: 'propurls propval'},
-                arr.map((l,i) => this.objbrowser_createElement('li',{className: 'propurl', source: l, onclick: `Dweb.SmartDict.objbrowser_expandurl(this); return false;`},`${i}...`) )
+                arr.map((l,i) => this.objbrowser_createElement('li',{className: 'propurl', source: l},
+                    this.objbrowser_createElement('span', {onclick: `Dweb.SmartDict.objbrowser_expandurl(this.parentNode); return false;`}, `${i}...`)
+                ))
             ) );
     }
     objbrowser_fields(propname) {
