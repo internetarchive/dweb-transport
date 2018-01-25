@@ -4466,18 +4466,58 @@ class ArchiveFile {
             const torrent = window.WEBTORRENT_TORRENT;
 
             const updateSpeed = () => {
-                const webtorrentStats = document.querySelector('#webtorrentStats'); // Not moved into updateSpeed as not in document when this is run first time
-                var progress = (100 * torrent.progress).toFixed(1);
-
-                const html = '<b>Peers:</b> ' + torrent.numPeers + ' ' + '<b>Progress:</b> ' + progress + '% ' + '<b>Download speed:</b> ' + __WEBPACK_IMPORTED_MODULE_0_prettier_bytes___default()(torrent.downloadSpeed) + '/s ' + '<b>Upload speed:</b> ' + __WEBPACK_IMPORTED_MODULE_0_prettier_bytes___default()(torrent.uploadSpeed) + '/s';
-
-                if (webtorrentStats) webtorrentStats.innerHTML = html; // May be null during loading, or not in UI
+                if (window.WEBTORRENT_TORRENT === torrent) {
+                    // Check still displaying ours
+                    const webtorrentStats = document.querySelector('#webtorrentStats'); // Not moved into updateSpeed as not in document when this is run first time
+                    const els = __WEBPACK_IMPORTED_MODULE_2__ReactFake__["a" /* default */].createElement(
+                        'span',
+                        null,
+                        __WEBPACK_IMPORTED_MODULE_2__ReactFake__["a" /* default */].createElement(
+                            'b',
+                            null,
+                            'Peers:'
+                        ),
+                        ' ',
+                        torrent.numPeers,
+                        ' ',
+                        __WEBPACK_IMPORTED_MODULE_2__ReactFake__["a" /* default */].createElement(
+                            'b',
+                            null,
+                            'Progress:'
+                        ),
+                        ' ',
+                        (100 * torrent.progress).toFixed(1),
+                        '%',
+                        ' ',
+                        __WEBPACK_IMPORTED_MODULE_2__ReactFake__["a" /* default */].createElement(
+                            'b',
+                            null,
+                            'Download speed:'
+                        ),
+                        ' ',
+                        __WEBPACK_IMPORTED_MODULE_0_prettier_bytes___default()(torrent.downloadSpeed),
+                        '/s',
+                        ' ',
+                        __WEBPACK_IMPORTED_MODULE_2__ReactFake__["a" /* default */].createElement(
+                            'b',
+                            null,
+                            'Upload speed:'
+                        ),
+                        ' ',
+                        __WEBPACK_IMPORTED_MODULE_0_prettier_bytes___default()(torrent.uploadSpeed),
+                        '/s'
+                    );
+                    if (webtorrentStats) {
+                        deletechildren(webtorrentStats);
+                        webtorrentStats.appendChild(els);
+                    }
+                }
             };
 
             torrent.on('download', __WEBPACK_IMPORTED_MODULE_4_throttleit___default()(updateSpeed, 250));
             torrent.on('upload', __WEBPACK_IMPORTED_MODULE_4_throttleit___default()(updateSpeed, 250));
             setInterval(updateSpeed, 1000);
-            updateSpeed();
+            updateSpeed(); //Do it once
         }
     }
     loadImg(jsx) {
