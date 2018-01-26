@@ -310,14 +310,14 @@ export default class Details extends ArchiveBase {
 
                         <div class="key-val-big">
                             <div>
-                                <span class="key">by</span>
+                                <span class="key">by</span>{' '}
                                 <span class="value"><span><a onClick={`Nav.nav_search('creator=\"${creator}\"')`}>{creator}</a></span></span>
                             </div>
                         </div>
 
                         <br/>
                         <div class="key-val-big">
-                            Publication date <a onClick="Nav.nav_search('date:{datePublished}')">
+                            Publication date <a onClick="Nav.nav_search('date:{datePublished}')">{' '}
                             <span itemprop="datePublished">{datePublished}</span></a>
                         </div>
 
@@ -338,7 +338,7 @@ export default class Details extends ArchiveBase {
                         </div>
                         ) : ( undefined ) }
                         { publisher ? (
-                        <div><span class="key">Publisher</span>
+                        <div><span class="key">Publisher</span>{' '}
 
                             <span
                                     class="value"
@@ -349,11 +349,11 @@ export default class Details extends ArchiveBase {
                         {/*-- sponsor (also does usage rights, if specified for the sponsor) --*/}
 
                         {/*-- contributor (also does usage rights, if specified for the contributor) --*/}
-                        { contributor ? ( <div><span class="key">Contributor</span><span class="value">{contributor}</span></div> ) : ( undefined ) }
+                        { contributor ? ( <div><span class="key">Contributor</span>{' '}<span class="value">{contributor}</span></div> ) : ( undefined ) }
                         { languageAbbrev ? (
                             <div class="key-val-big">
                                 <div>
-                                    <span class="key">Language</span>
+                                    <span class="key">Language</span>{' '}
 
                                     <span class="value"><span><a onClick={`Nav.nav_search('language=(\"${languageAbbrev}\"+OR+language=\"${languageLong}\")')`}>{languageLong}</a></span></span>
                                 </div>
