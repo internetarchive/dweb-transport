@@ -195,6 +195,73 @@ class Transport {
         console.log("Undefined function Transport.listmonitor");    // Note intentionally a log, as legitamte to not implement it
     }
 
+
+    // ==== TO SUPPORT KEY VALUE INTERFACES IMPLEMENT THESE =====
+    // Support for Key-Value pairs as per
+    // https://docs.google.com/document/d/1yfmLRqKPxKwB939wIy9sSaa7GKOzM5PrCZ4W1jRGW6M/edit#
+
+    async p_newdatabase(pubkey, verbose) {  //TODO-API-KEYVALUE
+        /*
+         Create a new database based on some existing object
+         pubkey:    Something that is, or has a pubkey, by default support Dweb.PublicPrivate, Dweb.KeyPair or an array of strings as in the output of keypair.publicexport()
+         returns: {publicurl, privateurl} which may be the same if there is no write authentication
+          */
+        throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_newdatabase");
+    }
+    //TODO maybe change the listmonitor / monitor code for to use "on" and the structure of PP.events
+    //TODO but note https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy about Proxy which might be suitable, prob not as doesnt map well to lists
+    async p_newtable(pubkey, table, verbose) {  //TODO-API-KEYVALUE
+        /*
+        Create a new table,
+        pubkey: Is or has a pubkey (see p_newdatabase)
+        table:  String representing the table - unique to the database
+        returns:    {privateurl, publicurl} which may be the same if there is no write authentication
+         */
+        throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_newtable");
+    }
+
+    async p_set(url, keyvalues, value, verbose) {  // url = yjs:/yjs/database/table/key   //TODO-KEYVALUE-API
+        /*
+        Set one or more keys in a table.
+        url:    URL of the table
+        keyvalues:  String representing a single key OR dictionary of keys
+        value:  String or other object to be stored (its not defined yet what objects should be supported, e.g. any object ?
+         */
+        throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_set");
+    }
+    async p_get(url, keys, verbose) {  //TODO-KEYVALUE-API - return dict or single
+        /* Get one or more keys from a table
+        url:    URL of the table
+        keys:   Array of keys
+        returns:    Dictionary of values found (undefined if not found)
+         */
+        throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_get");
+    }
+
+    async p_delete(url, keys, verbose) {  //TODO-KEYVALUE-API
+        /* Delete one or more keys from a table
+        url:    URL of the table
+        keys:   Array of keys
+         */
+        throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_delete");
+    }
+
+    async p_keys(url, verbose) {   //TODO-KEYVALUE-API
+        /* Return a list of keys in a table (suitable for iterating through)
+        url:    URL of the table
+        returns:    Array of strings
+         */
+        throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_keys");
+    }
+    async p_getall(url, verbose) {   //TODO-KEYVALUE-API
+        /* Return a dictionary representing the table
+        url:    URL of the table
+        returns:    Dictionary of Key:Value pairs, note take care if this could be large.
+         */
+        throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_keys");
+    }
+    // ------ UTILITY FUNCTIONS, NOT REQD TO BE SUBCLASSED ----
+
     static mergeoptions(a) {
         /*
         Deep merge options dictionaries
