@@ -1,10 +1,9 @@
-import prettierBytes from "prettier-bytes";
 import RenderMedia from 'render-media';
-
 require('babel-core/register')({ presets: ['env', 'react']}); // ES6 JS below!
 import React from './ReactFake';
 import Util from './Util';
 import throttle from "throttleit";
+import prettierBytes from "prettier-bytes";
 
 export default class ArchiveFile {
     /*
@@ -36,6 +35,25 @@ export default class ArchiveFile {
         //jsx.src = `http://archive.org/download/${this.itemid}/${this.metadata.name}`
         jsx.src = objectURL;
     }
+    async p_download(a, options) {
+        let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f=>!!f);   // Multiple potential sources elimate any empty
+        let blk = await  Dweb.Block.p_fetch(urls, verbose);  //Typically will be a Uint8Array
+        let blob = new Blob([blk._data], {type: Util.archiveMimeTypeFromFormat[this.metadata.format]}) // Works for data={Uint8Array|Blob}
+        let objectURL = URL.createObjectURL(blob);
+        if (verbose) console.log("Blob URL=",objectURL);
+        //browser.downloads.download({filename: this.metadata.name, url: objectURL});
+        //Downloads.fetch(objectURL, this.metadata.name);
+        //TODO-DETAILS figure out how to save with the name of the file rather than the blob
+        a.href = objectURL;
+        a.target= (options && options.target) || "_blank";                      // Open in new window by default
+        a.onclick = undefined;
+        a.download = true;
+        a.click();
+        //URL.revokeObjectURL(objectURL)    //TODO figure out when can do this - maybe last one, or maybe dont care?
+
+
+    }
+
     async p_loadStream(jsx) {
         let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f=>!!f);   // Multiple potential sources
         var file = {
@@ -94,5 +112,8 @@ export default class ArchiveFile {
     }
     downloadable() {
         return Object.keys(Util.downloadableFormats).includes(this.metadata.format)
+    }
+    sizePretty() {
+        return prettierBytes(parseInt(this.metadata.size));
     }
 }

@@ -145,8 +145,13 @@ export default class Nav { //extends React.Component
         let s = await new Search((typeof(q) === "object") ? q : (typeof(q) === "string") ? {query: encodeURIComponent(q)} : undefined).fetch();
         s.render(destn);
     }
+    static async nav_download(el) {
+        let source = el.source; // Should be an ArchiveFile. - see example in Details.js
+        await source.p_download(el);
+    }
 
-    static async factory(itemid, res, wanthistory=true) {
+
+static async factory(itemid, res, wanthistory=true) {
         console.log("XXX@Nav.factory",itemid)
         if (wanthistory) {
             let historystate = {itemid}; //TODO-HISTORY may want  to store verbose, transports etc here

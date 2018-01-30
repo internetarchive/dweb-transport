@@ -230,7 +230,6 @@ export default class Details extends ArchiveBase {
         let metadataListFound = Object.keys(metadataListPossible).filter((k) => metadata[k]);    // List of keys in the metadata
         let downloadableFiles = this._list.filter(f => f.downloadable()); // Note on image it EXCLUDED JPEG Thumb, but included JPEG*Thumb
             //TODO  Replace "a" with onclicks to download function on f
-            //TODO Need f.sizePretty property of ArchiveFile (see prettierbytes used in WebTorrent)
         let filesCount = item.files_count;
         let originalFilesCount = item.files.filter((f)=>f.source === "original").length+1; // Adds in Archive Bittorrent
         let downloadURL = `https://archive.org/download/${itemid}`;
@@ -419,13 +418,15 @@ export default class Details extends ArchiveBase {
                             {downloadableFiles.map((f) => (
                                 <div class="format-group">
                                     <div class="summary-rite">
-                                        <a class="stealth" href={`https://archive.org/download/${f.itemid}/${f.metadata.name}`}
-                                           title={f.sizePretty}>
+                                        <a class="stealth" source={f} onclick="Nav.nav_download(this)"
+                                           title={f.sizePretty()}>
                                             <span class="hover-badge-stealth"><span class="iconochive-download" aria-hidden="true"></span><span class="sr-only">download</span>1 file</span>
                                         </a>
                                     </div>
                                     <a class="format-summary download-pill"
-                                        href="https://archive.org/download/${f.itemid}/${f.metadata.name}" title={f.sizePretty}
+                                        source={f}
+                                        onclick="Nav.nav_download(this)"
+                                        title={f.sizePretty()}
                                         data-toggle="tooltip" data-placement="auto left" data-container="body" target="_blank">{/*--new window to persist dweb--*/}
                                         {Util.downloadableFormats[f.metadata.format]} <span class="iconochive-download" aria-hidden="true"></span><span class="sr-only">download</span>
                                     </a>
