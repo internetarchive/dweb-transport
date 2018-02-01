@@ -136,11 +136,16 @@ class KeyValueTable extends PublicPrivate {
             let masterobj = await this.p_new({name: "TEST KEYVALUETABLE", _allowunsafestore: true, keyvaluetable: "TESTTABLENAME"}, true, {passphrase: "This is a test this is only a test of VersionList"}, verbose);
             let privateurls = masterobj._urls;
             let publicurls = masterobj._publicurls;
+            await masterobj.p_set("address","Nowhere", verbose);
             let publicobj = await Dweb.SmartDict.p_fetch(publicurls, verbose);
-            console.assert(typeof publicobj._map["address"] === "undefined"); // Shouldnt be set yet
+            console.assert(publicobj._map["address"] === "Nowhere"); // Shouldnt be set yet
             await masterobj.p_set("address","Everywhere", verbose);
             await delay(500);
-            console.assert(publicobj._map["address"] === "Everywhere"); // Should be set after allow time for monitor event
+            if (Dweb.Transports.validFor(publicurls, "monitor").length) {
+                console.assert(publicobj._map["address"] === "Everywhere"); // Should be set after allow time for monitor event
+            } else {
+                console.log('Loaded transports dont support "monitor"');
+            }
         } catch (err) {
             console.log("Caught exception in KeyValueTable.test", err);
             throw(err)

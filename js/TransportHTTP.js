@@ -44,7 +44,7 @@ class TransportHTTP extends Transport {
         this.options = options;
         this.urlbase = options.http.urlbase;
         this.supportURLs = ['contenthash', 'http','https']; // http and https are legacy
-        this.supportFunctions = ['fetch', 'store', 'add', 'list', 'reverse', 'newlisturls', 'createReadStream']; //Does not support: listmonitor - reverse is disabled somewhere not sure if here or caller
+        this.supportFunctions = ['fetch', 'store', 'add', 'list', 'reverse', 'newlisturls', 'createReadStream', "get", "set", "keys", "getall", "delete", "newtable", "newdatabase"]; //Does not support: listmonitor - reverse is disabled somewhere not sure if here or caller
         this.supportFeatures = ['fetch.range']
         this.name = "HTTP";             // For console log etc
         this.status = Dweb.Transport.STATUS_LOADED;
@@ -156,27 +156,36 @@ class TransportHTTP extends Transport {
         return  `${this.urlbase}/${command}`
     }
     _url(url, command, parmstr) {
-        if (!url) throw new Dweb.errors.CodingError(`${command}: requires url`)
+        if (!url) throw new Dweb.errors.CodingError(`${command}: requires url`);
         if (typeof url !== "string") { url = url.href }
-        url = url.replace('contenthash:/contenthash', this._cmdurl(command))    // Note leaves http: and https: urls unchanged
-        url = url + (parmstr ? "?"+parmstr : "")
-        return url
+        url = url.replace('contenthash:/contenthash', this._cmdurl(command)) ;   // Note leaves http: and https: urls unchanged
+        url = url.replace('getall/table', command);
+        url = url + (parmstr ? "?"+parmstr : "");
+        return url;
     }
-    p_rawfetch(url, verbose, opts={}) {
+    async p_rawfetch(url, verbose, opts={}) {
         /*
         Fetch from underlying transport,
+        Fetch is used both for contenthash requests and table as when passed to SmartDict.p_fetch may not know what we have
         url: Of resource - which is turned into the HTTP url in p_httpfetch
         throws: TransportError if fails
          */
         //if (!(url && url.includes(':') ))
         //    throw new Dweb.errors.CodingError("TransportHTTP.p_rawfetch bad url: "+url);
-        return this.p_GET(this._url(url, servercommands.rawfetch), verbose, opts);
+        if (((typeof url === "string") ? url : url.href).includes('/getall/table')) {
+            return {
+                table: "keyvaluetable",
+                _map: await this.p_GET(this._url(url, servercommands.getall), verbose, opts)
+                }
+        } else {
+            return await this.p_GET(this._url(url, servercommands.rawfetch), verbose, opts);
+        }
     }
 
     p_rawlist(url, verbose) {
         // obj being loaded
         // Locate and return a block, based on its url
-        if (!url) throw new Dweb.errors.CodingError("TransportHTTP.p_rawlist: requires url")
+        if (!url) throw new Dweb.errors.CodingError("TransportHTTP.p_rawlist: requires url");
         return this.p_GET(this._url(url, servercommands.rawlist), verbose);
     }
     rawreverse() { throw new Dweb.errors.ToBeImplementedError("Undefined function TransportHTTP.rawreverse"); }
@@ -230,7 +239,7 @@ class TransportHTTP extends Transport {
             pubkey = pubkey.find(k => k.startsWith("NACL VERIFY:"));
         // By this point pubkey should be an export of a public key of form xyz:abc where xyz
         // specifies the type of public key (NACL VERIFY being the only kind we expect currently)
-        let u =  `contenthash:/contenthash/${encodeURIComponent(pubkey)}`;
+        let u =  `${this.urlbase}/getall/table/${encodeURIComponent(pubkey)}`; //TODO-KEYVALUE replace with URL of server
         return {"publicurl": u, "privateurl": u};
     }
 
@@ -247,10 +256,10 @@ class TransportHTTP extends Transport {
         if (!url || !keyvalues) throw new Dweb.errors.CodingError("TransportHTTP.p_set: invalid parms",url, keyvalyes);
         if (verbose) console.log("p_set", url, keyvalues, value);
         if (typeof keyvalues === "string") {
-            let kv = JSON.stringify([{key: keyvalues, value: value}])
+            let kv = JSON.stringify([{key: keyvalues, value: value}]);
             await this.p_POST(this._url(url, servercommands.set), "application/json", kv, verbose); // Returns immediately
         } else {
-            let kv = JSON.stringify(Object.keys(keyvalues).map((k) => ({"key": k, "value": keyvalues[k]})))
+            let kv = JSON.stringify(Object.keys(keyvalues).map((k) => ({"key": k, "value": keyvalues[k]})));
             await this.p_POST(this._url(url, servercommands.set), "application/json", kv, verbose); // Returns immediately
         }
     }
@@ -260,24 +269,24 @@ class TransportHTTP extends Transport {
     }
     //TODO-KEYALUE got to here on KEYVALUE in HTTP
     async p_get(url, keys, verbose) {
-        if (!url && keys) throw new Dweb.errors.CodingError("TransportHTTP.p_get: requires url and at least one key")
+        if (!url && keys) throw new Dweb.errors.CodingError("TransportHTTP.p_get: requires url and at least one key");
         let parmstr =Array.isArray(keys)  ?  keys.map(k => this._keyparm(k)).join('&') : this._keyparm(keys)
         let res = await this.p_GET(this._url(url, servercommands.get, parmstr),verbose);
         return Array.isArray(keys) ? res : res[keys]
     }
 
     async p_delete(url, keys, verbose) {  //TODO-KEYVALUE-API need to think this one through
-        if (!url && keys) throw new Dweb.errors.CodingError("TransportHTTP.p_get: requires url and at least one key")
-        let parmstr =  keys.map(k => this._keyparm(k)).join('&')
+        if (!url && keys) throw new Dweb.errors.CodingError("TransportHTTP.p_get: requires url and at least one key");
+        let parmstr =  keys.map(k => this._keyparm(k)).join('&');
         await this.p_GET(this._url(url, servercommands.delete, parmstr),verbose);
     }
 
     async p_keys(url, verbose) {
-        if (!url && keys) throw new Dweb.errors.CodingError("TransportHTTP.p_get: requires url and at least one key")
+        if (!url && keys) throw new Dweb.errors.CodingError("TransportHTTP.p_get: requires url and at least one key");
         return await this.p_GET(this._url(url, servercommands.keys), verbose);
     }
     async p_getall(url, verbose) {
-        if (!url && keys) throw new Dweb.errors.CodingError("TransportHTTP.p_get: requires url and at least one key")
+        if (!url && keys) throw new Dweb.errors.CodingError("TransportHTTP.p_get: requires url and at least one key");
         return await this.p_GET(this._url(url, servercommands.getall), verbose);
     }
     /* Make sure doesnt shadow regular p_rawfetch
@@ -298,6 +307,8 @@ class TransportHTTP extends Transport {
             if (verbose) console.log("HTTP connected");
             let res = await transport.p_info(verbose);
             if (verbose) console.log("TransportHTTP info=",res);
+            res = await transport.p_status(verbose);
+            console.assert(res === Dweb.Transport.STATUS_CONNECTED);
             await transport.p_test_kvt("NACL%20VERIFY", verbose);
         } catch(err) {
             console.log("Exception thrown in TransportHTTP.test:", err.message);

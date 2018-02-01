@@ -290,8 +290,8 @@ class TransportYJS extends Transport {
         return this._p_get(y, keys);
     }
     async p_rawfetch(url, verbose) {
-        return {
-            table: "keyvaluetable",
+        return { // See identical structure in TransportHTTP
+            table: "keyvaluetable",         //TODO-KEYVALUE its unclear if this is the best way, as maybe want to know the real type of table e.g. domain
             _map: await this.p_getall(url, verbose)
         };   // Data struc is ok as SmartDict.p_fetch will pass to KVT constructor
     }

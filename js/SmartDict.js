@@ -276,6 +276,9 @@ class SmartDict extends Transportable {
             let data = await super.p_fetch(urls, verbose);  // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
             let maybeencrypted = (typeof data === "string" || data instanceof Buffer) ? JSON.parse(data) : data;          // Parse JSON (dont parse if p_fetch has returned object (e.g. from KeyValueTable
             let table = maybeencrypted.table;               // Find the class it belongs to
+            if (!table) {
+                throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: no table field, whatever this is we cant decode it");
+            }
             let cls = Dweb[Dweb.table2class[table]];        // Gets class name, then looks up in Dweb - avoids dependency
             if (!cls) { // noinspection ExceptionCaughtLocallyJS
                 throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: " + table + " is not implemented in table2class");

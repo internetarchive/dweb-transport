@@ -45,7 +45,10 @@ async function p_test(verbose) {
         await Dweb.Transports.test(verbose);
         if (verbose) console.log("Transports tested");
         //TODO-KEYVALUE reenable these tests on http
-        //await Dweb.KeyValueTable.p_test(verbose);
+        await Dweb.KeyValueTable.p_test(verbose);
+        console.log("---EXITING AFTER KEYVALUE TEST") //TODO-KEYVALUE remove this and "return" once done
+        return
+
         //verbose=true;
         //await Dweb.Domain.p_test(verbose);
         await Dweb.Block.p_test(verbose);
