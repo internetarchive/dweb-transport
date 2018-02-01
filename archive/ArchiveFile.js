@@ -27,6 +27,8 @@ export default class ArchiveFile {
         Note it can't be inside load_img which has to be synchronous and return a jsx tree.
          */
         let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f=>!!f);   // Multiple potential sources elimate any empty
+        /*
+        //This method makes use of the full Dweb library, can get any kind of link, BUT doesnt work in Firefox, the image doesn't get rendered.
         let blk = await  Dweb.Block.p_fetch(urls, verbose);  //Typically will be a Uint8Array
         let blob = new Blob([blk._data], {type: Util.archiveMimeTypeFromFormat[this.metadata.format]}) // Works for data={Uint8Array|Blob}
         // This next code is bizarre combination needed to open a blob from within an HTML window.
@@ -34,6 +36,20 @@ export default class ArchiveFile {
         if (verbose) console.log("Blob URL=",objectURL);
         //jsx.src = `http://archive.org/download/${this.itemid}/${this.metadata.name}`
         jsx.src = objectURL;
+        */
+        console.log("Rendering");
+        var file = {
+            name: this.metadata.name,
+            createReadStream: function (opts) {
+                // Return a readable stream that provides the bytes between offsets "start"
+                // and "end" inclusive. This works just like fs.createReadStream(opts) from
+                // the node.js "fs" module.
+
+                return Dweb.Transports.createReadStream(urls, opts, verbose)
+            }
+        }
+
+        RenderMedia.append(file, jsx);  // Render into supplied element - have to use append, as render doesnt work
     }
     async p_download(a, options) {
         let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f=>!!f);   // Multiple potential sources elimate any empty

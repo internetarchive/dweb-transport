@@ -45,7 +45,7 @@ export default class React  {
                 if (!React._config.root) console.error("Need to React.config({root: 'https://xyz.abc'");
                 attrs[name] = React._config.root + attrs[name];  // e.g. /foo => https://bar.com/foo
             }
-            if (["img.src"].includes(tag+"."+name) && attrs[name] instanceof ArchiveFile) {
+            if (["div.src", "img.src"].includes(tag+"."+name) && attrs[name] instanceof ArchiveFile) {
                 attrs[name].loadImg(element);
             } else if (["video.src", "audio.src"].includes(tag+"."+name) && attrs[name] instanceof ArchiveFile) {
                 attrs[name].loadStream(element);
