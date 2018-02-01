@@ -126,10 +126,12 @@ class React {
                 if (!React._config.root) console.error("Need to React.config({root: 'https://xyz.abc'");
                 attrs[name] = React._config.root + attrs[name]; // e.g. /foo => https://bar.com/foo
             }
-            if (["img.src"].includes(tag + "." + name) && attrs[name] instanceof __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__["a" /* default */]) {
+            if (["div.src", "img.src"].includes(tag + "." + name) && attrs[name] instanceof __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__["a" /* default */]) {
                 attrs[name].loadImg(element);
             } else if (["video.src", "audio.src"].includes(tag + "." + name) && attrs[name] instanceof __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__["a" /* default */]) {
                 attrs[name].loadStream(element);
+            } else if (["a.source"].includes(tag + "." + name) && attrs[name] instanceof __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__["a" /* default */]) {
+                element[name] = attrs[name]; // Store the ArchiveFile in the DOM, function e.g. onClick will access it.
             } else if (name && attrs.hasOwnProperty(name)) {
                 let value = attrs[name];
                 if (value === true) {
@@ -211,8 +213,8 @@ if (typeof Object.create === 'function') {
 
 
 
-var base64 = __webpack_require__(37)
-var ieee754 = __webpack_require__(38)
+var base64 = __webpack_require__(36)
+var ieee754 = __webpack_require__(37)
 var isArray = __webpack_require__(20)
 
 exports.Buffer = Buffer
@@ -2711,7 +2713,6 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
         let metadataListFound = Object.keys(metadataListPossible).filter(k => metadata[k]); // List of keys in the metadata
         let downloadableFiles = this._list.filter(f => f.downloadable()); // Note on image it EXCLUDED JPEG Thumb, but included JPEG*Thumb
         //TODO  Replace "a" with onclicks to download function on f
-        //TODO Need f.sizePretty property of ArchiveFile (see prettierbytes used in WebTorrent)
         let filesCount = item.files_count;
         let originalFilesCount = item.files.filter(f => f.source === "original").length + 1; // Adds in Archive Bittorrent
         let downloadURL = `https://archive.org/download/${itemid}`;
@@ -2878,6 +2879,7 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
                                 { 'class': 'key' },
                                 'by'
                             ),
+                            ' ',
                             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                                 'span',
                                 { 'class': 'value' },
@@ -2901,6 +2903,7 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                             'a',
                             { onClick: 'Nav.nav_search(\'date:{datePublished}\')' },
+                            ' ',
                             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                                 'span',
                                 { itemprop: 'datePublished' },
@@ -2948,6 +2951,7 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
                             { 'class': 'key' },
                             'Publisher'
                         ),
+                        ' ',
                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                             'span',
                             {
@@ -2973,6 +2977,7 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
                             { 'class': 'key' },
                             'Contributor'
                         ),
+                        ' ',
                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                             'span',
                             { 'class': 'value' },
@@ -2990,6 +2995,7 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
                                 { 'class': 'key' },
                                 'Language'
                             ),
+                            ' ',
                             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                                 'span',
                                 { 'class': 'value' },
@@ -3028,6 +3034,7 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
                                 { 'class': 'key' },
                                 metadataListPossible[k]
                             ),
+                            ' ',
                             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                                 'span',
                                 { 'class': 'value' },
@@ -3079,6 +3086,7 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
                                 null,
                                 'Reviewer:'
                             ),
+                            ' ',
                             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                                 'a',
                                 { onClick: `Nav.nav_details('@${review.reviewer}')`,
@@ -3103,6 +3111,7 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
                                 null,
                                 'Subject:'
                             ),
+                            ' ',
                             review.reviewtitle,
                             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                                 'div',
@@ -3141,8 +3150,8 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
                                 { 'class': 'summary-rite' },
                                 __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                                     'a',
-                                    { 'class': 'stealth', href: `https://archive.org/download/${f.itemid}/${f.metadata.name}`,
-                                        title: f.sizePretty },
+                                    { 'class': 'stealth', source: f, onclick: 'Nav.nav_download(this)',
+                                        title: f.sizePretty() },
                                     __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                                         'span',
                                         { 'class': 'hover-badge-stealth' },
@@ -3159,7 +3168,9 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
                             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                                 'a',
                                 { 'class': 'format-summary download-pill',
-                                    href: 'https://archive.org/download/${f.itemid}/${f.metadata.name}', title: f.sizePretty,
+                                    source: f,
+                                    onclick: 'Nav.nav_download(this)',
+                                    title: f.sizePretty(),
                                     'data-toggle': 'tooltip', 'data-placement': 'auto left', 'data-container': 'body', target: '_blank' },
                                 __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].downloadableFormats[f.metadata.format],
                                 ' ',
@@ -3538,7 +3549,7 @@ exports.Readable = exports;
 exports.Writable = __webpack_require__(23);
 exports.Duplex = __webpack_require__(7);
 exports.Transform = __webpack_require__(25);
-exports.PassThrough = __webpack_require__(44);
+exports.PassThrough = __webpack_require__(43);
 
 
 /***/ }),
@@ -3665,9 +3676,9 @@ SafeBuffer.allocUnsafeSlow = function (size) {
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {// var assert = require('assert')
-var uint64be = __webpack_require__(59)
+var uint64be = __webpack_require__(58)
 
-var boxes = __webpack_require__(60)
+var boxes = __webpack_require__(59)
 
 var UINT32_MAX = 4294967295
 
@@ -4402,18 +4413,17 @@ class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default *
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_prettier_bytes__ = __webpack_require__(30);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_prettier_bytes___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_prettier_bytes__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_render_media__ = __webpack_require__(31);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_render_media___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1_render_media__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Util__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit__ = __webpack_require__(64);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_throttleit___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_4_throttleit__);
-
-
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_render_media__ = __webpack_require__(30);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_render_media___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_render_media__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__ReactFake__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Util__ = __webpack_require__(4);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_throttleit__ = __webpack_require__(63);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_throttleit___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_3_throttleit__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_prettier_bytes__ = __webpack_require__(64);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_prettier_bytes___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_4_prettier_bytes__);
 
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
 
 
 
@@ -4438,14 +4448,48 @@ class ArchiveFile {
          Note it can't be inside load_img which has to be synchronous and return a jsx tree.
          */
         let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f => !!f); // Multiple potential sources elimate any empty
-        let blk = await Dweb.Block.p_fetch(urls, verbose); //Typically will be a Uint8Array
-        let blob = new Blob([blk._data], { type: __WEBPACK_IMPORTED_MODULE_3__Util__["a" /* default */].archiveMimeTypeFromFormat[this.metadata.format] }); // Works for data={Uint8Array|Blob}
+        /*
+        //This method makes use of the full Dweb library, can get any kind of link, BUT doesnt work in Firefox, the image doesn't get rendered.
+        let blk = await  Dweb.Block.p_fetch(urls, verbose);  //Typically will be a Uint8Array
+        let blob = new Blob([blk._data], {type: Util.archiveMimeTypeFromFormat[this.metadata.format]}) // Works for data={Uint8Array|Blob}
         // This next code is bizarre combination needed to open a blob from within an HTML window.
         let objectURL = URL.createObjectURL(blob);
-        if (verbose) console.log("Blob URL=", objectURL);
+        if (verbose) console.log("Blob URL=",objectURL);
         //jsx.src = `http://archive.org/download/${this.itemid}/${this.metadata.name}`
         jsx.src = objectURL;
+        */
+        console.log("Rendering");
+        var file = {
+            name: this.metadata.name,
+            createReadStream: function (opts) {
+                // Return a readable stream that provides the bytes between offsets "start"
+                // and "end" inclusive. This works just like fs.createReadStream(opts) from
+                // the node.js "fs" module.
+
+                return Dweb.Transports.createReadStream(urls, opts, verbose);
+            }
+        };
+
+        __WEBPACK_IMPORTED_MODULE_0_render_media___default.a.append(file, jsx); // Render into supplied element - have to use append, as render doesnt work
     }
+    async p_download(a, options) {
+        let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f => !!f); // Multiple potential sources elimate any empty
+        let blk = await Dweb.Block.p_fetch(urls, verbose); //Typically will be a Uint8Array
+        let blob = new Blob([blk._data], { type: __WEBPACK_IMPORTED_MODULE_2__Util__["a" /* default */].archiveMimeTypeFromFormat[this.metadata.format] }); // Works for data={Uint8Array|Blob}
+        let objectURL = URL.createObjectURL(blob);
+        if (verbose) console.log("Blob URL=", objectURL);
+        //browser.downloads.download({filename: this.metadata.name, url: objectURL});
+        //Downloads.fetch(objectURL, this.metadata.name);
+        //TODO-DETAILS figure out how to save with the name of the file rather than the blob
+        a.href = objectURL;
+        a.target = options && options.target || "_blank"; // Open in new window by default
+        a.onclick = undefined;
+        a.download = this.metadata.name;
+        a.click();
+        //URL.revokeObjectURL(objectURL)    //TODO figure out when can do this - maybe last one, or maybe dont care?
+
+    }
+
     async p_loadStream(jsx) {
         let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f => !!f); // Multiple potential sources
         var file = {
@@ -4459,7 +4503,7 @@ class ArchiveFile {
             }
         };
 
-        __WEBPACK_IMPORTED_MODULE_1_render_media___default.a.render(file, jsx); // Render into supplied element
+        __WEBPACK_IMPORTED_MODULE_0_render_media___default.a.render(file, jsx); // Render into supplied element
 
         // TODO: port this to JSX
         if (window.WEBTORRENT_TORRENT) {
@@ -4469,10 +4513,10 @@ class ArchiveFile {
                 if (window.WEBTORRENT_TORRENT === torrent) {
                     // Check still displaying ours
                     const webtorrentStats = document.querySelector('#webtorrentStats'); // Not moved into updateSpeed as not in document when this is run first time
-                    const els = __WEBPACK_IMPORTED_MODULE_2__ReactFake__["a" /* default */].createElement(
+                    const els = __WEBPACK_IMPORTED_MODULE_1__ReactFake__["a" /* default */].createElement(
                         'span',
                         null,
-                        __WEBPACK_IMPORTED_MODULE_2__ReactFake__["a" /* default */].createElement(
+                        __WEBPACK_IMPORTED_MODULE_1__ReactFake__["a" /* default */].createElement(
                             'b',
                             null,
                             'Peers:'
@@ -4480,7 +4524,7 @@ class ArchiveFile {
                         ' ',
                         torrent.numPeers,
                         ' ',
-                        __WEBPACK_IMPORTED_MODULE_2__ReactFake__["a" /* default */].createElement(
+                        __WEBPACK_IMPORTED_MODULE_1__ReactFake__["a" /* default */].createElement(
                             'b',
                             null,
                             'Progress:'
@@ -4489,22 +4533,22 @@ class ArchiveFile {
                         (100 * torrent.progress).toFixed(1),
                         '%',
                         ' ',
-                        __WEBPACK_IMPORTED_MODULE_2__ReactFake__["a" /* default */].createElement(
+                        __WEBPACK_IMPORTED_MODULE_1__ReactFake__["a" /* default */].createElement(
                             'b',
                             null,
                             'Download speed:'
                         ),
                         ' ',
-                        __WEBPACK_IMPORTED_MODULE_0_prettier_bytes___default()(torrent.downloadSpeed),
+                        __WEBPACK_IMPORTED_MODULE_4_prettier_bytes___default()(torrent.downloadSpeed),
                         '/s',
                         ' ',
-                        __WEBPACK_IMPORTED_MODULE_2__ReactFake__["a" /* default */].createElement(
+                        __WEBPACK_IMPORTED_MODULE_1__ReactFake__["a" /* default */].createElement(
                             'b',
                             null,
                             'Upload speed:'
                         ),
                         ' ',
-                        __WEBPACK_IMPORTED_MODULE_0_prettier_bytes___default()(torrent.uploadSpeed),
+                        __WEBPACK_IMPORTED_MODULE_4_prettier_bytes___default()(torrent.uploadSpeed),
                         '/s'
                     );
                     if (webtorrentStats) {
@@ -4514,8 +4558,8 @@ class ArchiveFile {
                 }
             };
 
-            torrent.on('download', __WEBPACK_IMPORTED_MODULE_4_throttleit___default()(updateSpeed, 250));
-            torrent.on('upload', __WEBPACK_IMPORTED_MODULE_4_throttleit___default()(updateSpeed, 250));
+            torrent.on('download', __WEBPACK_IMPORTED_MODULE_3_throttleit___default()(updateSpeed, 250));
+            torrent.on('upload', __WEBPACK_IMPORTED_MODULE_3_throttleit___default()(updateSpeed, 250));
             setInterval(updateSpeed, 1000);
             updateSpeed(); //Do it once
         }
@@ -4533,7 +4577,10 @@ class ArchiveFile {
         return jsx;
     }
     downloadable() {
-        return Object.keys(__WEBPACK_IMPORTED_MODULE_3__Util__["a" /* default */].downloadableFormats).includes(this.metadata.format);
+        return Object.keys(__WEBPACK_IMPORTED_MODULE_2__Util__["a" /* default */].downloadableFormats).includes(this.metadata.format);
+    }
+    sizePretty() {
+        return __WEBPACK_IMPORTED_MODULE_4_prettier_bytes___default()(parseInt(this.metadata.size));
     }
 }
 /* harmony export (immutable) */ __webpack_exports__["a"] = ArchiveFile;
@@ -4851,7 +4898,7 @@ function isUndefined(arg) {
 /* 17 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var wrappy = __webpack_require__(49)
+var wrappy = __webpack_require__(48)
 module.exports = wrappy(once)
 module.exports.strict = wrappy(onceStrict)
 
@@ -4903,7 +4950,7 @@ module.exports = MediaElementWrapper
 
 var inherits = __webpack_require__(2)
 var stream = __webpack_require__(10)
-var toArrayBuffer = __webpack_require__(45)
+var toArrayBuffer = __webpack_require__(44)
 
 var MediaSource = typeof window !== 'undefined' && window.MediaSource
 
@@ -5222,7 +5269,7 @@ util.inherits = __webpack_require__(2);
 /*</replacement>*/
 
 /*<replacement>*/
-var debugUtil = __webpack_require__(39);
+var debugUtil = __webpack_require__(38);
 var debug = void 0;
 if (debugUtil && debugUtil.debuglog) {
   debug = debugUtil.debuglog('stream');
@@ -5231,7 +5278,7 @@ if (debugUtil && debugUtil.debuglog) {
 }
 /*</replacement>*/
 
-var BufferList = __webpack_require__(40);
+var BufferList = __webpack_require__(39);
 var destroyImpl = __webpack_require__(22);
 var StringDecoder;
 
@@ -6333,7 +6380,7 @@ util.inherits = __webpack_require__(2);
 
 /*<replacement>*/
 var internalUtil = {
-  deprecate: __webpack_require__(43)
+  deprecate: __webpack_require__(42)
 };
 /*</replacement>*/
 
@@ -6925,7 +6972,7 @@ Writable.prototype._destroy = function (err, cb) {
   this.end();
   cb(err);
 };
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5), __webpack_require__(41).setImmediate, __webpack_require__(8)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5), __webpack_require__(40).setImmediate, __webpack_require__(8)))
 
 /***/ }),
 /* 24 */
@@ -7562,54 +7609,18 @@ module.exports = exports["default"];
 
 /***/ }),
 /* 30 */
-/***/ (function(module, exports) {
-
-module.exports = prettierBytes
-
-function prettierBytes (num) {
-  if (typeof num !== 'number' || isNaN(num)) {
-    throw new TypeError('Expected a number, got ' + typeof num)
-  }
-
-  var neg = num < 0
-  var units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
-
-  if (neg) {
-    num = -num
-  }
-
-  if (num < 1) {
-    return (neg ? '-' : '') + num + ' B'
-  }
-
-  var exponent = Math.min(Math.floor(Math.log(num) / Math.log(1000)), units.length - 1)
-  num = Number(num / Math.pow(1000, exponent))
-  var unit = units[exponent]
-
-  if (num >= 10 || num % 1 === 0) {
-    // Do not show decimals when the number is two-digit, or if the number has no
-    // decimal component.
-    return (neg ? '-' : '') + num.toFixed(0) + ' ' + unit
-  } else {
-    return (neg ? '-' : '') + num.toFixed(1) + ' ' + unit
-  }
-}
-
-
-/***/ }),
-/* 31 */
 /***/ (function(module, exports, __webpack_require__) {
 
 exports.render = render
 exports.append = append
-exports.mime = __webpack_require__(32)
+exports.mime = __webpack_require__(31)
 
-var debug = __webpack_require__(33)('render-media')
-var isAscii = __webpack_require__(36)
+var debug = __webpack_require__(32)('render-media')
+var isAscii = __webpack_require__(35)
 var MediaElementWrapper = __webpack_require__(18)
-var path = __webpack_require__(46)
-var streamToBlobURL = __webpack_require__(47)
-var videostream = __webpack_require__(50)
+var path = __webpack_require__(45)
+var streamToBlobURL = __webpack_require__(46)
+var videostream = __webpack_require__(49)
 
 var VIDEOSTREAM_EXTS = [
   '.m4a',
@@ -7953,13 +7964,13 @@ function parseOpts (opts) {
 
 
 /***/ }),
-/* 32 */
+/* 31 */
 /***/ (function(module, exports) {
 
 module.exports = {".3gp":"video/3gpp",".aac":"audio/aac",".aif":"audio/x-aiff",".aiff":"audio/x-aiff",".atom":"application/atom+xml",".avi":"video/x-msvideo",".bmp":"image/bmp",".bz2":"application/x-bzip2",".conf":"text/plain",".css":"text/css",".csv":"text/plain",".diff":"text/x-diff",".doc":"application/msword",".flv":"video/x-flv",".gif":"image/gif",".gz":"application/x-gzip",".htm":"text/html",".html":"text/html",".ico":"image/vnd.microsoft.icon",".ics":"text/calendar",".iso":"application/octet-stream",".jar":"application/java-archive",".jpeg":"image/jpeg",".jpg":"image/jpeg",".js":"application/javascript",".json":"application/json",".less":"text/css",".log":"text/plain",".m3u":"audio/x-mpegurl",".m4a":"audio/mp4",".m4v":"video/mp4",".manifest":"text/cache-manifest",".markdown":"text/x-markdown",".mathml":"application/mathml+xml",".md":"text/x-markdown",".mid":"audio/midi",".midi":"audio/midi",".mov":"video/quicktime",".mp3":"audio/mpeg",".mp4":"video/mp4",".mp4v":"video/mp4",".mpeg":"video/mpeg",".mpg":"video/mpeg",".odp":"application/vnd.oasis.opendocument.presentation",".ods":"application/vnd.oasis.opendocument.spreadsheet",".odt":"application/vnd.oasis.opendocument.text",".oga":"audio/ogg",".ogg":"application/ogg",".pdf":"application/pdf",".png":"image/png",".pps":"application/vnd.ms-powerpoint",".ppt":"application/vnd.ms-powerpoint",".ps":"application/postscript",".psd":"image/vnd.adobe.photoshop",".qt":"video/quicktime",".rar":"application/x-rar-compressed",".rdf":"application/rdf+xml",".rss":"application/rss+xml",".rtf":"application/rtf",".svg":"image/svg+xml",".svgz":"image/svg+xml",".swf":"application/x-shockwave-flash",".tar":"application/x-tar",".tbz":"application/x-bzip-compressed-tar",".text":"text/plain",".tif":"image/tiff",".tiff":"image/tiff",".torrent":"application/x-bittorrent",".ttf":"application/x-font-ttf",".txt":"text/plain",".wav":"audio/wav",".webm":"video/webm",".wma":"audio/x-ms-wma",".wmv":"video/x-ms-wmv",".xls":"application/vnd.ms-excel",".xml":"application/xml",".yaml":"text/yaml",".yml":"text/yaml",".zip":"application/zip"}
 
 /***/ }),
-/* 33 */
+/* 32 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(process) {/**
@@ -7968,7 +7979,7 @@ module.exports = {".3gp":"video/3gpp",".aac":"audio/aac",".aif":"audio/x-aiff","
  * Expose `debug()` as the module.
  */
 
-exports = module.exports = __webpack_require__(34);
+exports = module.exports = __webpack_require__(33);
 exports.log = log;
 exports.formatArgs = formatArgs;
 exports.save = save;
@@ -8151,7 +8162,7 @@ function localstorage() {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5)))
 
 /***/ }),
-/* 34 */
+/* 33 */
 /***/ (function(module, exports, __webpack_require__) {
 
 
@@ -8167,7 +8178,7 @@ exports.coerce = coerce;
 exports.disable = disable;
 exports.enable = enable;
 exports.enabled = enabled;
-exports.humanize = __webpack_require__(35);
+exports.humanize = __webpack_require__(34);
 
 /**
  * The currently active debug mode names, and names to skip.
@@ -8359,7 +8370,7 @@ function coerce(val) {
 
 
 /***/ }),
-/* 35 */
+/* 34 */
 /***/ (function(module, exports) {
 
 /**
@@ -8517,7 +8528,7 @@ function plural(ms, n, name) {
 
 
 /***/ }),
-/* 36 */
+/* 35 */
 /***/ (function(module, exports) {
 
 /* (c) 2016 Ari Porad (@ariporad) <http://ariporad.com>. License: ariporad.mit-license.org */
@@ -8536,7 +8547,7 @@ module.exports = function isAscii(str) {
 
 
 /***/ }),
-/* 37 */
+/* 36 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8657,7 +8668,7 @@ function fromByteArray (uint8) {
 
 
 /***/ }),
-/* 38 */
+/* 37 */
 /***/ (function(module, exports) {
 
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
@@ -8747,13 +8758,13 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
 
 
 /***/ }),
-/* 39 */
+/* 38 */
 /***/ (function(module, exports) {
 
 /* (ignored) */
 
 /***/ }),
-/* 40 */
+/* 39 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8833,7 +8844,7 @@ module.exports = function () {
 }();
 
 /***/ }),
-/* 41 */
+/* 40 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var apply = Function.prototype.apply;
@@ -8886,13 +8897,13 @@ exports._unrefActive = exports.active = function(item) {
 };
 
 // setimmediate attaches itself to the global object
-__webpack_require__(42);
+__webpack_require__(41);
 exports.setImmediate = setImmediate;
 exports.clearImmediate = clearImmediate;
 
 
 /***/ }),
-/* 42 */
+/* 41 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global, process) {(function (global, undefined) {
@@ -9085,7 +9096,7 @@ exports.clearImmediate = clearImmediate;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(8), __webpack_require__(5)))
 
 /***/ }),
-/* 43 */
+/* 42 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global) {
@@ -9159,7 +9170,7 @@ function config (name) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(8)))
 
 /***/ }),
-/* 44 */
+/* 43 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -9212,7 +9223,7 @@ PassThrough.prototype._transform = function (chunk, encoding, cb) {
 };
 
 /***/ }),
-/* 45 */
+/* 44 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var Buffer = __webpack_require__(3).Buffer
@@ -9245,7 +9256,7 @@ module.exports = function (buf) {
 
 
 /***/ }),
-/* 46 */
+/* 45 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(process) {// Copyright Joyent, Inc. and other Node contributors.
@@ -9476,12 +9487,12 @@ var substr = 'ab'.substr(-1) === 'b'
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5)))
 
 /***/ }),
-/* 47 */
+/* 46 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* global URL */
 
-var getBlob = __webpack_require__(48)
+var getBlob = __webpack_require__(47)
 
 module.exports = function getBlobURL (stream, mimeType, cb) {
   if (typeof mimeType === 'function') return getBlobURL(stream, null, mimeType)
@@ -9494,7 +9505,7 @@ module.exports = function getBlobURL (stream, mimeType, cb) {
 
 
 /***/ }),
-/* 48 */
+/* 47 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* global Blob */
@@ -9520,7 +9531,7 @@ module.exports = function getBlob (stream, mimeType, cb) {
 
 
 /***/ }),
-/* 49 */
+/* 48 */
 /***/ (function(module, exports) {
 
 // Returns a wrapper function that returns a wrapped callback
@@ -9559,13 +9570,13 @@ function wrappy (fn, cb) {
 
 
 /***/ }),
-/* 50 */
+/* 49 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var MediaElementWrapper = __webpack_require__(18)
-var pump = __webpack_require__(51)
+var pump = __webpack_require__(50)
 
-var MP4Remuxer = __webpack_require__(54)
+var MP4Remuxer = __webpack_require__(53)
 
 module.exports = VideoStream
 
@@ -9688,12 +9699,12 @@ VideoStream.prototype.destroy = function () {
 
 
 /***/ }),
-/* 51 */
+/* 50 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var once = __webpack_require__(17)
-var eos = __webpack_require__(52)
-var fs = __webpack_require__(53) // we only need fs to get the ReadStream and WriteStream prototypes
+var eos = __webpack_require__(51)
+var fs = __webpack_require__(52) // we only need fs to get the ReadStream and WriteStream prototypes
 
 var noop = function () {}
 
@@ -9774,7 +9785,7 @@ module.exports = pump
 
 
 /***/ }),
-/* 52 */
+/* 51 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var once = __webpack_require__(17);
@@ -9863,21 +9874,21 @@ module.exports = eos;
 
 
 /***/ }),
-/* 53 */
+/* 52 */
 /***/ (function(module, exports) {
 
 /* (ignored) */
 
 /***/ }),
-/* 54 */
+/* 53 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer) {var bs = __webpack_require__(55)
+/* WEBPACK VAR INJECTION */(function(Buffer) {var bs = __webpack_require__(54)
 var EventEmitter = __webpack_require__(16).EventEmitter
 var inherits = __webpack_require__(2)
-var mp4 = __webpack_require__(56)
+var mp4 = __webpack_require__(55)
 var Box = __webpack_require__(13)
-var RangeSliceStream = __webpack_require__(63)
+var RangeSliceStream = __webpack_require__(62)
 
 module.exports = MP4Remuxer
 
@@ -10347,7 +10358,7 @@ MP4Remuxer.prototype._generateMoof = function (track, firstSample, lastSample) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 55 */
+/* 54 */
 /***/ (function(module, exports) {
 
 module.exports = function(haystack, needle, comparator, low, high) {
@@ -10396,20 +10407,20 @@ module.exports = function(haystack, needle, comparator, low, high) {
 
 
 /***/ }),
-/* 56 */
+/* 55 */
 /***/ (function(module, exports, __webpack_require__) {
 
-exports.decode = __webpack_require__(57)
-exports.encode = __webpack_require__(62)
+exports.decode = __webpack_require__(56)
+exports.encode = __webpack_require__(61)
 
 
 /***/ }),
-/* 57 */
+/* 56 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var stream = __webpack_require__(10)
 var inherits = __webpack_require__(2)
-var nextEvent = __webpack_require__(58)
+var nextEvent = __webpack_require__(57)
 var Box = __webpack_require__(13)
 
 var EMPTY = new Buffer(0)
@@ -10596,7 +10607,7 @@ MediaData.prototype.destroy = function (err) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 58 */
+/* 57 */
 /***/ (function(module, exports) {
 
 module.exports = nextEvent
@@ -10617,7 +10628,7 @@ function nextEvent (emitter, name) {
 
 
 /***/ }),
-/* 59 */
+/* 58 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var UINT_32_MAX = 0xffffffff
@@ -10656,12 +10667,12 @@ exports.decode.bytes = 8
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 60 */
+/* 59 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {// This is an intentionally recursive require. I don't like it either.
 var Box = __webpack_require__(13)
-var Descriptor = __webpack_require__(61)
+var Descriptor = __webpack_require__(60)
 
 var TIME_OFFSET = 2082844800000
 
@@ -11592,7 +11603,7 @@ function readString (buf, offset, length) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 61 */
+/* 60 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var tagToName = {
@@ -11671,7 +11682,7 @@ exports.DecoderConfigDescriptor.decode = function (buf, start, end) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer))
 
 /***/ }),
-/* 62 */
+/* 61 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer, process) {var stream = __webpack_require__(10)
@@ -11808,7 +11819,7 @@ MediaData.prototype.destroy = function (err) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3).Buffer, __webpack_require__(5)))
 
 /***/ }),
-/* 63 */
+/* 62 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /*
@@ -11939,7 +11950,7 @@ RangeSliceStream.prototype.destroy = function (err) {
 
 
 /***/ }),
-/* 64 */
+/* 63 */
 /***/ (function(module, exports) {
 
 module.exports = throttle;
@@ -11972,6 +11983,42 @@ function throttle (func, wait) {
     rtn = func.apply(ctx, args);
     ctx = null;
     args = null;
+  }
+}
+
+
+/***/ }),
+/* 64 */
+/***/ (function(module, exports) {
+
+module.exports = prettierBytes
+
+function prettierBytes (num) {
+  if (typeof num !== 'number' || isNaN(num)) {
+    throw new TypeError('Expected a number, got ' + typeof num)
+  }
+
+  var neg = num < 0
+  var units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
+
+  if (neg) {
+    num = -num
+  }
+
+  if (num < 1) {
+    return (neg ? '-' : '') + num + ' B'
+  }
+
+  var exponent = Math.min(Math.floor(Math.log(num) / Math.log(1000)), units.length - 1)
+  num = Number(num / Math.pow(1000, exponent))
+  var unit = units[exponent]
+
+  if (num >= 10 || num % 1 === 0) {
+    // Do not show decimals when the number is two-digit, or if the number has no
+    // decimal component.
+    return (neg ? '-' : '') + num.toFixed(0) + ' ' + unit
+  } else {
+    return (neg ? '-' : '') + num.toFixed(1) + ' ' + unit
   }
 }
 
@@ -12482,6 +12529,10 @@ class Nav {
         let s = await new __WEBPACK_IMPORTED_MODULE_2__Search__["default"](typeof q === "object" ? q : typeof q === "string" ? { query: encodeURIComponent(q) } : undefined).fetch();
         s.render(destn);
     }
+    static async nav_download(el) {
+        let source = el.source; // Should be an ArchiveFile. - see example in Details.js
+        await source.p_download(el);
+    }
 
     static async factory(itemid, res, wanthistory = true) {
         console.log("XXX@Nav.factory", itemid);
@@ -12842,7 +12893,7 @@ class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
                                             { className: 'carousel-image-wrapper',
                                                 href: `https://archive.org/download/${itemid}/${mainArchiveFile.metadata.name}`,
                                                 title: 'Open full sized image', target: '_blank' },
-                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { id: 'streamContainer', src: mainArchiveFile, className: 'rot0 carousel-image', alt: 'item image #1' }),
+                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'streamContainer', src: mainArchiveFile, className: 'rot0 carousel-image', alt: 'item image #1' }),
                                             ' '
                                         ),
                                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
