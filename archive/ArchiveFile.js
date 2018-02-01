@@ -63,7 +63,7 @@ export default class ArchiveFile {
         a.href = objectURL;
         a.target= (options && options.target) || "_blank";                      // Open in new window by default
         a.onclick = undefined;
-        a.download = true;
+        a.download = this.metadata.name;
         a.click();
         //URL.revokeObjectURL(objectURL)    //TODO figure out when can do this - maybe last one, or maybe dont care?
 

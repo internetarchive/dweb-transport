@@ -368,7 +368,7 @@ export default class Details extends ArchiveBase {
                         <div class="metadata-expandable-list" role="list">
                             { metadataListFound.map((k) =>
                                 <div role="listitem">
-                                    <span class="key">{metadataListPossible[k]}</span>
+                                    <span class="key">{metadataListPossible[k]}</span>{' '}
                                     <span class="value">{metadata[k]}</span>
                                 </div>
                             ) }
@@ -390,7 +390,7 @@ export default class Details extends ArchiveBase {
                             </h2>
                             { reviews && reviews.length ? reviews.map((review) => (
                                 <div class="aReview">
-                                    <b>Reviewer:</b>
+                                    <b>Reviewer:</b>{' '}
                                     <a onClick={`Nav.nav_details('@${review.reviewer}')`}
                                        data-event-click-tracking="ItemReviews|ReviewerLink">{review.reviewer}</a>
                                     -
@@ -400,7 +400,7 @@ export default class Details extends ArchiveBase {
                                         ) }
                                     </span>
                                     - {review.reviewdate}{/*TODO reviewdate needs pretty printing*/}<br/>
-                                    <b>Subject:</b>{review.reviewtitle}
+                                    <b>Subject:</b>{' '}{review.reviewtitle}
                                     <div class="breaker-breaker">{review.reviewbody}</div>
                                 </div>
                             )) : (
