@@ -260,6 +260,49 @@ class SmartDict extends Transportable {
             }
         }
     }
+    static _sync_after_fetch(maybeencrypted, urls, verbose) {
+        // Takes a structure after JSON.parse
+        let table = maybeencrypted.table;               // Find the class it belongs to
+        if (!table) {
+            throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: no table field, whatever this is we cant decode it");
+        }
+        let cls = Dweb[Dweb.table2class[table]];        // Gets class name, then looks up in Dweb - avoids dependency
+        if (!cls) { // noinspection ExceptionCaughtLocallyJS
+            throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: " + table + " is not implemented in table2class");
+        }
+        //console.log(cls);
+        if (!((Dweb.table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict))) { // noinspection ExceptionCaughtLocallyJS
+            throw new Dweb.errors.ForbiddenError("Avoiding data driven hacks to other classes - seeing " + table);
+        }
+        let decrypted = maybeencrypted;    //Skip decryption, which allows this to be sync
+        if (urls.length) {
+            decrypted._urls = urls;                         // Save where we got it - preempts a store - must do this after decrypt and before constructor as e.g KVT sets monitor if _urls is set
+        }
+        return new cls(decrypted);
+        // Returns new object that should be a subclass of SmartDict
+
+    }
+    static async _after_fetch(maybeencrypted, urls, verbose) {
+        // Takes a structure after JSON.parse
+        let table = maybeencrypted.table;               // Find the class it belongs to
+        if (!table) {
+            throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: no table field, whatever this is we cant decode it");
+        }
+        let cls = Dweb[Dweb.table2class[table]];        // Gets class name, then looks up in Dweb - avoids dependency
+        if (!cls) { // noinspection ExceptionCaughtLocallyJS
+            throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: " + table + " is not implemented in table2class");
+        }
+        //console.log(cls);
+        if (!((Dweb.table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict))) { // noinspection ExceptionCaughtLocallyJS
+            throw new Dweb.errors.ForbiddenError("Avoiding data driven hacks to other classes - seeing " + table);
+        }
+        let decrypted = await cls.p_decrypt(maybeencrypted, verbose);    // decrypt - may return string or obj , note it can be subclassed for different encryption
+        if (urls.length) {
+            decrypted._urls = urls;                         // Save where we got it - preempts a store - must do this after decrypt and before constructor as e.g KVT sets monitor if _urls is set
+        }
+        return new cls(decrypted);
+        // Returns new object that should be a subclass of SmartDict
+    }
     static async p_fetch(urls, verbose) {
         /*
         Fetches the object from Dweb, passes to p_decrypt in case it needs decrypting,
@@ -275,21 +318,8 @@ class SmartDict extends Transportable {
             if (verbose) console.log("SmartDict.p_fetch", urls);
             let data = await super.p_fetch(urls, verbose);  // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
             let maybeencrypted = (typeof data === "string" || data instanceof Buffer) ? JSON.parse(data) : data;          // Parse JSON (dont parse if p_fetch has returned object (e.g. from KeyValueTable
-            let table = maybeencrypted.table;               // Find the class it belongs to
-            if (!table) {
-                throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: no table field, whatever this is we cant decode it");
-            }
-            let cls = Dweb[Dweb.table2class[table]];        // Gets class name, then looks up in Dweb - avoids dependency
-            if (!cls) { // noinspection ExceptionCaughtLocallyJS
-                throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: " + table + " is not implemented in table2class");
-            }
-            //console.log(cls);
-            if (!((Dweb.table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict))) { // noinspection ExceptionCaughtLocallyJS
-                throw new Dweb.errors.ForbiddenError("Avoiding data driven hacks to other classes - seeing " + table);
-            }
-            let decrypted = await cls.p_decrypt(maybeencrypted, verbose);    // decrypt - may return string or obj , note it can be subclassed for different encryption
-            decrypted._urls = urls;                         // Save where we got it - preempts a store - must do this after decrypt
-            return new cls(decrypted);
+            let decrypted = await this._after_fetch(maybeencrypted, urls, verbose);
+            return decrypted;
             // Returns new object that should be a subclass of SmartDict
         } catch(err) {
             console.log(`cant fetch and decrypt ${urls}`);

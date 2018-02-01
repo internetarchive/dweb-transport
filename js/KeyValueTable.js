@@ -54,8 +54,8 @@ class KeyValueTable extends PublicPrivate {
             obj._autoset = true;
             await obj.p_store();
         }
-        if (this.keyvaluetable && this._urls.length) {
-            this.monitor(verbose);
+        if (obj.keyvaluetable && obj._urls.length) {
+            obj.monitor(verbose);
         }
         return obj;
     }
@@ -112,15 +112,15 @@ class KeyValueTable extends PublicPrivate {
          */
         if (verbose) console.log("Monitoring", this._publicurls);
         Dweb.Transports.monitor(this._publicurls,
-            (event) => {
+            (event) => {    // event of form {type, key, value} with value being an obj, so already done JSON.parse (see YJS for example)
                 if (verbose) console.log("KVT monitor",event,this._publicurls);
                 switch (event.type) {
                     case "set": // YJS mapped from ad
-                        this.p_set(event.name, event.value); // Loop broken in set if value unchanged
+                        this.p_set(event.key, event.value); // Loop broken in set if value unchanged
                         break;
                     case "delete":
-                        if (!["_publicurls", "_urls"].includes(name)) { //Potentially damaging, may need to check other fields
-                            this.p_delete(name);
+                        if (!["_publicurls", "_urls"].includes(event.key)) { //Potentially damaging, may need to check other fields
+                            this.p_delete(event.key);
                         }
                         break;
                 }

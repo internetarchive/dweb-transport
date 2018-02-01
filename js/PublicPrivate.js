@@ -97,7 +97,11 @@ class PublicPrivate extends SmartDict {
         :param value: KeyPair, or Dict like _key field of KeyPair
          */
         if (value && !(value instanceof Dweb.KeyPair)) {
-            value = new Dweb.KeyPair({key: value}, verbose) // Note ignoring keytype for now
+            if (value["table"]) {
+                value = Dweb.SmartDict._sync_after_fetch(value, [], verbose)
+            } else {
+                value = new Dweb.KeyPair({key: value}, verbose) // Note ignoring keytype for now
+            }
         }
         this.keypair = value;
         this._master = value && value.has_private();

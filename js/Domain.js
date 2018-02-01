@@ -84,6 +84,14 @@ class Domain extends KeyValueTable {
         }
         return obj;
     }
+    async p_set(name, value, verbose) {
+        // Superclass KVT to make sure turn objects into appropriate class (usually Domain or Name)
+        if (this._autoset) {
+            Dweb.Transports.p_set(this._urls, name, value, verbose); // Note this is aync and not waiting for result
+        }
+        this._map[name] = await Dweb.SmartDict._after_fetch(value, [], verbose);
+        //TODO_KEYVALUE copy semantics from __setattr_ for handling Dates, maybe other types
+    }
     sign(name, subdomain) { // Pair of verify
         let date = new Date(Date.now());
         let signable = subdomain._signable(this.fullnames, name, date);
@@ -108,7 +116,7 @@ class Domain extends KeyValueTable {
         }
         this.sign(name, registrable);
         console.assert(this.verify(name, registrable));   // It better verify !
-        await this.p_set(name, registrable);
+        await this.p_set(name, registrable);                //TODO-NAMING dont store private key in table !
     }
     /*
         ------------ Resolution ---------------------
@@ -132,6 +140,7 @@ class Domain extends KeyValueTable {
             remainder.unshift(pathArray.pop())
         }
         if (res) { // Found one
+            res = await Dweb.SmartDict._after_fetch(res, [], verbose);
             if (!remainder.length) // We found it
                 return res;
             return res.p_resolve(remainder.join('/'), {verbose});           // ===== Note recursion ====
@@ -196,7 +205,7 @@ class Domain extends KeyValueTable {
 
 }
 NameMixin.call(Domain.prototype);   // Add in the Mixin
-
+Domain.clsName = Name;  // Just So exports can find it and load into Dweb TODO move to own file
 
 exports = module.exports = Domain;
 

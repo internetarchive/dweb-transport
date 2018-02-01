@@ -251,7 +251,7 @@ class TransportYJS extends Transport {
     async p_set(url, keyvalues, value, verbose) {  // url = yjs:/yjs/database/table/key   //TODO-KEYVALUE-API
         let y = await this.p__ymap(url, verbose);
         if (typeof keyvalues === "string") {
-            y.share.map.set(keyvalues, value);
+            y.share.map.set(keyvalues, JSON.stringify(value));
         } else {
             Object.keys(keyvalues).map((key) => y.share.map.set(key, keyvalues[key]));
         }
@@ -259,11 +259,13 @@ class TransportYJS extends Transport {
     _p_get(y, keys, verbose) {
         if (Array.isArray(keys)) {
             return keys.reduce(function(previous, key) {
-                previous[key] = y.share.map.get(key);
+                let val = y.share.map.get(key);
+                previous[key] = typeof val === "string" ? JSON.parse(val) : val;    // Handle undefined
                 return previous;
             }, {});
         } else {
-            return y.share.map.get(keys);   // Surprisingly this is sync, the p__ymap should have synchronised
+            let val = y.share.map.get(keys);
+            return typeof val === "string" ? JSON.parse(val) : val;  // Surprisingly this is sync, the p__ymap should have synchronised
         }
     }
     async p_get(url, keys, verbose) {  //TODO-KEYVALUE-API - return dict or single
@@ -311,12 +313,15 @@ class TransportYJS extends Transport {
             if (['add','update'].includes(event.type)) { // Currently ignoring deletions.
                 if (verbose) console.log("YJS monitor:", url, event.type, event.name, event.value);
                 // ignores event.path (only in observeDeep) and event.object
-                let newevent = {
-                    "type":  {"add": "set", "update": "set", "delete": "delete" }[event.type],
-                    "value": event.value,
-                    "name": event.name,
-                };
-                callback(newevent);
+                if (!(event.type === "update" && event.oldValue === event.value)) {
+                    // Dont trigger on update as seeing some loops with p_set
+                    let newevent = {
+                        "type": {"add": "set", "update": "set", "delete": "delete"}[event.type],
+                        "value": JSON.parse(event.value),
+                        "key": event.name,
+                    };
+                    callback(newevent);
+                }
             }
         })
     }

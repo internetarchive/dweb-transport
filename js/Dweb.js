@@ -19,6 +19,7 @@ exports.VersionList = require('./VersionList');
 exports.StructuredBlock = require('./StructuredBlock'); //TODO - will remove SB once have path traversal.
 exports.EventListenerHandler = require("./EventListenerHandler");
 exports.Domain = require("./Domain");
+exports.Name = exports.Domain.clsName;
 
 exports.table2class = { // Each of these needs a constructor that takes data and is ok with no other parameters, (otherwise define a set of these methods as factories)
     "cl": "CommonList",
@@ -31,6 +32,7 @@ exports.table2class = { // Each of these needs a constructor that takes data and
     "vl": "VersionList",
     "keyvaluetable": "KeyValueTable",
     "domain": "Domain",
+    "name": "Name",
 };
 
 
