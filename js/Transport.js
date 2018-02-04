@@ -29,7 +29,7 @@ class Transport {
             In almost all cases this will call the constructor of the subclass
 
             :param obj options: Data structure required by underlying transport layer (format determined by that layer)
-            :param boolean verbose: True for debugging output
+            :param boolean verbose: true for debugging output
             :resolve Transport: Instance of subclass of Transport
              */
             let t = await this.setup0(options, verbose) // Sync version that doesnt connect
@@ -53,7 +53,7 @@ class Transport {
         Determine if this transport supports a certain set of URLs and a func
 
         :param url: String or parsed URL
-        :return:    True if this protocol supports these URLs and this func
+        :return:    true if this protocol supports these URLs and this func
         :throw:     TransportError if invalid URL
          */
         if (typeof url === "string") {
@@ -73,7 +73,7 @@ class Transport {
         Returns a promise that resolves to the url of the data
 
         :param string|Buffer data: Data to store - no assumptions made to size or content
-        :param boolean verbose: True for debugging output
+        :param boolean verbose: true for debugging output
         :resolve string: url of data stored
          */
         throw new Dweb.errors.ToBeImplementedError("Intentionally undefined function Transport.p_rawstore should have been subclassed");
@@ -100,7 +100,7 @@ class Transport {
         There may also be need for a streaming version of this call, at this point undefined.
 
         :param string url: URL of object being retrieved
-        :param boolean verbose: True for debugging output
+        :param boolean verbose: true for debugging output
         :resolve string: Return the object being fetched, (note currently returned as a string, may refactor to return Buffer)
         :throws:        TransportError if url invalid - note this happens immediately, not as a catch in the promise
          */
@@ -119,7 +119,7 @@ class Transport {
 
         :param string url: String identifying an object being added to the list.
         :param Signature sig: A signature data structure.
-        :param boolean verbose: True for debugging output
+        :param boolean verbose: true for debugging output
         :resolve undefined:
          */
         throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_rawadd");
@@ -134,7 +134,7 @@ class Transport {
         List items may have other data (e.g. reference ids of underlying transport)
 
         :param string url: String with the url that identifies the list.
-        :param boolean verbose: True for debugging output
+        :param boolean verbose: true for debugging output
         :resolve array: An array of objects as stored on the list.
          */
         throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_rawlist");
@@ -159,7 +159,7 @@ class Transport {
         Returns a promise that resolves to the list.
 
         :param string url: String with the url that identifies the object put on a list.
-        :param boolean verbose: True for debugging output
+        :param boolean verbose: true for debugging output
         :resolve array: An array of objects as stored on the list.
          */
         throw new Dweb.errors.ToBeImplementedError("Undefined function Transport.p_rawreverse");
@@ -193,7 +193,7 @@ class Transport {
         :param url:         string Identifier of list (as used by p_rawlist and "signedby" parameter of p_rawadd
         :param callback:    function(obj)  Callback for each new item added to the list
                	obj is same format as p_rawlist or p_rawreverse
-        :param verbose:     boolean - True for debugging output
+        :param verbose:     boolean - true for debugging output
          */
         console.log("Undefined function Transport.listmonitor");    // Note intentionally a log, as legitamte to not implement it
     }

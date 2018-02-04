@@ -102,12 +102,12 @@ class Signature extends SmartDict {
 
     static async p_test(verbose) {
         // Test Signatures
-        //verbose=True
+        //verbose=true
         let mydic = { "a": "AAA", "1":100, "B_date": Date.now()}; // Dic can't contain integer field names
         let signedblock = new Dweb.SmartDict(mydic, verbose);
         let keypair = new Dweb.KeyPair({"key":{"keygen":true}}, verbose);
         // This test should really fail, BUT since keypair has private it passes signature
-        // commonlist0 = CommonList(keypair=keypair, master=False)
+        // commonlist0 = CommonList(keypair=keypair, master=false)
         // print commonlist0
         // signedblock.sign(commonlist0, verbose) # This should fail, but
         if (verbose) console.log("test_Signatures CommonList");

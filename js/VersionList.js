@@ -18,7 +18,7 @@ class VersionList extends CommonList {
     constructor(data, master, key, verbose, options) {
         /*
         :param data: Data to initialize to - usually {name, contentacl, _acl}
-        :param master: True if should be master (false when loaded from Dweb)
+        :param master: true if should be master (false when loaded from Dweb)
          */
         super(data, master, key, verbose, options);
         this.table = "vl";

@@ -9,10 +9,10 @@ class PublicPrivate extends SmartDict {
 
     Fields:
     keypair         Holds a KeyPair used to sign items
-    _master         True if this is a master list, i.e. can add things
+    _master         true if this is a master list, i.e. can add things
     _publicurls     Holds the urls of publicly available version of the list.
-    _allowunsafestore True if should override protection against storing unencrypted private keys (usually only during testing)
-    dontstoremaster True if should not store master key
+    _allowunsafestore true if should override protection against storing unencrypted private keys (usually only during testing)
+    dontstoremaster true if should not store master key
     _listeners      Any event listeners  //TODO-LISTENER - maybe move to SmartDict as generically useful
 
     CL.p_store, KVP.p_store, _p_storepublic, _getdata and preflight work closely together as summarised below.
@@ -178,7 +178,7 @@ class PublicPrivate extends SmartDict {
         TODO-KEYVALUE its unclear if this is specific to CL and do differently on KV etc, if so move to CL from PP
 
         sig:    Signature object
-        returns:    True if verifies
+        returns:    true if verifies
         throws:     assertion error if doesn't //TODO handle that gracefully depending on caller
          */
         return Dweb.utils.intersects(this._publicurls, sig.signedby)    // Check signedby assertion is for this list -

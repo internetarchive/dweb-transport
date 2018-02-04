@@ -260,9 +260,9 @@ class SmartDict extends Transportable {
             }
         }
     }
-    static _sync_after_fetch(maybeencrypted, urls, verbose) {
+    static _sync_after_fetch(retrievedobj, urls, verbose) {   //TODO-NAMING check if still used
         // Takes a structure after JSON.parse
-        let table = maybeencrypted.table;               // Find the class it belongs to
+        let table = retrievedobj.table;               // Find the class it belongs to
         if (!table) {
             throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: no table field, whatever this is we cant decode it");
         }
@@ -274,15 +274,14 @@ class SmartDict extends Transportable {
         if (!((Dweb.table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict))) { // noinspection ExceptionCaughtLocallyJS
             throw new Dweb.errors.ForbiddenError("Avoiding data driven hacks to other classes - seeing " + table);
         }
-        let decrypted = maybeencrypted;    //Skip decryption, which allows this to be sync
         if (urls.length) {
-            decrypted._urls = urls;                         // Save where we got it - preempts a store - must do this after decrypt and before constructor as e.g KVT sets monitor if _urls is set
+            retrievedobj._urls = urls;                         // Save where we got it - preempts a store - must do this after decrypt and before constructor as e.g KVT sets monitor if _urls is set
         }
-        return new cls(decrypted);
+        return new cls(retrievedobj);
         // Returns new object that should be a subclass of SmartDict
 
     }
-    static async _after_fetch(maybeencrypted, urls, verbose) {
+    static async _after_fetch(maybeencrypted, urls, verbose) {  //TODO-NAMING check if still used
         // Takes a structure after JSON.parse
         let table = maybeencrypted.table;               // Find the class it belongs to
         if (!table) {

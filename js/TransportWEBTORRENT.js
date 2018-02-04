@@ -176,7 +176,7 @@ class TransportWEBTORRENT extends Transport {
         No assumption is made about the data in terms of size or structure.         Returns a new Promise that resolves to a buffer.
 
         :param string url: URL of object being retrieved
-        :param boolean verbose: True for debugging output
+        :param boolean verbose: true for debugging output
         :resolve buffer: Return the object being fetched.
         :throws:        TransportError if url invalid - note this happens immediately, not as a catch in the promise
          */
@@ -213,7 +213,7 @@ class TransportWEBTORRENT extends Transport {
         https://nodejs.org/api/stream.html#stream_readable_streams
 
         :param string url: URL of object being retrieved
-        :param boolean verbose: True for debugging output
+        :param boolean verbose: true for debugging output
         :returns stream: The readable stream.
         :throws:        TransportError if url invalid - note this happens immediately, not as a catch in the promise
          */

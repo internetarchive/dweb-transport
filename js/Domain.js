@@ -160,7 +160,7 @@ class Domain extends KeyValueTable {
     static async p_test(verbose) {
         if (verbose) console.log("KeyValueTable testing starting");
         try {
-            let pass = "Testing pass phrase"
+            let pass = "Testing pass phrase";
             //Register the toplevel domain
             Domain.root = await Domain.p_new({
                 fullnames: ["/"],
@@ -180,11 +180,11 @@ class Domain extends KeyValueTable {
             }, true, {passphrase: pass+"/testingtoplevel/adomain"});
             await testingtoplevel.p_register("adomain", adomain, verbose);
             //TODO-NAME Now register an item
-            let item1 = await new Dweb.SmartDict({"name": "My name", "birthdate": "2001-01-01"}).p_store()
+            let item1 = await new Dweb.SmartDict({"name": "My name", "birthdate": "2001-01-01"}).p_store();
             await adomain.p_register("item1", item1, verbose);
             let res= await Domain.root.p_resolve('testingtoplevel/adomain/item1', {verbose});
             if (verbose) console.log("Resolved to",res);
-            console.assert(res._publicurls[0] = item1._urls[0])
+            console.assert(res._publicurls[0] = item1._urls[0]);
             res= await Domain.root.p_resolve('testingtoplevel/adomain/itemxx', {verbose});
             console.assert(typeof res === "undefined");
             res= await Domain.root.p_resolve('testingtoplevel/adomainxx/item1', {verbose});

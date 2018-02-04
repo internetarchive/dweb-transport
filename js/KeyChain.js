@@ -65,7 +65,7 @@ class KeyChain extends CommonList {
          Encrypt an object (usually represented by the json string). Pair of .decrypt()
 
          :param res: The material to encrypt, usually JSON but could probably also be opaque bytes
-         :param b64: True if result wanted in urlsafebase64 (usually)
+         :param b64: true if result wanted in urlsafebase64 (usually)
          :return:    Data encrypted by Public Key of this KeyChain.
          */
         return this.keypair.encrypt(data, b64, this);  // data, b64, signer
@@ -175,7 +175,7 @@ class KeyChain extends CommonList {
             if (verbose) console.log("KEYCHAIN 2 - add viewerkeypair to it");
             let viewerkeypair = new Dweb.KeyPair({name: vkpname, key: keypairexport}, verbose);
             viewerkeypair._acl = kc;
-            await viewerkeypair.p_store(verbose); // Defaults to store private=True (which we want)
+            await viewerkeypair.p_store(verbose); // Defaults to store private=true (which we want)
             await kc.p_push(viewerkeypair, verbose);
             if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
 

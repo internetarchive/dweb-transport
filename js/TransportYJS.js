@@ -142,7 +142,7 @@ class TransportYJS extends Transport {
     List items may have other data (e.g. reference ids of underlying transport)
 
     :param string url: String with the url that identifies the list.
-    :param boolean verbose: True for debugging output
+    :param boolean verbose: true for debugging output
     :resolve array: An array of objects as stored on the list.
      */
         try {
@@ -164,7 +164,7 @@ class TransportYJS extends Transport {
          :param url:         string Identifier of list (as used by p_rawlist and "signedby" parameter of p_rawadd
          :param callback:    function(obj)  Callback for each new item added to the list
                     obj is same format as p_rawlist or p_rawreverse
-         :param verbose:     boolean - True for debugging output
+         :param verbose:     boolean - true for debugging output
           */
         let y = this.yarrays[typeof url === "string" ? url : url.href];
         console.assert(y,"Should always exist before calling listmonitor - async call p__yarray(url) to create");
@@ -185,7 +185,7 @@ class TransportYJS extends Transport {
         Returns a promise that resolves to the list.
 
         :param string url: String with the url that identifies the object put on a list.
-        :param boolean verbose: True for debugging output
+        :param boolean verbose: true for debugging output
         :resolve array: An array of objects as stored on the list.
          */
         //TODO-REVERSE this needs implementing once list structure on IPFS more certain
@@ -203,7 +203,7 @@ class TransportYJS extends Transport {
             urls - array of urls for the object being signed
             signature - verifiable signature of date+urls
             signedby - urls of public key used for the signature
-        :param boolean verbose: True for debugging output
+        :param boolean verbose: true for debugging output
         :resolve undefined:
         */
         console.assert(url && sig.urls.length && sig.signature && sig.signedby.length, "TransportIPFS.p_rawadd args", url, sig);
@@ -304,7 +304,7 @@ class TransportYJS extends Transport {
          :param url:         string Identifier of list (as used by p_rawlist and "signedby" parameter of p_rawadd
          :param callback:    function(obj)  Callback for each new item added to the list
                     obj is same format as p_rawlist or p_rawreverse
-         :param verbose:     boolean - True for debugging output
+         :param verbose:     boolean - true for debugging output
           */
         url = typeof url === "string" ? url : url.href;
         let y = this.yarrays[url];

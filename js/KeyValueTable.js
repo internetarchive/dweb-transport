@@ -9,7 +9,7 @@ class KeyValueTable extends PublicPrivate {
 
     Fields:
     keyvaluetable:  Name of table (in database) to store in
-    _autoset:       When set to True, any changes will be stored to server its set after p_new writes initial data
+    _autoset:       When set to true, any changes will be stored to server its set after p_new writes initial data
 
     Fields Inherited from PublicPrivate:
     _urls           The urls of the table e.g. YJS where keys will be stored

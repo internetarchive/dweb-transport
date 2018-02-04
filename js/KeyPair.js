@@ -61,7 +61,7 @@ class KeyPair extends SmartDict {
         value:  Dictionary in local format, or Uint8Array or urlsafebase64 string {
             mnemonic: BIP39 style mnemonic (currently unsupported except one fake test case
             passphrase: A phrase to hash to get a seed
-            keygen:     True to generate a new key
+            keygen:     true to generate a new key
             seed:       32 byte string or buffer
          */
         let verbose = false;
@@ -245,7 +245,7 @@ class KeyPair extends SmartDict {
          Encrypt a string, the destination string has to include any information needed by decrypt, e.g. Nonce etc
 
          :param data:   String to encrypt
-         :b64 bool:  True if want result encoded in urlsafebase64
+         :b64 bool:  true if want result encoded in urlsafebase64
          :signer AccessControlList or KeyPair: If want result signed (currently ignored for RSA, reqd for NACL)
          :return: str, binary encryption of data or urlsafebase64
          */

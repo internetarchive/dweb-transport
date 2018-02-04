@@ -164,7 +164,7 @@ class TransportIPFS extends Transport {
         There may also be need for a streaming version of this call, at this point undefined since we havent (currently) got a use case..
 
         :param string url: URL of object being retrieved
-        :param boolean verbose: True for debugging output
+        :param boolean verbose: true for debugging output
         :resolve buffer: Return the object being fetched. (may in the future return a stream and buffer externally)
         :throws:        TransportError if url invalid - note this happens immediately, not as a catch in the promise
          */
@@ -213,7 +213,7 @@ class TransportIPFS extends Transport {
         Returns a promise that resolves to the url of the data
 
         :param string|Buffer data: Data to store - no assumptions made to size or content
-        :param boolean verbose: True for debugging output
+        :param boolean verbose: true for debugging output
         :resolve string: url of data stored
          */
         console.assert(data, "TransportIPFS.p_rawstore: requires data");
