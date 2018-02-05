@@ -308,7 +308,7 @@ class TransportYJS extends Transport {
           */
         url = typeof url === "string" ? url : url.href;
         let y = this.yarrays[url];
-        console.assert(y,"Should always exist before calling listmonitor - async call p__yarray(url) to create");
+        console.assert(y,"Should always exist before calling monitor - async call p__yarray(url) to create");
         y.share.map.observe((event) => {
             if (['add','update'].includes(event.type)) { // Currently ignoring deletions.
                 if (verbose) console.log("YJS monitor:", url, event.type, event.name, event.value);

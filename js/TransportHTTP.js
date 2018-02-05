@@ -173,9 +173,9 @@ class TransportHTTP extends Transport {
         //if (!(url && url.includes(':') ))
         //    throw new Dweb.errors.CodingError("TransportHTTP.p_rawfetch bad url: "+url);
         if (((typeof url === "string") ? url : url.href).includes('/getall/table')) {
+            console.log("XXX@176 - probably dont want to be calling p_rawfetch on a KeyValueTable, especially since dont know if its keyvaluetable or subclass"); //TODO-NAMING
             return {
                 table: "keyvaluetable",
-                _map: await this.p_GET(this._url(url, servercommands.getall), verbose, opts)
                 }
         } else {
             return await this.p_GET(this._url(url, servercommands.rawfetch), verbose, opts);

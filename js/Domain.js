@@ -78,19 +78,11 @@ class Domain extends KeyValueTable {
         this.nameConstructor();  // from the Mixin, initializes signatures
     }
     static async p_new(data, master, key, verbose, options) {
-        let obj = await super.p_new(data, master, key, verbose, {keyvaluetable: "default"}); // Will default to call constructor
+        let obj = await super.p_new(data, master, key, verbose, {keyvaluetable: "domains"}); // Will default to call constructor
         if (obj._master && obj.keypair && !(obj.keys && obj.keys.length)) {
             obj.keys = [ obj.keypair.signingexport()]
         }
         return obj;
-    }
-    async p_set(name, value, verbose) {
-        // Superclass KVT to make sure turn objects into appropriate class (usually Domain or Name)
-        if (this._autoset) {
-            Dweb.Transports.p_set(this._urls, name, value, verbose); // Note this is aync and not waiting for result
-        }
-        this._map[name] = await Dweb.SmartDict._after_fetch(value, [], verbose);
-        //TODO_KEYVALUE copy semantics from __setattr_ for handling Dates, maybe other types
     }
     sign(name, subdomain) { // Pair of verify
         let date = new Date(Date.now());
@@ -99,6 +91,7 @@ class Domain extends KeyValueTable {
         subdomain.signatures.push({date, signature, signedby: this.keypair.signingexport()})
     }
     verify(name, subdomain) { // Pair of sign
+        //TODO-NAMING document if/where this is called
         // Note this verification will fail if this.fullnames has changed, it should work on master or public copy of domain.
         // Throws error if doesnt verify
         return subdomain.signatures
@@ -110,13 +103,15 @@ class Domain extends KeyValueTable {
         Register an object
         name:   What to register it under, relative to "this"
         registrable:    Either a Domain or Name, or else something with _publicurls or _urls (i.e. after calling p_store) and it will be wrapped with a Name
+
+        Code path is domain.p_register -> domain.p_set
          */
         if (!(registrable instanceof Domain || registrable instanceof Name)) {
             registrable = new Name({fullnames: this.fullnames.map(fn => [fn,name].join("/")), _publicurls: registrable._publicurls || registrable._urls}, verbose)
         }
         this.sign(name, registrable);
         console.assert(this.verify(name, registrable));   // It better verify !
-        await this.p_set(name, registrable);                //TODO-NAMING dont store private key in table !
+        await this.p_set(name, registrable);                //TODO-NAMING check doesnt store private key in table
     }
     /*
         ------------ Resolution ---------------------
@@ -136,11 +131,13 @@ class Domain extends KeyValueTable {
         // Look for path, try longest combination first, then work back to see if can find partial path
         while (pathArray.length > 0) {
             res = await this.p_get(pathArray.join('/'), verbose);
-            if (res) { break;}
+            if (res) {
+                res = await Dweb.SmartDict._after_fetch(res, [], verbose);  //Turn into an object
+                break;
+            }
             remainder.unshift(pathArray.pop())
         }
         if (res) { // Found one
-            res = await Dweb.SmartDict._after_fetch(res, [], verbose);
             if (!remainder.length) // We found it
                 return res;
             return res.p_resolve(remainder.join('/'), {verbose});           // ===== Note recursion ====
@@ -167,6 +164,7 @@ class Domain extends KeyValueTable {
                 keys: [],
                 signatures: [],    // TODO-NAME Root record itself needs signing - but by who (maybe /arc etc)
                 expires: undefined,
+                _allowunsafestore: true,    //TODO-NAME - undo this and add encryption of private data
                 _map: undefined,   // May need to define this as an empty KVT
             }, true, {passphrase: pass+"/"}, verbose);   //TODO-NAME will need a secure root key
             //console.log("XXX@39", Domain.root);
@@ -185,10 +183,12 @@ class Domain extends KeyValueTable {
             let res= await Domain.root.p_resolve('testingtoplevel/adomain/item1', {verbose});
             if (verbose) console.log("Resolved to",res);
             console.assert(res._publicurls[0] = item1._urls[0]);
+            if (verbose) console.log("Expect next group to fail");
             res= await Domain.root.p_resolve('testingtoplevel/adomain/itemxx', {verbose});
             console.assert(typeof res === "undefined");
             res= await Domain.root.p_resolve('testingtoplevel/adomainxx/item1', {verbose});
             console.assert(typeof res === "undefined");
+            console.log("Expect next group to fail");
             res= await Domain.root.p_resolve('testingtoplevelxx/adomain/item1', {verbose});
             console.assert(typeof res === "undefined");
             console.log(await Domain.root.p_printable())
