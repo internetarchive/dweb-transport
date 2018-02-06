@@ -1,5 +1,6 @@
 /*
 This is a shim to the IPFS library, (Lists are handled in YJS or OrbitDB)
+See https://github.com/ipfs/js-ipfs but note its often out of date relative to the generic API doc.
 */
 
 // IPFS components
@@ -221,6 +222,7 @@ class TransportIPFS extends Transport {
         //return this.promisified.ipfs.block.put(buf).then((block) => block.cid)
         //https://github.com/ipfs/interface-ipfs-core/blob/master/SPEC/DAG.md#dagput
         let cid = await this.ipfs.dag.put(buf,{ format: 'dag-cbor', hashAlg: 'sha2-256' });
+        //TODO-IPFS has been suggested to move this to files.add with no filename.
         return TransportIPFS.cid2url(cid);
         //return this.ipfs.files.put(buf).then((block) => TransportIPFS.cid2url(block.cid));
     }
