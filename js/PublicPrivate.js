@@ -138,15 +138,30 @@ class PublicPrivate extends SmartDict {
     }
 
     async _p_storepublic(verbose) {
-        // Build a copy of the data, then create a new !master version - preflight takes care of hiding master urls
-        let oo = Object.assign({}, this, {_master: false});
-        let ee = new this.constructor(this.preflight(oo), false, null, verbose);
-        await ee.p_store(verbose);
-        this._publicurls = ee._urls;
+        this._publicurls = await Dweb.Transports.p_rawstore(
+            JSON.stringify(
+                this.preflight(                 // Hides master urls and _acl since !master
+                    Object.assign({}, this,     // Copy the data
+                        {_master: false}))),    // cause preflight to trim keys to public
+            verbose);
     }
 
     storedpublic() {
         return this._publicurls.length > 0
+    }
+
+    async p_store(verbose) {
+        /*
+            Store on Dweb, if _master will ensure that stores a public version as well, and saves in _publicurls
+            Will store master unless dontstoremaster is set.
+            Subclassed in KeyValueTable
+         */
+        if (this._master && !this.storedpublic()) {
+            await this._p_storepublic(verbose); // Stores a public copy and sets _publicurls
+        }
+        if (!(this._master && this.dontstoremaster)) {
+            await super.p_store(verbose);    // Transportable.store(verbose)
+        }
     }
 
     stored() {

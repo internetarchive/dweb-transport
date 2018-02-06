@@ -53,20 +53,6 @@ class CommonList extends PublicPrivate {    //TODO-API split CL and PP
         this._list = this._list || [];        // Clear list (not undefined field) if setting data
     }
 
-    async p_store(verbose) {
-        /*
-            Store on Dweb, if _master will ensure that stores a public version as well, and saves in _publicurls
-            Will store master unless dontstoremaster is set.
-            Subclassed in KeyValueTable
-         */
-        if (this._master && !this.storedpublic()) {
-            await this._p_storepublic(verbose);
-        }
-        if (!(this._master && this.dontstoremaster)) {
-            await super.p_store(verbose);    // Transportable.store(verbose)
-        }
-    }
-
     preflight(dd) {
         /*
         p_store, p_storepublic and preflight work in tandem to store private and public versions of the data

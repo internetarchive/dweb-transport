@@ -3,7 +3,6 @@ const Dweb = require("./Dweb");
 const CustomEvent = require('custom-event'); // From web, Not present in node - this code uses global.CustomEvent if it exists so safe on browser/node
 
 class KeyValueTable extends PublicPrivate {
-    //TODO-NAME redo this so data stored in a sub-field and add set, get, delete functions
     /*
     Manages a KeyValue object intended for each field to be a separate item
 
@@ -54,6 +53,7 @@ class KeyValueTable extends PublicPrivate {
             await obj.p_store();
         }
         if (obj.tablepublicurls.length) {
+            await obj.p_getall(); // Load it up, this will have side-effect of connecting YJS etc.
             obj.monitor(verbose);
         }
         return obj;
@@ -72,11 +72,11 @@ class KeyValueTable extends PublicPrivate {
             return JSON.stringify(mapVal)
         }
     }
-    _mapFromStorage(storageVal) {
+    _mapFromStorage(storageVal, verbose=false) {
         /*
         Convert a value as stored in the map into a value suitable for storage dictionary. Pair of _mapFromStorage.
          */
-        const obj = JSON.parse(storageVal);   // Could be a string, or an integer, or a object or array of any of these
+        let obj = storageVal && JSON.parse(storageVal);   // Could be a string, or an integer, or a object or array of any of these
         if (Array.isArray(obj)) {
             return obj.map( m => this._storageFromMap(m))
         } else if (typeof(obj) === "object") {
@@ -98,31 +98,18 @@ class KeyValueTable extends PublicPrivate {
     }
 
 
-    async p_store(verbose) {
-        /*
-            Store on Dweb, if _master will ensure that stores a public version as well, and saves in _publicurls
-            Will store master unless dontstoremaster is set.
-            Subclassed in KeyValueTable
-            TODO-KEYVALUE this is currently same as CommonList can merge into PublicPrivate
-         */
-        if (this._master && !this.storedpublic()) {
-            await this._p_storepublic(verbose);
-        }
-        if (!(this._master && this.dontstoremaster)) {
-            await super.p_store(verbose);    // Transportable.store(verbose)
-        }
-        // Dont believe we want to do this, set should be done as set fields.
-        //await Dweb.Transports.p_set(this.tableurls,
-        //    Object.keys(this._map).reduce(function(prev, key) { prev[key] = this._storageFromMap(this._map[key]); return prev; }, {}),
-        //    null, verbose );   // Set whole dictionary
-    }
 
     async p_set(name, value, {verbose=false, fromNet=false}={}) {
+        // Subclased in Domain to avoid overwriting private version with public version from net
         //TODO-KEYVALUE these sets need to be signed
         if (this._autoset && !fromNet && (this._map[name] !== value)) {
             Dweb.Transports.p_set(this.tableurls, name, this._storageFromMap(value), verbose); // Note this is aync and not waiting for result
         }
-        this._map[name] = value;
+        if (!((value instanceof Dweb.PublicPrivate) && this._map[name] && this._map[name]._master)) {
+            // Dont overwrite the name:value pair if we already hold the master copy. This is needed for Domain, but probably generally useful
+            // The typical scenario is that a p_set causes a monitor event back on same machine, but value is the public version
+            this._map[name] = value;
+        }
         //TODO_KEYVALUE copy semantics from __setattr_ for handling Dates, maybe other types
     }
     _updatemap(res) {
@@ -135,13 +122,14 @@ class KeyValueTable extends PublicPrivate {
         if (!Array.isArray(keys)) { // Handle single by doing plural and returning the key
             return (await this.p_get([keys], verbose))[keys]
         }
-        if (!keys.every(k => this.map[k])) {
+        if (!keys.every(k => this._map[k])) {
             // If we dont have all the keys, get from transport
             const res = await Dweb.Transports.p_get(this.tablepublicurls, keys, verbose);
             this._updatemap(res);
         }
         // Return from _map after possibly updating it
-        return keys.reduce(function(prev, key) { prev[key] = this._map[key]; return prev; }, {});
+        let map = this._map;
+        return keys.reduce(function(prev, key) { prev[key] = map[key]; return prev; }, {});
     }
     async p_keys(verbose) {
         /*
