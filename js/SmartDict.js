@@ -74,7 +74,7 @@ class SmartDict extends Transportable {
         return res
     }
 
-    _getdata(wantstring=true) {
+    _getdata({ publicOnly=false, encryptIfAcl=true}={}) { //TODO-API
         /*
         Prepares data for sending. Retrieves attributes, runs through preflight.
             If there is an _acl field then it passes data through it for encrypting (see AccessControl library)
@@ -85,12 +85,16 @@ class SmartDict extends Transportable {
             //noinspection JSUnfilteredForInLoop don't use "of" because want inherited attributes
             dd[i] = this[i];    // This just copies the attributes not functions
         }
-        dd = this.preflight(dd);
-        let res = (wantstring || this._acl) ? JSON.stringify(dd) : dd ;   // This is where fields get deleted or updated (in subclasses etc)
-        if (this._acl) { //Need to encrypt, _acl is an object, not a url
+        if (publicOnly) {
+            dd._master = false;
+        }
+        dd = this.preflight(dd); // This is where fields get deleted or updated (in subclasses etc)
+        // Note that its this._acl not dd._acl as _acl is removed by default
+        let res = JSON.stringify(dd);
+        if (encryptIfAcl && this._acl ) { //Need to encrypt, _acl is an object, not a url
             let encdata = this._acl.encrypt(res, true);  // data, b64
             let dic = { "encrypted": encdata, "acl": this._acl._publicurls, "table": this.table};
-            res = wantstring ? JSON.stringify(dic) : dic;
+            res = JSON.stringify(dic);
         }
         return res
     }    // Should be being called on outgoing _data includes dumps and encoding etc

@@ -137,7 +137,8 @@ class PublicPrivate extends SmartDict {
         return dd;
     }
 
-    async _p_storepublic(verbose) {
+
+    async OBS_p_storepublic(verbose) {
         this._publicurls = await Dweb.Transports.p_rawstore(
             JSON.stringify(
                 this.preflight(                 // Hides master urls and _acl since !master
@@ -146,6 +147,9 @@ class PublicPrivate extends SmartDict {
             verbose);
     }
 
+    async _p_storepublic(verbose) {
+        this._publicurls = await Dweb.Transports.p_rawstore( this._getdata({publicOnly: true}), verbose);
+    }
     storedpublic() {
         return this._publicurls.length > 0
     }

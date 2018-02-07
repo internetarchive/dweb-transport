@@ -18,7 +18,6 @@ class KeyValueTable extends PublicPrivate {
     Three ordering use cases
     a) Create new object via p_new, store it the setart setting
     b) Retrieve object via SmartDict - want to start monitor after get, and start set
-    TODO-KEYVALUE think through whether we need a Private Key (other than in the url) and if so, where its stored and whether need another pointer to get it. (or maybe even store it encrypted with acl)
 
     Comments on functions in subclasses.
     p_store - default in PublicPrivate will store public and private versions, which isnt what we want so override here.
@@ -52,7 +51,7 @@ class KeyValueTable extends PublicPrivate {
             await obj.p_store();
         }
         if (obj.tablepublicurls.length) {
-            await obj.p_getall(); // Load it up, this will have side-effect of connecting YJS etc.
+            await obj.p_get([], verbose); // Read empty list of keys, side-effect of connecting YJS etc.
             obj.monitor(verbose);
         }
         return obj;
@@ -63,7 +62,7 @@ class KeyValueTable extends PublicPrivate {
         return fieldtypes[propname] || super.objbrowser_fields(propname);
     }
 
-    _storageFromMap(mapVal) {
+    _storageFromMap(mapVal, {publicOnly=false, encryptIfAcl=true}={}) { //TODO-API
         /*
         Convert a value as stored on a transport medium into a value suitable for the _map dictionary. Pair of _storageFromMap.
         This is working from the assumption that the underlying transport needs a JSON string to store.
@@ -71,12 +70,12 @@ class KeyValueTable extends PublicPrivate {
         This pair should be able to be subclassed safely as long as _mapFromStorage(_storageFromMap(x)) == x for your definition of equality.
          */
         if (mapVal instanceof Dweb.Transportable) {
-            return mapVal._getdata();               // This should also take care of not storing unencrypted private keys, and encrypting if requested.
+            return mapVal._getdata({publicOnly, encryptIfAcl});               // This should also take care of not storing unencrypted private keys, and encrypting if requested.
         } else {
             return JSON.stringify(mapVal)
         }
     }
-    _mapFromStorage(storageVal, verbose=false) {
+    _mapFromStorage(storageVal, verbose=false) { //TODO-API
         /*
         Convert a value as stored in the map into a value suitable for storage dictionary. Pair of _mapFromStorage.
          */
@@ -103,11 +102,11 @@ class KeyValueTable extends PublicPrivate {
 
 
 
-    async p_set(name, value, {verbose=false, fromNet=false}={}) {
+    async p_set(name, value, {verbose=false, publicOnly=false, encryptIfAcl=true, fromNet=false}={}) {  //TODO-API
         // Subclased in Domain to avoid overwriting private version with public version from net
         //TODO-KEYVALUE these sets need to be signed
         if (this._autoset && !fromNet && (this._map[name] !== value)) {
-            Dweb.Transports.p_set(this.tableurls, name, this._storageFromMap(value), verbose); // Note this is aync and not waiting for result
+            Dweb.Transports.p_set(this.tableurls, name, this._storageFromMap(value, {publicOnly, encryptIfAcl}), verbose); // Note this is aync and not waiting for result
         }
         if (!((value instanceof Dweb.PublicPrivate) && this._map[name] && this._map[name]._master)) {
             // Dont overwrite the name:value pair if we already hold the master copy. This is needed for Domain, but probably generally useful

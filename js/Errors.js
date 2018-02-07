@@ -94,4 +94,12 @@ class SecurityWarning extends Error {
 }
 errors.SecurityWarning = SecurityWarning;
 
+class ResolutionError extends Error {
+    constructor(message) {
+        super(message || "Resolution failure");
+        this.name = "ResolutionError"
+    }
+}
+errors.ResolutionError = ResolutionError;
+
 exports = module.exports = errors;
