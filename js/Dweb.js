@@ -134,3 +134,8 @@ exports.objbrowser = function(el, {maxdepth=2, verbose=false}={}) {
     if (typeof el === 'string') el = document.getElementById(el);
     (new Dweb.SmartDict()).objbrowser_arrayobj(el, "keychains", Dweb.keychains, {links: true});
 };
+
+exports.utils.keyFilter = function(dic, keys) {
+    // Utility to return a new dic containing each of keys (equivalent to python { dic[k] for k in keys }
+    return keys.reduce(function(prev, key) { prev[key] = dic[key]; return prev; }, {});
+}

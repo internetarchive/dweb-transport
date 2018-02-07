@@ -4,7 +4,44 @@ const Dweb = require("./Dweb");
 //TODO-DOMAIN when "register" maybe store publicurl sa the registration, then check can fetch via p_fetch from that.
 
 //Mixins based on https://javascriptweblog.wordpress.com/2011/05/31/a-fresh-look-at-javascript-mixins/
-var NameMixin = function(options) {
+
+const SignatureMixin = function(fieldlist) {
+    /*
+        This mixin is a generic signature tool, allows to specify which fields of an object should be signed/verified.
+
+        Fields:
+        signatures: [{
+            date,                   ISODate when signed
+            signature,              Signature (see KeyPair)
+            signedby,               Exported Public Key of Signer (see KeyPair)
+            }]                      Each signature is of JSON.stringify({date, domains, name, keys, urls|tablepublicurls, expires})
+     */
+    this.fieldlist = fieldlist;
+
+    this.signatureConstructor = function() {
+        this.signatures = this.signatures || [];
+    };
+    this._signable = function(date) {
+        return JSON.stringify({"date": date, signed: Dweb.utils.keyFilter(this, this.__proto__.fieldlist)}); //TODO-SIGMIXIN might be this.__proto__.fieldlist
+    };
+    this._signSelf = function(keypair) { // Pair of verify
+        const date = new Date(Date.now());
+        this.signatures.push({date,
+            signature: keypair.sign(  this._signable(date)),
+            signedby: keypair.signingexport()
+        })
+    };
+    this._verifyOwnSigs = function() { // Pair of sign
+        // Return an array of keys that signed this match, caller should check it accepts those keys
+        return this.signatures
+            .filter(sig => (new Dweb.KeyPair({key: sig.signedby}).verify(this._signable(sig.date), sig.signature)))
+            .map(sig => sig.signedby);
+    };
+
+    return this;
+};
+
+const NameMixin = function(options) {
     /*
         This Mixin defines fields and methods needed to name something in a Domain,
         Typically this will be either: another Domain; another SmartDict or class; raw content (e.g a PDF or HTML.
@@ -13,48 +50,47 @@ var NameMixin = function(options) {
     urls | tablepublicurls    Where to find the object (or table if its a domain)
     expires: ISODATE         When this name should be considered expired (it might still be resolved, but not if newer names available.
     (there is no validfrom time, this is implicitly when it was signed)
+    fullname: str           Names that this record applies to. e.g.  company/people/fred  family/smith/father. Mostly useful to go UP the path.
 
-    Unsigned Fields
-    fullnames: [ str* ]         Names that this record applies to. e.g.  company/people/fred  family/smith/father. Mostly useful to go UP the path.
-    signatures: [{
-        date,                   ISODate when signed
-        signature,              Signature (see KeyPair)
-        signedby,               Exported Public Key of Signer (see KeyPair)
-        }]                      Each signatgure is of JSON.stringify({date, domains, name, keys, urls|tablepublicurls, expires})
      */
     this.nameConstructor = function() {
-        this.signatures = this.signatures || [];  // Empty list rather than undefined
+        this.expires = this.expires || undefined;    // If Hasn't set
     };
-    this._signable = function(domains, name, date) {
-        // Get a signable version of this domain
-        let res = JSON.stringify({date: date, domains:domains, name: name, keys: this.keys, urls: this.urls | this.tablepublicurls, expires: this.expires});
-        return res;
-    }
     return this;
 };
 class Name extends SmartDict {
     /*
         The Name class is used to register another object in a domain.
 
-        Fields inherited from NameMixin: expires; signatures; fullnames; urls
+        Fields inherited from NameMixin: expires; fullname; urls
+        Fields inherited from SignatureMixin: signatures
 
      */
     constructor(data, verbose, options) {
         super(data, verbose, options);
-        this.nameConstructor();   // Initialize Signatures
+        this.nameConstructor();   //
+        this.signatureConstructor(); // Initialize Signatures
         this.table = 'name';
+
     }
     static async p_new(data, verbose, options) {
         console.assert(false);
     }
+    objbrowser_fields(propname) {
+        let fieldtypes = { expires: "str", "urls": "urlarray", "fullname": "str", "signatures": "arrayjsonobj"}
+        return fieldtypes[propname] || super.objbrowser_fields(propname);
+    }
+
     async p_printable({indent="  ",indentlevel=0}={}) {
         // Output something that can be displayed for debugging
-        return `${indent.repeat(indentlevel)}${this.fullnames.join(', ')} = ${this.urls.join(', ')}${this.expiry ? " expires:"+this.expiry : ""}\n`
+        return `${indent.repeat(indentlevel)}${this.fullname} = ${this.urls.join(', ')}${this.expires ? " expires:"+this.expires : ""}\n`
     }
+
 
 }
 NameMixin.call(Name.prototype);
-
+SignatureMixin.call(Name.prototype, ["urls", "fullname", "expires"]);
+//TODO-SIGMIXIN
 
 class Domain extends KeyValueTable {
     /*
@@ -67,7 +103,7 @@ class Domain extends KeyValueTable {
     Fields:
     keys: [NACL VERIFY:xyz*]   Public Key to use to verify entries - identified by type, any of these keys can be used to sign a record
 
-    Fields inheritd from NameMixin: fullnames; expires; signatures
+    Fields inherited from NameMixin: fullname; expires; signatures
 
     Fields inherited from KeyValueTable
     tablepublicurls: [ str* ]       Where to find the table.
@@ -77,6 +113,7 @@ class Domain extends KeyValueTable {
         super(data, master, key, verbose, options); // Initializes _map if not already set
         this.table = "domain"; // Superclasses may override
         this.nameConstructor();  // from the Mixin, initializes signatures
+        this.signatureConstructor();
     }
     static async p_new(data, master, key, verbose, options) {
         let obj = await super.p_new(data, master, key, verbose, {keyvaluetable: "domains"}); // Will default to call constructor
@@ -85,21 +122,24 @@ class Domain extends KeyValueTable {
         }
         return obj;
     }
-    sign(name, subdomain) { // Pair of verify
-        let date = new Date(Date.now());
-        let signable = subdomain._signable(this.fullnames, name, date);
-        let signature = this.keypair.sign(signable);
-        subdomain.signatures.push({date, signature, signedby: this.keypair.signingexport()})
+
+    objbrowser_fields(propname) {
+        let fieldtypes = { _map: "dictobj", "keys": "arraystr"};
+        return fieldtypes[propname] || super.objbrowser_fields(propname);
     }
-    verify(name, subdomain) { // Pair of sign
-        console.log("XXX@95 verify",name,subdomain.fullnames)
-        // Note this verification will fail if this.fullnames has changed, it should work on master or public copy of domain.
+
+    sign(subdomain) { // Pair of verify TODO-SIGMIXIN move to sigmixin
+        subdomain._signSelf(this.keypair);
+    }
+    verify(name, subdomain) { // Pair of sign TODO-SIGMIXIN move to sigmixin
+        /* Check the subdomain is valid.
+            That is teh case if the subdomain has a cryptographically valid signatures by one of the domain's keys and the fullname matches the name we have it at.
+         */
+        console.log("XXX@95 verify",name,subdomain.fullname);
         // its called when we think we have a resolution.
         //TODO-DOMAIN need to be cleverer about DOS, but at moment dont have failure case if KVT only accepts signed entries from table owner or verifies on retrieval.
         // Throws error if doesnt verify
-        return subdomain.signatures
-            .filter(sig => this.keys.includes(sig.signedby))
-            .some(sig => (new Dweb.KeyPair({key: sig.signedby}).verify(subdomain._signable(this.fullnames, name, sig.date), sig.signature)));
+        return subdomain._verifyOwnSigs().some(key => this.keys.includes(key)) && ([this.fullname === "/" ? "" : this.fullname,name].join('/') === subdomain.fullname)
     }
 
     async p_register(name, registrable, verbose) {
@@ -112,9 +152,9 @@ class Domain extends KeyValueTable {
          */
         if (!(registrable instanceof Domain || registrable instanceof Name)) {
             // If it isnt a Domain or Name then build a name to point at it
-            registrable = new Name({fullnames: this.fullnames.map(fn => [fn, name].join("/")), urls: registrable._publicurls || registrable._urls}, verbose)
+            registrable = new Name({fullname: [this.fullname, name].join("/"), urls: registrable._publicurls || registrable._urls}, verbose)
         }
-        this.sign(name, registrable);
+        this.sign(registrable);
         console.assert(this.verify(name, registrable));   // It better verify !
         await this.p_set(name, registrable);
     }
@@ -128,7 +168,7 @@ class Domain extends KeyValueTable {
 
     async p_resolve(path, {verbose=false}={}) { // Note merges verbose into options, makes more sense since both are optional
         //TODO check for / at start, if so remove it and get root
-        if (verbose) console.log("resolving",path,"in",this.fullnames.join(', '));
+        if (verbose) console.log("resolving",path,"in",this.fullname);
         const pathArray = path.split('/');
         const remainder = [];
         let res;
@@ -138,7 +178,7 @@ class Domain extends KeyValueTable {
             res = await this.p_get(name, verbose);
             if (res) {
                 res = await Dweb.SmartDict._after_fetch(res, [], verbose);  //Turn into an object
-                this.verify(name, res);
+                this.verify(name, res); //TODO-SIGMIXIN move to sigmixin
                 break;
             }
             remainder.unshift(pathArray.pop())
@@ -149,14 +189,14 @@ class Domain extends KeyValueTable {
             return res.p_resolve(remainder.join('/'), {verbose});           // ===== Note recursion ====
             //TODO need other classes e.g. SD  etc to handle p_resolve as way to get path
         } else {
-            console.log("Unable to completely resolve",path,"in",this.fullnames.join(', '))
+            console.log("Unable to completely resolve",path,"in",this.fullname);
             return undefined;
         }
     }
 
     async p_printable({indent="  ",indentlevel=0}={}) {
         // Output something that can be displayed for debugging
-        return `${indent.repeat(indentlevel)}${this.fullnames.join(', ')} @ ${this.tablepublicurls.join(', ')}${this.expiry ? " expires:"+this.expiry : ""}\n`
+        return `${indent.repeat(indentlevel)}${this.fullname} @ ${this.tablepublicurls.join(', ')}${this.expires ? " expires:"+this.expires : ""}\n`
             + (await Promise.all((await this.p_keys()).map(k => this._map[k].p_printable({indent, indentlevel: indentlevel + 1})))).join('')
     }
 
@@ -166,7 +206,7 @@ class Domain extends KeyValueTable {
             const pass = "Testing pass phrase";
             //Register the toplevel domain
             Domain.root = await Domain.p_new({
-                fullnames: ["/"],
+                fullname: "/",
                 keys: [],
                 signatures: [],    // TODO-NAME Root record itself needs signing - but by who (maybe /arc etc)
                 expires: undefined,
@@ -176,19 +216,19 @@ class Domain extends KeyValueTable {
             //console.log("XXX@39", Domain.root);
             //Now register a subdomain
             const testingtoplevel = await Domain.p_new({           // this would be "arc"
-                fullnames: [ "/testingtoplevel"],
+                fullname: "/testingtoplevel",
                 _allowunsafestore: true,    //TODO-NAME - undo this and add encryption of private data
             }, true, {passphrase: pass+"/testingtoplevel"});
             await Domain.root.p_register("testingtoplevel", testingtoplevel, verbose);
             const adomain = await Domain.p_new({           // this would be "arc"
-                fullnames: [ "/testingtoplevel/adomain"],   //TODO set this field at registration
+                fullname: "/testingtoplevel/adomain",   //TODO set this field at registration
                 _allowunsafestore: true,    //TODO-NAME - undo this and add encryption of private data
             }, true, {passphrase: pass+"/testingtoplevel/adomain"});
             await testingtoplevel.p_register("adomain", adomain, verbose);
             const item1 = await new Dweb.SmartDict({"name": "My name", "birthdate": "2001-01-01"}).p_store();
             await adomain.p_register("item1", item1, verbose);
             // Now try resolving on a client - i.e. without the Domain.root privte keys
-            const ClientDomainRoot = await Dweb.SmartDict.p_fetch(Domain.root._publicurls, verbose)
+            const ClientDomainRoot = await Dweb.SmartDict.p_fetch(Domain.root._publicurls, verbose);
             let res= await ClientDomainRoot.p_resolve('testingtoplevel/adomain/item1', {verbose});
             if (verbose) console.log("Resolved to",res);
             console.assert(res.urls[0] === item1._urls[0]);
@@ -216,6 +256,9 @@ class Domain extends KeyValueTable {
 
 }
 NameMixin.call(Domain.prototype);   // Add in the Mixin
+SignatureMixin.call(Domain.prototype, ["tablepublicurls", "fullname", "keys", "expires"]);
+
+//TODO-SIGMIXIN include here
 Domain.clsName = Name;  // Just So exports can find it and load into Dweb TODO move to own file
 
 exports = module.exports = Domain;

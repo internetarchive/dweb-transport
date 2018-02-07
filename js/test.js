@@ -36,9 +36,9 @@ async function p_test(verbose) {
 
         // Note the order of these is significant, it will retrieve by preference from the first setup, try with both orders if in doubt.
         //SEE-OTHER-ADDTRANSPORT
-        //let t_http = await Dweb.TransportHTTP.p_test(opts, verbose);
-        let t_ipfs = await Dweb.TransportIPFS.p_test(opts, verbose); // Note browser requires indexeddb
-        let t_yjs = await Dweb.TransportYJS.p_test(opts, verbose); // Should find ipfs transport
+        let t_http = await Dweb.TransportHTTP.p_test(opts, verbose);
+        //let t_ipfs = await Dweb.TransportIPFS.p_test(opts, verbose); // Note browser requires indexeddb
+        //let t_yjs = await Dweb.TransportYJS.p_test(opts, verbose); // Should find ipfs transport
         //let t_webtorrent = await Dweb.TransportWEBTORRENT.p_test(opts, verbose); //
         // Note that p_tests call p_status which is needed on some protocols or they wont be used
         if (verbose) console.log("setup returned and transport(s) set");

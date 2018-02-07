@@ -223,6 +223,22 @@ class SmartDict extends Transportable {
                 ))
             ) );
     }
+    objbrowser_dictobj(el, name, arr, {links=false}={}) {
+        const ul = this.objbrowser_createElement('ul',{className: 'propurls propval'},[]);
+        this._objbrowser_row(el, name, ul);
+        arr.map((l,i) => this._objbrowser_row(ul, name,
+            this.objbrowser_createElement('span', {},
+                this.objbrowser_createElement('span', {onclick: `Dweb.SmartDict.objbrowser_expandurl(this.parentNode); return false;`}, `${i}...`)
+            )));
+    }
+    objbrowser_arraystr(el, name, arr) {
+        this._objbrowser_row(el, name,
+            this.objbrowser_createElement('ul',{className: 'propurls propval'},
+                arr.map((l,i) => this.objbrowser_createElement('li',{className: 'propval'},
+                    this.objbrowser_createElement('span', {}, l)
+                ))
+            ) );
+    }
     objbrowser_fields(propname) {
         let fieldtypes = { _acl: "obj", _urls: "urlarray", table: "str", name: "str" } // Note Name is not an explicit field, but is normally set
         return fieldtypes[propname]; //TODO || super if implement on Transportable
@@ -246,7 +262,13 @@ class SmartDict extends Transportable {
                             break;
                         case "jsonobj": this.objbrowser_str(el, propname, JSON.stringify(this[propname]));
                             break;
+                        case "arrayjsonobj": this.objbrowser_arraystr(el, propname, this[propname].map(m => JSON.stringify(m)));
+                            break;
                         case "arrayobj": this.objbrowser_arrayobj(el, propname, this[propname], {links: true});
+                            break;
+                        case "dictobj": this.objbrowser_dictobj(el, propname, this[propname], {links: true});
+                            break;
+                        case "arraystr": this.objbrowser_arraystr(el, propname, this[propname]);
                             break;
                         case "key": this.objbrowser_key(el, propname, this[propname]); // Only defined on KeyPair
                             break;

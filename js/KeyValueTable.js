@@ -8,13 +8,12 @@ class KeyValueTable extends PublicPrivate {
 
     Fields:
     _autoset:       When set to true, any changes will be stored to server its set after p_new writes initial data
-
-    Fields Inherited from PublicPrivate:
-    _urls           The urls of the table e.g. YJS where keys will be stored
     tableurls       Urls needed to write to the table
     tablepublicurls Urls needed to read from the table, e.g. YJS which can be retrieved from.
-    keypair         Isn't used yet ... but will be by Superclasses
     _map           Where the KV mapping is stored.
+
+    Fields Inherited from PublicPrivate:
+    keypair         Key used to sign - not used here (yet), but is in DOmain
 
     Three ordering use cases
     a) Create new object via p_new, store it the setart setting
@@ -57,6 +56,11 @@ class KeyValueTable extends PublicPrivate {
             obj.monitor(verbose);
         }
         return obj;
+    }
+
+    objbrowser_fields(propname) {
+        let fieldtypes = { _autoset: "str", "tableurls": "urlarraynolinks", "tablepublicurls": "urlarraynolinks"}
+        return fieldtypes[propname] || super.objbrowser_fields(propname);
     }
 
     _storageFromMap(mapVal) {
@@ -128,8 +132,7 @@ class KeyValueTable extends PublicPrivate {
             this._updatemap(res);
         }
         // Return from _map after possibly updating it
-        let map = this._map;
-        return keys.reduce(function(prev, key) { prev[key] = map[key]; return prev; }, {});
+        return Dweb.utils.keyFilter(this._map, keys);
     }
     async p_keys(verbose) {
         /*
@@ -177,7 +180,6 @@ class KeyValueTable extends PublicPrivate {
             },
             verbose);
     }
-
 
     static async p_test(verbose) {
         if (verbose) console.log("KeyValueTable testing starting");
