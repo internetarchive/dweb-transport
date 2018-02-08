@@ -14,8 +14,10 @@ export default class Image extends Details {
         this.itemtype = "http://schema.org/VisualArtwork";
     }
     archive_setup_push() {
-        AJS.theatresize();
-        AJS.carouselsize('#ia-carousel', true);
+        archive_setup.push(function() {  // This is common to Text, AV and image - though some have stuff before this and some a
+            AJS.theatresize();
+            AJS.carouselsize('#ia-carousel', true);
+        });
         super.archive_setup_push(); // On eample images the theatre & carosel came before the parts common to AV, Image and Text
     }
 

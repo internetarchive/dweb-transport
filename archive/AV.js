@@ -9,14 +9,6 @@ export default class AV extends Details {
         super(itemid, item);
     }
 
-    archive_setup_push() {
-        let self = this;
-        super.archive_setup_push(); // On commute.html the Play came after the parts common to AV, Image and Text
-        // archive_setup.push(function() { //TODO-ARCHIVE_SETUP move Play from browserAfter to here
-        //    Play('jw6', self.playlist, self.cfg);
-        // });
-
-    }
     setupPlaylist(preferredTypes) {
         this.playlist=[];
         this.avs = this._list.filter(fi => (preferredTypes.includes(fi.metadata.format)));

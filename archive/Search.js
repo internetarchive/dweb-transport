@@ -174,8 +174,6 @@ export default class Search extends ArchiveBase {
     archive_setup_push() {
         archive_setup.push(function() {
             AJS.date_switcher(`&nbsp;<a href="/search.php?query=${query}&amp;sort=-publicdate"><div class="date_switcher in">Date Archived</div></a> <a href="/search.php?query=${query}&amp;sort=-date"><div class="date_switcher">Date Published</div></a> <a href="/search.php?query=${query}&amp;sort=-reviewdate"><div class="date_switcher">Date Reviewed</div></a> `);
-            });
-        archive_setup.push(function(){ //TODO-DETAILS check not pushing on top of existing (it probably is)
             AJS.lists_v_tiles_setup('search');
             AJS.popState('search');
             $('div.ikind').css({visibility:'visible'});

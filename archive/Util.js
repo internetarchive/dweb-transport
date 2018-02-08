@@ -91,7 +91,7 @@ export default class Util {
             $(() => {
                 for (const fn of archive_setup)
                     fn()
-                    /*TODO may need to delete fn so doesnt stay between pages */
+                archive_setup = []; // Delete archive_setup
             })
         }
 

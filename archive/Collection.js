@@ -14,7 +14,7 @@ export default class Collection extends Search {
 
     banner() {
         let item = this.item;
-        //TODO-DETAILS probably move this to the Search class after move to use the approach taken in template_image.js
+        //TODO-DETAILS probably move this to the Search class and trigger based on presence of "item" (which is missing for Searches.)
         const creator = (item.metadata.creator  &&  (item.metadata.creator != item.metadata.title) ? item.metadata.creator : '');
         //ARCHIVE-BROWSER note the elements below were converted to HTML 3 times in original version
         //TODO-DETAILS on prelinger, banner description is getting truncated.
@@ -45,7 +45,7 @@ export default class Collection extends Search {
     browserBefore() {
         $('body').addClass('bgEEE');
         // Note the archive_setup.push stuff is subtly different from that for 'search'
-        archive_setup.push(function(){ //TODO-DETAILS check not pushing on top of existing (it probably is)
+        archive_setup.push(function(){
             AJS.lists_v_tiles_setup('collection');
             $('div.ikind').css({visibility:'visible'});
             AJS.popState('');

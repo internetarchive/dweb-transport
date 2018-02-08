@@ -9,7 +9,7 @@ This expanded in use to make it easier to use HTML in as unchanged form from exi
 
 import ArchiveFile from "./ArchiveFile";
 
-function deletechildren(el, keeptemplate) { //TODO-DETAILS-REACT copied from htmlutils, maybe include that instead
+function deletechildren(el, keeptemplate) { //Note same function in htmlutils
     /*
     Remove all children from a node
     :param el:  An HTML element, or a string with id of an HTML element
