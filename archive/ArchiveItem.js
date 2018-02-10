@@ -7,7 +7,7 @@ require('babel-core/register')({ presets: ['env', 'react']}); // ES6 JS below!
 //TODO-REFACTOR extends SmartDict to eventually allow loading via URL - having problems with webpack ... libsodium -> fs
 //TODO-NAMING url could be a name
 
-export default class ArchiveItem { //extends SmartDict {  //TODO should extend SmartDict, but having Webpack issues loading it
+export default class ArchiveItem { //extends SmartDict {  //TODO should extend SmartDict, but having Webpack issues loading it all into one webpack
     /*
     Base class representing an Item and/or a Search query (A Collection is both).
     This is just storage, the UI is in ArchiveBase and subclasses, theoretically this class could be used for a server or gateway app with no UI.

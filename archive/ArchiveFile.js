@@ -57,9 +57,8 @@ export default class ArchiveFile {
         let blob = new Blob([blk._data], {type: Util.archiveMimeTypeFromFormat[this.metadata.format]}) // Works for data={Uint8Array|Blob}
         let objectURL = URL.createObjectURL(blob);
         if (verbose) console.log("Blob URL=",objectURL);
-        //browser.downloads.download({filename: this.metadata.name, url: objectURL});
-        //Downloads.fetch(objectURL, this.metadata.name);
-        //TODO-DETAILS figure out how to save with the name of the file rather than the blob
+        //browser.downloads.download({filename: this.metadata.name, url: objectURL});   //Doesnt work
+        //Downloads.fetch(objectURL, this.metadata.name);   // Doesnt work
         a.href = objectURL;
         a.target= (options && options.target) || "_blank";                      // Open in new window by default
         a.onclick = undefined;
@@ -85,7 +84,6 @@ export default class ArchiveFile {
 
         RenderMedia.render(file, jsx);  // Render into supplied element
 
-        // TODO: port this to JSX
         if (window.WEBTORRENT_TORRENT) {
             const torrent = window.WEBTORRENT_TORRENT
 
