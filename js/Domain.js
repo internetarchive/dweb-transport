@@ -1,7 +1,6 @@
 const KeyValueTable = require("./KeyValueTable"); //for extends
 const SmartDict = require("./SmartDict"); //for extends
 const Dweb = require("./Dweb");
-//TODO-DOMAIN when "register" maybe store publicurl sa the registration, then check can fetch via p_fetch from that.
 
 //Mixins based on https://javascriptweblog.wordpress.com/2011/05/31/a-fresh-look-at-javascript-mixins/
 
@@ -33,8 +32,10 @@ const SignatureMixin = function(fieldlist) {
     };
     this._verifyOwnSigs = function() { // Pair of sign
         // Return an array of keys that signed this match, caller should check it accepts those keys
+        console.debug("WARNING - faking signature verification while testing gateway to archive metadata")
         return this.signatures
-            .filter(sig => (new Dweb.KeyPair({key: sig.signedby}).verify(this._signable(sig.date), sig.signature)))
+            .filter(sig => ( sig.signature === "FAKEFAKEFAKE"  ||       // TODO=DOMAIN obviously this is faking verification while testing gateway to archive metadata
+                new Dweb.KeyPair({key: sig.signedby}).verify(this._signable(sig.date), sig.signature)))
             .map(sig => sig.signedby);
     };
 
@@ -64,6 +65,11 @@ class Name extends SmartDict {
 
         Fields inherited from NameMixin: expires; fullname;
         urls: Points at object being named (for a Transportable object its obj._publicurls)
+        mimetype:   Mimetype of content esp application/json
+        metadata:   Other information about the object needed before or during retrieval.
+                    This is a good place to extend, please document any here for now.
+                    jsontype: archive.org.dweb   is a way to say its a Dweb object,
+                    jsontype: archive.org.metadata is for archive.org metadata
         Fields inherited from SignatureMixin: signatures
 
      */
@@ -72,7 +78,8 @@ class Name extends SmartDict {
         this.nameConstructor();   //
         this.signatureConstructor(); // Initialize Signatures
         this.table = 'name';
-
+        this.mimetype = this.mimetype || undefined;  // Mime type of object retrieved
+        this.metadata = this.metadata || {};         // Other information about the object needed before or during retrieval
     }
     static async p_new(data, verbose, options) {
         if (data instanceof Dweb.Transportable) {
@@ -93,14 +100,24 @@ class Name extends SmartDict {
     async p_resolve(path, {verbose=false}={}) {
         let obj;
         try {
-            obj = await Dweb.SmartDict.p_fetch(this.urls, verbose);
+            if (["application/json"].includes(this.mimetype) ) {
+                let data = Dweb.Transportable.p_fetch(this.urls, verbose);
+                let datajson = (typeof data === "string" || data instanceof Buffer) ? JSON.parse(data) : data;          // Parse JSON (dont parse if p_fetch has returned object (e.g. from KeyValueTable
+                if (this.metadata["jsontype"] === "archive.org.dweb") {
+                    let obj = await this._after_fetch(datajson, urls, verbose);   // Interpret as dweb - look at its "table" and possibly decrypt
+                    return obj.p_resolve(path, {verbose: false});   // This wont work unless the object implements p_resolve (most dont)
+                } else {
+                    console.error("Name.p_resolve unknown type of JSON", this.mimetype);
+                    throw new Dweb.errors.ResolutionError(`Name.p_resolve unable to resolve path: ${path} in ${this.fullname} because jsontype ${this.metadata["jsontype"]} unrecognized`);
+                }
+            } else if (["text/html"].includes(this.mimetype) ) {
+                return [ this, path];
+            } else {
+                console.error("Name.p_resolve, unknown mimetype", this.mimetype)
+                throw new Dweb.errors.ResolutionError(`Name.p_resolve unable to resolve path: ${path} in ${this.fullname} because mimetype ${this.mimetype} unrecognized`);
+            }
         } catch(err) {
-            throw new Dweb.errors.ResolutionError(`Unable to resolve urls ${this.urls} with SmartDict.p_fetch, ${err.message}`);
-        }
-        try {
-            return await obj.p_resolve(path, {verbose: verbose});
-        } catch(err) {
-            throw new Dweb.errors.ResolutionError(`Obj of class ${obj.constructor.name} Cant do a p_resolve("${path}"), ${err.message}`);
+            throw new Dweb.errors.ResolutionError(err.message);
         }
     }
 
@@ -130,12 +147,12 @@ class Domain extends KeyValueTable {
         this.table = "domain"; // Superclasses may override
         this.nameConstructor();  // from the Mixin, initializes signatures
         this.signatureConstructor();
+        if (this._master && this.keypair && !(this.keys && this.keys.length)) {
+            this.keys = [ this.keypair.signingexport()]
+        }
     }
     static async p_new(data, master, key, verbose, options) {
         const obj = await super.p_new(data, master, key, verbose, {keyvaluetable: "domains"}); // Will default to call constructor
-        if (obj._master && obj.keypair && !(obj.keys && obj.keys.length)) {
-            obj.keys = [ obj.keypair.signingexport()]
-        }
         return obj;
     }
 
@@ -197,9 +214,10 @@ class Domain extends KeyValueTable {
             .map(r => this._mapFromStorage(r))
         // Errors in above will result in an undefined in the res array, which will be filtered out.
         // res is now an array of returned values in same order as tablepublicurls
-        //TODO-DOMAIN should verify here before do this test
-        const indexOfMostRecent = rr.reduce((iBest, r, i, arr) => (r && r.signatures[0].date) > (arr[iBest] && arr[iBest].signatures[0].date) ? i : iBest, 0);
-
+        //TODO-DOMAIN should verify here before do this test but note Python gateway is still using FAKEFAKEFAKE as a signature
+        //
+        const indexOfMostRecent = rr.reduce((iBest, r, i, arr) => (r && r.signatures[0].date) > (arr[iBest] || "" && arr[iBest].signatures[0].date) ? i : iBest, 0);
+        //TODO-DOMAIN save best results to others.
         const value = rr[indexOfMostRecent];
         this._map[key] = value;
         return value;
@@ -207,12 +225,18 @@ class Domain extends KeyValueTable {
 
 
     async p_resolve(path, {verbose=false}={}) { // Note merges verbose into options, makes more sense since both are optional
+        /*
+        Resolves a path, should resolve to the leaf
+        resolves to:    [ Name, remainder ]
+         */
+
         //TODO check for / at start, if so remove it and get root
         if (verbose) console.log("resolving",path,"in",this.fullname);
+        let res;
+        /*
+        // Look for path, try longest combination first, then work back to see if can find partial path
         const pathArray = path.split('/');
         const remainder = [];
-        let res;
-        // Look for path, try longest combination first, then work back to see if can find partial path
         while (pathArray.length > 0) {
             const name = pathArray.join('/');
             res = await this.p_get(name, verbose);
@@ -223,9 +247,17 @@ class Domain extends KeyValueTable {
             }
             remainder.unshift(pathArray.pop());                             // Loop around on subset of path
         }
+        */
+        const remainder = path.split('/');
+        const name = remainder.shift();
+        res = await this.p_get(name, verbose);
+        if (res) {
+            res = await Dweb.SmartDict._after_fetch(res, [], verbose);  //Turn into an object
+            this.verify(name, res);                                     // Check its valid
+        }
         if (res) { // Found one
             if (!remainder.length) // We found it
-                return res;
+                return [ res, undefined ] ;
             return await res.p_resolve(remainder.join('/'), {verbose});           // ===== Note recursion ====
             //TODO need other classes e.g. SD  etc to handle p_resolve as way to get path
         } else {
@@ -234,42 +266,31 @@ class Domain extends KeyValueTable {
         }
     }
 
-    async p_printable({indent="  ",indentlevel=0}={}) {
+    async p_printable({indent="  ",indentlevel=0, maxindent=9}={}) {
         // Output something that can be displayed for debugging
         return `${indent.repeat(indentlevel)}${this.fullname} @ ${this.tablepublicurls.join(', ')}${this.expires ? " expires:"+this.expires : ""}\n`
-            + (await Promise.all((await this.p_keys()).map(k => this._map[k].p_printable({indent, indentlevel: indentlevel + 1})))).join('')
+            + (indentlevel >= maxindent) ? "..." : (await Promise.all((await this.p_keys()).map(k => this._map[k].p_printable({indent, indentlevel: indentlevel + 1, maxindent: maxindent})))).join('')
     }
     static async p_setupOnce({verbose=false} = {}) { //TODO-DOMAIN move to own file
-        const metadatagateway = 'http://localhost:4244/name/archiveid';
+        const metadatagateway = 'http://localhost:4244/name/archiveid'; //TODO-BOOTSTRAP need to run this against main gateway
         const pass = "Replace this with something secret";
         const kc = await Dweb.KeyChain.p_new({name: "test_keychain kc"}, {passphrase: pass}, verbose);    //TODO-DOMAIN replace with secret passphrase
-        Domain.root = await Domain.p_new({_acl: kc}, true, {passphrase: pass+"/"}, verbose);   //TODO-NAME will need a secure root key
+        Domain.root = await Domain.p_new({_acl: kc, fullname: ""}, true, {passphrase: pass+"/"}, verbose);   //TODO-NAME will need a secure root key
         // /arc domain points at our top level resolver.
         //p_new should add registrars at whichever compliant transports are connected (YJS, HTTP)
+        console.log("Domain.root publicurls=",Domain.root._publicurls);
         const arcDomain = await Domain.p_new({_acl: kc},true, {passphrase: pass+"/arc"});
         await Domain.root.p_register("arc", arcDomain, verbose);
         const archiveOrgDomain = await Domain.p_new({_acl: kc}, true, {passphrase: pass+"/arc/archive.org"});
         await arcDomain.p_register("archive.org", archiveOrgDomain, verbose);
         //TODO-DOMAIN add ipfs address and ideally ipns address to archiveOrgDetails record
-        const archiveOrgDetails = await Name.p_new({urls: ["https://dweb.me/examples/archive.html"]}, verbose);
+        const archiveOrgDetails = await Name.p_new({urls: ["https://dweb.me/examples/archive.html"], mimetype: "text/html", metadata: {htmlusesrelativeurls: true, htmlpath: "item"}}, verbose);
         await archiveOrgDomain.p_register("details", archiveOrgDetails, verbose);
         const archiveOrgMetadata = await Domain.p_new({_acl: kc}, true, {passphrase: pass+"/arc/archive.org/metadata"});
         //Lazy gateway is going to have to be at e.g. https://dweb.me/name/archiveid?key=commute"
         archiveOrgMetadata.tablepublicurls.push(metadatagateway);
         await archiveOrgDomain.p_register("metadata", archiveOrgMetadata, verbose);
         await Domain.root.p_resolve("arc/archive.org/details", {verbose}); // Geta a Name -> HTML file, figure out how to bootstrap from that.
-        verbose=true;
-        if (verbose) console.log("Next line should attempt to find in metadata table *YJS or HTTP) then try name/archiveid?key=commute");
-        let res = await Domain.root.p_resolve("arc/archive.org/metadata/commute", {verbose});
-        console.log(res);
-        console.log("---Expect failure to resolve 'arc/archive.org/details/commute'", {verbose});
-        //TODO-DOMAIN dont think next will work.
-        try { //TODO-DOMAIN will need to figure out what want this to do
-            await Domain.root.p_resolve("arc/archive.org/details/commute", {verbose});
-        } catch(err) {
-            console.log("Got errror",err);
-        }
-        console.log('------');
     }
 
 
@@ -299,8 +320,8 @@ class Domain extends KeyValueTable {
             // Now try resolving on a client - i.e. without the Domain.root privte keys
             const ClientDomainRoot = await Dweb.SmartDict.p_fetch(Domain.root._publicurls, verbose);
             let res= await ClientDomainRoot.p_resolve('testingtoplevel/adomain/item1', {verbose});
-            if (verbose) console.log("Resolved to",res);
-            console.assert(res.urls[0] === item1._urls[0]);
+            if (verbose) console.log("Resolved to",await res[0].p_printable({maxindent:2}),res[1]);
+            console.assert(res[0].urls[0] === item1._urls[0]);
             // Now some failure cases / errors
             if (verbose) console.log("-Expect unable to completely resolve");
             res= await Domain.root.p_resolve('testingtoplevel/adomain/itemxx', {verbose});
@@ -314,9 +335,31 @@ class Domain extends KeyValueTable {
             if (verbose) console.log("Structure of registrations");
             if (verbose) console.log(await Domain.root.p_printable());
             //TODO-NAME build some more failure cases (bad key, bad fullname)
-            //TODO-NAME add http resolver for items to gateway and test case here
             //TODO-NAME try resolving on other machine
             await this.p_setupOnce(verbose);
+
+            verbose=true;
+            if (verbose) console.log("Next line should attempt to find in metadata table *YJS or HTTP) then try name/archiveid?key=commute");
+            let itemid = "commute";
+            let name = `arc/archive.org/metadata/${itemid}`;
+            res = await Domain.root.p_resolve(name, {verbose});
+            //TODO-DOMAIN note p_resolve is faking signature verification on FAKEFAKEFAKE - will also need to error check that which currently causes exception
+            console.assert(res[0].fullname === "/"+name);
+            if (verbose) console.log("Resolved",name,"to",await res[0].p_printable({maxindent:2}), res[1]);
+            let metadata = await Dweb.Transportable.p_fetch(res[0].urls); // Using Block as its multiurl and might not be HTTP urls
+            if (verbose) console.log("Retrieved metadata",JSON.stringify(metadata));
+            console.log("---Expect failure to resolve 'arc/archive.org/details/commute'");
+            console.assert(metadata.metadata.identifier === itemid);
+            //TODO-DOMAIN dont think next will work.
+            try { //TODO-DOMAIN will need to figure out what want this to do
+                res = await Domain.root.p_resolve("arc/archive.org/details/commute", {verbose});
+                console.log("resolved to",await res[0].p_printable({maxindent:2}), res[1] ? `Remainder=${res[1]}`: "");
+            } catch(err) {
+                console.log("Got error",err);
+            }
+            console.log('------');
+
+
         } catch (err) {
             console.log("Caught exception in Domain.test", err);
             throw(err)

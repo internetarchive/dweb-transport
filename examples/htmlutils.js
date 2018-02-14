@@ -239,9 +239,20 @@ async function p_httpget(url, headers) {
 }
 
 function display_blob(bb, options) {//TODO-STREAMS figure out how to pass streams to this and how to pass from IPFS
+    /*
+        Display a blob of data
+        Typical usage display_blob(await Dweb.Transportable.p_fetch(urls), {type: "application/pdf"})
+        bb: Data to display, either as blob or something that can be passed to Blob([bb]) e.g. a buffer
+        options:    {
+            type: mimetype  (required if bb not already a blob)
+            target:     Where to display e.g. "_blank" or "_self"
+        }
+        TODO probably extend this to do a download which has some code in archive/*js to handle
+     */
     // See https://developer.mozilla.org/en-US/docs/Web/API/URL/createObjectURL
     // and https://stackoverflow.com/questions/3665115/create-a-file-in-memory-for-user-to-download-not-through-server
     if (!(bb instanceof Blob)) {
+        console.log("display_blob: creating with type",options.type);
         bb = new Blob([bb], {type: options.type})
     }
     console.log("display_blob:",typeof bb);

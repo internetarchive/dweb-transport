@@ -148,7 +148,8 @@ class PublicPrivate extends SmartDict {
     }
 
     async _p_storepublic(verbose) {
-        this._publicurls = await Dweb.Transports.p_rawstore( this._getdata({publicOnly: true}), verbose);
+        // Store public version, dont encrypt on storing as want public part to be publicly visible (esp for Domain)
+        this._publicurls = await Dweb.Transports.p_rawstore( this._getdata({publicOnly: true, encryptIfAcl:false}), verbose);
     }
     storedpublic() {
         return this._publicurls.length > 0
