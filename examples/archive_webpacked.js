@@ -90,7 +90,7 @@ This expanded in use to make it easier to use HTML in as unchanged form from exi
 
 
 function deletechildren(el, keeptemplate) {
-    //TODO-DETAILS-REACT copied from htmlutils, maybe include that instead
+    //Note same function in htmlutils
     /*
     Remove all children from a node
     :param el:  An HTML element, or a string with id of an HTML element
@@ -2094,7 +2094,7 @@ class Util {
             // when DOM loaded/stable, do some setup
             $(() => {
                 for (const fn of archive_setup) fn();
-                /*TODO may need to delete fn so doesnt stay between pages */
+                archive_setup = []; // Delete archive_setup
             });
         }
 
@@ -4229,9 +4229,6 @@ class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default *
     archive_setup_push() {
         archive_setup.push(function () {
             AJS.date_switcher(`&nbsp;<a href="/search.php?query=${query}&amp;sort=-publicdate"><div class="date_switcher in">Date Archived</div></a> <a href="/search.php?query=${query}&amp;sort=-date"><div class="date_switcher">Date Published</div></a> <a href="/search.php?query=${query}&amp;sort=-reviewdate"><div class="date_switcher">Date Reviewed</div></a> `);
-        });
-        archive_setup.push(function () {
-            //TODO-DETAILS check not pushing on top of existing (it probably is)
             AJS.lists_v_tiles_setup('search');
             AJS.popState('search');
             $('div.ikind').css({ visibility: 'visible' });
@@ -4478,9 +4475,8 @@ class ArchiveFile {
         let blob = new Blob([blk._data], { type: __WEBPACK_IMPORTED_MODULE_2__Util__["a" /* default */].archiveMimeTypeFromFormat[this.metadata.format] }); // Works for data={Uint8Array|Blob}
         let objectURL = URL.createObjectURL(blob);
         if (verbose) console.log("Blob URL=", objectURL);
-        //browser.downloads.download({filename: this.metadata.name, url: objectURL});
-        //Downloads.fetch(objectURL, this.metadata.name);
-        //TODO-DETAILS figure out how to save with the name of the file rather than the blob
+        //browser.downloads.download({filename: this.metadata.name, url: objectURL});   //Doesnt work
+        //Downloads.fetch(objectURL, this.metadata.name);   // Doesnt work
         a.href = objectURL;
         a.target = options && options.target || "_blank"; // Open in new window by default
         a.onclick = undefined;
@@ -4505,7 +4501,6 @@ class ArchiveFile {
 
         __WEBPACK_IMPORTED_MODULE_0_render_media___default.a.render(file, jsx); // Render into supplied element
 
-        // TODO: port this to JSX
         if (window.WEBTORRENT_TORRENT) {
             const torrent = window.WEBTORRENT_TORRENT;
 
@@ -7526,7 +7521,6 @@ class ArchiveBase extends __WEBPACK_IMPORTED_MODULE_2__ArchiveItem__["a" /* defa
         __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].AJS_on_dom_loaded(); // Runs code pushed archive_setup - needed for image if "super" this, put it after superclasses
     }
     render(res) {
-        //TODO-DETAILS remove htm and from calling routines
         var els = this.navwrapped(); // Build the els
         this.browserBefore();
         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].domrender(els, res); //Put the els into the page
@@ -7561,13 +7555,6 @@ class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
         super(itemid, item);
     }
 
-    archive_setup_push() {
-        let self = this;
-        super.archive_setup_push(); // On commute.html the Play came after the parts common to AV, Image and Text
-        // archive_setup.push(function() { //TODO-ARCHIVE_SETUP move Play from browserAfter to here
-        //    Play('jw6', self.playlist, self.cfg);
-        // });
-    }
     setupPlaylist(preferredTypes) {
         this.playlist = [];
         this.avs = this._list.filter(fi => preferredTypes.includes(fi.metadata.format));
@@ -12040,7 +12027,7 @@ __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 //TODO-NAMING url could be a name
 
 class ArchiveItem {
-    //extends SmartDict {  //TODO should extend SmartDict, but having Webpack issues loading it
+    //extends SmartDict {  //TODO should extend SmartDict, but having Webpack issues loading it all into one webpack
     /*
     Base class representing an Item and/or a Search query (A Collection is both).
     This is just storage, the UI is in ArchiveBase and subclasses, theoretically this class could be used for a server or gateway app with no UI.
@@ -12647,7 +12634,7 @@ class Collection extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
 
     banner() {
         let item = this.item;
-        //TODO-DETAILS probably move this to the Search class after move to use the approach taken in template_image.js
+        //TODO-DETAILS probably move this to the Search class and trigger based on presence of "item" (which is missing for Searches.)
         const creator = item.metadata.creator && item.metadata.creator != item.metadata.title ? item.metadata.creator : '';
         //ARCHIVE-BROWSER note the elements below were converted to HTML 3 times in original version
         //TODO-DETAILS on prelinger, banner description is getting truncated.
@@ -12693,7 +12680,6 @@ class Collection extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
         $('body').addClass('bgEEE');
         // Note the archive_setup.push stuff is subtly different from that for 'search'
         archive_setup.push(function () {
-            //TODO-DETAILS check not pushing on top of existing (it probably is)
             AJS.lists_v_tiles_setup('collection');
             $('div.ikind').css({ visibility: 'visible' });
             AJS.popState('');
@@ -12830,8 +12816,11 @@ class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
         this.itemtype = "http://schema.org/VisualArtwork";
     }
     archive_setup_push() {
-        AJS.theatresize();
-        AJS.carouselsize('#ia-carousel', true);
+        archive_setup.push(function () {
+            // This is common to Text, AV and image - though some have stuff before this and some a
+            AJS.theatresize();
+            AJS.carouselsize('#ia-carousel', true);
+        });
         super.archive_setup_push(); // On eample images the theatre & carosel came before the parts common to AV, Image and Text
     }
 
