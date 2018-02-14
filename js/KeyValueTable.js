@@ -51,8 +51,8 @@ class KeyValueTable extends PublicPrivate {
             await obj.p_store();
         }
         if (obj.tablepublicurls.length) {
-            await obj.p_get([], verbose); // Read empty list of keys, side-effect of connecting YJS etc.
-            obj.monitor(verbose);
+            await Dweb.Transports.p_connection(obj.tablepublicurls, verbose); // Asynchronously connect especially to YJS
+            obj.monitor(verbose);                                              // Synchronously setup monitor
         }
         return obj;
     }
@@ -160,6 +160,7 @@ class KeyValueTable extends PublicPrivate {
     monitor(verbose) {
         /*
         Add a monitor for each transport - note this means if multiple transports support it, then will get duplicate events back if everyone else is notifying all of them.
+        Note monitor() is synchronous, so it cant do asynchronous things like connecting to the underlying transport
          */
         if (verbose) console.log("Monitoring", this.tablepublicurls);
         Dweb.Transports.monitor(this.tablepublicurls,

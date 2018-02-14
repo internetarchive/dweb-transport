@@ -1,4 +1,4 @@
-// Fake a browser like environment for some tests
+// Fake a browser like environment for some tests inc in Node CreateCustomEvent
 const jsdom = require("jsdom");
 const { JSDOM } = jsdom;        //TODO - figure out what this does, dont understand the Javascript
 htmlfake = '<!DOCTYPE html><ul><li id="myList.0">Failed to load sb via StructuredBlock</li><li id="myList.1">Failed to load mb via MutableBlock</li><li id="myList.2">Failed to load sb via dwebfile</li><li id="myList.3">Failed to load mb via dwebfile</li></ul>';
@@ -12,21 +12,18 @@ const Dweb = require('./Dweb');
  */
 
 
-// Utility packages (ours) Aand one-liners
+// Utility packages (ours) And one-liners
 //UNUSED: const makepromises = require('./utils/makepromises');
 function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { resolve(val); },ms)})}
 
 
 require('y-leveldb')(Dweb.TransportYJS.Y); //- can't be there for browser, node seems to find it ok without this, though not sure why, though its the cause of the warning: YJS: Please do not depend on automatic requiring of modules anymore! Extend modules as follows `require('y-modulename')(Y)`
 let verbose = false;
-let acl;
     // Note that this test setup is being mirror in test_ipfs.html
     // In general it should be possible to comment out failing tests EXCEPT where they provide a value to the next */
 
 async function p_test(verbose) {
     try {
-        //Comment out one of these next two lines
-        //let transportclass = Dweb.TransportIPFS;
         //SEE-OTHER-ADDTRANSPORT - note these are options just for testing that override default options for the transport.
         let opts = {
             http: {urlbase: "http://localhost:4244"},   // Localhost - comment out if want to use gateway.dweb.me (default args use this)
@@ -44,19 +41,16 @@ async function p_test(verbose) {
         if (verbose) console.log("setup returned and transport(s) set");
         await Dweb.Transports.test(verbose);
         if (verbose) console.log("Transports tested");
-        //TODO-KEYVALUE reenable these tests on http
-        await Dweb.KeyValueTable.p_test(verbose);
-        await Dweb.Domain.p_test(verbose);
-        console.log("---EXITING AFTER PARTIAL TEST") //TODO-KEYVALUE remove this and "return" once done
-        return
-
         await Dweb.Block.p_test(verbose);
         await Dweb.Signature.p_test(verbose);
         await Dweb.KeyPair.test(verbose);
         let res = await Dweb.AccessControlList.p_test(verbose);
-        acl = res.acl;
+        let acl = res.acl;
         await Dweb.VersionList.test(verbose);
         await Dweb.KeyChain.p_test(acl, verbose); // depends on VersionList for test, though not for KeyChain itself
+        await Dweb.KeyValueTable.p_test(verbose);
+        await Dweb.Domain.p_test(verbose);
+
         console.log("------END OF PREVIOUS TESTING PAUSING=====");
         await delay(1000);
         console.log("------AWAITED ANY BACKGROUND OUTPUT STARTING NEXT TEST =====");

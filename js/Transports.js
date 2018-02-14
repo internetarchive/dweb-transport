@@ -345,6 +345,15 @@ class Transports {
         return { privateurls: uuu.map(uu=>uu.privateurl), publicurls: uuu.map(uu=>uu.publicurl)};    // {privateurls: [ priv priv priv ], publicurls: [ pub pub pub ] }
     }
 
+    static async p_connection(urls, verbose) {
+        /*
+        Do any asynchronous connection opening work prior to potentially synchronous methods (like monitor)
+         */
+        await Promise.all(
+            this.validFor(urls, "connection")
+            .map(([u, t]) => t.p_connection(u, verbose)));
+    }
+
     static monitor(urls, cb, verbose) {
         /*
         Add a listmonitor for each transport - note this means if multiple transports support it, then will get duplicate events back if everyone else is notifying all of them.
@@ -352,8 +361,6 @@ class Transports {
         this.validFor(urls, "monitor")
             .map(([u, t]) => t.monitor(u, cb, verbose));
     }
-
-
 
     static addtransport(t) {
         /*

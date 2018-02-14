@@ -48,7 +48,7 @@ class TransportYJS extends Transport {
         this.name = "YJS";             // For console log etc
         this.supportURLs = ['yjs'];
         this.supportFunctions = ['fetch', 'add', 'list', 'listmonitor', 'newlisturls',
-            'get', 'set', 'getall', 'keys', 'newdatabase', 'newtable', 'monitor'];   // Only does list functions, Does not support reverse,
+            'connection', 'get', 'set', 'getall', 'keys', 'newdatabase', 'newtable', 'monitor'];   // Only does list functions, Does not support reverse,
         this.status = Dweb.Transport.STATUS_LOADED;
     }
 
@@ -85,11 +85,11 @@ class TransportYJS extends Transport {
         */
         return this.p__y(url, { share: {array: "Array"}}); // Copies options, ipfs will be set already
     }
-    async p__ymap(url, verbose) {
+    async p_connection(url, verbose) {
         /*
         Utility function to get Yarray for this URL and open a new connection if not already
         url:        URL string to find list of
-        resolves:   Y
+        resolves:   Y - a connection to use for get's etc.
         */
         return this.p__y(url, { share: {map: "Map"}}); // Copies options, ipfs will be set already
     }
@@ -249,7 +249,7 @@ class TransportYJS extends Transport {
     }
 
     async p_set(url, keyvalues, value, verbose) {  // url = yjs:/yjs/database/table/key   //TODO-KEYVALUE-API
-        let y = await this.p__ymap(url, verbose);
+        let y = await this.p_connection(url, verbose);
         if (typeof keyvalues === "string") {
             y.share.map.set(keyvalues, JSON.stringify(value));
         } else {
@@ -265,30 +265,29 @@ class TransportYJS extends Transport {
             }, {});
         } else {
             let val = y.share.map.get(keys);
-            return typeof val === "string" ? JSON.parse(val) : val;  // Surprisingly this is sync, the p__ymap should have synchronised
+            return typeof val === "string" ? JSON.parse(val) : val;  // Surprisingly this is sync, the p_connection should have synchronised
         }
     }
     async p_get(url, keys, verbose) {  //TODO-KEYVALUE-API - return dict or single
-        let y = await this.p__ymap(url, verbose);
-        return this._p_get(y, keys);
+        return this._p_get(await this.p_connection(url, verbose), keys);
     }
 
     async p_delete(url, keys, verbose) {  //TODO-KEYVALUE-API
-        let y = await this.p__ymap(url, verbose);
+        let y = await this.p_connection(url, verbose);
         if (typeof keys === "string") {
             y.share.map.delete(keys);
         } else {
-            keys.map((key) => y.share.map.delete(key));  // Surprisingly this is sync, the p__ymap should have synchronised
+            keys.map((key) => y.share.map.delete(key));  // Surprisingly this is sync, the p_connection should have synchronised
         }
     }
 
     async p_keys(url, verbose) {
-        let y = await this.p__ymap(url, verbose);
-        return y.share.map.keys();   // Surprisingly this is sync, the p__ymap should have synchronised
+        let y = await this.p_connection(url, verbose);
+        return y.share.map.keys();   // Surprisingly this is sync, the p_connection should have synchronised
     }
     async p_getall(url, verbose) {
-        let y = await this.p__ymap(url, verbose);
-        let keys = y.share.map.keys();   // Surprisingly this is sync, the p__ymap should have synchronised
+        let y = await this.p_connection(url, verbose);
+        let keys = y.share.map.keys();   // Surprisingly this is sync, the p_connection should have synchronised
         return this._p_get(y, keys);
     }
     async p_rawfetch(url, verbose) {
@@ -308,7 +307,9 @@ class TransportYJS extends Transport {
           */
         url = typeof url === "string" ? url : url.href;
         let y = this.yarrays[url];
-        console.assert(y,"Should always exist before calling monitor - async call p__yarray(url) to create");
+        if (!y) {
+            throw new Dweb.errors.CodingError("Should always exist before calling monitor - async call p__yarray(url) to create");
+        }
         y.share.map.observe((event) => {
             if (['add','update'].includes(event.type)) { // Currently ignoring deletions.
                 if (verbose) console.log("YJS monitor:", url, event.type, event.name, event.value);

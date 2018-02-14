@@ -7,3 +7,4 @@ dbtestjs
 .cache
 archive_minchanges/build
 archive/node_modules
+leveldb_dweb

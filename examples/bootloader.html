@@ -25,20 +25,14 @@
             document.write("Unable to bootstrap ",url.href, " unrecognized pattern");
             return;
         }
-        console.log("Name to lookup=",name)
+        console.log("Name to lookup=",name);
         document.write("Resolving name: ",name,"<BR>");   // Appears after loading
         document.write("Connecting to decentralized transports","<BR>");
         document.write('<div><ul id="transportstatuses"><li class="template vertical_li" onclick="transportclick(this);"><span name="name"></span></li></ul></div>');
         await p_connect();
-        //arcdomainpubkey="NACL VERIFY:sJCrB-wHFTNrLzxKZW4K9rjkY9MFmBcV2kejZQWPfEQ="; //TODO-BOOTSTRAP check this is on gateway (vi Domainjs.setuponce)
-        //gateway="http://localhost:4244";    //TODO-BOOTSTRAP testing locally - move
-        //arctables=[`${gateway}/getall/table/${arcdomainpubkey}/domains`]; //TODO-BOOTSTRAP add YJS
-        //arcdomain = await Dweb.Domain.p_new({ fullname:"/arc", keys: [arcdomainpubkey], tablepublicurls: arctables}, false, null, verbose);
-        //console.log("XXX@35 arcdomain=",arcdomain)
-        //arc2domain = await Dweb.SmartDict.p_fetch(['contenthash:/contenthash/QmbwzJwT2gjrgYbraCweSAYWWh1y8r3ytDjgpP9k7Tcrkn']); //TODO-BOOTSTRAP add IPFS
-        //console.log("XXX@35 arc2domain=",arc2domain);
-        //Dweb.Domain.root = await Dweb.Domain.p_new({ fullname:"", _map: {arc: arcdomain }}, false, null, verbose);
-        rootpublicurls = ["contenthash:/contenthash/QmYkEUngJ4eCdkQXBkU5qjBvwHp5Tyr6ZCfErCSah8BWXn"];
+        // This is our root - not necessarily a global one,
+        rootpublicurls = [ 'ipfs:/ipfs/zdpuAp5dg6LphYwebkqGqqebhgLgxW26VAxe76k68D7dVa1oa',
+            'contenthash:/contenthash/QmPxMb15iFcCiCnx6oWu6JJdNnwiqNkb5PVoAjbMBCAWLA' ];
         Dweb.Domain.root = await Dweb.SmartDict.p_fetch(rootpublicurls);
             /*
             fullname: "",   // Root is "" so that [fullname,name].join('/' is consistent for next level.

@@ -278,7 +278,8 @@ class Domain extends KeyValueTable {
         Domain.root = await Domain.p_new({_acl: kc, fullname: ""}, true, {passphrase: pass+"/"}, verbose);   //TODO-NAME will need a secure root key
         // /arc domain points at our top level resolver.
         //p_new should add registrars at whichever compliant transports are connected (YJS, HTTP)
-        console.log("Domain.root publicurls=",Domain.root._publicurls);
+        const testing = Domain.root.tablepublicurls.map(u => u.includes("localhost")).includes(true);
+        console.log("Domain.root publicurls for",testing ? "testing:" : "inclusion in bootloader.html:",Domain.root._publicurls);
         const arcDomain = await Domain.p_new({_acl: kc},true, {passphrase: pass+"/arc"});
         await Domain.root.p_register("arc", arcDomain, verbose);
         const archiveOrgDomain = await Domain.p_new({_acl: kc}, true, {passphrase: pass+"/arc/archive.org"});
@@ -290,7 +291,8 @@ class Domain extends KeyValueTable {
         //Lazy gateway is going to have to be at e.g. https://dweb.me/name/archiveid?key=commute"
         archiveOrgMetadata.tablepublicurls.push(metadatagateway);
         await archiveOrgDomain.p_register("metadata", archiveOrgMetadata, verbose);
-        await Domain.root.p_resolve("arc/archive.org/details", {verbose}); // Geta a Name -> HTML file, figure out how to bootstrap from that.
+        //await Domain.root.p_resolve("arc/archive.org/details", {verbose}); // Geta a Name -> HTML file, figure out how to bootstrap from that.
+        if (verbose) console.log(await Dweb.Domain.root.p_printable());
     }
 
 
@@ -336,7 +338,8 @@ class Domain extends KeyValueTable {
             if (verbose) console.log(await Domain.root.p_printable());
             //TODO-NAME build some more failure cases (bad key, bad fullname)
             //TODO-NAME try resolving on other machine
-            await this.p_setupOnce(verbose);
+            // Commented out as should run under setup.js with correct transports
+            // await this.p_setupOnce(verbose);
 
             verbose=true;
             if (verbose) console.log("Next line should attempt to find in metadata table *YJS or HTTP) then try name/archiveid?key=commute");
