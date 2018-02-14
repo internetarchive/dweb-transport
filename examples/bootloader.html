@@ -23,6 +23,7 @@
         } else {
             console.error("Unable to bootstrap",url.href, "unrecognized pattern");
             document.write("Unable to bootstrap ",url.href, " unrecognized pattern");
+            return;
         }
         console.log("Name to lookup=",name)
         document.write("Resolving name: ",name,"<BR>");   // Appears after loading
