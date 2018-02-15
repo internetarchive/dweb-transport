@@ -23,8 +23,8 @@ export default class Audio extends AV {
         this.setupPlaylist();
         return (
             <div id="theatre-ia-wrap" class="container container-ia width-max ">
-                <link itemprop="url" href={detailsurl}/>
-                <link itemprop="image" href={imgurl}/>
+                <link itemprop="url" href={detailsurl}/>{/*Link to archive.org directly*/}
+                <link itemprop="image" href={imgurl}/>{/*Its unclear how/if this is used*/}
 
                 {/* TODO-AUDIO Loop over tracks - has ogg and mp3 tracks here */}
                 {/*Example

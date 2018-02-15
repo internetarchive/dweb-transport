@@ -193,6 +193,7 @@ export default class Details extends ArchiveBase {
     }
     embed() {
         // Same on text, video, image
+        // Note this shortEmbedURL is just displayed in a form used to explain how to embed, its not actually called from dweb code.
         let shortEmbedURL = `https://archive.org/stream/${this.itemid}?ui=embed`;    //Note on archive.org/details this is different from iframeURL and not clear if that is intentional
         return(
             <div>
@@ -232,17 +233,17 @@ export default class Details extends ArchiveBase {
             //TODO  Replace "a" with onclicks to download function on f
         let filesCount = item.files_count;
         let originalFilesCount = item.files.filter((f)=>f.source === "original").length+1; // Adds in Archive Bittorrent
-        let downloadURL = `https://archive.org/download/${itemid}`;
-        let compressURL = `https://archive.org/compress/${itemid}`;
-        let compressAllURL = `https://archive.org/compress/${itemid}/formats=JSON,METADATA,JPEG,ARCHIVE BITTORRENT,MUSICBRAINZ METADATA`;
+        let downloadURL = `https://archive.org/download/${itemid}`; //TODO-LINKS check direct link
+        let compressURL = `https://archive.org/compress/${itemid}`; //TODO-LINKS check direct link
+        let compressAllURL = `https://archive.org/compress/${itemid}/formats=JSON,METADATA,JPEG,ARCHIVE BITTORRENT,MUSICBRAINZ METADATA`;  //TODO-LINKS check direct link
         let collections = Array.isArray(metadata.collection) ? metadata.collection : [ metadata.collection ];
         let mediatype = metadata.mediatype;
         let iconochiveIcon="iconochive-"+mediatype;
         let contributor = metadata.contributor;
         let reviews = item.reviews;
-        let writeReviewsURL = `https://archive.org/write-review.php?identifier=${itemid}`;
-        let loginURL = "https://archive.org/account/login.php";
-        let bookmarksAddURL = `https://archive.org/bookmarks.php?add_bookmark=1&amp;mediatype=image&amp;identifier=${itemid}&amp;title=${title}`;
+        let writeReviewsURL = `https://archive.org/write-review.php?identifier=${itemid}`;  //TODO-LINKS check direct link
+        let loginURL = "https://archive.org/account/login.php"; //TODO-LINKS check direct link
+        let bookmarksAddURL = `https://archive.org/bookmarks.php?add_bookmark=1&amp;mediatype=image&amp;identifier=${itemid}&amp;title=${title}`; //TODO-LINKS check direct link
         let credits = metadata.credits;
         //TODO-DETAILS much of below doesn't work (yet)
         return (

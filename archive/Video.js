@@ -16,8 +16,8 @@ export default class Video extends AV {
     theatreIaWrap() {
         let item = this.item;
         let itemid = this.itemid;
-        let detailsurl = `https://archive.org/details/${itemid}`
-        let title = item.title
+        let detailsurl = `https://archive.org/details/${itemid}`;  {/*TODO-SERVICES-IMG get directly */}
+        let title = item.title;
         //let cfg  = {"aspectratio": 4/3 }; // Old version in Traceys code which was missign other parts of cfg below
         let cfg =    {"start":0,"embed":null,"so":false,"autoplay":false,"width":0,"height":0,"list_height":0,"audio":false,
             "responsive":true,"flash":false, "hide_list":true,

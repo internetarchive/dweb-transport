@@ -280,7 +280,8 @@ class Domain extends KeyValueTable {
             + (indentlevel >= maxindent) ? "..." : (await Promise.all((await this.p_keys()).map(k => this._map[k].p_printable({indent, indentlevel: indentlevel + 1, maxindent: maxindent})))).join('')
     }
     static async p_setupOnce({verbose=false} = {}) { //TODO-DOMAIN move to own file
-        const metadatagateway = 'http://localhost:4244/name/archiveid'; //TODO-BOOTSTRAP need to run this against main gateway
+        //const metadatagateway = 'http://localhost:4244/name/archiveid';
+        const metadatagateway = 'https://gateway.dweb.me/name/archiveid'; //TODO-BOOTSTRAP need to run this against main gateway
         const pass = "Replace this with something secret";
         const kc = await Dweb.KeyChain.p_new({name: "test_keychain kc"}, {passphrase: pass}, verbose);    //TODO-DOMAIN replace with secret passphrase
         Domain.root = await Domain.p_new({_acl: kc, fullname: ""}, true, {passphrase: pass+"/"}, verbose);   //TODO-NAME will need a secure root key

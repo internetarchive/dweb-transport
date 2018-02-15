@@ -15,16 +15,16 @@ export default class Texts extends Details {
     theatreIaWrap() {
         let item = this.item;
         let metadata = item.metadata;
-        let detailsURL = `https://archive.org/details/${this.itemid}`;  // Probably correct as archive.org/details since used as itemProp
-        let imageURL = `https://archive.org/services/img/${this.itemid}`;
+        let detailsURL = `https://archive.org/details/${this.itemid}`;  // Probably correct as archive.org/details since used as itemProp //TODO-LINKS check how used
+        let imageURL = `https://archive.org/services/img/${this.itemid}`; //TODO-SERVICES-IMG replace with Dweb download
         //TODO-DETAILS-DWEB use alternative URLS via IPFS
         //TODO-STREAM pass as stream
-        let streamURL = `https://archive.org/stream/${this.itemid}`; //{1992.Zandvoorts.Nieuwsblad}`; //TODO-TEXTS Cant find 2nd part of URL
+        let streamURL = `https://archive.org/stream/${this.itemid}`; //{1992.Zandvoorts.Nieuwsblad}`; //TODO-TEXTS Cant find 2nd part of URL //TODO-LINKS check how used
         //let streamURL = `https://archive.org/stream/${this.itemid}/1992.Zandvoorts.Nieuwsblad`;   // In archive.org but needs looking for this string in file names
         //let iframeURL = `${streamURL}?ui=embed#mode/2up`;   //This comes from Traceys code and works
-        let iframeURL = `${streamURL}?ui=embed`;   //This works and matches archive.org
-        let shortEmbedURL = `https://archive.org/stream/${this.itemid}?ui=embed`;    //Note on archive.org/details this is different from iframeURL and not clear if that is intentional
-        let helpURL = `https://archive.org/help/audio.php?identifier=${this.itemid}`;
+        let iframeURL = `${streamURL}?ui=embed`;   //This works and matches archive.org  //TODO-LINKS check how used
+        let shortEmbedURL = `https://archive.org/stream/${this.itemid}?ui=embed`;    //Note on archive.org/details this is different from iframeURL and not clear if that is intentional  //TODO-LINKS check how used
+        let helpURL = `https://archive.org/help/audio.php?identifier=${this.itemid}`;  //TODO-LINKS check how used
         return (
             <div id="theatre-ia-wrap" class="container container-ia width-max">
                 <link itemprop="url" href={detailsURL} />

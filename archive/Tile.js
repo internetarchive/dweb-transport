@@ -19,7 +19,7 @@ export default class Tile {
       <div className={classes} data-id={item.identifier}  key={item.identifier}>
         <a className="stealth" tabIndex="-1" onClick={`Nav.nav_details("${collection}");`}>
           <div className="item-parent">
-            <div className="item-parent-img"><img src={'https://archive.org/services/img/'+collection}/></div>
+            <div className="item-parent-img"><img src={'https://archive.org/services/img/'+collection}/></div> {/*TODO-SERVICES-IMG get directly */}
             <div className="item-parent-ttl">xxx parent title</div>
           </div>{/*.item-parent*/}
         </a>
@@ -34,7 +34,7 @@ export default class Tile {
           <div className="item-ttl C C2">
             <a onClick={`Nav.nav_details("${item.identifier}");`} title={item.title}>
               <div className="tile-img">
-                <img className="item-img" xxxstyle="height:180px" src={'https://archive.org/services/img/'+item.identifier}/>
+                <img className="item-img" xxxstyle="height:180px" src={'https://archive.org/services/img/'+item.identifier}/>  {/*TODO-SERVICES-IMG get directly */}
               </div>{/*.tile-img*/}
               <div className="ttl">
                 {item.title}
