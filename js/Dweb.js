@@ -43,11 +43,6 @@ exports.table2class = { // Each of these needs a constructor that takes data and
 exports.utils = {}; //utility functions
 exports.errors = require("./Errors");
 
-/* Only applicable to HTTP...
-    exports.dwebserver = 'localhost';
-    //exports.dwebserver = '192.168.1.156';
-    exports.dwebport = '4243';
-*/
 exports.keychains = [];
 exports.eventHandler = new exports.EventListenerHandler();
 

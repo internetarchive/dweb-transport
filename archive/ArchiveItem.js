@@ -50,17 +50,30 @@ export default class ArchiveItem { //extends SmartDict {  //TODO should extend S
         if (this.itemid && !this.item) {
             console.log('get metadata for ' + this.itemid);
             //this.item = await Util.fetch_json(`https://archive.org/metadata/${this.itemid}`);
-            let transports = Dweb.Transports.connectedNames().map(n => "transport="+n).join('&')
-            this.item = await Util.fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}?${transports}`);
+            const transports = Dweb.Transports.connectedNames().map(n => "transport="+n).join('&'); // Pass transports, as metadata (currently) much quicker if not using IPFS
+            /* OLD WAY VIA HTTP
+                this.item = await Util.fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}?${transports}`);
+            */
+            // Fetch via Domain record
+            const name = `arc/archive.org/metadata/${this.itemid}`;
+            const res = await Dweb.Domain.p_rootResolve(name, {verbose});     // [ Name object, remainder ]
+            //TODO-DOMAIN note p_resolve is faking signature verification on FAKEFAKEFAKE - will also need to error check that which currently causes exception
+            console.assert(res[0].fullname === "/"+name);
+            console.assert(!res[1]);
+            const m = await Dweb.Transportable.p_fetch(res[0].urls, verbose); // Using Transportable as its multiurl and might not be HTTP urls
+            if (verbose) console.log("Retrieved metadata");
+            console.assert(m.metadata.identifier === itemid);
+            this.item = m;
+
             this._listLoad();   // Load _list with ArchiveFile
         }
         if (this.query) {   // This is for Search, Collection and Home.
-            let url =
+            const url =
                 //`https://archive.org/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`; // Archive (CORS fail)
                 `https://gateway.dweb.me/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}&and[]=${this.and}`;
                 //`http://localhost:4244/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`; //Testing
             console.log(url);
-            let j = await Util.fetch_json(url);
+            const j = await Util.fetch_json(url);
             this.items = j.response.docs;
         }
         return this; // For chaining, but note will need to do an "await fetch"

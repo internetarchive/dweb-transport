@@ -223,7 +223,15 @@ class Domain extends KeyValueTable {
         return value;
     }
 
-
+    static async p_rootResolve(path, {verbose=false}={}) {
+        if (!this.root) {
+            //TODO-CONFIG put this (and other TODO-CONFIG into config file)
+            const rootpublicurls = ['ipfs:/ipfs/zdpuAp5dg6LphYwebkqGqqebhgLgxW26VAxe76k68D7dVa1oa',
+                'contenthash:/contenthash/QmPxMb15iFcCiCnx6oWu6JJdNnwiqNkb5PVoAjbMBCAWLA'];
+            this.root = await Dweb.SmartDict.p_fetch(rootpublicurls);
+        }
+        return this.root.p_resolve(path, {verbose});
+    }
     async p_resolve(path, {verbose=false}={}) { // Note merges verbose into options, makes more sense since both are optional
         /*
         Resolves a path, should resolve to the leaf
