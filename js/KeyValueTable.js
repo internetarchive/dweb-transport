@@ -30,9 +30,6 @@ class KeyValueTable extends PublicPrivate {
             // If we haven't explicitly set _autoset then set if it looks like we are a master with a table to connect to.
             this._autoset = this._master && this["tablepublicurls"] && this.tablepublicurls.length
         }
-        if (this.tablepublicurls && this.tablepublicurls.length) {
-            this.monitor(verbose);
-        }
         this._map = this._map || {};
     }
 
@@ -49,10 +46,6 @@ class KeyValueTable extends PublicPrivate {
             obj.tablepublicurls = res.privateurls;
             obj._autoset = true;
             await obj.p_store();
-        }
-        if (obj.tablepublicurls.length) {
-            await Dweb.Transports.p_connection(obj.tablepublicurls, verbose); // Asynchronously connect especially to YJS
-            obj.monitor(verbose);                                              // Synchronously setup monitor
         }
         return obj;
     }
@@ -161,6 +154,7 @@ class KeyValueTable extends PublicPrivate {
         /*
         Add a monitor for each transport - note this means if multiple transports support it, then will get duplicate events back if everyone else is notifying all of them.
         Note monitor() is synchronous, so it cant do asynchronous things like connecting to the underlying transport
+        Stack: KVT()|KVT.p_new => KVT.monitor => (a: Transports.monitor => YJS.monitor)(b: dispatchEvent)
          */
         if (verbose) console.log("Monitoring", this.tablepublicurls);
         Dweb.Transports.monitor(this.tablepublicurls,

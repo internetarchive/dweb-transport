@@ -238,6 +238,11 @@ class PublicPrivate extends SmartDict {
     }
 
     dispatchEvent(event) {
+        /* Called when event triggered by monitor or listmonitor
+           Stack: KVT()|KVT.p_new => KVT.monitor => (a: Transports.monitor => YJS.monitor)(b: dispatchEvent)
+         */
+
+
         console.log("PP.dispatchEvent", event);
         if (!(event.type in this._listeners)) return true;
         let stack = this._listeners[event.type];

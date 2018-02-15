@@ -299,10 +299,11 @@ class TransportYJS extends Transport {
     async monitor(url, callback, verbose) {
         /*
          Setup a callback called whenever an item is added to a list, typically it would be called immediately after a p_rawlist to get any more items not returned by p_rawlist.
+         Stack: KVT()|KVT.p_new => KVT.monitor => (a: Transports.monitor => YJS.monitor)(b: dispatchEvent)
 
          :param url:         string Identifier of list (as used by p_rawlist and "signedby" parameter of p_rawadd
-         :param callback:    function(obj)  Callback for each new item added to the list
-                    obj is same format as p_rawlist or p_rawreverse
+         :param callback:    function({type, key, value})  Callback for each new item added to the list
+
          :param verbose:     boolean - true for debugging output
           */
         url = typeof url === "string" ? url : url.href;

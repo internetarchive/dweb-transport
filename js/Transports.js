@@ -357,6 +357,7 @@ class Transports {
     static monitor(urls, cb, verbose) {
         /*
         Add a listmonitor for each transport - note this means if multiple transports support it, then will get duplicate events back if everyone else is notifying all of them.
+        Stack: KVT()|KVT.p_new => KVT.monitor => (a: Transports.monitor => YJS.monitor)(b: dispatchEvent)
          */
         this.validFor(urls, "monitor")
             .map(([u, t]) => t.monitor(u, cb, verbose));
