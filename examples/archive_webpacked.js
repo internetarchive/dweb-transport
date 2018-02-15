@@ -1993,7 +1993,7 @@ function isnan (val) {
   return val !== val // eslint-disable-line no-self-compare
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(8)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(6)))
 
 /***/ }),
 /* 4 */
@@ -2410,6 +2410,163 @@ process.umask = function() { return 0; };
 
 /***/ }),
 /* 6 */
+/***/ (function(module, exports) {
+
+var g;
+
+// This works in non-strict mode
+g = (function() {
+	return this;
+})();
+
+try {
+	// This works if eval is allowed (see CSP)
+	g = g || Function("return this")() || (1,eval)("this");
+} catch(e) {
+	// This works if the window reference is available
+	if(typeof window === "object")
+		g = window;
+}
+
+// g can still be undefined, but nothing to do about it...
+// We return undefined, instead of nothing here, so it's
+// easier to handle this case. if(!global) { ...}
+
+module.exports = g;
+
+
+/***/ }),
+/* 7 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+// a duplex stream is just a stream that is both readable and writable.
+// Since JS doesn't have multiple prototypal inheritance, this class
+// prototypally inherits from Readable, and then parasitically from
+// Writable.
+
+
+
+/*<replacement>*/
+
+var processNextTick = __webpack_require__(11);
+/*</replacement>*/
+
+/*<replacement>*/
+var objectKeys = Object.keys || function (obj) {
+  var keys = [];
+  for (var key in obj) {
+    keys.push(key);
+  }return keys;
+};
+/*</replacement>*/
+
+module.exports = Duplex;
+
+/*<replacement>*/
+var util = __webpack_require__(9);
+util.inherits = __webpack_require__(2);
+/*</replacement>*/
+
+var Readable = __webpack_require__(19);
+var Writable = __webpack_require__(23);
+
+util.inherits(Duplex, Readable);
+
+var keys = objectKeys(Writable.prototype);
+for (var v = 0; v < keys.length; v++) {
+  var method = keys[v];
+  if (!Duplex.prototype[method]) Duplex.prototype[method] = Writable.prototype[method];
+}
+
+function Duplex(options) {
+  if (!(this instanceof Duplex)) return new Duplex(options);
+
+  Readable.call(this, options);
+  Writable.call(this, options);
+
+  if (options && options.readable === false) this.readable = false;
+
+  if (options && options.writable === false) this.writable = false;
+
+  this.allowHalfOpen = true;
+  if (options && options.allowHalfOpen === false) this.allowHalfOpen = false;
+
+  this.once('end', onend);
+}
+
+// the no-half-open enforcer
+function onend() {
+  // if we allow half-open state, or if the writable side ended,
+  // then we're ok.
+  if (this.allowHalfOpen || this._writableState.ended) return;
+
+  // no more data can be written.
+  // But allow more writes to happen in this tick.
+  processNextTick(onEndNT, this);
+}
+
+function onEndNT(self) {
+  self.end();
+}
+
+Object.defineProperty(Duplex.prototype, 'destroyed', {
+  get: function () {
+    if (this._readableState === undefined || this._writableState === undefined) {
+      return false;
+    }
+    return this._readableState.destroyed && this._writableState.destroyed;
+  },
+  set: function (value) {
+    // we ignore the value if the stream
+    // has not been initialized yet
+    if (this._readableState === undefined || this._writableState === undefined) {
+      return;
+    }
+
+    // backward compatibility, the user is explicitly
+    // managing destroyed
+    this._readableState.destroyed = value;
+    this._writableState.destroyed = value;
+  }
+});
+
+Duplex.prototype._destroy = function (err, cb) {
+  this.push(null);
+  this.end();
+
+  processNextTick(cb, err);
+};
+
+function forEach(xs, f) {
+  for (var i = 0, l = xs.length; i < l; i++) {
+    f(xs[i], i);
+  }
+}
+
+/***/ }),
+/* 8 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -2664,6 +2821,7 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
     }
     embed() {
         // Same on text, video, image
+        // Note this shortEmbedURL is just displayed in a form used to explain how to embed, its not actually called from dweb code.
         let shortEmbedURL = `https://archive.org/stream/${this.itemid}?ui=embed`; //Note on archive.org/details this is different from iframeURL and not clear if that is intentional
         return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
             'div',
@@ -2715,17 +2873,17 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
         //TODO  Replace "a" with onclicks to download function on f
         let filesCount = item.files_count;
         let originalFilesCount = item.files.filter(f => f.source === "original").length + 1; // Adds in Archive Bittorrent
-        let downloadURL = `https://archive.org/download/${itemid}`;
-        let compressURL = `https://archive.org/compress/${itemid}`;
-        let compressAllURL = `https://archive.org/compress/${itemid}/formats=JSON,METADATA,JPEG,ARCHIVE BITTORRENT,MUSICBRAINZ METADATA`;
+        let downloadURL = `https://archive.org/download/${itemid}`; //TODO-LINKS check direct link
+        let compressURL = `https://archive.org/compress/${itemid}`; //TODO-LINKS check direct link
+        let compressAllURL = `https://archive.org/compress/${itemid}/formats=JSON,METADATA,JPEG,ARCHIVE BITTORRENT,MUSICBRAINZ METADATA`; //TODO-LINKS check direct link
         let collections = Array.isArray(metadata.collection) ? metadata.collection : [metadata.collection];
         let mediatype = metadata.mediatype;
         let iconochiveIcon = "iconochive-" + mediatype;
         let contributor = metadata.contributor;
         let reviews = item.reviews;
-        let writeReviewsURL = `https://archive.org/write-review.php?identifier=${itemid}`;
-        let loginURL = "https://archive.org/account/login.php";
-        let bookmarksAddURL = `https://archive.org/bookmarks.php?add_bookmark=1&amp;mediatype=image&amp;identifier=${itemid}&amp;title=${title}`;
+        let writeReviewsURL = `https://archive.org/write-review.php?identifier=${itemid}`; //TODO-LINKS check direct link
+        let loginURL = "https://archive.org/account/login.php"; //TODO-LINKS check direct link
+        let bookmarksAddURL = `https://archive.org/bookmarks.php?add_bookmark=1&amp;mediatype=image&amp;identifier=${itemid}&amp;title=${title}`; //TODO-LINKS check direct link
         let credits = metadata.credits;
         //TODO-DETAILS much of below doesn't work (yet)
         return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
@@ -3266,163 +3424,6 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
     }
 }
 /* harmony export (immutable) */ __webpack_exports__["default"] = Details;
-
-
-/***/ }),
-/* 7 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-// a duplex stream is just a stream that is both readable and writable.
-// Since JS doesn't have multiple prototypal inheritance, this class
-// prototypally inherits from Readable, and then parasitically from
-// Writable.
-
-
-
-/*<replacement>*/
-
-var processNextTick = __webpack_require__(11);
-/*</replacement>*/
-
-/*<replacement>*/
-var objectKeys = Object.keys || function (obj) {
-  var keys = [];
-  for (var key in obj) {
-    keys.push(key);
-  }return keys;
-};
-/*</replacement>*/
-
-module.exports = Duplex;
-
-/*<replacement>*/
-var util = __webpack_require__(9);
-util.inherits = __webpack_require__(2);
-/*</replacement>*/
-
-var Readable = __webpack_require__(19);
-var Writable = __webpack_require__(23);
-
-util.inherits(Duplex, Readable);
-
-var keys = objectKeys(Writable.prototype);
-for (var v = 0; v < keys.length; v++) {
-  var method = keys[v];
-  if (!Duplex.prototype[method]) Duplex.prototype[method] = Writable.prototype[method];
-}
-
-function Duplex(options) {
-  if (!(this instanceof Duplex)) return new Duplex(options);
-
-  Readable.call(this, options);
-  Writable.call(this, options);
-
-  if (options && options.readable === false) this.readable = false;
-
-  if (options && options.writable === false) this.writable = false;
-
-  this.allowHalfOpen = true;
-  if (options && options.allowHalfOpen === false) this.allowHalfOpen = false;
-
-  this.once('end', onend);
-}
-
-// the no-half-open enforcer
-function onend() {
-  // if we allow half-open state, or if the writable side ended,
-  // then we're ok.
-  if (this.allowHalfOpen || this._writableState.ended) return;
-
-  // no more data can be written.
-  // But allow more writes to happen in this tick.
-  processNextTick(onEndNT, this);
-}
-
-function onEndNT(self) {
-  self.end();
-}
-
-Object.defineProperty(Duplex.prototype, 'destroyed', {
-  get: function () {
-    if (this._readableState === undefined || this._writableState === undefined) {
-      return false;
-    }
-    return this._readableState.destroyed && this._writableState.destroyed;
-  },
-  set: function (value) {
-    // we ignore the value if the stream
-    // has not been initialized yet
-    if (this._readableState === undefined || this._writableState === undefined) {
-      return;
-    }
-
-    // backward compatibility, the user is explicitly
-    // managing destroyed
-    this._readableState.destroyed = value;
-    this._writableState.destroyed = value;
-  }
-});
-
-Duplex.prototype._destroy = function (err, cb) {
-  this.push(null);
-  this.end();
-
-  processNextTick(cb, err);
-};
-
-function forEach(xs, f) {
-  for (var i = 0, l = xs.length; i < l; i++) {
-    f(xs[i], i);
-  }
-}
-
-/***/ }),
-/* 8 */
-/***/ (function(module, exports) {
-
-var g;
-
-// This works in non-strict mode
-g = (function() {
-	return this;
-})();
-
-try {
-	// This works if eval is allowed (see CSP)
-	g = g || Function("return this")() || (1,eval)("this");
-} catch(e) {
-	// This works if the window reference is available
-	if(typeof window === "object")
-		g = window;
-}
-
-// g can still be undefined, but nothing to do about it...
-// We return undefined, instead of nothing here, so it's
-// easier to handle this case. if(!global) { ...}
-
-module.exports = g;
 
 
 /***/ }),
@@ -4248,8 +4249,8 @@ class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default *
     banner() {
         // On Search "banner" is a search form
         let query = this.query;
-        let searchURL = `https://archive.org/advancedsearch.php?q={query}`;
-        let addBookmarkURL = `https://archive.org/bookmarks.php?add_bookmark=1&amp;mediatype=search&amp;identifier={query}&amp;title={query}`;
+        let searchURL = `https://archive.org/advancedsearch.php?q={query}`; //TODO-LINK check how used
+        let addBookmarkURL = `https://archive.org/bookmarks.php?add_bookmark=1&amp;mediatype=search&amp;identifier={query}&amp;title={query}`; //TODO-LINK check how used
         return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
             'div',
             { 'class': 'container container-ia width-max',
@@ -4284,6 +4285,7 @@ class Search extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default *
                                     action: 'https://archive.org/searchresults.php',
                                     'data-event-form-tracking': 'Search|SearchForm',
                                     'data-wayback-machine-search-url': 'https://web.archive.org/web/*/' },
+                                ' ',
                                 __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                                     'div',
                                     { 'class': 'form-group', style: 'position:relative' },
@@ -6200,7 +6202,7 @@ function indexOf(xs, x) {
   }
   return -1;
 }
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(8), __webpack_require__(5)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(6), __webpack_require__(5)))
 
 /***/ }),
 /* 20 */
@@ -6967,7 +6969,7 @@ Writable.prototype._destroy = function (err, cb) {
   this.end();
   cb(err);
 };
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5), __webpack_require__(40).setImmediate, __webpack_require__(8)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5), __webpack_require__(40).setImmediate, __webpack_require__(6)))
 
 /***/ }),
 /* 24 */
@@ -7543,7 +7545,7 @@ class ArchiveBase extends __WEBPACK_IMPORTED_MODULE_2__ArchiveItem__["a" /* defa
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Details__ = __webpack_require__(6);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Details__ = __webpack_require__(8);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
@@ -7575,7 +7577,7 @@ class AV extends __WEBPACK_IMPORTED_MODULE_2__Details__["default"] {
 
 //var React = require('react');
 //var ReactDOM = require('react-dom');
-var Details = __webpack_require__(6).default;
+var Details = __webpack_require__(8).default;
 var Search = __webpack_require__(14).default;
 var Nav = __webpack_require__(67).default;
 //window.Dweb = require('../js/Dweb');
@@ -8834,7 +8836,7 @@ module.exports = function () {
 /* 40 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var apply = Function.prototype.apply;
+/* WEBPACK VAR INJECTION */(function(global) {var apply = Function.prototype.apply;
 
 // DOM APIs, for completeness
 
@@ -8885,9 +8887,17 @@ exports._unrefActive = exports.active = function(item) {
 
 // setimmediate attaches itself to the global object
 __webpack_require__(41);
-exports.setImmediate = setImmediate;
-exports.clearImmediate = clearImmediate;
+// On some exotic environments, it's not clear which object `setimmeidate` was
+// able to install onto.  Search each possibility in the same order as the
+// `setimmediate` library.
+exports.setImmediate = (typeof self !== "undefined" && self.setImmediate) ||
+                       (typeof global !== "undefined" && global.setImmediate) ||
+                       (this && this.setImmediate);
+exports.clearImmediate = (typeof self !== "undefined" && self.clearImmediate) ||
+                         (typeof global !== "undefined" && global.clearImmediate) ||
+                         (this && this.clearImmediate);
 
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(6)))
 
 /***/ }),
 /* 41 */
@@ -9080,7 +9090,7 @@ exports.clearImmediate = clearImmediate;
     attachTo.clearImmediate = clearImmediate;
 }(typeof self === "undefined" ? typeof global === "undefined" ? this : global : self));
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(8), __webpack_require__(5)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(6), __webpack_require__(5)))
 
 /***/ }),
 /* 42 */
@@ -9154,7 +9164,7 @@ function config (name) {
   return String(val).toLowerCase() === 'true';
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(8)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(6)))
 
 /***/ }),
 /* 43 */
@@ -9816,6 +9826,10 @@ var eos = function(stream, opts, callback) {
 		callback.call(stream, exitCode ? new Error('exited with error code: ' + exitCode) : null);
 	};
 
+	var onerror = function(err) {
+		callback.call(stream, err);
+	};
+
 	var onclose = function() {
 		if (readable && !(rs && rs.ended)) return callback.call(stream, new Error('premature close'));
 		if (writable && !(ws && ws.ended)) return callback.call(stream, new Error('premature close'));
@@ -9839,7 +9853,7 @@ var eos = function(stream, opts, callback) {
 
 	stream.on('end', onend);
 	stream.on('finish', onfinish);
-	if (opts.error !== false) stream.on('error', callback);
+	if (opts.error !== false) stream.on('error', onerror);
 	stream.on('close', onclose);
 
 	return function() {
@@ -9852,7 +9866,7 @@ var eos = function(stream, opts, callback) {
 		stream.removeListener('finish', onfinish);
 		stream.removeListener('exit', onexit);
 		stream.removeListener('end', onend);
-		stream.removeListener('error', callback);
+		stream.removeListener('error', onerror);
 		stream.removeListener('close', onclose);
 	};
 };
@@ -12065,18 +12079,31 @@ class ArchiveItem {
         if (this.itemid && !this.item) {
             console.log('get metadata for ' + this.itemid);
             //this.item = await Util.fetch_json(`https://archive.org/metadata/${this.itemid}`);
-            let transports = Dweb.Transports.connectedNames().map(n => "transport=" + n).join('&');
-            this.item = await __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}?${transports}`);
+            const transports = Dweb.Transports.connectedNames().map(n => "transport=" + n).join('&'); // Pass transports, as metadata (currently) much quicker if not using IPFS
+            /* OLD WAY VIA HTTP
+                this.item = await Util.fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}?${transports}`);
+            */
+            // Fetch via Domain record
+            const name = `arc/archive.org/metadata/${this.itemid}`;
+            const res = await Dweb.Domain.p_rootResolve(name, { verbose }); // [ Name object, remainder ]
+            //TODO-DOMAIN note p_resolve is faking signature verification on FAKEFAKEFAKE - will also need to error check that which currently causes exception
+            console.assert(res[0].fullname === "/" + name);
+            console.assert(!res[1]);
+            const m = await Dweb.Transportable.p_fetch(res[0].urls, verbose); // Using Transportable as its multiurl and might not be HTTP urls
+            if (verbose) console.log("Retrieved metadata");
+            console.assert(m.metadata.identifier === itemid);
+            this.item = m;
+
             this._listLoad(); // Load _list with ArchiveFile
         }
         if (this.query) {
             // This is for Search, Collection and Home.
-            let url =
+            const url =
             //`https://archive.org/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`; // Archive (CORS fail)
             `https://gateway.dweb.me/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}&and[]=${this.and}`;
             //`http://localhost:4244/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`; //Testing
             console.log(url);
-            let j = await __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].fetch_json(url);
+            const j = await __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].fetch_json(url);
             this.items = j.response.docs;
         }
         return this; // For chaining, but note will need to do an "await fetch"
@@ -12123,6 +12150,7 @@ class Tile {
             { className: 'item-parent-img' },
             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { src: 'https://archive.org/services/img/' + collection })
           ),
+          ' ',
           __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
             'div',
             { className: 'item-parent-ttl' },
@@ -12156,7 +12184,8 @@ class Tile {
             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
               'div',
               { className: 'tile-img' },
-              __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { className: 'item-img', xxxstyle: 'height:180px', src: 'https://archive.org/services/img/' + item.identifier })
+              __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { className: 'item-img', xxxstyle: 'height:180px', src: 'https://archive.org/services/img/' + item.identifier }),
+              '  '
             ),
             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
               'div',
@@ -12279,11 +12308,12 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Search__ = __webpack_require__(14);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Details__ = __webpack_require__(6);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Details__ = __webpack_require__(8);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__Home__ = __webpack_require__(68);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__Collection__ = __webpack_require__(69);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__Texts__ = __webpack_require__(70);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__Image__ = __webpack_require__(71);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__Image___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_7__Image__);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__Audio__ = __webpack_require__(72);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_9__Video__ = __webpack_require__(73);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_10__DetailsError__ = __webpack_require__(74);
@@ -12544,7 +12574,7 @@ class Nav {
                         new __WEBPACK_IMPORTED_MODULE_6__Texts__["a" /* default */](itemid, item).render(res);
                         break;
                     case "image":
-                        new __WEBPACK_IMPORTED_MODULE_7__Image__["a" /* default */](itemid, item).render(res);
+                        new __WEBPACK_IMPORTED_MODULE_7__Image__["default"](itemid, item).render(res);
                         break;
                     case "audio":
                         // Intentionally drop thru to movies
@@ -12638,7 +12668,7 @@ class Collection extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
         const creator = item.metadata.creator && item.metadata.creator != item.metadata.title ? item.metadata.creator : '';
         //ARCHIVE-BROWSER note the elements below were converted to HTML 3 times in original version
         //TODO-DETAILS on prelinger, banner description is getting truncated.
-        let imgurl = 'https://archive.org/services/img/' + this.itemid; //TODO Dwebify - what is services/img
+        let imgurl = 'https://archive.org/services/img/' + this.itemid; //TODO-SERVICES-IMG Dwebify - what is services/img
         let description = this.preprocessDescription(item.metadata.description); // Contains HTML (supposedly safe) inserted via innerHTML thing
 
         return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
@@ -12703,7 +12733,7 @@ class Collection extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(6);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(8);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
@@ -12723,16 +12753,16 @@ class Texts extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
     theatreIaWrap() {
         let item = this.item;
         let metadata = item.metadata;
-        let detailsURL = `https://archive.org/details/${this.itemid}`; // Probably correct as archive.org/details since used as itemProp
-        let imageURL = `https://archive.org/services/img/${this.itemid}`;
+        let detailsURL = `https://archive.org/details/${this.itemid}`; // Probably correct as archive.org/details since used as itemProp //TODO-LINKS check how used
+        let imageURL = `https://archive.org/services/img/${this.itemid}`; //TODO-SERVICES-IMG replace with Dweb download
         //TODO-DETAILS-DWEB use alternative URLS via IPFS
         //TODO-STREAM pass as stream
-        let streamURL = `https://archive.org/stream/${this.itemid}`; //{1992.Zandvoorts.Nieuwsblad}`; //TODO-TEXTS Cant find 2nd part of URL
+        let streamURL = `https://archive.org/stream/${this.itemid}`; //{1992.Zandvoorts.Nieuwsblad}`; //TODO-TEXTS Cant find 2nd part of URL //TODO-LINKS check how used
         //let streamURL = `https://archive.org/stream/${this.itemid}/1992.Zandvoorts.Nieuwsblad`;   // In archive.org but needs looking for this string in file names
         //let iframeURL = `${streamURL}?ui=embed#mode/2up`;   //This comes from Traceys code and works
-        let iframeURL = `${streamURL}?ui=embed`; //This works and matches archive.org
-        let shortEmbedURL = `https://archive.org/stream/${this.itemid}?ui=embed`; //Note on archive.org/details this is different from iframeURL and not clear if that is intentional
-        let helpURL = `https://archive.org/help/audio.php?identifier=${this.itemid}`;
+        let iframeURL = `${streamURL}?ui=embed`; //This works and matches archive.org  //TODO-LINKS check how used
+        let shortEmbedURL = `https://archive.org/stream/${this.itemid}?ui=embed`; //Note on archive.org/details this is different from iframeURL and not clear if that is intentional  //TODO-LINKS check how used
+        let helpURL = `https://archive.org/help/audio.php?identifier=${this.itemid}`; //TODO-LINKS check how used
         return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
             'div',
             { id: 'theatre-ia-wrap', 'class': 'container container-ia width-max' },
@@ -12794,146 +12824,9 @@ class Texts extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
 
 /***/ }),
 /* 71 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
+/***/ (function(module, exports) {
 
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Util__ = __webpack_require__(4);
-__webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
-
-
-
-
-
-class Image extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
-    constructor(itemid, item) {
-        /*
-        Construct an Image object before rendering it to a HTML page
-        item = metadata from a metadata fetch
-         */
-        super(itemid, item);
-        this.itemtype = "http://schema.org/VisualArtwork";
-    }
-    archive_setup_push() {
-        archive_setup.push(function () {
-            // This is common to Text, AV and image - though some have stuff before this and some a
-            AJS.theatresize();
-            AJS.carouselsize('#ia-carousel', true);
-        });
-        super.archive_setup_push(); // On eample images the theatre & carosel came before the parts common to AV, Image and Text
-    }
-
-    theatreIaWrap() {
-        let item = this.item;
-        let itemid = item.metadata.identifier; // Shortcut as used a lot
-        let mainArchiveFile = this._list.find(fi => __WEBPACK_IMPORTED_MODULE_2__Util__["a" /* default */].imageFormats.includes(fi.metadata.format)); // Can be undefined if none included
-        let detailsURL = `https://archive.org/details/${itemid}`; //This is probably correct to remain pointed at archive.org since used as an itemprop
-        let embedurl = `https://archive.org/embed/${itemid}`; //This is probably correct to remain pointed at archive.org since passed to social media
-        return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-            'div',
-            { id: 'theatre-ia-wrap', className: 'container container-ia width-max  resized', style: { height: "600px" } },
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemProp: 'url', href: detailsURL }),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemProp: 'thumbnailUrl', href: 'https://archive.org/services/img/{itemid}' }),
-            item.files.filter(fi => fi.source !== "metadata").map(fi => //TODO-DETAILS-LIST Maybe use _list instead of .files
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemProp: 'associatedMedia', href: `https://archive.org/download/${itemid}/${fi.name}`, key: `${itemid}/${fi.name}` })),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'h1',
-                { className: 'sr-only' },
-                item.metadata.title
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'h2',
-                { className: 'sr-only' },
-                'Item Preview'
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                'div',
-                { id: 'theatre-ia', className: 'container' },
-                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                    'div',
-                    { className: 'row' },
-                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                        'div',
-                        { className: 'xs-col-12' },
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'theatre-controls' }),
-                        ' ',
-                        mainArchiveFile ? __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { className: 'details-carousel-wrapper' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'section',
-                                { id: 'ia-carousel', className: 'carousel slide', 'data-ride': 'carousel', 'data-interval': 'false',
-                                    'aria-label': 'Item image slideshow', style: { maxHeight: "600px" } },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'ol',
-                                    { className: 'carousel-indicators', style: { display: "none" } },
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('li', { 'data-target': '#ia-carousel', 'data-slide-to': '0', className: ' active', role: 'button', tabIndex: '0',
-                                        'aria-label': 'Go to image 1' })
-                                ),
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'div',
-                                    { className: 'carousel-inner' },
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'div',
-                                        { className: 'item active' },
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'a',
-                                            { className: 'carousel-image-wrapper',
-                                                href: `https://archive.org/download/${itemid}/${mainArchiveFile.metadata.name}`,
-                                                title: 'Open full sized image', target: '_blank' },
-                                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'streamContainer', src: mainArchiveFile, className: 'rot0 carousel-image', alt: 'item image #1' }),
-                                            ' '
-                                        ),
-                                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                            'div',
-                                            { className: 'carousel-caption' },
-                                            mainArchiveFile.metadata.name
-                                        )
-                                    )
-                                )
-                            )
-                        ) : __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                            'div',
-                            { className: 'row', style: { color: "white" } },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                'div',
-                                { className: 'col-md-10 col-md-offset-1 no-preview' },
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'p',
-                                    { className: 'theatre-title' },
-                                    'There Is No Preview Available For This Item'
-                                ),
-                                __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                    'p',
-                                    null,
-                                    'This item does not appear to have any files that can be experienced on Archive.org',
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'span',
-                                        { className: 'hidden-xs hidden-sm' },
-                                        'Please download files in this item to interact with them on your computer.'
-                                    ),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('br', null),
-                                    __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
-                                        'a',
-                                        { className: 'show-all', href: `https://archive.org/download/${itemid}`, target: '_blank' },
-                                        'Show all files'
-                                    )
-                                )
-                            )
-                        ),
-                        __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'webtorrentStats', style: 'color: white; text-align: center;' }),
-                        this.cherModal("audio")
-                    )
-                )
-            ),
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'flag-overlay', className: 'center-area ' })
-        );
-    }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = Image;
-
+throw new Error("Module build failed: SyntaxError: Unexpected token, expected ... (63:229)\n\n\u001b[0m \u001b[90m 61 | \u001b[39m                                        \u001b[33m<\u001b[39m\u001b[33mdiv\u001b[39m className\u001b[33m=\u001b[39m\u001b[32m\"item active\"\u001b[39m\u001b[33m>\u001b[39m\n \u001b[90m 62 | \u001b[39m                                            \u001b[33m<\u001b[39m\u001b[33ma\u001b[39m className\u001b[33m=\u001b[39m\u001b[32m\"carousel-image-wrapper\"\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 63 | \u001b[39m                                               href\u001b[33m=\u001b[39m{\u001b[32m`https://archive.org/download/${itemid}/${mainArchiveFile.metadata.name}`\u001b[39m} {\u001b[90m/*TODO-LINKS make download directly (we do this somewhere else already maybe in download side-bar)*/\u001b[39m}\n \u001b[90m    | \u001b[39m                                                                                                                                                                                                                                     \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 64 | \u001b[39m                                               title\u001b[33m=\u001b[39m\u001b[32m\"Open full sized image\"\u001b[39m target\u001b[33m=\u001b[39m\u001b[32m\"_blank\"\u001b[39m\u001b[33m>\u001b[39m{\u001b[90m/*--Separate window so dont break Dweb--*/\u001b[39m}\n \u001b[90m 65 | \u001b[39m                                                    \u001b[33m<\u001b[39m\u001b[33mdiv\u001b[39m id\u001b[33m=\u001b[39m\u001b[32m\"streamContainer\"\u001b[39m src\u001b[33m=\u001b[39m{mainArchiveFile} className\u001b[33m=\u001b[39m\u001b[32m\"rot0 carousel-image\"\u001b[39m alt\u001b[33m=\u001b[39m\u001b[32m\"item image #1\"\u001b[39m\u001b[35m/> {/\u001b[39m\u001b[33m*\u001b[39m\u001b[33m--\u001b[39m\u001b[33mNote\u001b[39m \u001b[36mthis\u001b[39m div not img to work around ffox bug\u001b[33m,\u001b[39m see \u001b[33mArchiveFile\u001b[39m\u001b[33m.\u001b[39mloadImg\u001b[33m--\u001b[39m\u001b[33m*\u001b[39m\u001b[33m/\u001b[39m}\n \u001b[90m 66 | \u001b[39m                                            \u001b[33m<\u001b[39m\u001b[33m/\u001b[39m\u001b[33ma\u001b[39m\u001b[33m>\u001b[39m\u001b[0m\n");
 
 /***/ }),
 /* 72 */
@@ -13071,7 +12964,7 @@ class Video extends __WEBPACK_IMPORTED_MODULE_1__AV__["a" /* default */] {
     theatreIaWrap() {
         let item = this.item;
         let itemid = this.itemid;
-        let detailsurl = `https://archive.org/details/${itemid}`;
+        let detailsurl = `https://archive.org/details/${itemid}`;{/*TODO-SERVICES-IMG get directly */}
         let title = item.title;
         //let cfg  = {"aspectratio": 4/3 }; // Old version in Traceys code which was missign other parts of cfg below
         let cfg = { "start": 0, "embed": null, "so": false, "autoplay": false, "width": 0, "height": 0, "list_height": 0, "audio": false,
@@ -13185,7 +13078,7 @@ class Video extends __WEBPACK_IMPORTED_MODULE_1__AV__["a" /* default */] {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(6);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(8);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
