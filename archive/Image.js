@@ -62,7 +62,7 @@ export default class Image extends Details {
                                             <a className="carousel-image-wrapper"
                                                href={`https://archive.org/download/${itemid}/${mainArchiveFile.metadata.name}`}
                                                title="Open full sized image" target="_blank">{/*--Separate window so dont break Dweb--*/}{/*TODO-LINKS make download directly (we do this somewhere else already maybe in download side-bar)*/}
-                                                    <div id="streamContainer" src={mainArchiveFile} className="rot0 carousel-image" alt="item image #1"/> {/*--Note this div not img to work around ffox bug, see ArchiveFile.loadImg--*/}
+                                                    <img src={mainArchiveFile} id="streamContainer" className="rot0 carousel-image" alt="item image #1"/> {/*--Note this div not img to work around ffox bug, see ArchiveFile.loadImg--*/}
                                             </a>
                                             <div className="carousel-caption">
                                                 {mainArchiveFile.metadata.name}

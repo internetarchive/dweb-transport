@@ -19,38 +19,18 @@ export default class ArchiveFile {
         this.itemid = itemid;
         this.metadata = metadata;
     }
-    async p_loadImg(jsx) {
-        /*
-        This is the asyncronous part of loadImg, runs in the background to update the image.
-        It gets a static (non stream) content and puts in an existing IMG tag.
 
-        Note it can't be inside load_img which has to be synchronous and return a jsx tree.
-         */
-        let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f=>!!f);   // Multiple potential sources elimate any empty
-        /*
-        //This method makes use of the full Dweb library, can get any kind of link, BUT doesnt work in Firefox, the image doesn't get rendered.
-        let blk = await  Dweb.Block.p_fetch(urls, verbose);  //Typically will be a Uint8Array
-        let blob = new Blob([blk._data], {type: Util.archiveMimeTypeFromFormat[this.metadata.format]}) // Works for data={Uint8Array|Blob}
-        // This next code is bizarre combination needed to open a blob from within an HTML window.
-        let objectURL = URL.createObjectURL(blob);
-        if (verbose) console.log("Blob URL=",objectURL);
-        //jsx.src = `http://archive.org/download/${this.itemid}/${this.metadata.name}`
-        jsx.src = objectURL;
-        */
-        console.log("Rendering");
-        var file = {
-            name: this.metadata.name,
-            createReadStream: function (opts) {
-                // Return a readable stream that provides the bytes between offsets "start"
-                // and "end" inclusive. This works just like fs.createReadStream(opts) from
-                // the node.js "fs" module.
-
-                return Dweb.Transports.createReadStream(urls, opts, verbose)
-            }
-        }
-
-        RenderMedia.append(file, jsx);  // Render into supplied element - have to use append, as render doesnt work
+    name() {
+        /* Name suitable for downloading etc */
+        return this.metadata.name;
     }
+    urls() {
+        /*
+        Return an array of URLs that might be a good place to get this item
+         */
+        return [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f => !!f);   // Multiple potential sources elimate any empty
+    }
+
     async p_download(a, options) {
         let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f=>!!f);   // Multiple potential sources elimate any empty
         let blk = await  Dweb.Block.p_fetch(urls, verbose);  //Typically will be a Uint8Array
@@ -69,7 +49,7 @@ export default class ArchiveFile {
 
     }
 
-    async p_loadStream(jsx) {
+    async p_loadStream(jsx, atts, childrenarr) {
         let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f=>!!f);   // Multiple potential sources
         var file = {
             name: this.metadata.name,
@@ -112,15 +92,9 @@ export default class ArchiveFile {
         }
 
     }
-    loadImg(jsx) {
+    loadStream(jsx) {   //TODO maybe move this into React like loadImg
         //asynchronously loads file from one of metadata, turns into blob, and stuffs into element
-        // Usage like  {this.loadImg(<img width=10>))
-        this.p_loadImg(jsx); /* Asynchronously load image*/
-        return jsx;
-    }
-    loadStream(jsx) {
-        //asynchronously loads file from one of metadata, turns into blob, and stuffs into element
-        // Usage like  {this.loadImg(<img width=10>))
+        // Usage like  {this.loadStream(<img width=10>))
         this.p_loadStream(jsx); /* Asynchronously load image*/
         return jsx;
     }

@@ -20,7 +20,7 @@ export default class Tile {
         <a className="stealth" tabIndex="-1" onClick={`Nav.nav_details("${collection}");`}>
           <div className="item-parent">
             <div className="item-parent-img"><img src={'https://archive.org/services/img/'+collection}/></div> {/*TODO-SERVICES-IMG get directly */}
-            <div className="item-parent-ttl">xxx parent title</div>
+            <div className="item-parent-ttl">  </div>{/*TODO Need to find collection name for each tile - do on gateway*/}
           </div>{/*.item-parent*/}
         </a>
 
@@ -34,7 +34,7 @@ export default class Tile {
           <div className="item-ttl C C2">
             <a onClick={`Nav.nav_details("${item.identifier}");`} title={item.title}>
               <div className="tile-img">
-                <img className="item-img" xxxstyle="height:180px" src={'https://archive.org/services/img/'+item.identifier}/>  {/*TODO-SERVICES-IMG get directly */}
+                <img className="item-img" xxxstyle="height:180px" src={'https://archive.org/services/img/'+item.identifier}/>  {/*TODO-SERVICES-IMG get directly unclear where height comes from*/}
               </div>{/*.tile-img*/}
               <div className="ttl">
                 {item.title}

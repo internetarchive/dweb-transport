@@ -48,7 +48,7 @@ export default class ArchiveItem { //extends SmartDict {  //TODO should extend S
             resolves to: this
          */
         if (this.itemid && !this.item) {
-            console.log('get metadata for ' + this.itemid);
+            console.group('getting metadata for ' + this.itemid);
             //this.item = await Util.fetch_json(`https://archive.org/metadata/${this.itemid}`);
             const transports = Dweb.Transports.connectedNamesParm(); // Pass transports, as metadata (currently) much quicker if not using IPFS
             /* OLD WAY VIA HTTP
@@ -61,14 +61,12 @@ export default class ArchiveItem { //extends SmartDict {  //TODO should extend S
             if (!res[0]) {
                 throw new Error(`Unable to resolve ${name}`);
             }
-            console.assert(res[0].fullname === "/"+name);
-            console.assert(!res[1]);
+            console.assert((res[0].fullname === "/"+name) && !res[1]);
             const m = await Dweb.Transportable.p_fetch(res[0].urls, verbose); // Using Transportable as its multiurl and might not be HTTP urls
-            if (verbose) console.log("Retrieved metadata");
             console.assert(m.metadata.identifier === this.itemid);
             this.item = m;
-
             this._listLoad();   // Load _list with ArchiveFile
+            if (verbose) console.groupEnd('getting metadata for ' + this.itemid);
         }
         if (this.query) {   // This is for Search, Collection and Home.
             const url =
