@@ -43,7 +43,7 @@ async function p_setup(verbose) {
         let t_yjs = await Dweb.TransportYJS.p_setup(opts, verbose);  await t_yjs.p_status(); // Should find ipfs transport
         let t_http = await Dweb.TransportHTTP.p_setup(opts, verbose); await t_http.p_status();
         //let t_webtorrent = await Dweb.TransportWEBTORRENT.p_test(opts, verbose); await t_webtorrent.p_status();
-        if (verbose) console.log("setup returned and transport(s) connected:",Dweb.Transports.connectedNames());
+        if (verbose) console.log("setup returned and transport(s) connected:", Dweb.Transports.connectedNames());
         await Dweb.Domain.p_setupOnce(verbose);
     } catch (err) {
         console.log("Test failed", err);

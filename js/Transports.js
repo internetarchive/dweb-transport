@@ -20,6 +20,9 @@ class Transports {
     static connectedNames() {
         return this._connected().map(t => t.name);
     }
+    static connectedNamesParm() {
+        return this.connectedNames().map(n => "transport="+n).join('&')
+    }
     static validFor(urls, func) {
         /*
         Finds an array or Transports that can support this URL.
@@ -372,7 +375,7 @@ class Transports {
 
     // Setup Transports - setup0 is called once, and should return quickly, p_setup1 and p_setup2 are asynchronous and p_setup2 relies on p_setup1 having resolved.
 
-    static setup0(transports, options, verbose) {
+    static setup0(transports, options, verbose) {   //TODO-API transports now an array
         /*
         Setup Transports for a range of classes
         transports is abbreviation HTTP, IPFS, LOCAL or list of them e.g. "HTTP,IPFS"
@@ -381,7 +384,6 @@ class Transports {
         returns array of transport instances
          */
         // "IPFS" or "IPFS,LOCAL,HTTP"
-        transports = transports.split(','); // [ "IPFS", "LOCAL", "HTTP" ]
         let localoptions = {http: {urlbase: "http://localhost:4244"}};
         return transports.map((tabbrev) => {
             let transportclass;

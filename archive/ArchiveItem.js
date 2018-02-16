@@ -44,13 +44,13 @@ export default class ArchiveItem { //extends SmartDict {  //TODO should extend S
             Goes through gateway.dweb.me so that we can work around a CORS issue (general approach & security questions confirmed with Sam!)
 
             this.itemid Archive Item identifier
-            throws: TypeError or Error if fails
+            throws: TypeError or Error if fails esp Unable to resolve name
             resolves to: this
          */
         if (this.itemid && !this.item) {
             console.log('get metadata for ' + this.itemid);
             //this.item = await Util.fetch_json(`https://archive.org/metadata/${this.itemid}`);
-            const transports = Dweb.Transports.connectedNames().map(n => "transport="+n).join('&'); // Pass transports, as metadata (currently) much quicker if not using IPFS
+            const transports = Dweb.Transports.connectedNamesParm(); // Pass transports, as metadata (currently) much quicker if not using IPFS
             /* OLD WAY VIA HTTP
                 this.item = await Util.fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}?${transports}`);
             */
@@ -58,11 +58,14 @@ export default class ArchiveItem { //extends SmartDict {  //TODO should extend S
             const name = `arc/archive.org/metadata/${this.itemid}`;
             const res = await Dweb.Domain.p_rootResolve(name, {verbose});     // [ Name object, remainder ]
             //TODO-DOMAIN note p_resolve is faking signature verification on FAKEFAKEFAKE - will also need to error check that which currently causes exception
+            if (!res[0]) {
+                throw new Error(`Unable to resolve ${name}`);
+            }
             console.assert(res[0].fullname === "/"+name);
             console.assert(!res[1]);
             const m = await Dweb.Transportable.p_fetch(res[0].urls, verbose); // Using Transportable as its multiurl and might not be HTTP urls
             if (verbose) console.log("Retrieved metadata");
-            console.assert(m.metadata.identifier === itemid);
+            console.assert(m.metadata.identifier === this.itemid);
             this.item = m;
 
             this._listLoad();   // Load _list with ArchiveFile

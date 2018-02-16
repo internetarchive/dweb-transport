@@ -198,17 +198,20 @@ function transportclick(el) { // Similar routines to this could display status, 
     t.togglePaused();
     refresh_transportstatuses("transportstatuses");
 }
-async function p_connect(options) {
+async function p_connect(options) { //TODO-API its defaulttransports
     /*
         This is a standardish starting process, feel free to copy and reuse !
-        options = { defaulttransport: "IPFS"; }
+        options = { defaulttransports: ["IPFS"]; }
      */
     if (verbose) console.group("p_connect ---");
     try {
         options = options || {};
         let setupoptions = {};
-        let transpparm = (searchparams.get("transport") || options.defaulttransport || "HTTP,IPFS,YJS,WEBTORRENT").toUpperCase();
-        let transports = Dweb.Transports.setup0(transpparm);
+        let tabbrevs = searchparams.getAll("transport");    // Array of transports
+        if (!tabbrevs.length) { tabbrevs = options.defaulttransports || [] }
+        if (!tabbrevs.length) { tabbrevs = ["HTTP", "YJS", "IPFS", "WEBTORRENT"]; }
+        tabbrevs = tabbrevs.map(n => n.toUpperCase());
+        let transports = Dweb.Transports.setup0(tabbrevs);
         replacetexts("transportstatuses", Dweb.Transports._transports);
         await Dweb.Transports.p_setup1(verbose);
         refresh_transportstatuses("transportstatuses"); // Update status for anything,

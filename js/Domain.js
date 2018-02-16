@@ -224,13 +224,17 @@ class Domain extends KeyValueTable {
     }
 
     static async p_rootResolve(path, {verbose=false}={}) {
+        console.group("Resolving:",path)
         if (!this.root) {
             //TODO-CONFIG put this (and other TODO-CONFIG into config file)
             const rootpublicurls = ['ipfs:/ipfs/zdpuAp5dg6LphYwebkqGqqebhgLgxW26VAxe76k68D7dVa1oa',
                 'contenthash:/contenthash/QmPxMb15iFcCiCnx6oWu6JJdNnwiqNkb5PVoAjbMBCAWLA'];
             this.root = await Dweb.SmartDict.p_fetch(rootpublicurls);
         }
-        return this.root.p_resolve(path, {verbose});
+        const res = this.root.p_resolve(path, {verbose});
+        console.groupEnd("Resolving:",path)
+        return res;
+
     }
     async p_resolve(path, {verbose=false}={}) { // Note merges verbose into options, makes more sense since both are optional
         /*
@@ -269,8 +273,8 @@ class Domain extends KeyValueTable {
             return await res.p_resolve(remainder.join('/'), {verbose});           // ===== Note recursion ====
             //TODO need other classes e.g. SD  etc to handle p_resolve as way to get path
         } else {
-            console.log("Unable to completely resolve",path,"in",this.fullname);
-            return undefined;
+            console.log("Unable to resolve",name,"in",this.fullname);
+            return [ undefined, path ];
         }
     }
 
