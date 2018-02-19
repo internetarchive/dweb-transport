@@ -57,6 +57,7 @@ class Transports {
         throws: TransportError with message being concatenated messages of transports if NONE of them succeed.
          */
         let tt = this.validFor(undefined, "store"); // Valid connected transports that support "store"
+        if (verbose) console.log("Valid for transports:", tt.map(([u,t]) => t.name))
         if (!tt.length) {
             throw new Dweb.errors.TransportError('Transports.p_rawstore: Cant find transport for store');
         }

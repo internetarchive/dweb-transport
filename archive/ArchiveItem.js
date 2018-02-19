@@ -48,7 +48,7 @@ export default class ArchiveItem { //extends SmartDict {  //TODO should extend S
             resolves to: this
          */
         if (this.itemid && !this.item) {
-            console.group('getting metadata for ' + this.itemid);
+            if (verbose) console.group('getting metadata for ' + this.itemid);
             //this.item = await Util.fetch_json(`https://archive.org/metadata/${this.itemid}`);
             const transports = Dweb.Transports.connectedNamesParm(); // Pass transports, as metadata (currently) much quicker if not using IPFS
             /* OLD WAY VIA HTTP

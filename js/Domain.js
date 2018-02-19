@@ -151,8 +151,11 @@ class Domain extends KeyValueTable {
             this.keys = [ this.keypair.signingexport()]
         }
     }
-    static async p_new(data, master, key, verbose, options) {
-        const obj = await super.p_new(data, master, key, verbose, {keyvaluetable: "domains"}); // Will default to call constructor
+    static async p_new(data, master, key, verbose, seedurls, kids) {
+        const obj = await super.p_new(data, master, key, verbose, {keyvaluetable: "domains", seedurls: seedurls}); // Will default to call constructor and p_store if master
+        for (let j in kids ) {
+            await obj.p_register(j, kids[j]);
+        }
         return obj;
     }
 
@@ -224,7 +227,7 @@ class Domain extends KeyValueTable {
     }
 
     static async p_rootResolve(path, {verbose=false}={}) {
-        console.group("Resolving:",path)
+        console.log("Resolving:",path)
         if (!this.root) {
             //TODO-CONFIG put this (and other TODO-CONFIG into config file)
             const rootpublicurls = ['ipfs:/ipfs/zdpuAp5dg6LphYwebkqGqqebhgLgxW26VAxe76k68D7dVa1oa',
@@ -232,7 +235,6 @@ class Domain extends KeyValueTable {
             this.root = await Dweb.SmartDict.p_fetch(rootpublicurls);
         }
         const res = this.root.p_resolve(path, {verbose});
-        console.groupEnd("Resolving:",path)
         return res;
 
     }
@@ -285,26 +287,23 @@ class Domain extends KeyValueTable {
     }
     static async p_setupOnce({verbose=false} = {}) { //TODO-DOMAIN move to own file
         //const metadatagateway = 'http://localhost:4244/name/archiveid';
-        const metadatagateway = 'https://gateway.dweb.me/name/archiveid'; //TODO-BOOTSTRAP need to run this against main gateway
+        const metadataGateway = 'https://gateway.dweb.me/name/archiveid'; //TODO-BOOTSTRAP need to run this against main gateway
         const pass = "Replace this with something secret";
         const kc = await Dweb.KeyChain.p_new({name: "test_keychain kc"}, {passphrase: pass}, verbose);    //TODO-DOMAIN replace with secret passphrase
-        Domain.root = await Domain.p_new({_acl: kc, fullname: ""}, true, {passphrase: pass+"/"}, verbose);   //TODO-NAME will need a secure root key
-        // /arc domain points at our top level resolver.
+        //TODO-DOMAIN add ipfs address and ideally ipns address to archiveOrgDetails record
         //p_new should add registrars at whichever compliant transports are connected (YJS, HTTP)
+        Domain.root = await Domain.p_new({_acl: kc, fullname: ""}, true, {passphrase: pass+"/"}, verbose, [], {   //TODO-NAME will need a secure root key
+            arc: await Domain.p_new({_acl: kc},true, {passphrase: pass+"/arc"}, verbose, [], { // /arc domain points at our top level resolver.
+                "archive.org": await Domain.p_new({_acl: kc}, true, {passphrase: pass+"/arc/archive.org"}, verbose, [], {
+                            "details": await Name.p_new({urls: ["https://dweb.me/examples/archive.html"], mimetype: "text/html",
+                                metadata: {htmlusesrelativeurls: true, htmlpath: "item"}}, verbose,[], {}),
+                            metadata: await Domain.p_new({_acl: kc}, true, {passphrase: pass+"/arc/archive.org/metadata"}, verbose, [metadataGateway], {})
+                            //Note I was seeing a lock error here, but cant repeat now - commenting out one of these last two lines seemed to clear it.
+                })
+            })
+        }); //root
         const testing = Domain.root.tablepublicurls.map(u => u.includes("localhost")).includes(true);
         console.log("Domain.root publicurls for",testing ? "testing:" : "inclusion in bootloader.html:",Domain.root._publicurls);
-        const arcDomain = await Domain.p_new({_acl: kc},true, {passphrase: pass+"/arc"});
-        await Domain.root.p_register("arc", arcDomain, verbose);
-        const archiveOrgDomain = await Domain.p_new({_acl: kc}, true, {passphrase: pass+"/arc/archive.org"});
-        await arcDomain.p_register("archive.org", archiveOrgDomain, verbose);
-        //TODO-DOMAIN add ipfs address and ideally ipns address to archiveOrgDetails record
-        const archiveOrgDetails = await Name.p_new({urls: ["https://dweb.me/examples/archive.html"], mimetype: "text/html", metadata: {htmlusesrelativeurls: true, htmlpath: "item"}}, verbose);
-        await archiveOrgDomain.p_register("details", archiveOrgDetails, verbose);
-        const archiveOrgMetadata = await Domain.p_new({_acl: kc}, true, {passphrase: pass+"/arc/archive.org/metadata"});
-        //Lazy gateway is going to have to be at e.g. https://dweb.me/name/archiveid?key=commute"
-        archiveOrgMetadata.tablepublicurls.push(metadatagateway);
-        await archiveOrgDomain.p_register("metadata", archiveOrgMetadata, verbose);
-        //await Domain.root.p_resolve("arc/archive.org/details", {verbose}); // Geta a Name -> HTML file, figure out how to bootstrap from that.
         if (verbose) console.log(await Dweb.Domain.root.p_printable());
     }
 

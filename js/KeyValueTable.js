@@ -33,17 +33,21 @@ class KeyValueTable extends PublicPrivate {
         this._map = this._map || {};
     }
 
-    static async p_new(data, master, key, verbose, options) {
+    static async p_new(data, master, key, verbose, options) { //TODO-API
         // p_fetch is standard via SmartDict - gets passed to TransportYJS etc which returns a dict which goes to constructor
-        // options: {keyvaluetable} Which table at the DB to store this in
+        // options: {
+        //  keyvaluetable   Which table at the DB to store this in
+        //  seedurls        extra urls to use for tablepublicurls, typically a http server
         const keyvaluetable = options.keyvaluetable;  // Dont store this, use it to generate newtable
         delete options.keyvaluetable;
+        const seedurls = options.seedurls || [];
+        delete options.seedurls;
         const obj = await super.p_new(data, master, key, verbose, options);
         // Should set this._autoset to true if and only if master && urls set in data or options
         if (master && !(obj.tablepublicurls && obj.tablepublicurls.length)) {
             const res = await Dweb.Transports.p_newtable(obj, keyvaluetable);
             obj.tableurls = res.privateurls;
-            obj.tablepublicurls = res.privateurls;
+            obj.tablepublicurls = res.publicurls.concat(seedurls);
             obj._autoset = true;
             await obj.p_store();
         }
@@ -99,7 +103,7 @@ class KeyValueTable extends PublicPrivate {
         // Subclased in Domain to avoid overwriting private version with public version from net
         //TODO-KEYVALUE these sets need to be signed
         if (this._autoset && !fromNet && (this._map[name] !== value)) {
-            Dweb.Transports.p_set(this.tableurls, name, this._storageFromMap(value, {publicOnly, encryptIfAcl}), verbose); // Note this is aync and not waiting for result
+            await Dweb.Transports.p_set(this.tableurls, name, this._storageFromMap(value, {publicOnly, encryptIfAcl}), verbose); // Note were not waiting for result but have to else hit locks
         }
         if (!((value instanceof Dweb.PublicPrivate) && this._map[name] && this._map[name]._master)) {
             // Dont overwrite the name:value pair if we already hold the master copy. This is needed for Domain, but probably generally useful
