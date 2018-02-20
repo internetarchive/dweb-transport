@@ -155,6 +155,13 @@ class TransportIPFS extends Transport {
         }
     }
 
+    static ipfsFrom(url) {
+        /*
+        Convert to a ipfspath i.e. /ipfs/Qm....
+        Required because of strange differences in APIs between files.cat and dag.get  see https://github.com/ipfs/js-ipfs/issues/1229
+         */
+        return (typeof(url) === "string" ? url : url.href).slice(5);
+    }
     async p_rawfetch(url, verbose) {
         /*
         Fetch some bytes based on a url of the form ipfs:/ipfs/Qm..... or ipfs:/ipfs/z....  .
@@ -171,7 +178,8 @@ class TransportIPFS extends Transport {
          */
         if (verbose) console.log("IPFS p_rawfetch", Dweb.utils.stringfrom(url));
         if (!url) throw new Dweb.errors.CodingError("TransportIPFS.p_rawfetch: requires url");
-        let cid = TransportIPFS.cidFrom(url);  // Throws TransportError if url bad
+        const cid = TransportIPFS.cidFrom(url);  // Throws TransportError if url bad
+        const ipfspath = TransportIPFS.ipfsFrom(url) // Need because dag.get has different requirement than file.cat
 
         try {
             let res = await this.ipfs.dag.get(cid);
@@ -187,8 +195,8 @@ class TransportIPFS extends Transport {
                 // as since we dont know if we are on node or browser best way is to try the files.cat and if it fails try the block to get an approximate file);
                 // Works on Node, but fails on Chrome, cant figure out how to get data from the DAGNode otherwise (its the wrong size)
                 //buff = await Dweb.utils.p_streamToBuffer(await this.ipfs.files.cat(cid), true); //js-ipfs v0.26 version
-                buff = await this.ipfs.files.cat(cid); //js-ipfs v0.27 version
-                /* Was only needed on v0.26
+                buff = await this.ipfs.files.cat(ipfspath); //See js-ipfs v0.27 version and  https://github.com/ipfs/js-ipfs/issues/1229 and https://github.com/ipfs/interface-ipfs-core/blob/master/SPEC/FILES.md#cat
+                /* Was needed on v0.26, not on v0.27
                 if (buff.length === 0) {    // Hit the Chrome bug
                     // This will get a file padded with ~14 bytes - 4 at front, 4 at end and cant find the other 6 !
                     // but it seems to work for PDFs which is what I'm testing on.

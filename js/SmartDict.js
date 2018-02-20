@@ -342,7 +342,7 @@ class SmartDict extends Transportable {
         try {
             if (verbose) console.log("SmartDict.p_fetch", urls);
             let data = await super.p_fetch(urls, verbose);  // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
-            let maybeencrypted = (typeof data === "string" || data instanceof Buffer) ? JSON.parse(data) : data;          // Parse JSON (dont parse if p_fetch has returned object (e.g. from KeyValueTable
+            let maybeencrypted = Dweb.utils.objectfrom(data);         // Parse JSON (dont parse if p_fetch has returned object (e.g. from KeyValueTable
             let decrypted = await this._after_fetch(maybeencrypted, urls, verbose);
             return decrypted;
             // Returns new object that should be a subclass of SmartDict

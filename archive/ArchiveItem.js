@@ -63,7 +63,8 @@ export default class ArchiveItem { //extends SmartDict {  //TODO should extend S
                 throw new Error(`Unable to resolve ${name}`);
             }
             console.assert((res[0].fullname === "/"+name) && !res[1]);
-            const m = await Dweb.Transportable.p_fetch(res[0].urls, verbose); // Using Transportable as its multiurl and might not be HTTP urls
+            let m = await Dweb.Transportable.p_fetch(res[0].urls, verbose); // Using Transportable as its multiurl and might not be HTTP urls
+            m = Dweb.utils.objectfrom(m);
             console.assert(m.metadata.identifier === this.itemid);
             this.item = m;
             this._listLoad();   // Load _list with ArchiveFile

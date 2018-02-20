@@ -124,6 +124,10 @@ exports.utils.stringfrom = function(foo, hints={}) {
         throw new Dweb.errors.CodingError(`Unable to turn ${foo} into a string ${err.message}`)
     }
 };
+exports.utils.objectfrom = function(data, hints={}) {
+    // Generic way to turn something into a object (typically expecting a string, or a buffer)
+    return (typeof data === "string" || data instanceof Buffer) ? JSON.parse(data) : data;
+}
 
 exports.objbrowser = function(el, {maxdepth=2, verbose=false}={}) {
     if (typeof el === 'string') el = document.getElementById(el);
