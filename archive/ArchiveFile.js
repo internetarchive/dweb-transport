@@ -24,15 +24,18 @@ export default class ArchiveFile {
         /* Name suitable for downloading etc */
         return this.metadata.name;
     }
-    urls() {
+    async p_urls() {
         /*
         Return an array of URLs that might be a good place to get this item
          */
+        if (!this.metadata.ipfs && Dweb.Transports.connectedNames().includes("IPFS")) {   // Connected to IPFS but dont have IPFS URL yet (not included by default because IPFS caching is slow)
+            this.metadata = await Util.fetch_json(`${Util.gateway.url_metadata}${this.itemid}/${this.metadata.name}`);
+        }
         return [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f => !!f);   // Multiple potential sources elimate any empty
     }
 
     async p_download(a, options) {
-        let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f=>!!f);   // Multiple potential sources elimate any empty
+        let urls = await this.p_urls()   // Multiple potential sources elimating any empty
         let blk = await  Dweb.Block.p_fetch(urls, verbose);  //Typically will be a Uint8Array
         let blob = new Blob([blk._data], {type: Util.archiveMimeTypeFromFormat[this.metadata.format]}) // Works for data={Uint8Array|Blob}
         let objectURL = URL.createObjectURL(blob);

@@ -31,6 +31,7 @@ export default class ArchiveItem { //extends SmartDict {  //TODO should extend S
     _listLoad() {
         /*
          After set this.item, load the _list with an array for ArchiveFile
+         Note that this metadata will be un-cached i.e. without in particular the IPFS link and possibly without contenthash link
         */
         this._list = (this.item && this.item.files )
             ? this.item.files.map((f) => new ArchiveFile({itemid: this.itemid, metadata: f})) // Allow methods on files of item

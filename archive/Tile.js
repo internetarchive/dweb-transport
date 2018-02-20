@@ -13,6 +13,7 @@ export default class Tile {
     const nFavorites = collections.filter(e => e.startsWith('fav-')).length;
     const is_collection = (item.mediatype === 'collection');
     const classes = 'item-ia' + (is_collection ? ' collection-ia' : '');
+    const imgname = item.identifier + ".PNG"; // Required since rendermedia doesnt know the filetype otherwise
     //ARCHIVE-BROWSER on browser, want to load links locally (via APIs) rather than rebuilding HTML page
       // ARCHIVE-BROWSER added key= to keep react happy (I hope)
       return (
@@ -34,7 +35,7 @@ export default class Tile {
           <div className="item-ttl C C2">
             <a onClick={`Nav.nav_details("${item.identifier}");`} title={item.title}>
               <div className="tile-img">
-                <img className="item-img" xxxstyle="height:180px" src={'https://archive.org/services/img/'+item.identifier}/>  {/*TODO-SERVICES-IMG get directly unclear where height comes from*/}
+                <img className="item-img" xxxstyle="height:180px" imgname={imgname} src={item.thumbnaillinks}/>  {/*TODO-SERVICES-IMG get directly unclear where height comes from*/}
               </div>{/*.tile-img*/}
               <div className="ttl">
                 {item.title}

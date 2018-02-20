@@ -25,6 +25,7 @@ function deletechildren(el, keeptemplate) { //Note same function in htmlutils
 }
 
 export default class React  {
+
     static async p_loadImg(jsx, name, urls, cb) {
         /*
         This is the asyncronous part of loadImg, runs in the background to update the image.
@@ -42,8 +43,12 @@ export default class React  {
         if (verbose) console.log("Blob URL=",objectURL);
         //jsx.src = `http://archive.org/download/${this.itemid}/${this.metadata.name}`
         jsx.src = objectURL;
+        //TODO-SERVICES-IMG make this get smart about kinds of urls e.g. if http or IPFS then skip the createstream and load the image
         */
         console.log("Rendering");
+        if (urls instanceof ArchiveFile) {
+            urls = await urls.p_urls();   // This could be slow, may have to get the gateway to cache the file in IPFS
+        }
         var file = {
             name: name,
             createReadStream: function (opts) {
@@ -60,11 +65,31 @@ export default class React  {
 
     static loadImg(name, urls, cb) {
         //asynchronously loads file from one of metadata, turns into blob, and stuffs into element
+        // urls can be a array of URLs of an ArchiveFile (which is passed as an ArchiveFile because ArchiveFile.p_urls() is async as may require expanding metadata
         // Usage like  {this.loadImg(<img width=10>))
         var element = document.createElement("div");
         this.p_loadImg(element, name, urls, cb); /* Asynchronously load image under element - note NOT awaiting return*/
         return element;
     }
+    static async p_loadImgByName(name, cb) {
+        // Load an image by resolving its name, this was tested but isnt currently used as including urls of thumbnails in metadata
+        //TODO-SERVICES-IMG this code might move elsewhere, since static it should be easy.
+        //TODO-SERVICES-IMG Note similar code in ArchiveItem.fetch to get metadata
+        if (verbose) console.log('getting image for',name); //Dont use console.group because happening in parallel
+        const transports = Dweb.Transports.connectedNamesParm(); // Pass transports, as metadata (currently) much quicker if not using IPFS
+        const res = await Dweb.Domain.p_rootResolve(name, {verbose});     // [ Name object, remainder ] //TODO-NAME see comments in p_rootResolve about FAKEFAKEFAKE
+        if (!(res[0] && (res[0].fullname === "/"+name) && !res[1] )) {
+            throw new Error(`Unable to resolve ${name}`);
+        }
+        el = this.loadImg(name, res[0].urls, cb);
+        return el;
+    }
+
+    /*
+    static async loadServicesImg(itemid, cb) {  //TODO-SERVICES-IMG we might never use this.
+        return loadImgByName(`/arc/archive.org/services/img/${itemid}`)
+    }
+    */
 
     static config(options) {
         /*
@@ -85,11 +110,28 @@ export default class React  {
         const kids = Array.prototype.slice.call(arguments).slice(2);
         
         function cb(err, element) {
+            if (err) {
+                console.log("Caught error in createElement callback in loadImg",err.message);
+                throw err;
+            }
+            //console.log("XXX@113",tag,attrs)
             React.buildoutElement(element, tag, attrs, kids);
         }
         if (tag === "img" && Object.keys(attrs).includes("src") && attrs["src"] instanceof ArchiveFile) {
             //Its an image loaded from an ArchiveFile, so wrap in a DIV and pass children and attrs to renderer
-            return this.loadImg(attrs["src"].name(), attrs["src"].urls(), cb);   //Creates a <div></div>, asynchronously creates an <img> under it and calls cb on that IMG. The <div> is returned immediately.
+            const af = attrs.src;
+            delete attrs.src;   // Make sure dont get passed to cb for building into img (which wont like an array)
+            return this.loadImg(af.name(), af, cb);   //Creates a <div></div>, asynchronously creates an <img> under it and calls cb on that IMG. The <div> is returned immediately.
+        } else if (tag === "img" && Object.keys(attrs).includes("src") && Array.isArray(attrs["src"])) {
+            const urls = attrs.src;
+            delete attrs.src;   // Make sure dont get passed to cb for building into img (which wont like an array)
+            return this.loadImg(attrs["imgname"] || "DummyName.PNG", urls, cb);   //Creates a <div></div>, asynchronously creates an <img> under it and calls cb on that IMG. The <div> is returned immediately.}
+        } else if (tag === "img" && Object.keys(attrs).includes("src") && (attrs["src"].startsWith('dweb:/arc') )) {
+            //TODO-SERVICES-IMG check this once called
+            const name = attrs["src"]
+                .replace('https://archive.org/','/arc/archive.org/')
+                .replace('dweb:/','');
+            return this.p_loadImgByName(name, cb);   //Creates a <div></div>, asynchronously creates an <img> under it and calls cb on that IMG. The <div> is returned immediately.
         } else {
             return this.buildoutElement(document.createElement(tag), tag, attrs, kids);
         }
@@ -113,9 +155,7 @@ export default class React  {
             }
             // Load ArchiveFile inside a div if specify in src
             //TODO - first fix this to use classes etc and replace a node, THEN expand to /service/img/xxx
-            if (["img.src"].includes(tag + "." + name) && attrs[name] instanceof ArchiveFile) {
-                //attrs[name].loadImg(element);
-            } else if (["video.src", "audio.src"].includes(tag + "." + name) && attrs[name] instanceof ArchiveFile) {
+            if (["video.src", "audio.src"].includes(tag + "." + name) && attrs[name] instanceof ArchiveFile) {
                 attrs[name].loadStream(element);
             } else if (["a.source"].includes(tag + "." + name) && attrs[name] instanceof ArchiveFile) {
                 element[name] = attrs[name];      // Store the ArchiveFile in the DOM, function e.g. onClick will access it.

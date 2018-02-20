@@ -283,7 +283,7 @@ class Domain extends KeyValueTable {
     async p_printable({indent="  ",indentlevel=0, maxindent=9}={}) {
         // Output something that can be displayed for debugging
         return `${indent.repeat(indentlevel)}${this.fullname} @ ${this.tablepublicurls.join(', ')}${this.expires ? " expires:"+this.expires : ""}\n`
-            + (indentlevel >= maxindent) ? "..." : (await Promise.all((await this.p_keys()).map(k => this._map[k].p_printable({indent, indentlevel: indentlevel + 1, maxindent: maxindent})))).join('')
+            + ((indentlevel >= maxindent) ? "..." : (await Promise.all((await this.p_keys()).map(k => this._map[k].p_printable({indent, indentlevel: indentlevel + 1, maxindent: maxindent})))).join(''))
     }
     static async p_setupOnce({verbose=false} = {}) { //TODO-DOMAIN move to own file
         //const metadatagateway = 'http://localhost:4244/name/archiveid';

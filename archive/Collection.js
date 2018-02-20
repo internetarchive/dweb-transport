@@ -13,13 +13,15 @@ export default class Collection extends Search {
     }
 
     banner() {
-        let item = this.item;
+        const item = this.item;
         //TODO-DETAILS probably move this to the Search class and trigger based on presence of "item" (which is missing for Searches.)
         const creator = (item.metadata.creator  &&  (item.metadata.creator != item.metadata.title) ? item.metadata.creator : '');
         //ARCHIVE-BROWSER note the elements below were converted to HTML 3 times in original version
         //TODO-DETAILS on prelinger, banner description is getting truncated.
-        let imgurl='https://archive.org/services/img/'+this.itemid; //TODO-SERVICES-IMG Dwebify - what is services/img
-        let description = this.preprocessDescription(item.metadata.description); // Contains HTML (supposedly safe) inserted via innerHTML thing
+        const imgurl='https://archive.org/services/img/'+this.itemid; //TODO-SERVICES-IMG
+        const description = this.preprocessDescription(item.metadata.description); // Contains HTML (supposedly safe) inserted via innerHTML thing
+        const thumbnaillinks = item.metadata.thumbnaillinks;
+        const imgname = this.itemid + ".PNG";   // Required or rendermedia has difficulty knowing what to render since it doesnt take a mimetype
 
         return (
             <div className="welcome container container-ia width-max" style={{'backgroundColor':'white'}}>
@@ -28,7 +30,7 @@ export default class Collection extends Search {
                         <div className="col-xs-11 col-sm-10 welcome-left">
                             <div id="file-dropper-wrap">
                                 <div id="file-dropper"></div>
-                                <img id="file-dropper-img" className="img-responsive" style={{'maxWidth':"350px", margin:'0 10px 5px 0'}} src={imgurl}/>
+                                <img id="file-dropper-img" className="img-responsive" style={{'maxWidth':"350px", margin:'0 10px 5px 0'}} imgname={imgname} src={thumbnaillinks}/>
                             </div>
                             <h1>{item.metadata.title}</h1>
                             <h4>{creator}</h4>
