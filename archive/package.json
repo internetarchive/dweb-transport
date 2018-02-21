@@ -25,7 +25,7 @@
     "node-fetch-npm": "^2.0.2",
     "prettier-bytes": "^1.0.4",
     "promisify-es6": "^1.0.3",
-    "render-media": "^2.10.0",
+    "render-media": "^2.11.0",
     "request": "^2.83.0",
     "sha3": "^1.2.0",
     "throttleit": "^1.0.0",
