@@ -71,6 +71,7 @@ export default class React  {
         this.p_loadImg(element, name, urls, cb); /* Asynchronously load image under element - note NOT awaiting return*/
         return element;
     }
+
     static async p_loadImgByName(name, cb) {
         // Load an image by resolving its name, this was tested but isnt currently used as including urls of thumbnails in metadata
         //TODO-SERVICES-IMG this code might move elsewhere, since static it should be easy.
@@ -85,11 +86,55 @@ export default class React  {
         return el;
     }
 
-    /*
-    static async loadServicesImg(itemid, cb) {  //TODO-SERVICES-IMG we might never use this.
-        return loadImgByName(`/arc/archive.org/services/img/${itemid}`)
+    static async p_loadStream(jsx, name, urls, cb) {
+        var file = {
+            name: name,
+            createReadStream: function (opts) {
+                // Return a readable stream that provides the bytes between offsets "start"
+                // and "end" inclusive. This works just like fs.createReadStream(opts) from
+                // the node.js "fs" module.
+
+                return Dweb.Transports.createReadStream(urls, opts, verbose)
+            }
+        }
+
+        RenderMedia.render(file, jsx, cb);  // Render into supplied element
+
+        if (window.WEBTORRENT_TORRENT) {
+            const torrent = window.WEBTORRENT_TORRENT
+
+            const updateSpeed = () => {
+                if (window.WEBTORRENT_TORRENT === torrent) {    // Check still displaying ours
+                    const webtorrentStats = document.querySelector('#webtorrentStats'); // Not moved into updateSpeed as not in document when this is run first time
+                    const els = (
+                        <span>
+                        <b>Peers:</b> {torrent.numPeers}{' '}
+                    <b>Progress:</b> {(100 * torrent.progress).toFixed(1)}%{' '}
+                    <b>Download speed:</b> {prettierBytes(torrent.downloadSpeed)}/s{' '}
+                <b>Upload speed:</b> {prettierBytes(torrent.uploadSpeed)}/s
+                    </span>
+                )
+                    if (webtorrentStats) {
+                        deletechildren(webtorrentStats);
+                        webtorrentStats.appendChild(els);
+                    }
+                }
+            }
+
+            torrent.on('download', throttle(updateSpeed, 250));
+            torrent.on('upload', throttle(updateSpeed, 250));
+            setInterval(updateSpeed, 1000)
+            updateSpeed(); //Do it once
+        }
+
     }
-    */
+    static loadStream(jsx, name, urls, cb) {   //TODO maybe move this into React like loadImg
+        //asynchronously loads file from one of metadata, turns into blob, and stuffs into element
+        // usage like <VIDEO src=<ArchiveFile instance>  >
+        this.p_loadStream(jsx, name, urls, cb); /* Asynchronously load image*/
+        return jsx;
+    }
+
 
     static config(options) {
         /*
@@ -154,9 +199,11 @@ export default class React  {
                 attrs[name] = React._config.root + attrs[name];  // e.g. /foo => https://bar.com/foo
             }
             // Load ArchiveFile inside a div if specify in src
-            //TODO - first fix this to use classes etc and replace a node, THEN expand to /service/img/xxx
             if (["video.src", "audio.src"].includes(tag + "." + name) && attrs[name] instanceof ArchiveFile) {
-                attrs[name].loadStream(element);
+                const af = attrs[name];
+                const videoname = this.metadata.name XXX THIS;
+                const urls = [af.metadata.ipfs, af.metadata.magnetlink, af.metadata.contenthash].filter(f=>!!f);   // Multiple potential sources, filter out nulls
+                this.loadStream(element, videoname, urls);  // Cues up asynchronously to load the video/audio tag
             } else if (["a.source"].includes(tag + "." + name) && attrs[name] instanceof ArchiveFile) {
                 element[name] = attrs[name];      // Store the ArchiveFile in the DOM, function e.g. onClick will access it.
             } else if (name && attrs.hasOwnProperty(name)) {

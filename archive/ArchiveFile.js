@@ -52,55 +52,6 @@ export default class ArchiveFile {
 
     }
 
-    async p_loadStream(jsx, atts, childrenarr) {
-        let urls = [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f=>!!f);   // Multiple potential sources
-        var file = {
-            name: this.metadata.name,
-            createReadStream: function (opts) {
-                // Return a readable stream that provides the bytes between offsets "start"
-                // and "end" inclusive. This works just like fs.createReadStream(opts) from
-                // the node.js "fs" module.
-
-                return Dweb.Transports.createReadStream(urls, opts, verbose)
-            }
-        }
-
-        RenderMedia.render(file, jsx);  // Render into supplied element
-
-        if (window.WEBTORRENT_TORRENT) {
-            const torrent = window.WEBTORRENT_TORRENT
-
-            const updateSpeed = () => {
-                if (window.WEBTORRENT_TORRENT === torrent) {    // Check still displaying ours
-                    const webtorrentStats = document.querySelector('#webtorrentStats'); // Not moved into updateSpeed as not in document when this is run first time
-                    const els = (
-                        <span>
-                        <b>Peers:</b> {torrent.numPeers}{' '}
-                        <b>Progress:</b> {(100 * torrent.progress).toFixed(1)}%{' '}
-                        <b>Download speed:</b> {prettierBytes(torrent.downloadSpeed)}/s{' '}
-                        <b>Upload speed:</b> {prettierBytes(torrent.uploadSpeed)}/s
-                        </span>
-                    )
-                    if (webtorrentStats) {
-                        deletechildren(webtorrentStats);
-                        webtorrentStats.appendChild(els);
-                    }
-                }
-            }
-
-            torrent.on('download', throttle(updateSpeed, 250));
-            torrent.on('upload', throttle(updateSpeed, 250));
-            setInterval(updateSpeed, 1000)
-            updateSpeed(); //Do it once
-        }
-
-    }
-    loadStream(jsx) {   //TODO maybe move this into React like loadImg
-        //asynchronously loads file from one of metadata, turns into blob, and stuffs into element
-        // Usage like  {this.loadStream(<img width=10>))
-        this.p_loadStream(jsx); /* Asynchronously load image*/
-        return jsx;
-    }
     downloadable() {
         return Object.keys(Util.downloadableFormats).includes(this.metadata.format)
     }
