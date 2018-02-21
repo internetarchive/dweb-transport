@@ -25,30 +25,17 @@
             document.write("Unable to bootstrap ",url.href, " unrecognized pattern");
             return;
         }
+        const search_supplied = url.search.slice(1); // Skip initial ?
         console.log("Name to lookup=",name);
         document.write("Resolving name: ",name,"<BR>");   // Appears after loading
         document.write("Connecting to decentralized transports","<BR>");
         document.write('<div><ul id="transportstatuses"><li class="template vertical_li" onclick="transportclick(this);"><span name="name"></span></li></ul></div>');
         await p_connect();
-        // This is our root - not necessarily a global one,
-        rootpublicurls = [ 'ipfs:/ipfs/zdpuAp5dg6LphYwebkqGqqebhgLgxW26VAxe76k68D7dVa1oa',
-            'contenthash:/contenthash/QmPxMb15iFcCiCnx6oWu6JJdNnwiqNkb5PVoAjbMBCAWLA' ];
-        Dweb.Domain.root = await Dweb.SmartDict.p_fetch(rootpublicurls);
-            /*
-            fullname: "",   // Root is "" so that [fullname,name].join('/' is consistent for next level.
-            keys: [],
-            signatures: [],    // TODO-NAME Root record itself needs signing - but by who (maybe /arc etc)
-            expires: undefined,
-            _acl: kc,
-            _map: undefined,   // May need to define this as an empty KVT
-        }, true, {passphrase: pass+"/"}, verbose);   //TODO-NAME will need a secure root key
-        */
-
         //TODO-BOOSTRAP - remove next couple of lines test
         //res = await Dweb.Domain.root.p_resolve("arc/archive.org/metadata/commute", {verbose});
         //console.log("Just checked resolves ok",res);
         try {
-            let res = await Dweb.Domain.root.p_resolve(name, {verbose});
+            let res = await Dweb.Domain.p_rootResolve(name, {verbose});
             let resolution = res[0];
             let remainder = res[1];
             opentarget="_self"; //TODO-BOOTSTRAP Use "_blank" when testing "_self" normally
@@ -60,7 +47,8 @@
                     while (tempurls.length) {
                         url = new URL(tempurls.shift())
                         try {
-                            url.search = url.search + (url.search ? '&' : "") + `${pathatt}=${remainder}`;
+                            if (remainder) url.search = url.search + (url.search ? '&' : "") + `${pathatt}=${remainder}`;
+                            if (search_supplied) url.search = url.search + (url.search ? '&' : "") + search_supplied;
                             if (verbose) console.log("Bootstrap loading url:", url.href);
                             window.open(url.href, opentarget); //if opentarget is blank then I think should end this script.
                             break; // Only try and open one

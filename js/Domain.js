@@ -232,7 +232,7 @@ class Domain extends KeyValueTable {
             //TODO-CONFIG put this (and other TODO-CONFIG into config file)
             const rootpublicurls = ['ipfs:/ipfs/zdpuAp5dg6LphYwebkqGqqebhgLgxW26VAxe76k68D7dVa1oa',
                 'contenthash:/contenthash/QmPxMb15iFcCiCnx6oWu6JJdNnwiqNkb5PVoAjbMBCAWLA'];
-            this.root = await Dweb.SmartDict.p_fetch(rootpublicurls);
+            this.root = await Dweb.SmartDict.p_fetch(rootpublicurls, verbose);
         }
         const res = this.root.p_resolve(path, {verbose});
         return res;
@@ -297,7 +297,9 @@ class Domain extends KeyValueTable {
                 "archive.org": await Domain.p_new({_acl: kc}, true, {passphrase: pass+"/arc/archive.org"}, verbose, [], {
                             "details": await Name.p_new({urls: ["https://dweb.me/examples/archive.html"], mimetype: "text/html",
                                 metadata: {htmlusesrelativeurls: true, htmlpath: "item"}}, verbose,[], {}),
-                            metadata: await Domain.p_new({_acl: kc}, true, {passphrase: pass+"/arc/archive.org/metadata"}, verbose, [metadataGateway], {})
+                            metadata: await Domain.p_new({_acl: kc}, true, {passphrase: pass+"/arc/archive.org/metadata"}, verbose, [metadataGateway], {}),
+                            "search.php": await Name.p_new({urls: ["https://dweb.me/examples/archive.html"], mimetype: "text/html",
+                                metadata: {htmlusesrelativeurls: true, htmlpath: "path"}}, verbose,[], {})
                             //Note I was seeing a lock error here, but cant repeat now - commenting out one of these last two lines seemed to clear it.
                 })
             })
