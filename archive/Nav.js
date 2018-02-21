@@ -88,7 +88,7 @@ export default class Nav { //extends React.Component
                     <span className="sr-only">search</span>
                   </a>
                   <div>
-                    <form role="search" onSubmit="Nav.nav_search(this.elements[0].value); return 0;" target="_top">
+                    <form role="search" onSubmit="Nav.nav_search(this.elements[0].value); return 0;">
                       <label htmlFor="search-bar-2" className="sr-only">Search the Archive</label>
                       <input id="search-bar-2" placeholder="Search" type="text" name="query" value=""/>
                       <input type="submit" value="Search"/>
@@ -155,7 +155,7 @@ static async factory(itemid, res, wanthistory=true) {
         console.group("Nav.factory",itemid);
         if (wanthistory) {
             let historystate = {itemid}; //TODO-HISTORY may want  to store verbose, transports etc here
-            history.pushState(historystate, `Internet Archive item ${itemid}`, `?item=${itemid}&verbose=${verbose}&${Dweb.Transports.connectedNamesParm()}`); //TODO-HISTORY need to save state of transports
+            history.pushState(historystate, `Internet Archive item ${itemid ? itemid : ""}`, `?${itemid ? "item="+itemid+"&" : ""}verbose=${verbose}&${Dweb.Transports.connectedNamesParm()}`); //TODO-HISTORY need to save state of transports
         }
         if (!itemid) {
             (await new Home(itemid, undefined).fetch()).render(res);
@@ -194,10 +194,10 @@ static async factory(itemid, res, wanthistory=true) {
 
 }
 window.onpopstate = function(event) {
-    console.log("XXX@popstate",document.location,"state=",event.state);
-    if (event.state.query) {
+    if (verbose) console.log("Popping state",document.location,"state=",event.state);
+    if (event.state && event.state.query) {
         Nav.nav_search(event.state.query, false)
-    } else if (event.state.itemid) {
+    } else if (event.state && event.state.itemid) {
         Nav.nav_details(event.state.itemid, false);
     } else {
         Nav.nav_home(false);
