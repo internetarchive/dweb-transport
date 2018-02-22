@@ -59,9 +59,9 @@ const NameMixin = function(options) {
     };
     return this;
 };
-class Name extends SmartDict {
+class Leaf extends SmartDict {
     /*
-        The Name class is used to register another object in a domain.
+        The Leaf class is used to register another object in a domain.
 
         Fields inherited from NameMixin: expires; fullname;
         urls: Points at object being named (for a Transportable object its obj._publicurls)
@@ -77,7 +77,7 @@ class Name extends SmartDict {
         super(data, verbose, options);
         this.nameConstructor();   //
         this.signatureConstructor(); // Initialize Signatures
-        this.table = 'name';
+        this.table = 'leaf';
         this.mimetype = this.mimetype || undefined;  // Mime type of object retrieved
         this.metadata = this.metadata || {};         // Other information about the object needed before or during retrieval
     }
@@ -107,14 +107,14 @@ class Name extends SmartDict {
                     let obj = await this._after_fetch(datajson, urls, verbose);   // Interpret as dweb - look at its "table" and possibly decrypt
                     return obj.p_resolve(path, {verbose: false});   // This wont work unless the object implements p_resolve (most dont)
                 } else {
-                    console.error("Name.p_resolve unknown type of JSON", this.mimetype);
-                    throw new Dweb.errors.ResolutionError(`Name.p_resolve unable to resolve path: ${path} in ${this.fullname} because jsontype ${this.metadata["jsontype"]} unrecognized`);
+                    console.error("Leaf.p_resolve unknown type of JSON", this.mimetype);
+                    throw new Dweb.errors.ResolutionError(`Leaf.p_resolve unable to resolve path: ${path} in ${this.fullname} because jsontype ${this.metadata["jsontype"]} unrecognized`);
                 }
             } else if (["text/html"].includes(this.mimetype) ) {
                 return [ this, path];
             } else {
-                console.error("Name.p_resolve, unknown mimetype", this.mimetype)
-                throw new Dweb.errors.ResolutionError(`Name.p_resolve unable to resolve path: ${path} in ${this.fullname} because mimetype ${this.mimetype} unrecognized`);
+                console.error("Leaf.p_resolve, unknown mimetype", this.mimetype)
+                throw new Dweb.errors.ResolutionError(`Leaf.p_resolve unable to resolve path: ${path} in ${this.fullname} because mimetype ${this.mimetype} unrecognized`);
             }
         } catch(err) {
             throw new Dweb.errors.ResolutionError(err.message);
@@ -122,14 +122,14 @@ class Name extends SmartDict {
     }
 
 }
-NameMixin.call(Name.prototype);
-SignatureMixin.call(Name.prototype, ["urls", "fullname", "expires"]);
+NameMixin.call(Leaf.prototype);
+SignatureMixin.call(Leaf.prototype, ["urls", "fullname", "expires"]);
 
 class Domain extends KeyValueTable {
     /*
     The Domain class is for name resolution across multiple technologies.
 
-    Domains are of the form Name:/arc/somedomain/somepath/somename
+    Domains are of the form /arc/somedomain/somepath/somename
 
     Where signed records at each level lead to the next level
 
@@ -175,20 +175,20 @@ class Domain extends KeyValueTable {
         //TODO-DOMAIN need to be cleverer about DOS, but at moment dont have failure case if KVT only accepts signed entries from table owner or verifies on retrieval.
         // Throws error if doesnt verify
         return subdomain._verifyOwnSigs().some(key => this.keys.includes(key))                       // Check valid sig by this
-            && ([this.fullname,name].join('/') === subdomain.fullname); // Check name matches
+            && ([this.fullname, name].join('/') === subdomain.fullname); // Check name matches
     }
 
     async p_register(name, registrable, verbose) {
         /*
         Register an object
         name:   What to register it under, relative to "this"
-        registrable:    Either a Domain or Name, or else something with _publicurls or _urls (i.e. after calling p_store) and it will be wrapped with a Name
+        registrable:    Either a Domain or Leaf, or else something with _publicurls or _urls (i.e. after calling p_store) and it will be wrapped with a Leaf
 
         Code path is domain.p_register -> domain.p_set
          */
-        if (!(registrable instanceof Domain || registrable instanceof Name)) {
-            // If it isnt a Domain or Name then build a name to point at it
-            registrable = await Name.p_new(registrable, verbose)
+        if (!(registrable instanceof Domain || registrable instanceof Leaf)) {
+            // If it isnt a Domain or Leaf then build a name to point at it
+            registrable = await Leaf.p_new(registrable, verbose)
         }
         registrable.fullname =  [this.fullname, name].join("/");    // Set fullname to be this path
         this.sign(registrable);
@@ -241,7 +241,7 @@ class Domain extends KeyValueTable {
     async p_resolve(path, {verbose=false}={}) { // Note merges verbose into options, makes more sense since both are optional
         /*
         Resolves a path, should resolve to the leaf
-        resolves to:    [ Name, remainder ]
+        resolves to:    [ Leaf, remainder ]
          */
 
         //TODO check for / at start, if so remove it and get root
@@ -286,8 +286,8 @@ class Domain extends KeyValueTable {
             + ((indentlevel >= maxindent) ? "..." : (await Promise.all((await this.p_keys()).map(k => this._map[k].p_printable({indent, indentlevel: indentlevel + 1, maxindent: maxindent})))).join(''))
     }
     static async p_setupOnce({verbose=false} = {}) { //TODO-DOMAIN move to own file
-        //const metadatagateway = 'http://localhost:4244/name/archiveid';
-        const metadataGateway = 'https://gateway.dweb.me/name/archiveid'; //TODO-BOOTSTRAP need to run this against main gateway
+        //const metadatagateway = 'http://localhost:4244/leaf/archiveid';
+        const metadataGateway = 'https://gateway.dweb.me/leaf/archiveid'; //TODO-BOOTSTRAP need to run this against main gateway
         const pass = "Replace this with something secret";
         const kc = await Dweb.KeyChain.p_new({name: "test_keychain kc"}, {passphrase: pass}, verbose);    //TODO-DOMAIN replace with secret passphrase
         //TODO-DOMAIN add ipfs address and ideally ipns address to archiveOrgDetails record
@@ -295,10 +295,10 @@ class Domain extends KeyValueTable {
         Domain.root = await Domain.p_new({_acl: kc, fullname: ""}, true, {passphrase: pass+"/"}, verbose, [], {   //TODO-NAME will need a secure root key
             arc: await Domain.p_new({_acl: kc},true, {passphrase: pass+"/arc"}, verbose, [], { // /arc domain points at our top level resolver.
                 "archive.org": await Domain.p_new({_acl: kc}, true, {passphrase: pass+"/arc/archive.org"}, verbose, [], {
-                            "details": await Name.p_new({urls: ["https://dweb.me/examples/archive.html"], mimetype: "text/html",
+                            "details": await Leaf.p_new({urls: ["https://dweb.me/examples/archive.html"], mimetype: "text/html",
                                 metadata: {htmlusesrelativeurls: true, htmlpath: "item"}}, verbose,[], {}),
                             metadata: await Domain.p_new({_acl: kc}, true, {passphrase: pass+"/arc/archive.org/metadata"}, verbose, [metadataGateway], {}),
-                            "search.php": await Name.p_new({urls: ["https://dweb.me/examples/archive.html"], mimetype: "text/html",
+                            "search.php": await Leaf.p_new({urls: ["https://dweb.me/examples/archive.html"], mimetype: "text/html",
                                 metadata: {htmlusesrelativeurls: true, htmlpath: "path"}}, verbose,[], {})
                             //Note I was seeing a lock error here, but cant repeat now - commenting out one of these last two lines seemed to clear it.
                 })
@@ -356,7 +356,7 @@ class Domain extends KeyValueTable {
             // await this.p_setupOnce(verbose);
 
             verbose=true;
-            if (verbose) console.log("Next line should attempt to find in metadata table *YJS or HTTP) then try name/archiveid?key=commute");
+            if (verbose) console.log("Next line should attempt to find in metadata table *YJS or HTTP) then try leaf/archiveid?key=commute");
             let itemid = "commute";
             let name = `arc/archive.org/metadata/${itemid}`;
             res = await Domain.root.p_resolve(name, {verbose});
@@ -388,6 +388,6 @@ class Domain extends KeyValueTable {
 NameMixin.call(Domain.prototype);   // Add in the Mixin
 SignatureMixin.call(Domain.prototype, ["tablepublicurls", "fullname", "keys", "expires"]);
 
-Domain.clsName = Name;  // Just So exports can find it and load into Dweb TODO move to own file
+Domain.clsLeaf = Leaf;  // Just So exports can find it and load into Dweb TODO move to own file
 
 exports = module.exports = Domain;

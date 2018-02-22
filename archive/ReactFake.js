@@ -96,7 +96,7 @@ export default class React  {
         //TODO-SERVICES-IMG Note similar code in ArchiveItem.fetch to get metadata
         if (verbose) console.log('getting image for',name); //Dont use console.group because happening in parallel
         const transports = Dweb.Transports.connectedNamesParm(); // Pass transports, as metadata (currently) much quicker if not using IPFS
-        const res = await Dweb.Domain.p_rootResolve(name, {verbose});     // [ Name object, remainder ] //TODO-NAME see comments in p_rootResolve about FAKEFAKEFAKE
+        const res = await Dweb.Domain.p_rootResolve(name, {verbose});     // [ Leaf object, remainder ] //TODO-NAME see comments in p_rootResolve about FAKEFAKEFAKE
         if (!(res[0] && (res[0].fullname === "/"+name) && !res[1] )) {
             throw new Error(`Unable to resolve ${name}`);
         }

@@ -35,17 +35,17 @@
         //res = await Dweb.Domain.root.p_resolve("arc/archive.org/metadata/commute", {verbose});
         //console.log("Just checked resolves ok",res);
         try {
-            let res = await Dweb.Domain.p_rootResolve(name, {verbose});
-            let resolution = res[0];
-            let remainder = res[1];
-            opentarget="_self"; //TODO-BOOTSTRAP Use "_blank" when testing "_self" normally
-            if ((resolution instanceof Dweb.Name) && ["text/html"].includes(resolution.mimetype)) {
+            const res = await Dweb.Domain.p_rootResolve(name, {verbose});
+            const resolution = res[0];
+            const remainder = res[1];
+            const opentarget="_self"; //TODO-BOOTSTRAP Use "_blank" when testing "_self" normally
+            if ((resolution instanceof Dweb.Leaf) && ["text/html"].includes(resolution.mimetype)) {
                 //Its an HTML file, open it (TODO-BOOTSTRAP see iterations in google doc)
                 if (resolution.metadata.htmlusesrelativeurls) {
                     let tempurls = resolution.urls;
-                    let pathatt = resolution.metadata.htmlpath || "path";
+                    const pathatt = resolution.metadata.htmlpath || "path";
                     while (tempurls.length) {
-                        url = new URL(tempurls.shift())
+                        url = new URL(tempurls.shift());
                         try {
                             if (remainder) url.search = url.search + (url.search ? '&' : "") + `${pathatt}=${remainder}`;
                             if (search_supplied) url.search = url.search + (url.search ? '&' : "") + search_supplied;

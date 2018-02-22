@@ -57,7 +57,7 @@ export default class ArchiveItem { //extends SmartDict {  //TODO should extend S
             */
             // Fetch via Domain record
             const name = `arc/archive.org/metadata/${this.itemid}`;
-            const res = await Dweb.Domain.p_rootResolve(name, {verbose});     // [ Name object, remainder ]
+            const res = await Dweb.Domain.p_rootResolve(name, {verbose});     // [ Leaf object, remainder ]
             //TODO-DOMAIN note p_resolve is faking signature verification on FAKEFAKEFAKE - will also need to error check that which currently causes exception
             if (!res[0]) {
                 throw new Error(`Unable to resolve ${name}`);
