@@ -129,7 +129,8 @@ export default class Util {
 /* === Configuration info ==== */
 Util.archiveMimeTypeFromFormat = {
         JPEG: "image/jpeg",
-        PNG: "image/png"
+        PNG: "image/png",
+        "h.264": "video/mp4"
     };   //TODO expand to other formats - see mimetypes list from petabox
 Util.imageFormats = ['JPEG', 'PNG'];     //TODO expand to other formats - see mimetypes list from petabox
 Util.downloadableFormats = {

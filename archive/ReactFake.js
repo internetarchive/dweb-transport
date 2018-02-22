@@ -8,6 +8,8 @@ This expanded in use to make it easier to use HTML in as unchanged form from exi
  */
 import RenderMedia from 'render-media';
 import ArchiveFile from "./ArchiveFile";
+import Util from "./Util";
+import from2 from "from2";
 
 function deletechildren(el, keeptemplate) { //Note same function in htmlutils
     /*
@@ -45,22 +47,38 @@ export default class React  {
         jsx.src = objectURL;
         //TODO-SERVICES-IMG make this get smart about kinds of urls e.g. if http or IPFS then skip the createstream and load the image
         */
-        console.log("Rendering");
+        if (verbose) console.log("Loading Image");
         if (urls instanceof ArchiveFile) {
             urls = await urls.p_urls();   // This could be slow, may have to get the gateway to cache the file in IPFS
         }
-        var file = {
-            name: name,
-            createReadStream: function (opts) {
-                // Return a readable stream that provides the bytes between offsets "start"
-                // and "end" inclusive. This works just like fs.createReadStream(opts) from
-                // the node.js "fs" module.
+        const validCreateReadStream = Dweb.Transports.validFor(urls, "createReadStream").length;
+        if (validCreateReadStream) {
 
-                return Dweb.Transports.createReadStream(urls, opts, verbose)
+            const file = {
+                name: name,
+                createReadStream: function (opts) {
+                    // Return a readable stream that provides the bytes between offsets "start"
+                    // and "end" inclusive. This works just like fs.createReadStream(opts) from
+                    // the node.js "fs" module.
+
+                    return Dweb.Transports.createReadStream(urls, opts, verbose)
+                }
             }
-        }
 
-        RenderMedia.append(file, jsx, cb);  // Render into supplied element - have to use append, as render doesnt work, the cb will set attributes and/or add children.
+            RenderMedia.append(file, jsx, cb);  // Render into supplied element - have to use append, as render doesnt work, the cb will set attributes and/or add children.
+        } else {
+            // Otherwise fetch the file, and pass via rendermedia and from2
+            const buff = await  Dweb.Transportable.p_fetch(urls, verbose);  //Typically will be a Uint8Array
+            if (verbose) console.log("Retrieved image size",buff.length);
+            const file = {
+                name: name,
+                createReadStream: function (opts) {
+                    if (!opts) opts = {}
+                    return from2([buff.slice(opts.start || 0, opts.end || (buff.length - 1))])
+                }
+            }
+            RenderMedia.append(file, jsx, cb);  // Render into supplied element - have to use append, as render doesnt work, the cb will set attributes and/or add children.
+        }
     }
 
     static loadImg(name, urls, cb) {
@@ -87,48 +105,74 @@ export default class React  {
     }
 
     static async p_loadStream(jsx, name, urls, cb) {
-        var file = {
-            name: name,
-            createReadStream: function (opts) {
-                // Return a readable stream that provides the bytes between offsets "start"
-                // and "end" inclusive. This works just like fs.createReadStream(opts) from
-                // the node.js "fs" module.
+        //More complex strategy. ....
+        //If the Transports supports urls/createReadStream (webtorrent only at this point) then load it.
+        //If its a HTTP URL use that
+        //Dont try and use IPFS till get a fix for createReadStream
 
-                return Dweb.Transports.createReadStream(urls, opts, verbose)
-            }
-        }
+        const validCreateReadStream = Dweb.Transports.validFor(urls, "createReadStream").length;
+        if (validCreateReadStream) {
+            var file = {
+                name: name,
+                createReadStream: function (opts) {
+                    // Return a readable stream that provides the bytes between offsets "start"
+                    // and "end" inclusive. This works just like fs.createReadStream(opts) from
+                    // the node.js "fs" module.
 
-        RenderMedia.render(file, jsx, cb);  // Render into supplied element
-
-        if (window.WEBTORRENT_TORRENT) {
-            const torrent = window.WEBTORRENT_TORRENT
-
-            const updateSpeed = () => {
-                if (window.WEBTORRENT_TORRENT === torrent) {    // Check still displaying ours
-                    const webtorrentStats = document.querySelector('#webtorrentStats'); // Not moved into updateSpeed as not in document when this is run first time
-                    const els = (
-                        <span>
-                        <b>Peers:</b> {torrent.numPeers}{' '}
-                    <b>Progress:</b> {(100 * torrent.progress).toFixed(1)}%{' '}
-                    <b>Download speed:</b> {prettierBytes(torrent.downloadSpeed)}/s{' '}
-                <b>Upload speed:</b> {prettierBytes(torrent.uploadSpeed)}/s
-                    </span>
-                )
-                    if (webtorrentStats) {
-                        deletechildren(webtorrentStats);
-                        webtorrentStats.appendChild(els);
-                    }
+                    return Dweb.Transports.createReadStream(urls, opts, verbose)
                 }
             }
 
-            torrent.on('download', throttle(updateSpeed, 250));
-            torrent.on('upload', throttle(updateSpeed, 250));
-            setInterval(updateSpeed, 1000)
-            updateSpeed(); //Do it once
-        }
+            RenderMedia.render(file, jsx, cb);  // Render into supplied element
 
+            if (window.WEBTORRENT_TORRENT) {
+                const torrent = window.WEBTORRENT_TORRENT
+
+                const updateSpeed = () => {
+                    if (window.WEBTORRENT_TORRENT === torrent) {    // Check still displaying ours
+                        const webtorrentStats = document.querySelector('#webtorrentStats'); // Not moved into updateSpeed as not in document when this is run first time
+                        const els = (
+                            <span>
+                            <b>Peers:</b> {torrent.numPeers}{' '}
+                        <b>Progress:</b> {(100 * torrent.progress).toFixed(1)}%{' '}
+                        <b>Download speed:</b> {prettierBytes(torrent.downloadSpeed)}/s{' '}
+                    <b>Upload speed:</b> {prettierBytes(torrent.uploadSpeed)}/s
+                        </span>
+                    )
+                        if (webtorrentStats) {
+                            deletechildren(webtorrentStats);
+                            webtorrentStats.appendChild(els);
+                        }
+                    }
+                }
+
+                torrent.on('download', throttle(updateSpeed, 250));
+                torrent.on('upload', throttle(updateSpeed, 250));
+                setInterval(updateSpeed, 1000)
+                updateSpeed(); //Do it once
+            }
+        } else {
+            // Next choice is to pass a HTTP url direct to <VIDEO> as it knows how to stream it.
+            // TODO clean this nasty kludge up,
+            // Find a HTTP transport if connected, then ask it for the URL (as will probably be contenthash) note it leaves non contenthash urls untouched
+            const url = Dweb.Transports._connected().find(t => t.name = "HTTP")._url(urls.find(u => (u.startsWith("contenthash") || u.startsWith("http"))), "content/rawfetch");
+            if (url) {
+                jsx.src = url;
+            } else {
+                // Worst choice - getch the file, and pass via rendermedia and from2
+                const buff = await  Dweb.Transportable.p_fetch(urls, verbose);  //Typically will be a Uint8Array
+                const file = {
+                    name: name,
+                    createReadStream: function (opts) {
+                        if (!opts) opts = {}
+                        return from2([buff.slice(opts.start || 0, opts.end || (buff.length - 1))])
+                    }
+                }
+                RenderMedia.render(file, jsx, cb);  // Render into supplied element
+            }
+        }
     }
-    static loadStream(jsx, name, urls, cb) {   //TODO maybe move this into React like loadImg
+    static loadStream(jsx, name, urls, cb) {
         //asynchronously loads file from one of metadata, turns into blob, and stuffs into element
         // usage like <VIDEO src=<ArchiveFile instance>  >
         this.p_loadStream(jsx, name, urls, cb); /* Asynchronously load image*/
@@ -201,9 +245,12 @@ export default class React  {
             // Load ArchiveFile inside a div if specify in src
             if (["video.src", "audio.src"].includes(tag + "." + name) && attrs[name] instanceof ArchiveFile) {
                 const af = attrs[name];
-                const videoname = this.metadata.name XXX THIS;
+                const videoname = af.metadata.name;
+                //Dont need mimetype currently
+                //const mimetype = Util.archiveMimeTypeFromFormat[af.metadata.format]; // Might be undefined for many formats still
+                //if (!mimetype) console.warning("Unknown mimetype for ",af.metadata.format, "on",af.metadata.name);
                 const urls = [af.metadata.ipfs, af.metadata.magnetlink, af.metadata.contenthash].filter(f=>!!f);   // Multiple potential sources, filter out nulls
-                this.loadStream(element, videoname, urls);  // Cues up asynchronously to load the video/audio tag
+                this.loadStream(element, videoname, urls, undefined);  // Cues up asynchronously to load the video/audio tag
             } else if (["a.source"].includes(tag + "." + name) && attrs[name] instanceof ArchiveFile) {
                 element[name] = attrs[name];      // Store the ArchiveFile in the DOM, function e.g. onClick will access it.
             } else if (name && attrs.hasOwnProperty(name)) {

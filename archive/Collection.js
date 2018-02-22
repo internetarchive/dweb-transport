@@ -18,7 +18,6 @@ export default class Collection extends Search {
         const creator = (item.metadata.creator  &&  (item.metadata.creator != item.metadata.title) ? item.metadata.creator : '');
         //ARCHIVE-BROWSER note the elements below were converted to HTML 3 times in original version
         //TODO-DETAILS on prelinger, banner description is getting truncated.
-        const imgurl='https://archive.org/services/img/'+this.itemid; //TODO-SERVICES-IMG
         const description = this.preprocessDescription(item.metadata.description); // Contains HTML (supposedly safe) inserted via innerHTML thing
         const thumbnaillinks = item.metadata.thumbnaillinks;
         const imgname = this.itemid + ".PNG";   // Required or rendermedia has difficulty knowing what to render since it doesnt take a mimetype

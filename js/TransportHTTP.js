@@ -44,7 +44,7 @@ class TransportHTTP extends Transport {
         this.options = options;
         this.urlbase = options.http.urlbase;
         this.supportURLs = ['contenthash', 'http','https']; // http and https are legacy
-        this.supportFunctions = ['fetch', 'store', 'add', 'list', 'reverse', 'newlisturls', 'createReadStream', "get", "set", "keys", "getall", "delete", "newtable", "newdatabase"]; //Does not support: listmonitor - reverse is disabled somewhere not sure if here or caller
+        this.supportFunctions = ['fetch', 'store', 'add', 'list', 'reverse', 'newlisturls', "get", "set", "keys", "getall", "delete", "newtable", "newdatabase"]; //Does not support: listmonitor - reverse is disabled somewhere not sure if here or caller
         this.supportFeatures = ['fetch.range']
         this.name = "HTTP";             // For console log etc
         this.status = Dweb.Transport.STATUS_LOADED;

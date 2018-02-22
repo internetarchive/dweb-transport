@@ -36,7 +36,7 @@ export default class ArchiveFile {
 
     async p_download(a, options) {
         let urls = await this.p_urls()   // Multiple potential sources elimating any empty
-        let blk = await  Dweb.Block.p_fetch(urls, verbose);  //Typically will be a Uint8Array
+        let blk = await  Dweb.Transportable.p_fetch(urls, verbose);  //Typically will be a Uint8Array
         let blob = new Blob([blk._data], {type: Util.archiveMimeTypeFromFormat[this.metadata.format]}) // Works for data={Uint8Array|Blob}
         let objectURL = URL.createObjectURL(blob);
         if (verbose) console.log("Blob URL=",objectURL);
