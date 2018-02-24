@@ -227,7 +227,7 @@ class Domain extends KeyValueTable {
     }
 
     static async p_rootResolve(path, {verbose=false}={}) {
-        console.log("Resolving:",path)
+        console.group("Resolving:",path);
         if (!this.root) {
             //TODO-CONFIG put this (and other TODO-CONFIG into config file)
             const rootpublicurls = ['ipfs:/ipfs/zdpuAp5dg6LphYwebkqGqqebhgLgxW26VAxe76k68D7dVa1oa',
@@ -235,6 +235,8 @@ class Domain extends KeyValueTable {
             this.root = await Dweb.SmartDict.p_fetch(rootpublicurls, verbose);
         }
         const res = this.root.p_resolve(path, {verbose});
+        console.log("Resolved path",path);
+        console.groupEnd();
         return res;
 
     }

@@ -14,11 +14,12 @@ export default class Video extends AV {
     }
 
     theatreIaWrap() {
-        let item = this.item;
-        let itemid = this.itemid;
-        let detailsurl = `https://archive.org/details/${itemid}`;  {/*TODO-SERVICES-IMG get directly */}
-        let title = item.title;
-        //let cfg  = {"aspectratio": 4/3 }; // Old version in Traceys code which was missign other parts of cfg below
+        const item = this.item;
+        const itemid = this.itemid;
+        const detailsurl = `https://archive.org/details/${itemid}`;  {/*TODO-SERVICES-IMG get directly */}
+        const title = item.title;
+        const videothumbnailurl = this._list.filter(fi => (fi.metadata.name.includes(`${itemid}.thumbs/`)))[1]; // 2nd thumbnail, first is usually black-sreen
+        //let cfg  = {"aspectratio": 4/3 }; // Old version in Traceys code which was missing other parts of cfg below
         let cfg =    {"start":0,"embed":null,"so":false,"autoplay":false,"width":0,"height":0,"list_height":0,"audio":false,
             "responsive":true,"flash":false, "hide_list":true,
             "identifier": this.itemid, //TODO-DETAILS-ONLINE check another example and see if identifier should be itemid or title
@@ -32,18 +33,20 @@ export default class Video extends AV {
                 {"file":"/download/commute/commute.ogv","type":"ogg","height":"304","width":"400","label":"304p"}],
             "tracks":[{"file":"https://archive.org/stream/commute/commute.thumbs/commute_000005.jpg&vtt=vtt.vtt","kind":"thumbnails"}]}],
         */
-        this.setupPlaylist();
+        this.setupPlaylist();   // Creates this.avs
+        const contenturl = `${Util.gateway.url_download}${itemid}/${this.avs[0].metadata.name}`;
+        const embedurlname = (this.avs[0].metadata.source === "original") ? this.avs[0].metadata.name : this.avs[0].metadata.original;
+        const embedurlurl = `${Util.gateway.url_download}${itemid}/${embedurlname}`;
+        const schemacontentlength = `PT0M${parseInt(this.avs[0].metadata.length)}S`;
 
         //TODO-DETAILS make next few lines between theatre-ia-wrap and theatre-ia not commute specific
         return (
             <div id="theatre-ia-wrap" class="container container-ia width-max ">
                 <link itemprop="url" href={detailsurl}/>
-                {/*-- TODO make commute specific - look for somewhere else it builds itemprop
-                <link itemprop="thumbnailUrl" href="https://archive.org/download/commute/commute.thumbs/commute_000005.jpg">
-                <link itemprop="contentUrl" href="https://archive.org/download/commute/commute.mp4">
-                <link itemprop="embedUrl" href="https://archive.org/embed/commute/commute.avi">
-                 <meta itemprop="duration" content="PT0M115S">
-                 --*/}
+                <link itemprop="thumbnailUrl" href={videothumbnailurl} />
+                <link itemprop="contentUrl" href={contenturl} />
+                <link itemprop="embedUrl" href={embedurl} />
+                <meta itemprop="duration" content={schemacontentlength} />
                 <h1 class="sr-only">{title}</h1>
                 <h2 class="sr-only">Movies Preview</h2>
 

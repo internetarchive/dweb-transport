@@ -68,7 +68,8 @@ export default class ArchiveItem { //extends SmartDict {  //TODO should extend S
             console.assert(m.metadata.identifier === this.itemid);
             this.item = m;
             this._listLoad();   // Load _list with ArchiveFile
-            if (verbose) console.groupEnd('getting metadata for ' + this.itemid);
+            if (verbose) console.log("Got metadata for " + this.itemid);
+            if (verbose) console.groupEnd();
         }
         if (this.query) {   // This is for Search, Collection and Home.
             const url =
