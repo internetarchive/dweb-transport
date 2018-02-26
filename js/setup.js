@@ -5,6 +5,13 @@ htmlfake = '<!DOCTYPE html><ul><li id="myList.0">Failed to load sb via Structure
 const dom = new JSDOM(htmlfake);
 document = dom.window.document;   // Note in JS can't see "document" like can in python
 
+// Dweb constituents
+const Transports = require('./Transports'); // Manage all Transports that are loaded
+const TransportHTTP = require('./TransportHTTP');
+const TransportYJS = require('./TransportYJS');
+const TransportWEBTORRENT = require('./TransportWEBTORRENT');
+//TODO-REQUIRE above here are done
+
 const Dweb = require('./Dweb');
 
 
@@ -23,7 +30,7 @@ const Dweb = require('./Dweb');
 // Utility packages (ours) And one-liners
 //function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { resolve(val); },ms)})}
 
-require('y-leveldb')(Dweb.TransportYJS.Y); //- can't be there for browser, node seems to find it ok without this and auto-loads with a warning.
+require('y-leveldb')(TransportYJS.Y); //- can't be there for browser, node seems to find it ok without this and auto-loads with a warning.
 let verbose = true;
 // Note that this test setup is being mirror in test_ipfs.html
 // In general it should be possible to comment out failing tests EXCEPT where they provide a value to the next */
@@ -39,11 +46,12 @@ async function p_setup(verbose) {
 
         // Note the order of these is significant, it will retrieve by preference from the first setup, try with both orders if in doubt.
         //SEE-OTHER-ADDTRANSPORT
-        let t_ipfs = await Dweb.TransportIPFS.p_setup(opts, verbose); await t_ipfs.p_status(); // Note browser requires indexeddb
-        let t_yjs = await Dweb.TransportYJS.p_setup(opts, verbose);  await t_yjs.p_status(); // Should find ipfs transport
-        let t_http = await Dweb.TransportHTTP.p_setup(opts, verbose); await t_http.p_status();
-        //let t_webtorrent = await Dweb.TransportWEBTORRENT.p_test(opts, verbose); await t_webtorrent.p_status();
-        if (verbose) console.log("setup returned and transport(s) connected:", Dweb.Transports.connectedNames());
+        //TODO-REQUIRE these will break
+        let t_ipfs = await TransportIPFS.p_setup(opts, verbose); await t_ipfs.p_status(); // Note browser requires indexeddb
+        let t_yjs = await TransportYJS.p_setup(opts, verbose);  await t_yjs.p_status(); // Should find ipfs transport
+        let t_http = await TransportHTTP.p_setup(opts, verbose); await t_http.p_status();
+        //let t_webtorrent = await TransportWEBTORRENT.p_test(opts, verbose); await t_webtorrent.p_status();
+        if (verbose) console.log("setup returned and transport(s) connected:", Transports.connectedNames());
         await Dweb.Domain.p_setupOnce(verbose);
     } catch (err) {
         console.log("Test failed", err);

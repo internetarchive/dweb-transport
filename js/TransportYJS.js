@@ -18,8 +18,10 @@ require('y-indexeddb')(Y);
 function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { resolve(val); },ms)})}
 
 // Other Dweb modules
-const errors = require('./Errors');
-const Transport = require('./Transport');
+const errors = require('./Errors'); // Standard Dweb Errors
+const Transport = require('./Transport.js'); // Base class for TransportXyz
+const Transports = require('./Transports'); // Manage all Transports that are loaded
+//TODO-REQUIRE above here are done
 const Dweb = require('./Dweb');
 
 let defaultoptions = {
@@ -104,7 +106,7 @@ class TransportYJS extends Transport {
         let combinedoptions = Transport.mergeoptions(defaultoptions, options);
         if (verbose) console.log("YJS options %o", combinedoptions); // Log even if !verbose
         let t = new TransportYJS(combinedoptions, verbose);   // Note doesnt start IPFS or Y
-        Dweb.Transports.addtransport(t);
+        Transports.addtransport(t);
         return t;
     }
 
@@ -116,7 +118,7 @@ class TransportYJS extends Transport {
         */
         try {
             this.status = Transport.STATUS_STARTING;   // Should display, but probably not refreshed in most case
-            this.options.yarray.connector.ipfs = Dweb.Transports.ipfs(verbose).ipfs; // Find an IPFS to use (IPFS's should be starting in p_setup1)
+            this.options.yarray.connector.ipfs = Transports.ipfs(verbose).ipfs; // Find an IPFS to use (IPFS's should be starting in p_setup1)
             this.yarrays = {};
         } catch(err) {
             console.error("YJS failed to start",err);
@@ -153,7 +155,7 @@ class TransportYJS extends Transport {
             if (verbose) console.log("p_rawlist found", ...Dweb.utils.consolearr(res));
             return res;
         } catch(err) {
-            console.log("TransportIPFS.p_rawlist failed",err.message);
+            console.log("TransportYJS.p_rawlist failed",err.message);
             throw(err);
         }
     }
@@ -190,7 +192,7 @@ class TransportYJS extends Transport {
         :resolve array: An array of objects as stored on the list.
          */
         //TODO-REVERSE this needs implementing once list structure on IPFS more certain
-        throw new errors.ToBeImplementedError("Undefined function TransportHTTP.rawreverse"); }
+        throw new errors.ToBeImplementedError("Undefined function TransportYJS.rawreverse"); }
 
     async p_rawadd(url, sig, verbose) {
         /*
@@ -207,7 +209,7 @@ class TransportYJS extends Transport {
         :param boolean verbose: true for debugging output
         :resolve undefined:
         */
-        console.assert(url && sig.urls.length && sig.signature && sig.signedby.length, "TransportIPFS.p_rawadd args", url, sig);
+        console.assert(url && sig.urls.length && sig.signature && sig.signedby.length, "TransportYJS.p_rawadd args", url, sig);
         if (verbose) console.log("TransportYJS.p_rawadd", typeof url === "string" ? url : url.href, sig);
         let value = sig.preflight(Object.assign({}, sig));
         let y = await this.p__yarray(url, verbose);
@@ -345,7 +347,7 @@ class TransportYJS extends Transport {
             transport.listmonitor(testurl, (obj) => (monitoredobj = obj), verbose);
             let sig = new Dweb.Signature({urls: ["123"], date: new Date(Date.now()), signature: "Joe Smith", signedby: [testurl]}, verbose);
             await transport.p_rawadd(testurl, sig, verbose);
-            if (verbose) console.log("TransportIPFS.p_rawadd returned ");
+            if (verbose) console.log("TransportYJS.p_rawadd returned ");
             res = await transport.p_rawlist(testurl, verbose);
             if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res)); // Note not showing return
             await delay(500);
@@ -364,4 +366,5 @@ class TransportYJS extends Transport {
 
 }
 TransportYJS.Y = Y; // Allow node tests to find it
+Transports._transportclasses["YJS"] = TransportYJS;
 exports = module.exports = TransportYJS;

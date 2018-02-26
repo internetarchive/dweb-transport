@@ -1,4 +1,6 @@
-const errors = require('./Errors');
+const errors = require('./Errors'); // Standard Dweb Errors
+const Transports = require('./Transports'); // Manage all Transports that are loaded
+//TODO-REQUIRE above here are done
 const SmartDict = require("./SmartDict"); //for extends
 const Dweb = require("./Dweb");
 
@@ -140,7 +142,7 @@ class PublicPrivate extends SmartDict {
 
 
     async OBS_p_storepublic(verbose) {
-        this._publicurls = await Dweb.Transports.p_rawstore(
+        this._publicurls = await Transports.p_rawstore(
             JSON.stringify(
                 this.preflight(                 // Hides master urls and _acl since !master
                     Object.assign({}, this,     // Copy the data
@@ -150,7 +152,7 @@ class PublicPrivate extends SmartDict {
 
     async _p_storepublic(verbose) {
         // Store public version, dont encrypt on storing as want public part to be publicly visible (esp for Domain)
-        this._publicurls = await Dweb.Transports.p_rawstore( this._getdata({publicOnly: true, encryptIfAcl:false}), verbose);
+        this._publicurls = await Transports.p_rawstore( this._getdata({publicOnly: true, encryptIfAcl:false}), verbose);
     }
     storedpublic() {
         return this._publicurls.length > 0

@@ -1,5 +1,6 @@
-// ######### Parallel development to CommonBlock.py ########
-const errors = require('./Errors');
+const errors = require('./Errors'); // Standard Dweb Errors
+const Transports = require('./Transports'); // Manage all Transports that are loaded
+//TODO-REQUIRE above here are done
 const Dweb = require("./Dweb");
 
 class Transportable {
@@ -49,7 +50,7 @@ class Transportable {
                 return this;  // No-op if already stored, use dirty() if change after retrieved
             let data = this._getdata();
             if (verbose) console.log("Transportable.p_store data=", data);
-            this._urls = await Dweb.Transports.p_rawstore(data, verbose);
+            this._urls = await Transports.p_rawstore(data, verbose);
             if (verbose) console.log("Transportable.p_store urls=", this._urls);
             return this;
         } catch (err) {
@@ -73,7 +74,7 @@ class Transportable {
         returns:	string - arbitrary bytes retrieved or possibly Buffer or sometimes even an object (like a dictionary)
         throws:     TransportError with messages of any errors if none succeeded
          */
-        return Dweb.Transports.p_rawfetch(urls, verbose);
+        return Transports.p_rawfetch(urls, verbose);
     }
 
     file() { throw new errors.ToBeImplementedError("Undefined function Transportable.file"); } //TODO-BACKPORT from Python

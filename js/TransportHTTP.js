@@ -1,5 +1,7 @@
-const errors = require('./Errors');
-const Transport = require('./Transport.js');
+const errors = require('./Errors'); // Standard Dweb Errors
+const Transport = require('./Transport'); // Base class for TransportXyz
+const Transports = require('./Transports'); // Manage all Transports that are loaded
+//TODO-REQUIRE above here are done
 const Dweb = require('./Dweb.js');
 const nodefetch = require('node-fetch-npm');
 const Url = require('url');
@@ -55,7 +57,7 @@ class TransportHTTP extends Transport {
         let combinedoptions = Transport.mergeoptions({ http: defaulthttpoptions },options);
         try {
             let t = new TransportHTTP(combinedoptions, verbose);
-            Dweb.Transports.addtransport(t);
+            Transports.addtransport(t);
             return t;
         } catch (err) {
             console.log("Exception thrown in TransportHTTP.p_setup", err.message);
@@ -221,6 +223,7 @@ class TransportHTTP extends Transport {
                 (parsedurl.protocol === "https" && parsedurl.host === "gateway.dweb.me" && parsedurl.pathname.includes('/content/rawfetch'))
                 || (parsedurl.protocol === "contenthash:" && (parsedurl.pathname.split('/')[1] === "contenthash")));
         if (!u) {
+            //TODO-REQUIRE see if this is ever used, and maybe pass something as option from testing
             u = `contenthash:/contenthash/${ Dweb.KeyPair.multihashsha256_58(cl.keypair.publicexport()[0]) }`; // Pretty random, but means same test will generate same list
         }
         return [u,u];
@@ -232,6 +235,7 @@ class TransportHTTP extends Transport {
     // Support for Key-Value pairs as per
     // https://docs.google.com/document/d/1yfmLRqKPxKwB939wIy9sSaa7GKOzM5PrCZ4W1jRGW6M/edit#
     async p_newdatabase(pubkey, verbose) {
+        //TODO-REQUIRE make this call a method on pubkey (ducktype)
         if (pubkey instanceof Dweb.PublicPrivate)
             pubkey = pubkey.keypair;
         if (pubkey instanceof Dweb.KeyPair)
@@ -304,7 +308,7 @@ class TransportHTTP extends Transport {
     static async p_test(opts={}, verbose=false) {
         if (verbose) {console.log("TransportHTTP.test")}
         try {
-            let transport = await Dweb.TransportHTTP.p_setup(opts, verbose);
+            let transport = await this.p_setup(opts, verbose);
             if (verbose) console.log("HTTP connected");
             let res = await transport.p_info(verbose);
             if (verbose) console.log("TransportHTTP info=",res);
@@ -322,5 +326,6 @@ class TransportHTTP extends Transport {
     }
 
 }
+Transports._transportclasses["HTTP"] = TransportHTTP;
 exports = module.exports = TransportHTTP;
 

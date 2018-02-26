@@ -1,4 +1,6 @@
-const errors = require('./Errors');
+const errors = require('./Errors'); // Standard Dweb Errors
+const Transports = require('./Transports'); // Manage all Transports that are loaded
+//TODO-REQUIRE above here are done
 const KeyValueTable = require("./KeyValueTable"); //for extends
 const SmartDict = require("./SmartDict"); //for extends
 const Dweb = require("./Dweb");
@@ -214,7 +216,7 @@ class Domain extends KeyValueTable {
         }
         if (this._map[key])
             return this._map[key]; // If already have a defined result then return it (it will be from this session so reasonable to cache)
-        const rr = (await Promise.all(this.tablepublicurls.map(u => Dweb.Transports.p_get([u], key, verbose).catch((err) => undefined))))
+        const rr = (await Promise.all(this.tablepublicurls.map(u => Transports.p_get([u], key, verbose).catch((err) => undefined))))
             .map(r => this._mapFromStorage(r))
         // Errors in above will result in an undefined in the res array, which will be filtered out.
         // res is now an array of returned values in same order as tablepublicurls

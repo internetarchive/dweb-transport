@@ -1,6 +1,6 @@
 const Url = require('url');
 const errors = require('./Errors');
-const Dweb = require('./Dweb.js');
+//const Dweb = require('./Dweb.js');
 
 /*
 Handles multiple transports, API should be (almost) the same as for an individual transport)
@@ -48,7 +48,7 @@ class Transports {
     }
     static ipfs(verbose) {
         // Find an ipfs transport if it exists, so for example YJS can use it.
-        return Transports._transports.find((t) => t instanceof Dweb.TransportIPFS)
+        return Transports._transports.find((t) => t.name === "IPFS")
     }
 
     static async p_rawstore(data, verbose) {
@@ -386,13 +386,14 @@ class Transports {
         returns array of transport instances
          */
         // "IPFS" or "IPFS,LOCAL,HTTP"
+        //TODO-REQUIRE this will break
         let localoptions = {http: {urlbase: "http://localhost:4244"}};
         return transports.map((tabbrev) => {
             let transportclass;
             if (tabbrev === "LOCAL") {
-                transportclass = Dweb["TransportHTTP"];
+                transportclass = this._transportclasses["HTTP"];
             } else {
-                transportclass = Dweb["Transport" + tabbrev];
+                transportclass = this._transportclasses[tabbrev];
             }
             return transportclass.setup0(tabbrev === "LOCAL" ? localoptions : options, verbose);
         });
@@ -400,12 +401,12 @@ class Transports {
     static async p_setup1(verbose) {
         /* Second stage of setup, connect if possible */
         // Does all setup1a before setup1b since 1b can rely on ones with 1a, e.g. YJS relies on IPFS
-        await Promise.all(Dweb.Transports._transports.map((t) => t.p_setup1(verbose)));
+        await Promise.all(this._transports.map((t) => t.p_setup1(verbose)));
     }
     static async p_setup2(verbose) {
         /* Second stage of setup, connect if possible */
         // Does all setup1a before setup1b since 1b can rely on ones with 1a, e.g. YJS relies on IPFS
-        await Promise.all(Dweb.Transports._transports.map((t) => t.p_setup2(verbose)));
+        await Promise.all(this._transports.map((t) => t.p_setup2(verbose)));
     }
     static async test(verbose) {
         if (verbose) {console.log("Transports.test")}
@@ -455,6 +456,6 @@ class Transports {
 
 }
 Transports._transports = [];    // Array of transport instances connected
-
+Transports._transportclasses = {};  // Pointers to classes whose code is loaded.
 
 exports = module.exports = Transports;

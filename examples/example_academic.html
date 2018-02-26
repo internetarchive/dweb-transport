@@ -198,7 +198,7 @@
     //    .then((t) => t.p_status())
     //    .then((msg) => alert(msg))  //TODO-status as list
     //    .catch((err) => { console.log("ERROR in connecting to HTTP:",err); alert(err.message); });
-    let transportclass = Dweb["Transport"+(searchparms.get("transport") || "IPFS").toUpperCase()]; // e.g. Dweb["TransportHTTP"]
+    let transportclass = Dweb["Transport"+(searchparms.get("transport") || "IPFS").toUpperCase()]; // e.g. Dweb["TransportHTTP"] //TODO-REQUIRE this will break
     transportclass.p_setup({}, verbose)
         .then((t) => t.p_status())
         .then((msg) => setstatus(msg))

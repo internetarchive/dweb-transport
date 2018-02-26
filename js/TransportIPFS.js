@@ -21,8 +21,10 @@ const promisify = require('promisify-es6');
 //const makepromises = require('./utils/makepromises'); // Replaced by direct call to promisify
 
 // Other Dweb modules
-const errors = require('./Errors');
-const Transport = require('./Transport');
+const errors = require('./Errors'); // Standard Dweb Errors
+const Transport = require('./Transport.js'); // Base class for TransportXyz
+const Transports = require('./Transports'); // Manage all Transports that are loaded
+//TODO-REQUIRE above here are done
 const Dweb = require('./Dweb');
 
 let defaultoptions = {
@@ -103,7 +105,7 @@ class TransportIPFS extends Transport {
         let combinedoptions = Transport.mergeoptions(defaultoptions, options);
         if (verbose) console.log("IPFS options %o", combinedoptions);
         let t = new TransportIPFS(combinedoptions, verbose);   // Note doesnt start IPFS
-        Dweb.Transports.addtransport(t);
+        Transports.addtransport(t);
         return t;
     }
 
@@ -276,4 +278,5 @@ class TransportIPFS extends Transport {
     }
 
 }
+Transports._transportclasses["IPFS"] = TransportIPFS;
 exports = module.exports = TransportIPFS;

@@ -1,10 +1,5 @@
 const errors = require('./Errors');
 // SEE-OTHER-ADDTRANSPORT */
-exports.TransportHTTP = require('./TransportHTTP'); // Note this used to cause a problem in bundle I believe
-exports.TransportIPFS = require('./TransportIPFS');
-exports.TransportYJS = require('./TransportYJS');
-exports.TransportWEBTORRENT = require('./TransportWEBTORRENT');
-exports.Transports = require('./Transports'); // Handles multiple transports
 exports.Transportable = require('./Transportable');
 exports.Block = require('./Block');
 exports.SmartDict = require("./SmartDict");
@@ -20,6 +15,9 @@ exports.StructuredBlock = require('./StructuredBlock'); //TODO - will remove SB 
 exports.EventListenerHandler = require("./EventListenerHandler");
 exports.Domain = require("./Domain");
 exports.Leaf = exports.Domain.clsLeaf;
+//TODO-REQUIRE these are needed by archive/* for now
+exports.Transports = require('./Transports'); // Handles multiple transports
+
 
 exports.table2class = { // Each of these needs a constructor that takes data and is ok with no other parameters, (otherwise define a set of these methods as factories)
     "cl": "CommonList",

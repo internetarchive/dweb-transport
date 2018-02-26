@@ -10,8 +10,10 @@ const WebTorrent = require('webtorrent');
 const stream = require('readable-stream');
 
 // Other Dweb modules
-const errors = require('./Errors');
-const Transport = require('./Transport');
+const errors = require('./Errors'); // Standard Dweb Errors
+const Transport = require('./Transport.js'); // Base class for TransportXyz
+const Transports = require('./Transports'); // Manage all Transports that are loaded
+//TODO-REQUIRE above here are done
 const Dweb = require('./Dweb');
 
 let defaultoptions = {
@@ -61,7 +63,7 @@ class TransportWEBTORRENT extends Transport {
         let combinedoptions = Transport.mergeoptions(defaultoptions, options);
         console.log("WebTorrent options %o", combinedoptions);
         let t = new TransportWEBTORRENT(combinedoptions, verbose);
-        Dweb.Transports.addtransport(t);
+        Transports.addtransport(t);
 
         return t;
     }
@@ -278,4 +280,6 @@ class TransportWEBTORRENT extends Transport {
     }
 
 }
+Transports._transportclasses["WEBTORRENT"] = TransportWEBTORRENT;
+
 exports = module.exports = TransportWEBTORRENT;
