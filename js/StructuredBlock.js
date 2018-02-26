@@ -1,7 +1,6 @@
 const errors = require('./Errors');
 const SmartDict = require("./SmartDict");
 const Signature = require("./Signature");
-const Dweb = require("./Dweb");
 //TODO-MULTI-needs-scanning
 
 
@@ -25,7 +24,7 @@ class StructuredBlock extends SmartDict {
             let links = value;
             for (let len = links.length, i=0; i<len; i++) {
                 throw new errors.CodingError("Next line needs fixing, caller should do this expansion as its async and __setattr__ cant be");  //TODO-REL5
-                links[i] = Dweb.SmartDict.p_fetch(links[i],verbose); //TODO-MULTI use urls plural
+                links[i] = SmartDict.p_fetch(links[i],verbose); //TODO-MULTI use urls plural
             }
             this[name] = links;
         } else {
@@ -138,7 +137,7 @@ class StructuredBlock extends SmartDict {
                     console.log("StructuredBlock.test sb=", sb);
                 }
                 sb.p_store(verbose)
-                    .then(() => Dweb.SmartDict.p_fetch(sb._urls)) // Will be StructuredBlock
+                    .then(() => SmartDict.p_fetch(sb._urls)) // Will be StructuredBlock
                     .then((newsb) => sb2 = newsb)
                     .then(() => {
                         if (verbose) console.assert(sb2.data === teststr, "SB should round trip", sb2.data, "!==", teststr)
@@ -200,4 +199,5 @@ class StructuredBlock extends SmartDict {
 
 }
 
+SmartDict.table2class["sb"] = StructuredBlock;
 exports = module.exports = StructuredBlock;

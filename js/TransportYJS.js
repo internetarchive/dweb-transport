@@ -21,8 +21,7 @@ function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { reso
 const errors = require('./Errors'); // Standard Dweb Errors
 const Transport = require('./Transport.js'); // Base class for TransportXyz
 const Transports = require('./Transports'); // Manage all Transports that are loaded
-//TODO-REQUIRE above here are done
-const Dweb = require('./Dweb');
+const utils = require('./utils'); // Utility functions
 
 let defaultoptions = {
     yarray: {    // Based on how IIIF uses them in bootstrap.js in ipfs-iiif-db repo
@@ -152,7 +151,7 @@ class TransportYJS extends Transport {
             let y = await this.p__yarray(url, verbose);
             let res = y.share.array.toArray();
             // .filter((obj) => (obj.signedby.includes(url))); Cant filter since url is the YJS URL, not the URL of the CL that signed it. (upper layers verify, which filters)
-            if (verbose) console.log("p_rawlist found", ...Dweb.utils.consolearr(res));
+            if (verbose) console.log("p_rawlist found", ...utils.consolearr(res));
             return res;
         } catch(err) {
             console.log("TransportYJS.p_rawlist failed",err.message);
@@ -222,20 +221,18 @@ class TransportYJS extends Transport {
                 (parsedurl.protocol === "ipfs" && parsedurl.pathname.includes('/ipfs/'))
                 || (parsedurl.protocol === "yjs:"));
         if (!u) {
-            u = `yjs:/yjs/${ Dweb.KeyPair.multihashsha256_58(cl.keypair.publicexport()[0]) }`; // Pretty random, but means same test will generate same list
+            u = `yjs:/yjs/${ cl.keypair.verifyexportmultihashsha256_58() }`; // Pretty random, but means same test will generate same list
         }
         return [u,u];
     }
 
+
     // Support for Key-Value pairs as per
     // https://docs.google.com/document/d/1yfmLRqKPxKwB939wIy9sSaa7GKOzM5PrCZ4W1jRGW6M/edit#
     async p_newdatabase(pubkey, verbose) {
-        if (pubkey instanceof Dweb.PublicPrivate)
-            pubkey = pubkey.keypair;
-        if (pubkey instanceof Dweb.KeyPair)
-            pubkey = pubkey.publicexport();
-        if (Array.isArray(pubkey))
-            pubkey = pubkey.find(k => k.startsWith("NACL VERIFY:"));
+        //if (pubkey instanceof Dweb.PublicPrivate)
+        if (pubkey.hasOwnProperty("keypair"))
+            pubkey = pubkey.keypair.signingexport()
         // By this point pubkey should be an export of a public key of form xyz:abc where xyz
         // specifies the type of public key (NACL VERIFY being the only kind we expect currently)
         let u =  `yjs:/yjs/${encodeURIComponent(pubkey)}`;
@@ -329,39 +326,6 @@ class TransportYJS extends Transport {
                 }
             }
         })
-    }
-
-    static async p_test(opts={}, verbose) {
-        if (verbose) {console.log("TransportYJS.test")}
-        try {
-            let transport = await Dweb.TransportYJS.p_setup(opts, verbose); // Assumes IPFS already setup
-            if (verbose) console.log(transport.name, "setup");
-            let res = await transport.p_status(verbose);
-            console.assert(res === Transport.STATUS_CONNECTED)
-            //TODO move this to Transport.p_test_list -=-=-=-=
-            let testurl = "yjs:/yjs/THISATEST";  // Just a predictable number can work with
-            res = await transport.p_rawlist(testurl, verbose);
-            let listlen = res.length;   // Holds length of list run intermediate
-            if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res));
-            let monitoredobj;
-            transport.listmonitor(testurl, (obj) => (monitoredobj = obj), verbose);
-            let sig = new Dweb.Signature({urls: ["123"], date: new Date(Date.now()), signature: "Joe Smith", signedby: [testurl]}, verbose);
-            await transport.p_rawadd(testurl, sig, verbose);
-            if (verbose) console.log("TransportYJS.p_rawadd returned ");
-            res = await transport.p_rawlist(testurl, verbose);
-            if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res)); // Note not showing return
-            await delay(500);
-            console.assert(monitoredobj.urls[0] === "123"); // Should have been caught by the listmonitor above
-            res = await transport.p_rawlist(testurl, verbose);
-            console.assert(res.length === listlen + 1, "Should have added one item");
-            //console.log("TransportYJS test complete");
-            // -=-=-=-===-=- Now test KeyValue using common test -=-=-=-=-=-=-
-            await transport.p_test_kvt("yjs:/yjs/NACL%20VERIFY", verbose);
-            return transport;
-        } catch(err) {
-            console.log("Exception thrown in TransportYJS.test:", err.message);
-            throw err;
-        }
     }
 
 }

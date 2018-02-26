@@ -1,6 +1,6 @@
 const errors = require('./Errors');
 const Transportable = require("./Transportable");   //Superclass
-const Dweb = require("./Dweb");
+const utils = require('./utils'); // Utility functions
 
 // See CommonBlock.py for Python version
 
@@ -125,7 +125,7 @@ class SmartDict extends Transportable {
          */
         return Object.keys(dict).every((key) => {
             return (
-                (["_publicurls","_urls"].includes(key))  ? Dweb.utils.intersects(this[key], dict[key])
+                (["_publicurls","_urls"].includes(key))  ? utils.intersects(this[key], dict[key])
                 :   (key[0] !== '.')            ? (this[key] === dict[key])
                 :   ( key === ".instanceof")    ? (this instanceof dict[key])
                 :   false)
@@ -195,7 +195,7 @@ class SmartDict extends Transportable {
     objbrowser_obj(el, name, val) {
         this._objbrowser_row(el, name,
             this.objbrowser_createElement('span',{className: 'propval', source: val},
-                this.objbrowser_createElement('span', {onclick: `Dweb.SmartDict.objbrowser_expandurl(this.parentNode); return false;`},val.constructor.name)
+                this.objbrowser_createElement('span', {onclick: `SmartDict.objbrowser_expandurl(this.parentNode); return false;`},val.constructor.name)
 
             ));
     }
@@ -215,7 +215,7 @@ class SmartDict extends Transportable {
             this.objbrowser_createElement('ul',{className: 'propurls propval'},
                 links
                     ? arr.map(l => this.objbrowser_createElement('li',{className: 'propurl', source: l},
-                        this.objbrowser_createElement('span', {onclick: `Dweb.SmartDict.objbrowser_expandurl(this.parentNode); return false;`},l)
+                        this.objbrowser_createElement('span', {onclick: `SmartDict.objbrowser_expandurl(this.parentNode); return false;`},l)
                     ) )
                     : arr.map(l => this.objbrowser_createElement('li',{className: 'propurl'},l) )
             ) );
@@ -224,7 +224,7 @@ class SmartDict extends Transportable {
         this._objbrowser_row(el, name,
             this.objbrowser_createElement('ul',{className: 'propurls propval'},
                 arr.map((l,i) => this.objbrowser_createElement('li',{className: 'propurl', source: l},
-                    this.objbrowser_createElement('span', {onclick: `Dweb.SmartDict.objbrowser_expandurl(this.parentNode); return false;`}, `${i}...`)
+                    this.objbrowser_createElement('span', {onclick: `SmartDict.objbrowser_expandurl(this.parentNode); return false;`}, `${i}...`)
                 ))
             ) );
     }
@@ -233,7 +233,7 @@ class SmartDict extends Transportable {
         this._objbrowser_row(el, name, ul);
         arr.map((l,i) => this._objbrowser_row(ul, name,
             this.objbrowser_createElement('span', {},
-                this.objbrowser_createElement('span', {onclick: `Dweb.SmartDict.objbrowser_expandurl(this.parentNode); return false;`}, `${i}...`)
+                this.objbrowser_createElement('span', {onclick: `SmartDict.objbrowser_expandurl(this.parentNode); return false;`}, `${i}...`)
             )));
     }
     objbrowser_arraystr(el, name, arr) {
@@ -293,12 +293,12 @@ class SmartDict extends Transportable {
         if (!table) {
             throw new errors.ToBeImplementedError("SmartDict.p_fetch: no table field, whatever this is we cant decode it");
         }
-        let cls = Dweb[Dweb.table2class[table]];        // Gets class name, then looks up in Dweb - avoids dependency
+        let cls = this.table2class[table];        // Gets class
         if (!cls) { // noinspection ExceptionCaughtLocallyJS
             throw new errors.ToBeImplementedError("SmartDict.p_fetch: " + table + " is not implemented in table2class");
         }
         //console.log(cls);
-        if (!((Dweb.table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict))) { // noinspection ExceptionCaughtLocallyJS
+        if (!((cls === SmartDict) || (cls.prototype instanceof SmartDict))) { // noinspection ExceptionCaughtLocallyJS
             throw new errors.ForbiddenError("Avoiding data driven hacks to other classes - seeing " + table);
         }
         if (urls.length) {
@@ -314,12 +314,12 @@ class SmartDict extends Transportable {
         if (!table) {
             throw new errors.ToBeImplementedError("SmartDict.p_fetch: no table field, whatever this is we cant decode it");
         }
-        let cls = Dweb[Dweb.table2class[table]];        // Gets class name, then looks up in Dweb - avoids dependency
+        let cls = this.table2class[table];        // Gets class
         if (!cls) { // noinspection ExceptionCaughtLocallyJS
             throw new errors.ToBeImplementedError("SmartDict.p_fetch: " + table + " is not implemented in table2class");
         }
         //console.log(cls);
-        if (!((Dweb.table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict))) { // noinspection ExceptionCaughtLocallyJS
+        if (!((cls === SmartDict) || (cls.prototype instanceof SmartDict))) { // noinspection ExceptionCaughtLocallyJS
             throw new errors.ForbiddenError("Avoiding data driven hacks to other classes - seeing " + table);
         }
         let decrypted = await cls.p_decrypt(maybeencrypted, verbose);    // decrypt - may return string or obj , note it can be subclassed for different encryption
@@ -343,7 +343,7 @@ class SmartDict extends Transportable {
         try {
             if (verbose) console.log("SmartDict.p_fetch", urls);
             let data = await super.p_fetch(urls, verbose);  // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
-            let maybeencrypted = Dweb.utils.objectfrom(data);         // Parse JSON (dont parse if p_fetch has returned object (e.g. from KeyValueTable
+            let maybeencrypted = utils.objectfrom(data);         // Parse JSON (dont parse if p_fetch has returned object (e.g. from KeyValueTable
             let decrypted = await this._after_fetch(maybeencrypted, urls, verbose);
             return decrypted;
             // Returns new object that should be a subclass of SmartDict
@@ -361,9 +361,26 @@ class SmartDict extends Transportable {
          :param data: possibly encrypted object produced from json stored on Dweb
          :return: same object if not encrypted, or decrypted version
          */
-        return await Dweb.AccessControlList.p_decryptdata(data, verbose);
+        if (this.decryptcb) {
+            return await this.decryptcb(data, verbose);
+        }
     }
 
+    static decryptwith(cb) {
+        /*
+        Takes a callback that should be used to decrypt data (see AccessControlList) for setting it.
+        The callback should return a promise.
+
+        cb(encrypteddata, verbose) => resolves to data
+         */
+        this.decryptcb = cb;
+    }
+
+}
+
+SmartDict.decryptdb = undefined;
+SmartDict.table2class = { // Each of these needs a constructor that takes data and is ok with no other parameters, (otherwise define a set of these methods as factories)
+    "sd": SmartDict
 }
 
 exports = module.exports = SmartDict;

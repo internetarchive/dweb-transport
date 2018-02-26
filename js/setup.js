@@ -10,10 +10,7 @@ const Transports = require('./Transports'); // Manage all Transports that are lo
 const TransportHTTP = require('./TransportHTTP');
 const TransportYJS = require('./TransportYJS');
 const TransportWEBTORRENT = require('./TransportWEBTORRENT');
-//TODO-REQUIRE above here are done
-
-const Dweb = require('./Dweb');
-
+const Domain = require('./Domain');
 
 /*
     This file sets up various data structures,
@@ -52,21 +49,11 @@ async function p_setup(verbose) {
         let t_http = await TransportHTTP.p_setup(opts, verbose); await t_http.p_status();
         //let t_webtorrent = await TransportWEBTORRENT.p_test(opts, verbose); await t_webtorrent.p_status();
         if (verbose) console.log("setup returned and transport(s) connected:", Transports.connectedNames());
-        await Dweb.Domain.p_setupOnce(verbose);
+        await Domain.p_setupOnce(verbose);
     } catch (err) {
         console.log("Test failed", err);
     }
 
-
 }
 p_setup(verbose);
-/* path tests not done ... old ones
- console.log("Now test path using dwebfile and sb =======");
- verbose=false;
- Dweb.p_dwebfile("sb", sburl, "langs/readme.md", ["p_elem", "myList.2", verbose, null]);
- console.log("Now test path using dwebfile and mb =======");
- Dweb.p_dwebfile("mb", mburl, "langs/readme.md", ["p_elem", "myList.3", verbose, null]);
- console.log("END testing previouslyworking()");
-
- */
 

@@ -1,8 +1,6 @@
 const errors = require('./Errors'); // Standard Dweb Errors
 const Transport = require('./Transport'); // Base class for TransportXyz
 const Transports = require('./Transports'); // Manage all Transports that are loaded
-//TODO-REQUIRE above here are done
-const Dweb = require('./Dweb.js');
 const nodefetch = require('node-fetch-npm');
 const Url = require('url');
 
@@ -223,8 +221,7 @@ class TransportHTTP extends Transport {
                 (parsedurl.protocol === "https" && parsedurl.host === "gateway.dweb.me" && parsedurl.pathname.includes('/content/rawfetch'))
                 || (parsedurl.protocol === "contenthash:" && (parsedurl.pathname.split('/')[1] === "contenthash")));
         if (!u) {
-            //TODO-REQUIRE see if this is ever used, and maybe pass something as option from testing
-            u = `contenthash:/contenthash/${ Dweb.KeyPair.multihashsha256_58(cl.keypair.publicexport()[0]) }`; // Pretty random, but means same test will generate same list
+            u = `contenthash:/contenthash/${ cl.keypair.verifyexportmultihashsha256_58() }`; // Pretty random, but means same test will generate same list and server is expecting base58 of a hash
         }
         return [u,u];
     }
@@ -235,16 +232,12 @@ class TransportHTTP extends Transport {
     // Support for Key-Value pairs as per
     // https://docs.google.com/document/d/1yfmLRqKPxKwB939wIy9sSaa7GKOzM5PrCZ4W1jRGW6M/edit#
     async p_newdatabase(pubkey, verbose) {
-        //TODO-REQUIRE make this call a method on pubkey (ducktype)
-        if (pubkey instanceof Dweb.PublicPrivate)
-            pubkey = pubkey.keypair;
-        if (pubkey instanceof Dweb.KeyPair)
-            pubkey = pubkey.publicexport();
-        if (Array.isArray(pubkey))
-            pubkey = pubkey.find(k => k.startsWith("NACL VERIFY:"));
+        //if (pubkey instanceof Dweb.PublicPrivate)
+        if (pubkey.hasOwnProperty("keypair"))
+            pubkey = pubkey.keypair.signingexport()
         // By this point pubkey should be an export of a public key of form xyz:abc where xyz
         // specifies the type of public key (NACL VERIFY being the only kind we expect currently)
-        let u =  `${this.urlbase}/getall/table/${encodeURIComponent(pubkey)}`; //TODO-KEYVALUE replace with URL of server
+        let u =  `${this.urlbase}/getall/table/${encodeURIComponent(pubkey)}`;
         return {"publicurl": u, "privateurl": u};
     }
 

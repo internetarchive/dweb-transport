@@ -109,7 +109,7 @@
                 // Any code you want to run once online goes here.
                 starteditor();
                 //Setup a callback so once logged in it will populate drop-downs
-                Dweb.eventHandler.addEventListener((event) => {
+                Dweb.KeyChain.eventHandler.addEventListener((event) => {    //TODO-EVENT move to new mechanism in PublicPrivate
                     console.log("event",event);
                     if (event.type === "login") { onlogin(event.values); }
                 });

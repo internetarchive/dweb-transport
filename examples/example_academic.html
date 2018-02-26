@@ -80,10 +80,10 @@
                 //verbose = true;
                 let multihash = el.getAttribute("href"); // Note this is not el.href which has the domain as well
                 if (verbose) console.log("display_ipfs:", multihash);
-                let blk = await Dweb.Block.p_fetch([`ipfs:/ipfs/${multihash}`], verbose);
-                if (verbose) console.log("display_ipfs retrieved", blk._data.constructor.name, blk.size());
-                if (verbose && blk.size() < 1000) console.log("Buffer=", blk._data.toString());
-                display_blob(blk._data, {type: 'application/pdf'}); //TODO allow for multiple types
+                let data = await Transportable.p_fetch([`ipfs:/ipfs/${multihash}`], verbose);
+                if (verbose) console.log("display_ipfs retrieved", data.constructor.name, blk.size());
+                if (verbose && data.length < 1000) console.log("Buffer=", data.toString());
+                display_blob(data, {type: 'application/pdf'}); //TODO allow for multiple types
             } catch(err) {
                     console.log("display_ipfs cant retrieve",err)
             }

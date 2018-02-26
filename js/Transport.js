@@ -207,7 +207,7 @@ class Transport {
     async p_newdatabase(pubkey, verbose) {  //TODO-API-KEYVALUE
         /*
          Create a new database based on some existing object
-         pubkey:    Something that is, or has a pubkey, by default support Dweb.PublicPrivate, Dweb.KeyPair or an array of strings as in the output of keypair.publicexport()
+         pubkey:    Something that is, or has a pubkey, by default support Dweb.PublicPrivate, KeyPair or an array of strings as in the output of keypair.publicexport()
          returns: {publicurl, privateurl} which may be the same if there is no write authentication
           */
         throw new errors.ToBeImplementedError("Undefined function Transport.p_newdatabase");

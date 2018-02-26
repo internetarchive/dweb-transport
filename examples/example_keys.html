@@ -20,7 +20,7 @@
                 await p_connect(); // Default startup beavior from loginutils.js
                 // Any code you want to run once online goes here.
                 var url = searchparams.get("url"); // Unused in this example
-                Dweb.eventHandler.addEventListener((event) => {
+                Dweb.KeyChain.eventHandler.addEventListener((event) => {   //TODO-EVENT move to new mechanism in PublicPrivate
                     console.log("event",event);
                     if (event.type === "login") { onlogin(event.values); }
                 });

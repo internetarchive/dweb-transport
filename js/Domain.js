@@ -1,9 +1,11 @@
 const errors = require('./Errors'); // Standard Dweb Errors
 const Transports = require('./Transports'); // Manage all Transports that are loaded
-//TODO-REQUIRE above here are done
-const KeyValueTable = require("./KeyValueTable"); //for extends
+const Transportable = require('./Transportable'); // Base class of any object the transports can handle
 const SmartDict = require("./SmartDict"); //for extends
-const Dweb = require("./Dweb");
+const KeyPair = require('./KeyPair'); // Encapsulate public/private key pairs and crypto libraries
+const utils = require('./utils'); // Utility functions
+const KeyValueTable = require("./KeyValueTable"); //for extends
+const KeyChain = require('./KeyChain'); // Hold a set of keys, and locked objects
 
 //Mixins based on https://javascriptweblog.wordpress.com/2011/05/31/a-fresh-look-at-javascript-mixins/
 
@@ -24,7 +26,7 @@ const SignatureMixin = function(fieldlist) {
         this.signatures = this.signatures || [];
     };
     this._signable = function(date) {
-        return JSON.stringify({"date": date, signed: Dweb.utils.keyFilter(this, this.__proto__.fieldlist)});
+        return JSON.stringify({"date": date, signed: utils.keyFilter(this, this.__proto__.fieldlist)});
     };
     this._signSelf = function(keypair) { // Pair of verify
         const date = new Date(Date.now());
@@ -38,7 +40,7 @@ const SignatureMixin = function(fieldlist) {
         console.debug("WARNING - faking signature verification while testing gateway to archive metadata")
         return this.signatures
             .filter(sig => ( sig.signature === "FAKEFAKEFAKE"  ||       // TODO=DOMAIN obviously this is faking verification while testing gateway to archive metadata
-                new Dweb.KeyPair({key: sig.signedby}).verify(this._signable(sig.date), sig.signature)))
+                new KeyPair({key: sig.signedby}).verify(this._signable(sig.date), sig.signature)))
             .map(sig => sig.signedby);
     };
 
@@ -85,7 +87,7 @@ class Leaf extends SmartDict {
         this.metadata = this.metadata || {};         // Other information about the object needed before or during retrieval
     }
     static async p_new(data, verbose, options) {
-        if (data instanceof Dweb.Transportable) {
+        if (data instanceof Transportable) {
             data = {urls: data._publicurls || data._urls };  // Public if appropriate else _urls
         }
         return new this(data, verbose, options)
@@ -104,7 +106,7 @@ class Leaf extends SmartDict {
         let obj;
         try {
             if (["application/json"].includes(this.mimetype) ) {
-                let data = Dweb.Transportable.p_fetch(this.urls, verbose);
+                let data = Transportable.p_fetch(this.urls, verbose);
                 let datajson = (typeof data === "string" || data instanceof Buffer) ? JSON.parse(data) : data;          // Parse JSON (dont parse if p_fetch has returned object (e.g. from KeyValueTable
                 if (this.metadata["jsontype"] === "archive.org.dweb") {
                     let obj = await this._after_fetch(datajson, urls, verbose);   // Interpret as dweb - look at its "table" and possibly decrypt
@@ -127,6 +129,7 @@ class Leaf extends SmartDict {
 }
 NameMixin.call(Leaf.prototype);
 SignatureMixin.call(Leaf.prototype, ["urls", "fullname", "expires"]);
+SmartDict.table2class["leaf"] = Leaf;
 
 class Domain extends KeyValueTable {
     /*
@@ -235,7 +238,7 @@ class Domain extends KeyValueTable {
             //TODO-CONFIG put this (and other TODO-CONFIG into config file)
             const rootpublicurls = ['ipfs:/ipfs/zdpuAp5dg6LphYwebkqGqqebhgLgxW26VAxe76k68D7dVa1oa',
                 'contenthash:/contenthash/QmPxMb15iFcCiCnx6oWu6JJdNnwiqNkb5PVoAjbMBCAWLA'];
-            this.root = await Dweb.SmartDict.p_fetch(rootpublicurls, verbose);
+            this.root = await SmartDict.p_fetch(rootpublicurls, verbose);
         }
         const res = this.root.p_resolve(path, {verbose});
         console.log("Resolved path",path);
@@ -260,7 +263,7 @@ class Domain extends KeyValueTable {
             const name = pathArray.join('/');
             res = await this.p_get(name, verbose);
             if (res) {
-                res = await Dweb.SmartDict._after_fetch(res, [], verbose);  //Turn into an object
+                res = await SmartDict._after_fetch(res, [], verbose);  //Turn into an object
                 this.verify(name, res);                                     // Check its valid
                 break;
             }
@@ -271,7 +274,7 @@ class Domain extends KeyValueTable {
         const name = remainder.shift();
         res = await this.p_get(name, verbose);
         if (res) {
-            res = await Dweb.SmartDict._after_fetch(res, [], verbose);  //Turn into an object
+            res = await SmartDict._after_fetch(res, [], verbose);  //Turn into an object
             this.verify(name, res);                                     // Check its valid
         }
         if (res) { // Found one
@@ -294,7 +297,7 @@ class Domain extends KeyValueTable {
         //const metadatagateway = 'http://localhost:4244/leaf/archiveid';
         const metadataGateway = 'https://gateway.dweb.me/leaf/archiveid'; //TODO-BOOTSTRAP need to run this against main gateway
         const pass = "Replace this with something secret";
-        const kc = await Dweb.KeyChain.p_new({name: "test_keychain kc"}, {passphrase: pass}, verbose);    //TODO-DOMAIN replace with secret passphrase
+        const kc = await KeyChain.p_new({name: "test_keychain kc"}, {passphrase: pass}, verbose);    //TODO-DOMAIN replace with secret passphrase
         //TODO-DOMAIN add ipfs address and ideally ipns address to archiveOrgDetails record
         //p_new should add registrars at whichever compliant transports are connected (YJS, HTTP)
         Domain.root = await Domain.p_new({_acl: kc, fullname: ""}, true, {passphrase: pass+"/"}, verbose, [], {   //TODO-NAME will need a secure root key
@@ -311,7 +314,7 @@ class Domain extends KeyValueTable {
         }); //root
         const testing = Domain.root.tablepublicurls.map(u => u.includes("localhost")).includes(true);
         console.log("Domain.root publicurls for",testing ? "testing:" : "inclusion in bootloader.html:",Domain.root._publicurls);
-        if (verbose) console.log(await Dweb.Domain.root.p_printable());
+        if (verbose) console.log(await this.root.p_printable());
     }
 
 
@@ -322,7 +325,7 @@ class Domain extends KeyValueTable {
             //Register the toplevel domain
             // Set mnemonic to value that generates seed "01234567890123456789012345678901"
             const mnemonic = "coral maze mimic half fat breeze thought champion couple muscle snack heavy gloom orchard tooth alert cram often ask hockey inform broken school cotton"; // 32 byte
-            const kc = await Dweb.KeyChain.p_new({name: "test_keychain kc"}, {mnemonic: mnemonic}, verbose);    //Note in KEYCHAIN 4 we recreate exactly same way.
+            const kc = await KeyChain.p_new({name: "test_keychain kc"}, {mnemonic: mnemonic}, verbose);    //Note in KEYCHAIN 4 we recreate exactly same way.
             Domain.root = await Domain.p_new({
                 fullname: "",   // Root is "" so that [fullname,name].join('/' is consistent for next level.
                 keys: [],
@@ -336,10 +339,10 @@ class Domain extends KeyValueTable {
             await Domain.root.p_register("testingtoplevel", testingtoplevel, verbose);
             const adomain = await Domain.p_new({_acl: kc}, true, {passphrase: pass+"/testingtoplevel/adomain"});
             await testingtoplevel.p_register("adomain", adomain, verbose);
-            const item1 = await new Dweb.SmartDict({"name": "My name", "birthdate": "2001-01-01"}).p_store();
+            const item1 = await new SmartDict({"name": "My name", "birthdate": "2001-01-01"}).p_store();
             await adomain.p_register("item1", item1, verbose);
             // Now try resolving on a client - i.e. without the Domain.root privte keys
-            const ClientDomainRoot = await Dweb.SmartDict.p_fetch(Domain.root._publicurls, verbose);
+            const ClientDomainRoot = await SmartDict.p_fetch(Domain.root._publicurls, verbose);
             let res= await ClientDomainRoot.p_resolve('testingtoplevel/adomain/item1', {verbose});
             if (verbose) console.log("Resolved to",await res[0].p_printable({maxindent:2}),res[1]);
             console.assert(res[0].urls[0] === item1._urls[0]);
@@ -369,7 +372,7 @@ class Domain extends KeyValueTable {
             //TODO-DOMAIN note p_resolve is faking signature verification on FAKEFAKEFAKE - will also need to error check that which currently causes exception
             console.assert(res[0].fullname === "/"+name);
             if (verbose) console.log("Resolved",name,"to",await res[0].p_printable({maxindent:2}), res[1]);
-            let metadata = await Dweb.Transportable.p_fetch(res[0].urls); // Using Block as its multiurl and might not be HTTP urls
+            let metadata = await Transportable.p_fetch(res[0].urls); // Using Block as its multiurl and might not be HTTP urls
             if (verbose) console.log("Retrieved metadata",JSON.stringify(metadata));
             console.log("---Expect failure to resolve 'arc/archive.org/details/commute'");
             console.assert(metadata.metadata.identifier === itemid);
@@ -395,5 +398,6 @@ NameMixin.call(Domain.prototype);   // Add in the Mixin
 SignatureMixin.call(Domain.prototype, ["tablepublicurls", "fullname", "keys", "expires"]);
 
 Domain.clsLeaf = Leaf;  // Just So exports can find it and load into Dweb TODO move to own file
+SmartDict.table2class["domain"] = Domain;
 
 exports = module.exports = Domain;

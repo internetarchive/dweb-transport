@@ -1,6 +1,6 @@
 const Url = require('url');
 const errors = require('./Errors');
-//const Dweb = require('./Dweb.js');
+const utils = require('./utils'); // Utility functions
 
 /*
 Handles multiple transports, API should be (almost) the same as for an individual transport)
@@ -415,13 +415,13 @@ class Transports {
             let testurl = "yjs:/yjs/THISATEST";  // Just a predictable number can work with
             let res = await transport.p_rawlist(testurl, verbose);
             let listlen = res.length;   // Holds length of list run intermediate
-            if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res));
+            if (verbose) console.log("rawlist returned ", ...utils.consolearr(res));
             transport.listmonitor(testurl, (obj) => console.log("Monitored", obj), verbose);
             let sig = new Dweb.Signature({urls: ["123"], date: new Date(Date.now()), signature: "Joe Smith", signedby: [testurl]}, verbose);
             await transport.p_rawadd(testurl, sig, verbose);
             if (verbose) console.log("TransportIPFS.p_rawadd returned ");
             res = await transport.p_rawlist(testurl, verbose);
-            if (verbose) console.log("rawlist returned ", ...Dweb.utils.consolearr(res)); // Note not showing return
+            if (verbose) console.log("rawlist returned ", ...utils.consolearr(res)); // Note not showing return
             await delay(500);
             res = await transport.p_rawlist(testurl, verbose);
             console.assert(res.length === listlen + 1, "Should have added one item");

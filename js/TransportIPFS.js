@@ -24,8 +24,7 @@ const promisify = require('promisify-es6');
 const errors = require('./Errors'); // Standard Dweb Errors
 const Transport = require('./Transport.js'); // Base class for TransportXyz
 const Transports = require('./Transports'); // Manage all Transports that are loaded
-//TODO-REQUIRE above here are done
-const Dweb = require('./Dweb');
+const utils = require('./utils'); // Utility functions
 
 let defaultoptions = {
     ipfs: {
@@ -179,7 +178,7 @@ class TransportIPFS extends Transport {
         :resolve buffer: Return the object being fetched. (may in the future return a stream and buffer externally)
         :throws:        TransportError if url invalid - note this happens immediately, not as a catch in the promise
          */
-        if (verbose) console.log("IPFS p_rawfetch", Dweb.utils.stringfrom(url));
+        if (verbose) console.log("IPFS p_rawfetch", utils.stringfrom(url));
         if (!url) throw new errors.CodingError("TransportIPFS.p_rawfetch: requires url");
         const cid = TransportIPFS.cidFrom(url);  // Throws TransportError if url bad
         const ipfspath = TransportIPFS.ipfsFrom(url) // Need because dag.get has different requirement than file.cat
@@ -197,7 +196,7 @@ class TransportIPFS extends Transport {
                 //console.log("Case a or b" - we can tell the difference by looking at (res.value._links.length > 0) but dont need to
                 // as since we dont know if we are on node or browser best way is to try the files.cat and if it fails try the block to get an approximate file);
                 // Works on Node, but fails on Chrome, cant figure out how to get data from the DAGNode otherwise (its the wrong size)
-                //buff = await Dweb.utils.p_streamToBuffer(await this.ipfs.files.cat(cid), true); //js-ipfs v0.26 version
+                //buff = await utils.p_streamToBuffer(await this.ipfs.files.cat(cid), true); //js-ipfs v0.26 version
                 buff = await this.ipfs.files.cat(ipfspath); //See js-ipfs v0.27 version and  https://github.com/ipfs/js-ipfs/issues/1229 and https://github.com/ipfs/interface-ipfs-core/blob/master/SPEC/FILES.md#cat
                 /* Was needed on v0.26, not on v0.27
                 if (buff.length === 0) {    // Hit the Chrome bug

@@ -1,7 +1,7 @@
 const errors = require('./Errors');
 const sodium = require("libsodium-wrappers");
 const SmartDict = require("./SmartDict");
-const Dweb = require("./Dweb");
+const utils = require('./utils'); // Utility functions
 const crypto = require('crypto'); // Needed to do a simple sha256 which doesnt appear to be in libsodium
 //Buffer seems to be built in, require('Buffer') actually breaks things
 const multihashes = require('multihashes');
@@ -91,7 +91,7 @@ class KeyPair extends SmartDict {
                     delete value.keygen;
                 }
                 if (value.seed) {
-                    value = KeyPair._keyfromseed(value.seed, Dweb.KeyPair.KEYTYPESIGNANDENCRYPT, verbose);
+                    value = KeyPair._keyfromseed(value.seed, KeyPair.KEYTYPESIGNANDENCRYPT, verbose);
                 }
             }
             this._key = value;
@@ -156,10 +156,10 @@ class KeyPair extends SmartDict {
         let key = {};
         if (sodium.crypto_box_SEEDBYTES !== seed.length) throw new errors.CodingError(`Seed should be ${sodium.crypto_box_SEEDBYTES}, but is ${seed.length}`);
         key.seed = seed;
-        if (keytype === Dweb.KeyPair.KEYTYPESIGN || keytype === Dweb.KeyPair.KEYTYPESIGNANDENCRYPT) {
+        if (keytype === KeyPair.KEYTYPESIGN || keytype === KeyPair.KEYTYPESIGNANDENCRYPT) {
             key.sign = sodium.crypto_sign_seed_keypair(key.seed); // Object { publicKey: Uint8Array[32], privateKey: Uint8Array[64], keyType: "ed25519" }
         }
-        if (keytype === Dweb.KeyPair.KEYTYPEENCRYPT || keytype === Dweb.KeyPair.KEYTYPESIGNANDENCRYPT) {
+        if (keytype === KeyPair.KEYTYPEENCRYPT || keytype === KeyPair.KEYTYPESIGNANDENCRYPT) {
             key.encrypt = sodium.crypto_box_seed_keypair(key.seed); // Object { publicKey: Uint8Array[32], privateKey: Uint8Array[64] } <<maybe other keyType
             // note this doesnt have the keyType field
         }
@@ -190,7 +190,7 @@ class KeyPair extends SmartDict {
             if (tag === "NACL PUBLIC")           { this._key["encrypt"] = {"publicKey": hasharr};
             } else if (tag === "NACL PRIVATE")   { throw new errors.ToBeImplementedError("_importkey: Cant (yet) import Private key "+value+" normally use SEED");
             } else if (tag === "NACL SIGNING")   { throw new errors.ToBeImplementedError("_importkey: Cant (yet) import Signing key "+value+" normally use SEED");
-            } else if (tag === "NACL SEED")      { this._key = KeyPair._keyfromseed(hasharr, Dweb.KeyPair.KEYTYPESIGNANDENCRYPT);
+            } else if (tag === "NACL SEED")      { this._key = KeyPair._keyfromseed(hasharr, KeyPair.KEYTYPESIGNANDENCRYPT);
             } else if (tag === "NACL VERIFY")    { this._key["sign"] = {"publicKey": hasharr};
             } else { throw new errors.ToBeImplementedError("_importkey: Cant (yet) import "+value) }
         }
@@ -208,6 +208,11 @@ class KeyPair extends SmartDict {
         if (this._key.encrypt) { res.push("NACL PUBLIC:"+sodium.to_urlsafebase64(this._key.encrypt.publicKey)) }
         if (this._key.sign) { res.push(this.signingexport()) }
         return res;
+    }
+    verifyexportmultihashsha256_58() {
+        // This is a pretty arbitrary export used for list addresses etc, it might be changed to the publickey allowing signature checking
+        // but note that currently the server expects a base58 obj
+        return  KeyPair.multihashsha256_58(this.signingexport())
     }
 
     mnemonic() { throw new errors.ToBeImplementedError("Undefined function KeyPair.mnemonic"); }
@@ -260,7 +265,7 @@ class KeyPair extends SmartDict {
         const nonce = sodium.randombytes_buf(sodium.crypto_box_NONCEBYTES);
         const ciphertext = sodium.crypto_box_easy(data, nonce, this._key.encrypt.publicKey, signer.keypair._key.encrypt.privateKey, "uint8array"); //(message, nonce, publicKey, secretKey, outputFormat)
 
-        const combined = Dweb.utils.mergeTypedArraysUnsafe(nonce, ciphertext);
+        const combined = utils.mergeTypedArraysUnsafe(nonce, ciphertext);
         return b64 ? sodium.to_urlsafebase64(combined) : sodium.to_string(combined);
     }
     decrypt(data, signer, outputformat) {
@@ -360,7 +365,7 @@ class KeyPair extends SmartDict {
         sym_key = sodium.from_urlsafebase64(sym_key);
         const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
         const ciphertext = sodium.crypto_secretbox_easy(data, nonce, sym_key, "uint8array");  // message, nonce, key, outputFormat
-        const combined = Dweb.utils.mergeTypedArraysUnsafe(nonce, ciphertext);
+        const combined = utils.mergeTypedArraysUnsafe(nonce, ciphertext);
         return b64 ? sodium.to_urlsafebase64(combined) : sodium.to_string(combined);
     };
 
@@ -439,6 +444,8 @@ class KeyPair extends SmartDict {
 KeyPair.KEYTYPESIGN = 1;            // Want a signing key
 KeyPair.KEYTYPEENCRYPT = 2;         // Want a key for encryption
 KeyPair.KEYTYPESIGNANDENCRYPT = 3;  // Want both types of key - this is usually used for encryption due to libsodium-wrappers limitations.
+
+SmartDict.table2class["kp"] = KeyPair;
 
 
 exports = module.exports = KeyPair;

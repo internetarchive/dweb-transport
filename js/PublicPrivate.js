@@ -1,8 +1,9 @@
 const errors = require('./Errors'); // Standard Dweb Errors
 const Transports = require('./Transports'); // Manage all Transports that are loaded
-//TODO-REQUIRE above here are done
 const SmartDict = require("./SmartDict"); //for extends
-const Dweb = require("./Dweb");
+const KeyPair = require('./KeyPair'); // Encapsulate public/private key pairs and crypto libraries
+const Signature = require('./Signature'); // Encapsulate a signature as used for items on a CommonList
+const utils = require('./utils'); // Utility functions
 
 
 class PublicPrivate extends SmartDict {
@@ -65,12 +66,12 @@ class PublicPrivate extends SmartDict {
 
     keytype() {
         /*
-        Return the type of key to use from Dweb.KeyPair.KEYTYPE* constants
+        Return the type of key to use from KeyPair.KEYTYPE* constants
         By default its KEYTYPESIGN, but KeyChain subclasses
 
         :return: constant
          */
-        return Dweb.KeyPair.KEYTYPESIGN;
+        return KeyPair.KEYTYPESIGN;
     }
 
     __setattr__(name, value) {
@@ -99,11 +100,11 @@ class PublicPrivate extends SmartDict {
 
         :param value: KeyPair, or Dict like _key field of KeyPair
          */
-        if (value && !(value instanceof Dweb.KeyPair)) {
+        if (value && !(value instanceof KeyPair)) {
             if (value["table"]) {
-                value = Dweb.SmartDict._sync_after_fetch(value, [], verbose)
+                value = SmartDict._sync_after_fetch(value, [], verbose)
             } else {
-                value = new Dweb.KeyPair({key: value}, verbose) // Note ignoring keytype for now
+                value = new KeyPair({key: value}, verbose) // Note ignoring keytype for now
             }
         }
         this.keypair = value;
@@ -190,7 +191,7 @@ class PublicPrivate extends SmartDict {
         */
         if (!urls || !urls.length) throw new errors.CodingError("Empty url is a coding error");
         if (!this._master) throw new errors.ForbiddenError("Must be master to sign something");
-        let sig = await Dweb.Signature.p_sign(this, urls, verbose); //returns a new Signature
+        let sig = await Signature.p_sign(this, urls, verbose); //returns a new Signature
         if (!sig.signature) throw new errors.CodingError("Must be a signature");
         return sig
     }
@@ -204,7 +205,7 @@ class PublicPrivate extends SmartDict {
         returns:    true if verifies
         throws:     assertion error if doesn't //TODO handle that gracefully depending on caller
          */
-        return Dweb.utils.intersects(this._publicurls, sig.signedby)    // Check signedby assertion is for this list -
+        return utils.intersects(this._publicurls, sig.signedby)    // Check signedby assertion is for this list -
             && this.keypair.verify(sig.signable(), sig.signature)    //TODO currently throws assertion error if doesnt - not sure that is correct
     }
     objbrowser_fields(propname) {
@@ -251,11 +252,12 @@ class PublicPrivate extends SmartDict {
         let stack = this._listeners[event.type];
         console.log("THIS=", this, "event.target=", event.target);
         //event.target = this;   //https://developer.mozilla.org/en-US/docs/Web/API/EventTarget but fails because target is readonly, with no apparent way to set it
-        for (let i = 0, l = stack.length; i < l; i++) {
+        for (let i = 0, l = stack.length; i < l; i++) { //TODO-EVENTS add try/catch around this next call - like in EventListenerHandler
             stack[i].call(this, event);
         }
         return !event.defaultPrevented;
     }
 }
 
+SmartDict.table2class["pp"] = PublicPrivate;
 exports = module.exports = PublicPrivate;

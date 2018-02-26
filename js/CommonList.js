@@ -1,8 +1,10 @@
 const errors = require('./Errors'); // Standard Dweb Errors
 const Transports = require('./Transports'); // Manage all Transports that are loaded
-//TODO-REQUIRE above here are done
+const Transportable = require('./Transportable'); // Base class of any object the transports can handle
+const SmartDict = require('./SmartDict'); // General handling of JSON structures
+const Signature = require('./Signature'); // Encapsulate a signature as used for items on a CommonList
 const PublicPrivate = require("./PublicPrivate"); //for extends
-const Dweb = require("./Dweb");
+const utils = require('./utils'); // Utility functions
 //https://www.npmjs.com/package/custom-event && https://github.com/webmodules/custom-event
 const CustomEvent = require('custom-event'); // From web, Not present in node - this code uses global.CustomEvent if it exists so safe on browser/node
 
@@ -87,7 +89,7 @@ class CommonList extends PublicPrivate {    //TODO-API split CL and PP
         let lines = await Transports.p_rawlist(this.listpublicurls, verbose); // [[sig,sig],[sig,sig]]
         if (verbose) console.log("CommonList:p_fetchlist.success", this._urls, "len=", lines.length);
         this._list = lines
-            .map((l) => new Dweb.Signature(l, verbose))    // Turn each line into a Signature
+            .map((l) => new Signature(l, verbose))    // Turn each line into a Signature
             .sort((a,b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);  // Sort signatures by date
     }
 
@@ -101,7 +103,7 @@ class CommonList extends PublicPrivate {    //TODO-API split CL and PP
             await this.p_fetchlist(verbose);
             this.listmonitor(verbose);  // Track any future objects  - will call event Handler on any added
             return await Promise.all(
-                Dweb.Signature.filterduplicates(this._list) // Dont load multiple copies of items on list (might need to be an option?)
+                Signature.filterduplicates(this._list) // Dont load multiple copies of items on list (might need to be an option?)
                     .map((sig) => sig.p_fetchdata(verbose))
             ); // Return is array result of p_fetchdata which is array of new objs (suitable for storing in keys etc)
         } catch(err) {
@@ -128,7 +130,7 @@ class CommonList extends PublicPrivate {    //TODO-API split CL and PP
             await this.p_store(verbose);        // Make sure list is stored before store anything on it.
             if (verbose) console.log("CL.p_push", obj._urls, "onto", this._urls);
             let urls = obj;
-            if (obj instanceof Dweb.Transportable) {
+            if (obj instanceof Transportable) {
                 await obj.p_store(verbose);     // Make sure any object is stored
                 urls = obj._urls;
             }
@@ -157,7 +159,7 @@ class CommonList extends PublicPrivate {    //TODO-API split CL and PP
         :resolves:  undefined
          */
         if (!sig) throw new errors.CodingError("CommonList.p_add is meaningless without a sig");
-        if (! Dweb.utils.intersects(sig.signedby, this._publicurls)) throw new errors.CodingError(`CL.p_add: sig.signedby ${sig.signedby} should overlap with this._publicurls ${this._publicurls}`);
+        if (! utils.intersects(sig.signedby, this._publicurls)) throw new errors.CodingError(`CL.p_add: sig.signedby ${sig.signedby} should overlap with this._publicurls ${this._publicurls}`);
         return Transports.p_rawadd(this.listpublicurls, sig, verbose);
     }
 
@@ -179,7 +181,7 @@ class CommonList extends PublicPrivate {    //TODO-API split CL and PP
         Transports.listmonitor(this.listpublicurls,
                 (obj) => {
                     if (verbose) console.log("listmonitor added",obj,"to",this.listpublicurls);
-                    let sig = new Dweb.Signature(obj, verbose);
+                    let sig = new Signature(obj, verbose);
                     if (this.verify(sig)) { // Ignore if not signed by this node, and verify throws Signing Error if correct list, but not verified
                         if (!this._list.some((othersig) => othersig.signature === sig.signature)) {    // Check not duplicate (esp of locally pushed one
                             this._list.push(sig);
@@ -193,4 +195,5 @@ class CommonList extends PublicPrivate {    //TODO-API split CL and PP
                 });
     }
 }
+SmartDict.table2class["cl"] = CommonList;
 exports = module.exports = CommonList;

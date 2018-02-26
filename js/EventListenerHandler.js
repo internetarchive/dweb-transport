@@ -1,6 +1,6 @@
 class EventListenerHandler {
     /*
-    NOTE this is copied from Yjs and TODO maybe should be made more like Node streams interface
+    NOTE this is copied from Yjs and TODO maybe should be made more like Node streams interface or the one in PublicPrivate.js
 
     An event is a callback f({name, values})
 

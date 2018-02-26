@@ -1,6 +1,5 @@
 const errors = require('./Errors');
 const Transportable = require("./Transportable");
-const Dweb = require("./Dweb");
 
 // ######### Parallel development to Block.py ########
 

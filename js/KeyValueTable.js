@@ -1,7 +1,8 @@
 const Transports = require('./Transports'); // Manage all Transports that are loaded
-//TODO-REQUIRE above here are done
+const Transportable = require('./Transportable'); // Base class of any object the transports can handle
+const SmartDict = require("./SmartDict");   // _AccessControlListEntry extends this
 const PublicPrivate = require("./PublicPrivate"); //for extends
-const Dweb = require("./Dweb");
+const utils = require('./utils'); // Utility functions
 const CustomEvent = require('custom-event'); // From web, Not present in node - this code uses global.CustomEvent if it exists so safe on browser/node
 
 class KeyValueTable extends PublicPrivate {
@@ -68,7 +69,7 @@ class KeyValueTable extends PublicPrivate {
         If change that assumption - and store Objects - then these two functions should be only place that needs changing.
         This pair should be able to be subclassed safely as long as _mapFromStorage(_storageFromMap(x)) == x for your definition of equality.
          */
-        if (mapVal instanceof Dweb.Transportable) {
+        if (mapVal instanceof Transportable) {
             return mapVal._getdata({publicOnly, encryptIfAcl});               // This should also take care of not storing unencrypted private keys, and encrypting if requested.
         } else {
             return JSON.stringify(mapVal)
@@ -83,7 +84,7 @@ class KeyValueTable extends PublicPrivate {
             return obj.map( m => this._storageFromMap(m))
         } else if (typeof(obj) === "object") {
             if (obj["table"]) {
-                obj = Dweb.SmartDict._sync_after_fetch(obj, [], verbose);   // Convert object to subclass of Transportable, note cant decrypt as sync
+                obj = SmartDict._sync_after_fetch(obj, [], verbose);   // Convert object to subclass of Transportable, note cant decrypt as sync
             }
             //else If no "table" field, then just return the object.
         }
@@ -107,7 +108,7 @@ class KeyValueTable extends PublicPrivate {
         if (this._autoset && !fromNet && (this._map[name] !== value)) {
             await Transports.p_set(this.tableurls, name, this._storageFromMap(value, {publicOnly, encryptIfAcl}), verbose); // Note were not waiting for result but have to else hit locks
         }
-        if (!((value instanceof Dweb.PublicPrivate) && this._map[name] && this._map[name]._master)) {
+        if (!((value instanceof PublicPrivate) && this._map[name] && this._map[name]._master)) {
             // Dont overwrite the name:value pair if we already hold the master copy. This is needed for Domain, but probably generally useful
             // The typical scenario is that a p_set causes a monitor event back on same machine, but value is the public version
             this._map[name] = value;
@@ -130,7 +131,7 @@ class KeyValueTable extends PublicPrivate {
             this._updatemap(res);
         }
         // Return from _map after possibly updating it
-        return Dweb.utils.keyFilter(this._map, keys);
+        return utils.keyFilter(this._map, keys);
     }
     async p_keys(verbose) {
         /*
@@ -186,7 +187,7 @@ class KeyValueTable extends PublicPrivate {
         try {
             let masterobj = await this.p_new({name: "TEST KEYVALUETABLE", _allowunsafestore: true}, true, {passphrase: "This is a test this is only a test of VersionList"}, verbose, { keyvaluetable: "TESTTABLENAME"});
             await masterobj.p_set("address","Nowhere", verbose);
-            let publicobj = await Dweb.SmartDict.p_fetch(masterobj._publicurls, verbose);
+            let publicobj = await SmartDict.p_fetch(masterobj._publicurls, verbose);
             await publicobj.p_getall(); // Load from table
             console.assert(publicobj._map["address"] === "Nowhere"); // Shouldnt be set yet
             await masterobj.p_set("address","Everywhere", verbose);
@@ -206,5 +207,6 @@ class KeyValueTable extends PublicPrivate {
 }
 function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { resolve(val); },ms)})}
 
+SmartDict.table2class["keyvaluetable"] = KeyValueTable;
 
 exports = module.exports = KeyValueTable;

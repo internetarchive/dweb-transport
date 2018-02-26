@@ -1,6 +1,6 @@
 const errors = require('./Errors');
 const SmartDict = require("./SmartDict");
-const Dweb = require("./Dweb");
+const KeyPair = require('./KeyPair'); // Encapsulate public/private key pairs and crypto libraries
 
 class Signature extends SmartDict {
     /*
@@ -91,7 +91,7 @@ class Signature extends SmartDict {
         :resolves to: obj - object that was signed
          */
         if (!this.data) {   // Fetch data if have not already fetched it
-            this.data = await Dweb.SmartDict.p_fetch(this.urls, verbose); // Resolves to new obj
+            this.data = await SmartDict.p_fetch(this.urls, verbose); // Resolves to new obj
         }
         return this.data;
     }
@@ -99,29 +99,6 @@ class Signature extends SmartDict {
     objbrowser_fields(propname) {
         let fieldtypes = { date: "str", urls: "urlarray", signature: "str", signedby: "urlarray"};
         return fieldtypes[propname] || super.objbrowser_fields(propname);
-    }
-
-    static async p_test(verbose) {
-        // Test Signatures
-        //verbose=true
-        let mydic = { "a": "AAA", "1":100, "B_date": Date.now()}; // Dic can't contain integer field names
-        let signedblock = new Dweb.SmartDict(mydic, verbose);
-        let keypair = new Dweb.KeyPair({"key":{"keygen":true}}, verbose);
-        // This test should really fail, BUT since keypair has private it passes signature
-        // commonlist0 = CommonList(keypair=keypair, master=false)
-        // print commonlist0
-        // signedblock.sign(commonlist0, verbose) # This should fail, but
-        if (verbose) console.log("test_Signatures CommonList");
-        let commonlist = await Dweb.CommonList.p_new({name: "test_Signatures.commonlist" }, true, keypair, verbose); //data,master,key,verbose
-        commonlist.table = "BOGUS";
-        if (verbose) console.log("test_Signatures sign");
-        commonlist._allowunsafestore = true;
-        let sig;
-        await signedblock.p_store(verbose);
-        sig = await Dweb.Signature.p_sign(commonlist, signedblock._urls, verbose); //commonlist, urls, verbose
-        commonlist._allowunsafestore = false;
-        if (verbose) console.log("test_Signatures verification");
-        if (!commonlist.verify(sig, verbose)) throw new errors.CodingError("Should verify");
     }
 
 }

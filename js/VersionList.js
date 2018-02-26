@@ -1,5 +1,6 @@
+const SmartDict = require("./SmartDict");   // _AccessControlListEntry extends this
 const CommonList = require("./CommonList"); // VersionList extends this
-const Dweb = require("./Dweb");
+const KeyChain = require('./KeyChain'); // Hold a set of keys, and locked objects
 
 class VersionList extends CommonList {
     /*
@@ -34,7 +35,7 @@ class VersionList extends CommonList {
         try {
             if (data.contentacl) {
                 if (typeof data.contentacl === "string") data.contentacl = [data.contentacl];
-                if (Array.isArray(data.contentacl)) data.contentacl = await Dweb.SmartDict.p_fetch(data.contentacl, verbose); // THis is the one that gets "Must be logged in as Mary Smith"
+                if (Array.isArray(data.contentacl)) data.contentacl = await SmartDict.p_fetch(data.contentacl, verbose); // THis is the one that gets "Must be logged in as Mary Smith"
             }
         } catch(err) {
                 console.log("Unable to expand data in p_expanddata",err);
@@ -51,7 +52,7 @@ class VersionList extends CommonList {
         firstinstance   instance used for initialization, will be copied for each version.
         resolves to:    new instance of VersionList (note since static, it cant make subclasses)
          */
-        if (!data.acl) data._acl = Dweb.KeyChain.default();
+        if (!data.acl) data._acl = KeyChain.default();
         if (verbose) console.log("VL.p_new data=%o",data);
         await VersionList.p_expanddata(data, verbose);  // Expands _contentacl url
         let vl = await super.p_new(data, master, key, verbose); // Calls CommonList.p_new -> new VL() -> new CL() and then sets listurls and listpublicurls
@@ -109,15 +110,15 @@ class VersionList extends CommonList {
         if (verbose) console.log("VersionList.test starting");
         try {
             //(data, master, key, verbose, options
-            let vl1 = await Dweb.VersionList.p_new({_allowunsafestore: true}, true, {passphrase: "This is a test this is only a test of VersionList"},
-                    new Dweb.SmartDict({textfield: "This is some content"}, verbose),
+            let vl1 = await this.p_new({_allowunsafestore: true}, true, {passphrase: "This is a test this is only a test of VersionList"},
+                    new SmartDict({textfield: "This is some content"}, verbose),
                     verbose);
             await vl1.p_fetchlistandworking(verbose);
             let siglength = vl1._list.length; // Will check for size below
             await vl1.p_saveversion(verbose);
             //console.log("VL.test after saveversion=",vl1);
             console.assert(vl1._list.length === siglength+1);
-            let vl2 = await Dweb.SmartDict.p_fetch(vl1._publicurls, verbose);
+            let vl2 = await SmartDict.p_fetch(vl1._publicurls, verbose);
             await vl2.p_fetchlistandworking(verbose);
             console.assert(vl2._list.length === siglength+1, "Expect list",siglength+1,"got",vl2._list.length);
             console.assert(vl2._working.textfield === vl1._working.textfield, "Should have retrieved");
@@ -128,5 +129,7 @@ class VersionList extends CommonList {
         }
     }
 }
+
+SmartDict.table2class["vl"] = VersionList;
 
 exports = module.exports = VersionList;

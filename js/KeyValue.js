@@ -1,4 +1,4 @@
-const Dweb = require("./Dweb");
+const SmartDict = require("./SmartDict");
 
 class KeyValue extends SmartDict {
     /*
