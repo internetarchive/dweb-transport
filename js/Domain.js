@@ -343,13 +343,13 @@ class Domain extends KeyValueTable {
             // Now some failure cases / errors
             if (verbose) console.log("-Expect unable to completely resolve");
             res= await Domain.root.p_resolve('testingtoplevel/adomain/itemxx', {verbose});
-            console.assert(typeof res === "undefined");
+            console.assert(typeof res[0] === "undefined");
             if (verbose) console.log("-Expect unable to completely resolve");
             res= await Domain.root.p_resolve('testingtoplevel/adomainxx/item1', {verbose});
-            console.assert(typeof res === "undefined");
+            console.assert(typeof res[0] === "undefined");
             if (verbose) console.log("-Expect unable to completely resolve");
             res= await Domain.root.p_resolve('testingtoplevelxx/adomain/item1', {verbose});
-            console.assert(typeof res === "undefined");
+            console.assert(typeof res[0] === "undefined");
             if (verbose) console.log("Structure of registrations");
             if (verbose) console.log(await Domain.root.p_printable());
             //TODO-NAME build some more failure cases (bad key, bad fullname)
@@ -357,6 +357,7 @@ class Domain extends KeyValueTable {
             // Commented out as should run under setup.js with correct transports
             // await this.p_setupOnce(verbose);
 
+            /* Dont expect this to quite work now not doing setupOnce in above test
             verbose=true;
             if (verbose) console.log("Next line should attempt to find in metadata table *YJS or HTTP) then try leaf/archiveid?key=commute");
             let itemid = "commute";
@@ -377,7 +378,7 @@ class Domain extends KeyValueTable {
                 console.log("Got error",err);
             }
             console.log('------');
-
+            */
 
         } catch (err) {
             console.log("Caught exception in Domain.test", err);
