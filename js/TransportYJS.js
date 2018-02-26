@@ -18,6 +18,7 @@ require('y-indexeddb')(Y);
 function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { resolve(val); },ms)})}
 
 // Other Dweb modules
+const errors = require('./Errors');
 const Transport = require('./Transport');
 const Dweb = require('./Dweb');
 
@@ -49,7 +50,7 @@ class TransportYJS extends Transport {
         this.supportURLs = ['yjs'];
         this.supportFunctions = ['fetch', 'add', 'list', 'listmonitor', 'newlisturls',
             'connection', 'get', 'set', 'getall', 'keys', 'newdatabase', 'newtable', 'monitor'];   // Only does list functions, Does not support reverse,
-        this.status = Dweb.Transport.STATUS_LOADED;
+        this.status = Transport.STATUS_LOADED;
     }
 
     async p__y(url, opts, verbose) {
@@ -114,12 +115,12 @@ class TransportYJS extends Transport {
         Throws: Error("websocket error") if WiFi off, probably other errors if fails to connect
         */
         try {
-            this.status = Dweb.Transport.STATUS_STARTING;   // Should display, but probably not refreshed in most case
+            this.status = Transport.STATUS_STARTING;   // Should display, but probably not refreshed in most case
             this.options.yarray.connector.ipfs = Dweb.Transports.ipfs(verbose).ipfs; // Find an IPFS to use (IPFS's should be starting in p_setup1)
             this.yarrays = {};
         } catch(err) {
             console.error("YJS failed to start",err);
-            this.status = Dweb.Transport.STATUS_FAILED;
+            this.status = Transport.STATUS_FAILED;
         }
         return this;
     }
@@ -129,7 +130,7 @@ class TransportYJS extends Transport {
         Return a string for the status of a transport. No particular format, but keep it short as it will probably be in a small area of the screen.
         For YJS, its online if IPFS is.
          */
-        this.status =  (await this.options.yarray.connector.ipfs.isOnline()) ? Dweb.Transport.STATUS_CONNECTED : Dweb.Transport.STATUS_FAILED;
+        this.status =  (await this.options.yarray.connector.ipfs.isOnline()) ? Transport.STATUS_CONNECTED : Transport.STATUS_FAILED;
         return this.status;
     }
 
@@ -189,7 +190,7 @@ class TransportYJS extends Transport {
         :resolve array: An array of objects as stored on the list.
          */
         //TODO-REVERSE this needs implementing once list structure on IPFS more certain
-        throw new Dweb.errors.ToBeImplementedError("Undefined function TransportHTTP.rawreverse"); }
+        throw new errors.ToBeImplementedError("Undefined function TransportHTTP.rawreverse"); }
 
     async p_rawadd(url, sig, verbose) {
         /*
@@ -242,7 +243,7 @@ class TransportYJS extends Transport {
     //TODO maybe change the listmonitor / monitor code for to use "on" and the structure of PP.events
     //TODO but note https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy about Proxy which might be suitable, prob not as doesnt map well to lists
     async p_newtable(pubkey, table, verbose) {
-        if (!pubkey) throw new Dweb.errors.CodingError("p_newtable currently requires a pubkey");
+        if (!pubkey) throw new errors.CodingError("p_newtable currently requires a pubkey");
         let database = await this.p_newdatabase(pubkey, verbose);
         // If have use cases without a database, then call p_newdatabase first
         return { privateurl: `${database.privateurl}/${table}`,  publicurl: `${database.publicurl}/${table}`}  // No action required to create it
@@ -309,7 +310,7 @@ class TransportYJS extends Transport {
         url = typeof url === "string" ? url : url.href;
         let y = this.yarrays[url];
         if (!y) {
-            throw new Dweb.errors.CodingError("Should always exist before calling monitor - async call p__yarray(url) to create");
+            throw new errors.CodingError("Should always exist before calling monitor - async call p__yarray(url) to create");
         }
         y.share.map.observe((event) => {
             if (['add','update'].includes(event.type)) { // Currently ignoring deletions.
@@ -334,7 +335,7 @@ class TransportYJS extends Transport {
             let transport = await Dweb.TransportYJS.p_setup(opts, verbose); // Assumes IPFS already setup
             if (verbose) console.log(transport.name, "setup");
             let res = await transport.p_status(verbose);
-            console.assert(res === Dweb.Transport.STATUS_CONNECTED)
+            console.assert(res === Transport.STATUS_CONNECTED)
             //TODO move this to Transport.p_test_list -=-=-=-=
             let testurl = "yjs:/yjs/THISATEST";  // Just a predictable number can work with
             res = await transport.p_rawlist(testurl, verbose);

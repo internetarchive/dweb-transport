@@ -10,6 +10,7 @@ const WebTorrent = require('webtorrent');
 const stream = require('readable-stream');
 
 // Other Dweb modules
+const errors = require('./Errors');
 const Transport = require('./Transport');
 const Dweb = require('./Dweb');
 
@@ -32,7 +33,7 @@ class TransportWEBTORRENT extends Transport {
         this.name = "WEBTORRENT";       // For console log etc
         this.supportURLs = ['magnet'];
         this.supportFunctions = ['fetch', 'createReadStream'];
-        this.status = Dweb.Transport.STATUS_LOADED;
+        this.status = Transport.STATUS_LOADED;
     }
 
     p_webtorrentstart(verbose) {
@@ -67,11 +68,11 @@ class TransportWEBTORRENT extends Transport {
 
     async p_setup1(verbose) {
         try {
-            this.status = Dweb.Transport.STATUS_STARTING;
+            this.status = Transport.STATUS_STARTING;
             await this.p_webtorrentstart(verbose);
         } catch(err) {
             console.error("WebTorrent failed to connect",err);
-            this.status = Dweb.Transport.STATUS_FAILED;
+            this.status = Transport.STATUS_FAILED;
         }
         return this;
     }
@@ -81,11 +82,11 @@ class TransportWEBTORRENT extends Transport {
         Return a string for the status of a transport. No particular format, but keep it short as it will probably be in a small area of the screen.
          */
         if (this.webtorrent && this.webtorrent.ready) {
-            this.status = Dweb.Transport.STATUS_CONNECTED;
+            this.status = Transport.STATUS_CONNECTED;
         } else if (this.webtorrent) {
-            this.status = Dweb.Transport.STATUS_STARTING;
+            this.status = Transport.STATUS_STARTING;
         } else {
-            this.status = Dweb.Transport.STATUS_FAILED;
+            this.status = Transport.STATUS_FAILED;
         }
 
         return this.status;
@@ -97,14 +98,14 @@ class TransportWEBTORRENT extends Transport {
         returns:    torrentid, path
          */
         if (!url) {
-            throw new Dweb.errors.CodingError("TransportWEBTORRENT.p_rawfetch: requires url");
+            throw new errors.CodingError("TransportWEBTORRENT.p_rawfetch: requires url");
         }
 
         const urlstring = typeof url === "string" ? url : url.href
         const index = urlstring.indexOf('/');
 
         if (index === -1) {
-            throw new Dweb.errors.CodingError("TransportWEBTORRENT.p_rawfetch: invalid url - missing path component. Should look like magnet:xyzabc/path/to/file");
+            throw new errors.CodingError("TransportWEBTORRENT.p_rawfetch: invalid url - missing path component. Should look like magnet:xyzabc/path/to/file");
         }
 
         const torrentId = urlstring.slice(0, index);
@@ -123,7 +124,7 @@ class TransportWEBTORRENT extends Transport {
                 torrent = this.webtorrent.add(torrentId);
 
                 torrent.once("error", (err) => {
-                    reject(new Dweb.errors.TransportError("Torrent encountered a fatal error " + err.message));
+                    reject(new errors.TransportError("Torrent encountered a fatal error " + err.message));
                 });
 
                 torrent.on("warning", (err) => {
@@ -159,7 +160,7 @@ class TransportWEBTORRENT extends Transport {
 
         if (!file) {
             //debugger;
-            throw new Dweb.errors.TransportError("Requested file (" + path + ") not found within torrent ");
+            throw new errors.TransportError("Requested file (" + path + ") not found within torrent ");
         }
 
         return file;
@@ -190,7 +191,7 @@ class TransportWEBTORRENT extends Transport {
                     const file = this.webtorrentfindfile(torrent, path);
                     file.getBuffer((err, buffer) => {
                         if (err) {
-                            return reject(new Dweb.errors.TransportError("Torrent encountered a fatal error " + err.message + " (" + torrent.name + ")"));
+                            return reject(new errors.TransportError("Torrent encountered a fatal error " + err.message + " (" + torrent.name + ")"));
                         }
                         resolve(buffer);
                     });
@@ -241,7 +242,7 @@ class TransportWEBTORRENT extends Transport {
             let transport = await this.p_setup(opts, verbose); // Assumes IPFS already setup
             if (verbose) console.log(transport.name, "setup");
             let res = await transport.p_status(verbose);
-            console.assert(res === Dweb.Transport.STATUS_CONNECTED)
+            console.assert(res === Transport.STATUS_CONNECTED)
 
             // Creative commons torrent, copied from https://webtorrent.io/free-torrents
             let bigBuckBunny = 'magnet:?xt=urn:btih:dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c&dn=Big+Buck+Bunny&tr=udp%3A%2F%2Fexplodie.org%3A6969&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Ftracker.empire-js.us%3A1337&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337&tr=wss%3A%2F%2Ftracker.btorrent.xyz&tr=wss%3A%2F%2Ftracker.fastcast.nz&tr=wss%3A%2F%2Ftracker.openwebtorrent.com&ws=https%3A%2F%2Fwebtorrent.io%2Ftorrents%2F&xs=https%3A%2F%2Fwebtorrent.io%2Ftorrents%2Fbig-buck-bunny.torrent/Big Buck Bunny.en.srt';

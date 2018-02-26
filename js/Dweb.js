@@ -1,4 +1,4 @@
-exports.Transport = require('./Transport');
+const errors = require('./Errors');
 // SEE-OTHER-ADDTRANSPORT */
 exports.TransportHTTP = require('./TransportHTTP'); // Note this used to cause a problem in bundle I believe
 exports.TransportIPFS = require('./TransportIPFS');
@@ -41,7 +41,6 @@ exports.table2class = { // Each of these needs a constructor that takes data and
 // The crypto uses https://github.com/jedisct1/libsodium.js but https://github.com/paixaop/node-sodium may also be suitable if we move to node
 
 exports.utils = {}; //utility functions
-exports.errors = require("./Errors");
 
 exports.keychains = [];
 exports.eventHandler = new exports.EventListenerHandler();
@@ -78,7 +77,7 @@ exports.utils.p_streamToBuffer = function(stream, verbose) {
                 .once('end', () => { if (verbose) console.log('end chunks', chunks.length); resolve(Buffer.concat(chunks)); })
                 .on('error', (err) => { // Note error behavior untested currently
                     console.log("Error event in p_streamToBuffer",err);
-                    reject(new Dweb.errors.TransportError('Error in stream'))
+                    reject(new errors.TransportError('Error in stream'))
                 });
             stream.resume();
         } catch (err) {
@@ -102,7 +101,7 @@ exports.utils.p_streamToBlob = function(stream, mimeType, verbose) {
                         : new Blob(chunks)))
                 .on('error', (err) => { // Note error behavior untested currently
                     console.log("Error event in p_streamToBuffer",err);
-                    reject(new Dweb.errors.TransportError('Error in stream'))
+                    reject(new errors.TransportError('Error in stream'))
                 });
             stream.resume();
         } catch(err) {
@@ -121,7 +120,7 @@ exports.utils.stringfrom = function(foo, hints={}) {
             return foo;
         return foo.toString();  // Last chance try and convert to a string based on a method of the object (could check for its existence)
     } catch (err) {
-        throw new Dweb.errors.CodingError(`Unable to turn ${foo} into a string ${err.message}`)
+        throw new errors.CodingError(`Unable to turn ${foo} into a string ${err.message}`)
     }
 };
 exports.utils.objectfrom = function(data, hints={}) {

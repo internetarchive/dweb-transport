@@ -1,4 +1,5 @@
 // ######### Parallel development to CommonBlock.py ########
+const errors = require('./Errors');
 const Dweb = require("./Dweb");
 
 class Transportable {
@@ -75,9 +76,9 @@ class Transportable {
         return Dweb.Transports.p_rawfetch(urls, verbose);
     }
 
-    file() { throw new Dweb.errors.ToBeImplementedError("Undefined function Transportable.file"); } //TODO-BACKPORT from Python
-    content() { throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally undefined function Transportable.content - superclass should define"); }
-    p_updatelist() { throw new Dweb.errors.IntentionallyUnimplementedError("Intentionally undefined function Transportable.p_updatelist - meaningless except on CL"); }
+    file() { throw new errors.ToBeImplementedError("Undefined function Transportable.file"); } //TODO-BACKPORT from Python
+    content() { throw new errors.IntentionallyUnimplementedError("Intentionally undefined function Transportable.content - superclass should define"); }
+    p_updatelist() { throw new errors.IntentionallyUnimplementedError("Intentionally undefined function Transportable.p_updatelist - meaningless except on CL"); }
 
 
     // Note for tests, best to use Block.test()

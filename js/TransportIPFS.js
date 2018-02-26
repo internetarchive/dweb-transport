@@ -21,6 +21,7 @@ const promisify = require('promisify-es6');
 //const makepromises = require('./utils/makepromises'); // Replaced by direct call to promisify
 
 // Other Dweb modules
+const errors = require('./Errors');
 const Transport = require('./Transport');
 const Dweb = require('./Dweb');
 
@@ -58,7 +59,7 @@ class TransportIPFS extends Transport {
         this.name = "IPFS";             // For console log etc
         this.supportURLs = ['ipfs'];
         this.supportFunctions = ['fetch', 'store'];   // Does not support reverse, createReadStream fails as cant seek
-        this.status = Dweb.Transport.STATUS_LOADED;
+        this.status = Transport.STATUS_LOADED;
     }
 
 
@@ -108,11 +109,11 @@ class TransportIPFS extends Transport {
 
     async p_setup1(verbose) {
         try {
-            this.status = Dweb.Transport.STATUS_STARTING;   // Should display, but probably not refreshed in most case
+            this.status = Transport.STATUS_STARTING;   // Should display, but probably not refreshed in most case
             await this.p_ipfsstart(verbose);    // Throws Error("websocket error") and possibly others.
         } catch(err) {
             console.error("IPFS failed to connect",err);
-            this.status = Dweb.Transport.STATUS_FAILED;
+            this.status = Transport.STATUS_FAILED;
         }
         return this;
     }
@@ -121,7 +122,7 @@ class TransportIPFS extends Transport {
         /*
         Return a string for the status of a transport. No particular format, but keep it short as it will probably be in a small area of the screen.
          */
-        this.status =  (await this.ipfs.isOnline()) ? Dweb.Transport.STATUS_CONNECTED : Dweb.Transport.STATUS_FAILED;
+        this.status =  (await this.ipfs.isOnline()) ? Transport.STATUS_CONNECTED : Transport.STATUS_FAILED;
         return this.status;
     }
 
@@ -146,12 +147,12 @@ class TransportIPFS extends Transport {
         if (url && url["pathname"]) { // On browser "instanceof Url" isn't valid)
             let patharr = url.pathname.split('/');
             if ((url.protocol !== "ipfs:") || (patharr[1] !== 'ipfs') || (patharr.length < 3))
-                throw new Dweb.errors.TransportError("TransportIPFS.cidFrom bad format for url should be ipfs:/ipfs/...: " + url.href);
+                throw new errors.TransportError("TransportIPFS.cidFrom bad format for url should be ipfs:/ipfs/...: " + url.href);
             if (patharr.length > 3)
-                throw new Dweb.errors.TransportError("TransportIPFS.cidFrom not supporting paths in url yet, should be ipfs:/ipfs/...: " + url.href);
+                throw new errors.TransportError("TransportIPFS.cidFrom not supporting paths in url yet, should be ipfs:/ipfs/...: " + url.href);
             return new CID(patharr[2]);
         } else {
-            throw new Dweb.errors.CodingError("TransportIPFS.cidFrom: Cant convert url",url);
+            throw new errors.CodingError("TransportIPFS.cidFrom: Cant convert url",url);
         }
     }
 
@@ -177,7 +178,7 @@ class TransportIPFS extends Transport {
         :throws:        TransportError if url invalid - note this happens immediately, not as a catch in the promise
          */
         if (verbose) console.log("IPFS p_rawfetch", Dweb.utils.stringfrom(url));
-        if (!url) throw new Dweb.errors.CodingError("TransportIPFS.p_rawfetch: requires url");
+        if (!url) throw new errors.CodingError("TransportIPFS.p_rawfetch: requires url");
         const cid = TransportIPFS.cidFrom(url);  // Throws TransportError if url bad
         const ipfspath = TransportIPFS.ipfsFrom(url) // Need because dag.get has different requirement than file.cat
 
@@ -186,7 +187,7 @@ class TransportIPFS extends Transport {
             // noinspection Annotator
             if (res.remainderPath.length)
                 { // noinspection ExceptionCaughtLocallyJS
-                    throw new Dweb.errors.TransportError("Not yet supporting paths in p_rawfetch");
+                    throw new errors.TransportError("Not yet supporting paths in p_rawfetch");
                 } //TODO-PATH
             let buff;
             if (res.value instanceof DAGNode) { // Its file or something added with the HTTP API for example, TODO not yet handling multiple files
@@ -239,7 +240,7 @@ class TransportIPFS extends Transport {
         //TODO-API needs documentation and API update
         //TODO-STREAMS untested - doesnt work since cant seek into streams.
         if (verbose) console.log("TransportIPFS:createReadStream:%o, %o", url, opts);
-        if (!url) throw new Dweb.errors.CodingError("TransportIPFS.p_rawfetch: requires url");
+        if (!url) throw new errors.CodingError("TransportIPFS.p_rawfetch: requires url");
         let stream = this.ipfs.files.catReadableStream(TransportIPFS.cidFrom(url));   // cidFrom Throws TransportError if url bad
         return stream;
     }
@@ -250,7 +251,7 @@ class TransportIPFS extends Transport {
             let transport = await this.p_setup(opts, verbose); // Assumes IPFS already setup
             if (verbose) console.log(transport.name,"setup");
             let res = await transport.p_status(verbose);
-            console.assert(res === Dweb.Transport.STATUS_CONNECTED)
+            console.assert(res === Transport.STATUS_CONNECTED)
 
             let urlqbf;
             let qbf = "The quick brown fox";

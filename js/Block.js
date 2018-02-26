@@ -1,3 +1,4 @@
+const errors = require('./Errors');
 const Transportable = require("./Transportable");
 const Dweb = require("./Dweb");
 
@@ -41,7 +42,7 @@ class Block extends Transportable {
             await blk.p_store(verbose);                         // Store it to transport
             let blk2 = await Block.p_fetch(blk._urls, verbose);
             if (blk2._data.toString() !== blk._data) {          // noinspection ExceptionCaughtLocallyJS
-                throw new Dweb.errors.CodingError("Block should survive round trip");
+                throw new errors.CodingError("Block should survive round trip");
             }
             return blk2;
         } catch(err) { console.log("Block Test failed"); throw err; }

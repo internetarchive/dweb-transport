@@ -13,6 +13,7 @@
 
 
  */
+const errors = require('./Errors'); //TODO-REQUIRE will break
 
 // Array of images can use
 const icon_images = {   //!SEE-OTHER-KC-CLASSES
@@ -101,7 +102,7 @@ async function kcitem_click(el) { //!SEE-OTHER-KC-CLASSES
     else if ((obj instanceof Dweb.SmartDict) && obj.token)  // Its a token - like a key
         token_click(el);
      else
-        throw new Dweb.errors.ToBeImplementedError(`kcitem_click doesnt support ${obj.constructor.name}`)
+        throw new errors.ToBeImplementedError(`kcitem_click doesnt support ${obj.constructor.name}`)
 }
 
 //!SEE-OTHER-KC-CLASSES

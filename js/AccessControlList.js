@@ -1,3 +1,4 @@
+const errors = require('./Errors');
 const CommonList = require("./CommonList"); // AccessControlList extends this
 const SmartDict = require("./SmartDict");   // _AccessControlListEntry extends this
 const Dweb = require("./Dweb");
@@ -75,8 +76,8 @@ class AccessControlList extends CommonList {
         try {
             if (verbose) console.log("ACL.p_add_acle viewerpublicurls=", viewerpublicurls);
             if (viewerpublicurls instanceof Dweb.KeyPair) viewerpublicurls = viewerpublicurls._publicurls;
-            if (!this._master) throw new Dweb.errors.ForbiddenError("ACL.p_add_acle: Cannot add viewers to a public copy of an ACL");
-            if (!(viewerpublicurls && viewerpublicurls.length)) throw new Dweb.errors.CodingError("ACL.p_add_acle: Cant add empty viewerpublicurls");
+            if (!this._master) throw new errors.ForbiddenError("ACL.p_add_acle: Cannot add viewers to a public copy of an ACL");
+            if (!(viewerpublicurls && viewerpublicurls.length)) throw new errors.CodingError("ACL.p_add_acle: Cant add empty viewerpublicurls");
             let viewerpublickeypair = await Dweb.SmartDict.p_fetch(viewerpublicurls, verbose); // Fetch the public key will be KeyPair
             // Create a new ACLE with access key, encrypted by publickey
             let acle = new SmartDict({
@@ -137,7 +138,7 @@ class AccessControlList extends CommonList {
          */
         if (!this.accesskey) {
             console.log("ACL.encrypt no accesskey, prob Public",this);
-            throw new Dweb.errors.EncryptionError("ACL.encrypt needs an access key - is this a Public _acl?")
+            throw new errors.EncryptionError("ACL.encrypt needs an access key - is this a Public _acl?")
         }
         return Dweb.KeyPair.sym_encrypt(data, this.accesskey, b64); };  //CodingError if accesskey not set
 
@@ -163,7 +164,7 @@ class AccessControlList extends CommonList {
             }
         }
         // If drop out of nested loop then there was no token for our ViewerKey that contained a accesskey that can decrypt the data
-        throw new Dweb.errors.AuthenticationError("ACL.decrypt: No valid keys found");
+        throw new errors.AuthenticationError("ACL.decrypt: No valid keys found");
     };
 
     static async p_decryptdata(value, verbose) {
@@ -198,7 +199,7 @@ class AccessControlList extends CommonList {
                         if (decryptor instanceof Dweb.KeyChain) {
                             if (verbose) console.log(`ACL.p_decryptdata: encrypted with KC name=${decryptor.name}, but not logged in`);
                             // noinspection ExceptionCaughtLocallyJS
-                            throw new Dweb.errors.AuthenticationError(`Must be logged in as ${decryptor.name}`);
+                            throw new errors.AuthenticationError(`Must be logged in as ${decryptor.name}`);
                         }
                     }
                     if (verbose) console.log("ACL.p_decryptdata: fetching ACL tokens");

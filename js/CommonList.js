@@ -1,3 +1,4 @@
+const errors = require('./Errors');
 const PublicPrivate = require("./PublicPrivate"); //for extends
 const Dweb = require("./Dweb");
 //https://www.npmjs.com/package/custom-event && https://github.com/webmodules/custom-event
@@ -118,7 +119,7 @@ class CommonList extends PublicPrivate {    //TODO-API split CL and PP
          */
         try {
             if (!obj) { // noinspection ExceptionCaughtLocallyJS
-                throw new Dweb.errors.CodingError("CL.p_push obj should never be non-empty");
+                throw new errors.CodingError("CL.p_push obj should never be non-empty");
             }
             let sig;
             console.assert(this.listpublicurls.length); // Should be set by now
@@ -131,7 +132,7 @@ class CommonList extends PublicPrivate {    //TODO-API split CL and PP
             }
             if (!(this._master && this.keypair))
                 { // noinspection ExceptionCaughtLocallyJS
-                    throw new Dweb.errors.ForbiddenError("Signing a new entry when not a master list");
+                    throw new errors.ForbiddenError("Signing a new entry when not a master list");
                 }
             sig = await this.p_sign(urls, verbose);
             sig.data = obj;                     // Keep a copy of the signed obj on the sig, saves retrieving it again
@@ -153,8 +154,8 @@ class CommonList extends PublicPrivate {    //TODO-API split CL and PP
         :param sig: Signature
         :resolves:  undefined
          */
-        if (!sig) throw new Dweb.errors.CodingError("CommonList.p_add is meaningless without a sig");
-        if (! Dweb.utils.intersects(sig.signedby, this._publicurls)) throw new Dweb.errors.CodingError(`CL.p_add: sig.signedby ${sig.signedby} should overlap with this._publicurls ${this._publicurls}`);
+        if (!sig) throw new errors.CodingError("CommonList.p_add is meaningless without a sig");
+        if (! Dweb.utils.intersects(sig.signedby, this._publicurls)) throw new errors.CodingError(`CL.p_add: sig.signedby ${sig.signedby} should overlap with this._publicurls ${this._publicurls}`);
         return Dweb.Transports.p_rawadd(this.listpublicurls, sig, verbose);
     }
 

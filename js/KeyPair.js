@@ -1,3 +1,4 @@
+const errors = require('./Errors');
 const sodium = require("libsodium-wrappers");
 const SmartDict = require("./SmartDict");
 const Dweb = require("./Dweb");
@@ -46,9 +47,9 @@ class KeyPair extends SmartDict {
         if (name === "key") {
             this._key_setter(value);
         } else if (name === "private") {
-            throw new Dweb.errors.ToBeImplementedError("Undefined functionality KeyPair.private.setter");
+            throw new errors.ToBeImplementedError("Undefined functionality KeyPair.private.setter");
         } else if (name === "public") {
-            throw new Dweb.errors.ToBeImplementedError("Undefined functionality KeyPair.public.setter");
+            throw new errors.ToBeImplementedError("Undefined functionality KeyPair.public.setter");
         } else {
             super.__setattr__(name, value);
         }
@@ -75,7 +76,7 @@ class KeyPair extends SmartDict {
                         value.seed = "01234567890123456789012345678901";  // Note this is seed from mnemonic above
                         console.log("Faking mnemonic encoding for now")
                     } else {
-                        throw new Dweb.errors.ToBeImplementedError("MNEMONIC STILL TO BE IMPLEMENTED");    //TODO-mnemonic
+                        throw new errors.ToBeImplementedError("MNEMONIC STILL TO BE IMPLEMENTED");    //TODO-mnemonic
                     }
                 }
                 if (value.passphrase) {
@@ -129,7 +130,7 @@ class KeyPair extends SmartDict {
         :returns: dict of fields suitable for storing in Dweb
          */
         if (KeyPair._key_has_private(dd._key) && !dd._acl && !this._allowunsafestore) {
-            throw new Dweb.errors.SecurityWarning("Probably shouldnt be storing private key" + JSON.stringify(dd));
+            throw new errors.SecurityWarning("Probably shouldnt be storing private key" + JSON.stringify(dd));
         }
         if (dd._key) { //Based on whether the CommonList is master, rather than if the key is (key could be master, and CL not)
             dd.key = KeyPair._key_has_private(dd._key) ? this.privateexport() : this.publicexport();
@@ -153,7 +154,7 @@ class KeyPair extends SmartDict {
         :returns:       Dict suitable for storing in _key
          */
         let key = {};
-        if (sodium.crypto_box_SEEDBYTES !== seed.length) throw new Dweb.errors.CodingError(`Seed should be ${sodium.crypto_box_SEEDBYTES}, but is ${seed.length}`);
+        if (sodium.crypto_box_SEEDBYTES !== seed.length) throw new errors.CodingError(`Seed should be ${sodium.crypto_box_SEEDBYTES}, but is ${seed.length}`);
         key.seed = seed;
         if (keytype === Dweb.KeyPair.KEYTYPESIGN || keytype === Dweb.KeyPair.KEYTYPESIGNANDENCRYPT) {
             key.sign = sodium.crypto_sign_seed_keypair(key.seed); // Object { publicKey: Uint8Array[32], privateKey: Uint8Array[64], keyType: "ed25519" }
@@ -187,11 +188,11 @@ class KeyPair extends SmartDict {
             //See https://github.com/jedisct1/libsodium.js/issues/91 for issues
             if (!this._key) { this._key = {}}   // Only handles NACL style keys
             if (tag === "NACL PUBLIC")           { this._key["encrypt"] = {"publicKey": hasharr};
-            } else if (tag === "NACL PRIVATE")   { throw new Dweb.errors.ToBeImplementedError("_importkey: Cant (yet) import Private key "+value+" normally use SEED");
-            } else if (tag === "NACL SIGNING")   { throw new Dweb.errors.ToBeImplementedError("_importkey: Cant (yet) import Signing key "+value+" normally use SEED");
+            } else if (tag === "NACL PRIVATE")   { throw new errors.ToBeImplementedError("_importkey: Cant (yet) import Private key "+value+" normally use SEED");
+            } else if (tag === "NACL SIGNING")   { throw new errors.ToBeImplementedError("_importkey: Cant (yet) import Signing key "+value+" normally use SEED");
             } else if (tag === "NACL SEED")      { this._key = KeyPair._keyfromseed(hasharr, Dweb.KeyPair.KEYTYPESIGNANDENCRYPT);
             } else if (tag === "NACL VERIFY")    { this._key["sign"] = {"publicKey": hasharr};
-            } else { throw new Dweb.errors.ToBeImplementedError("_importkey: Cant (yet) import "+value) }
+            } else { throw new errors.ToBeImplementedError("_importkey: Cant (yet) import "+value) }
         }
     }
 
@@ -209,7 +210,7 @@ class KeyPair extends SmartDict {
         return res;
     }
 
-    mnemonic() { throw new Dweb.errors.ToBeImplementedError("Undefined function KeyPair.mnemonic"); }
+    mnemonic() { throw new errors.ToBeImplementedError("Undefined function KeyPair.mnemonic"); }
 
     privateexport() {
         /*
@@ -220,7 +221,7 @@ class KeyPair extends SmartDict {
         if (key.seed) {
             return "NACL SEED:" + (typeof(key.seed) === "string" ? key.seed : sodium.to_urlsafebase64(key.seed));
         } else {
-            throw new Dweb.errors.ToBeImplementedError("Undefined function KeyPair.privateexport without seed", key);
+            throw new errors.ToBeImplementedError("Undefined function KeyPair.privateexport without seed", key);
             //TODO should export full set of keys prob as JSON
         }
     }
@@ -252,7 +253,7 @@ class KeyPair extends SmartDict {
         // Assumes nacl.public.PrivateKey or nacl.signing.SigningKey
         if (!signer) {
             console.log("KP.encrypt no signer:", this);
-            throw new Dweb.errors.CodingError("Until PyNaCl bindings have secretbox we require a signer and have to add authentication");
+            throw new errors.CodingError("Until PyNaCl bindings have secretbox we require a signer and have to add authentication");
             //box = nacl.public.Box(signer.keypair._key.encrypt.privateKey, self._key.encrypt.publicKey)
         }
         //return box.encrypt(data, encoder=(nacl.encoding.URLSafeBase64Encoder if b64 else nacl.encoding.RawEncoder))
@@ -273,11 +274,11 @@ class KeyPair extends SmartDict {
          :throws: EnryptionError if no encrypt.privateKey, CodingError if !data||!signer
         */
         if (!data)
-            throw new Dweb.errors.CodingError("KeyPair.decrypt: meaningless to decrypt undefined, null or empty strings");
+            throw new errors.CodingError("KeyPair.decrypt: meaningless to decrypt undefined, null or empty strings");
         if (!signer)
-            throw new Dweb.errors.CodingError("Until libsodium-wrappers has secretbox we require a signer and have to add authentication");
+            throw new errors.CodingError("Until libsodium-wrappers has secretbox we require a signer and have to add authentication");
         if (! this._key.encrypt.privateKey)
-            throw new Dweb.errors.EncryptionError("No private encryption key in" + JSON.stringify(this._key));
+            throw new errors.EncryptionError("No private encryption key in" + JSON.stringify(this._key));
          // Note may need to convert data from unicode to str
          if (typeof(data) === "string") {   // If its a string turn into a Uint8Array
             data = sodium.from_urlsafebase64(data);
@@ -295,9 +296,9 @@ class KeyPair extends SmartDict {
         :param signable: A signable string
         :return: signature that can be verified with verify
         */
-        if (!signable) throw new Dweb.errors.CodingError("Needs signable");
+        if (!signable) throw new errors.CodingError("Needs signable");
         if (! this._key.sign.privateKey) {
-            throw new Dweb.errors.EncryptionError("Can't sign with out private key. Key =" + JSON.stringify(this._key));
+            throw new errors.EncryptionError("Can't sign with out private key. Key =" + JSON.stringify(this._key));
         }
         let sig = sodium.crypto_sign_detached(signable, this._key.sign.privateKey, "urlsafebase64");
         //Can implement and uncomment next line if seeing problems verifying things that should verify ok - tests immediate verification
@@ -315,7 +316,7 @@ class KeyPair extends SmartDict {
 
         let sig = sodium.from_urlsafebase64(urlb64sig);
         let tested = sodium.crypto_sign_verify_detached(sig, signable, this._key.sign.publicKey);
-        if (!tested) throw new Dweb.errors.SigningError("Signature not verified");
+        if (!tested) throw new errors.SigningError("Signature not verified");
         return true;
     }
 
@@ -355,7 +356,7 @@ class KeyPair extends SmartDict {
         :returns:       encrypted data
          */
         // May need to handle different forms of sym_key for now assume urlbase64 encoded string
-        if (!sym_key) throw new Dweb.errors.CodingError('KP.sym_encrypt sym_key cant be empty');
+        if (!sym_key) throw new errors.CodingError('KP.sym_encrypt sym_key cant be empty');
         sym_key = sodium.from_urlsafebase64(sym_key);
         const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
         const ciphertext = sodium.crypto_secretbox_easy(data, nonce, sym_key, "uint8array");  // message, nonce, key, outputFormat
@@ -373,7 +374,7 @@ class KeyPair extends SmartDict {
         :returns:       decrypted data in selected outputformat
          */
         if (!data)
-            throw new Dweb.errors.EncryptionError("KeyPair.sym_decrypt: meaningless to decrypt undefined, null or empty strings");
+            throw new errors.EncryptionError("KeyPair.sym_decrypt: meaningless to decrypt undefined, null or empty strings");
         // Note may need to convert data from unicode to str
         if (typeof(data) === "string") {   // If its a string turn into a Uint8Array
             data = sodium.from_urlsafebase64(data);
@@ -386,7 +387,7 @@ class KeyPair extends SmartDict {
         try {
             return sodium.crypto_secretbox_open_easy(data, nonce, sym_key, outputformat);
         } catch(err) {
-            throw new Dweb.errors.DecryptionFailError("Failed in symetrical decryption");
+            throw new errors.DecryptionFailError("Failed in symetrical decryption");
         }
     };
 

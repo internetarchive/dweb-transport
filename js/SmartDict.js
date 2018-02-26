@@ -1,3 +1,4 @@
+const errors = require('./Errors');
 const Transportable = require("./Transportable");   //Superclass
 const Dweb = require("./Dweb");
 
@@ -63,7 +64,7 @@ class SmartDict extends Transportable {
             if (i.indexOf('_') !== 0) { // Ignore any attributes starting _
                 if (dd[i] instanceof Transportable) {
                     // Any field that contains an object will be turned into an array of urls for the object.
-                    if (!dd[i].stored()) throw new Dweb.errors.CodingError("Should store subobjects before calling preflight");
+                    if (!dd[i].stored()) throw new errors.CodingError("Should store subobjects before calling preflight");
                     res[i] = dd[i]._urls
                 } else {
                     res[i] = dd[i];
@@ -109,7 +110,7 @@ class SmartDict extends Transportable {
         // COPIED FROM PYTHON 2017-5-27
         value = typeof(value) === "string" ? JSON.parse(value) : value; // If its a string, interpret as JSON
         if (value && value.encrypted)
-            throw new Dweb.errors.EncryptionError("Should have been decrypted in p_fetch");
+            throw new errors.EncryptionError("Should have been decrypted in p_fetch");
         this._setproperties(value); // Note value should not contain a "_data" field, so wont recurse even if catch "_data" at __setattr__()
     }
 
@@ -290,15 +291,15 @@ class SmartDict extends Transportable {
         // Takes a structure after JSON.parse
         let table = retrievedobj.table;               // Find the class it belongs to
         if (!table) {
-            throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: no table field, whatever this is we cant decode it");
+            throw new errors.ToBeImplementedError("SmartDict.p_fetch: no table field, whatever this is we cant decode it");
         }
         let cls = Dweb[Dweb.table2class[table]];        // Gets class name, then looks up in Dweb - avoids dependency
         if (!cls) { // noinspection ExceptionCaughtLocallyJS
-            throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: " + table + " is not implemented in table2class");
+            throw new errors.ToBeImplementedError("SmartDict.p_fetch: " + table + " is not implemented in table2class");
         }
         //console.log(cls);
         if (!((Dweb.table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict))) { // noinspection ExceptionCaughtLocallyJS
-            throw new Dweb.errors.ForbiddenError("Avoiding data driven hacks to other classes - seeing " + table);
+            throw new errors.ForbiddenError("Avoiding data driven hacks to other classes - seeing " + table);
         }
         if (urls.length) {
             retrievedobj._urls = urls;                         // Save where we got it - preempts a store - must do this after decrypt and before constructor as e.g KVT sets monitor if _urls is set
@@ -311,15 +312,15 @@ class SmartDict extends Transportable {
         // Takes a structure after JSON.parse
         let table = maybeencrypted.table;               // Find the class it belongs to
         if (!table) {
-            throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: no table field, whatever this is we cant decode it");
+            throw new errors.ToBeImplementedError("SmartDict.p_fetch: no table field, whatever this is we cant decode it");
         }
         let cls = Dweb[Dweb.table2class[table]];        // Gets class name, then looks up in Dweb - avoids dependency
         if (!cls) { // noinspection ExceptionCaughtLocallyJS
-            throw new Dweb.errors.ToBeImplementedError("SmartDict.p_fetch: " + table + " is not implemented in table2class");
+            throw new errors.ToBeImplementedError("SmartDict.p_fetch: " + table + " is not implemented in table2class");
         }
         //console.log(cls);
         if (!((Dweb.table2class[table] === "SmartDict") || (cls.prototype instanceof SmartDict))) { // noinspection ExceptionCaughtLocallyJS
-            throw new Dweb.errors.ForbiddenError("Avoiding data driven hacks to other classes - seeing " + table);
+            throw new errors.ForbiddenError("Avoiding data driven hacks to other classes - seeing " + table);
         }
         let decrypted = await cls.p_decrypt(maybeencrypted, verbose);    // decrypt - may return string or obj , note it can be subclassed for different encryption
         if (urls.length) {

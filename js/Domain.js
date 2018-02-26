@@ -1,3 +1,4 @@
+const errors = require('./Errors');
 const KeyValueTable = require("./KeyValueTable"); //for extends
 const SmartDict = require("./SmartDict"); //for extends
 const Dweb = require("./Dweb");
@@ -108,16 +109,16 @@ class Leaf extends SmartDict {
                     return obj.p_resolve(path, {verbose: false});   // This wont work unless the object implements p_resolve (most dont)
                 } else {
                     console.error("Leaf.p_resolve unknown type of JSON", this.mimetype);
-                    throw new Dweb.errors.ResolutionError(`Leaf.p_resolve unable to resolve path: ${path} in ${this.fullname} because jsontype ${this.metadata["jsontype"]} unrecognized`);
+                    throw new errors.ResolutionError(`Leaf.p_resolve unable to resolve path: ${path} in ${this.fullname} because jsontype ${this.metadata["jsontype"]} unrecognized`);
                 }
             } else if (["text/html"].includes(this.mimetype) ) {
                 return [ this, path];
             } else {
                 console.error("Leaf.p_resolve, unknown mimetype", this.mimetype)
-                throw new Dweb.errors.ResolutionError(`Leaf.p_resolve unable to resolve path: ${path} in ${this.fullname} because mimetype ${this.mimetype} unrecognized`);
+                throw new errors.ResolutionError(`Leaf.p_resolve unable to resolve path: ${path} in ${this.fullname} because mimetype ${this.mimetype} unrecognized`);
             }
         } catch(err) {
-            throw new Dweb.errors.ResolutionError(err.message);
+            throw new errors.ResolutionError(err.message);
         }
     }
 

@@ -1,3 +1,4 @@
+const errors = require('./Errors');
 const SmartDict = require("./SmartDict"); //for extends
 const Dweb = require("./Dweb");
 
@@ -123,7 +124,7 @@ class PublicPrivate extends SmartDict {
         if (dd.keypair) {
             // Check that we don't unintentionally store an unencrypted version with a private key
             if (dd._master && !dd._acl && !this._allowunsafestore) {
-                throw new Dweb.errors.SecurityWarning("Probably shouldnt be storing private key" + JSON.stringify(dd));
+                throw new errors.SecurityWarning("Probably shouldnt be storing private key" + JSON.stringify(dd));
             }
             dd.keypair = dd._master ? dd.keypair.privateexport() : dd.keypair.publicexport();
         }
@@ -185,10 +186,10 @@ class PublicPrivate extends SmartDict {
         :param urls:    URL of object to sign
         :returns:       Signature
         */
-        if (!urls || !urls.length) throw new Dweb.errors.CodingError("Empty url is a coding error");
-        if (!this._master) throw new Dweb.errors.ForbiddenError("Must be master to sign something");
+        if (!urls || !urls.length) throw new errors.CodingError("Empty url is a coding error");
+        if (!this._master) throw new errors.ForbiddenError("Must be master to sign something");
         let sig = await Dweb.Signature.p_sign(this, urls, verbose); //returns a new Signature
-        if (!sig.signature) throw new Dweb.errors.CodingError("Must be a signature");
+        if (!sig.signature) throw new errors.CodingError("Must be a signature");
         return sig
     }
 

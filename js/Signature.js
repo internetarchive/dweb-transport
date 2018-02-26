@@ -1,3 +1,4 @@
+const errors = require('./Errors');
 const SmartDict = require("./SmartDict");
 const Dweb = require("./Dweb");
 
@@ -120,7 +121,7 @@ class Signature extends SmartDict {
         sig = await Dweb.Signature.p_sign(commonlist, signedblock._urls, verbose); //commonlist, urls, verbose
         commonlist._allowunsafestore = false;
         if (verbose) console.log("test_Signatures verification");
-        if (!commonlist.verify(sig, verbose)) throw new Dweb.errors.CodingError("Should verify");
+        if (!commonlist.verify(sig, verbose)) throw new errors.CodingError("Should verify");
     }
 
 }

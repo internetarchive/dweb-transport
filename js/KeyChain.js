@@ -1,3 +1,4 @@
+const errors = require('./Errors');
 const CommonList = require("./CommonList");  // Superclass
 const Dweb = require("./Dweb");
 
@@ -31,7 +32,7 @@ class KeyChain extends CommonList {
             try {
                 await kc.p_store(verbose);
             } catch(err) { // Should be a Transport Error
-                throw new Dweb.errors.AuthenticationError("Unable to login as transport failed")
+                throw new errors.AuthenticationError("Unable to login as transport failed")
             }
             // The order here is important - kc has to be on keychains to decrypt the elements, and eventhandler has to be
             // after elements are loaded so cant be inside addkeychains()
@@ -81,11 +82,11 @@ class KeyChain extends CommonList {
          :throws: :throws: EnryptionError if no encrypt.privateKey, CodingError if !data
          */
         if (! this.keypair._key.encrypt)
-            throw new Dweb.errors.EncryptionError("No decryption key in"+JSON.stringify(this.keypair._key));
+            throw new errors.EncryptionError("No decryption key in"+JSON.stringify(this.keypair._key));
         return this.keypair.decrypt(data, this, "text"); //data, signer, outputformat - Throws EnryptionError if no encrypt.privateKey, CodingError if !data
     }
 
-    accesskey() { throw new Dweb.errors.CodingError("KeyChain doesnt have an accesskey"); }
+    accesskey() { throw new errors.CodingError("KeyChain doesnt have an accesskey"); }
 
     p_store(verbose) {
         /*
@@ -207,12 +208,12 @@ class KeyChain extends CommonList {
             await sb.p_store(verbose);
             if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
             let mvk = KeyChain.mykeys(Dweb.KeyPair);
-            if (mvk[0].name !== vkpname) throw new Dweb.errors.CodingError("Should find viewerkeypair stored above");
+            if (mvk[0].name !== vkpname) throw new errors.CodingError("Should find viewerkeypair stored above");
             if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
 
             if (verbose) console.log("KEYCHAIN 6: Check can fetch and decrypt - should use viewerkeypair stored above");
             let sb2 = await Dweb.SmartDict.p_fetch(sb._urls, verbose); // Will be StructuredBlock, fetched and decrypted
-            if (sb2.data !== qbf) throw new Dweb.errors.CodingError("Data should survive round trip");
+            if (sb2.data !== qbf) throw new errors.CodingError("Data should survive round trip");
             if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
 
             if (verbose) console.log("KEYCHAIN 7: Check can store content via an VL");
@@ -223,7 +224,7 @@ class KeyChain extends CommonList {
             await vlmasterwithacl.p_saveversion(verbose);
             let vl = await Dweb.SmartDict.p_fetch(vlmasterwithacl._publicurls, verbose); // Will be VersionList
             await vl.p_fetchlistandworking(verbose);
-            if (vl._working.content !== qbf) throw new Dweb.errors.CodingError("Data should round trip through ACL");
+            if (vl._working.content !== qbf) throw new errors.CodingError("Data should round trip through ACL");
             if (verbose) console.log("KeyChain.test promises complete");
             //console.log("KeyChain.test requires more tests defined");
             return {kc: kc, vlmaster: vlmaster};
