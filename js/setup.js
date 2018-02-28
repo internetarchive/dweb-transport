@@ -1,7 +1,7 @@
 // Fake a browser like environment for some tests inc in Node CreateCustomEvent
 const jsdom = require("jsdom");
 const { JSDOM } = jsdom;        //TODO - figure out what this does, dont understand the Javascript
-htmlfake = '<!DOCTYPE html><ul><li id="myList.0">Failed to load sb via StructuredBlock</li><li id="myList.1">Failed to load mb via MutableBlock</li><li id="myList.2">Failed to load sb via dwebfile</li><li id="myList.3">Failed to load mb via dwebfile</li></ul>';
+htmlfake = '<!DOCTYPE html></html>';
 const dom = new JSDOM(htmlfake);
 document = dom.window.document;   // Note in JS can't see "document" like can in python
 

@@ -1,7 +1,7 @@
 // Fake a browser like environment for some tests inc in Node CreateCustomEvent
 const jsdom = require("jsdom");
 const { JSDOM } = jsdom;        //TODO - figure out what this does, dont understand the Javascript
-htmlfake = '<!DOCTYPE html><ul><li id="myList.0">Failed to load sb via StructuredBlock</li><li id="myList.1">Failed to load mb via MutableBlock</li><li id="myList.2">Failed to load sb via dwebfile</li><li id="myList.3">Failed to load mb via dwebfile</li></ul>';
+htmlfake = '<!DOCTYPE html></html>';
 const dom = new JSDOM(htmlfake);
 document = dom.window.document;   // Note in JS can't see "document" like can in python
 
@@ -22,7 +22,6 @@ const KeyChain = require('./KeyChain'); // Hold a set of keys, and locked object
 const AccessControlList = require('./AccessControlList'); // Parent of list classes
 const VersionList = require('./VersionList'); // Hold a list that manages versions of something
 const Domain = require('./Domain');
-const StructuredBlock = require('./StructuredBlock'); //TODO-REQUIRE maybe time to get rid of SB & MB
 
 /*
     This file is intended to be run under node, e.g. "node test.js" to test as many features as possible.
@@ -74,7 +73,6 @@ async function p_test(verbose) {
         console.log("------END OF NEW TESTING PAUSING=====");
         await delay(1000);
         console.log("------AND FINISHED WAITING =====");
-        //let sb = (await StructuredBlock.test(document, verbose)).sb;
         console.log("Completed test - running IPFS in background, hit Ctrl-C to exit");
     } catch (err) {
         console.log("Test failed", err);
@@ -138,7 +136,7 @@ async function p_test_KeyChain(acl, verbose) {
         acl._allowunsafestore = true;
         await acl.p_add_acle(viewerkeypair, {"name": "my token"}, verbose);
         console.assert("acl._list.length === 1", "Should have added exactly 1 viewerkeypair", acl);
-        let sb = new StructuredBlock({"name": "test_sb", "data": qbf, "_acl": acl}, verbose); //url,data,verbose
+        let sb = new SmartDict({"name": "test_sb", "data": qbf, "_acl": acl}, verbose); //url,data,verbose
         await sb.p_store(verbose);
         if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
         let mvk = KeyChain.mykeys(KeyPair);
@@ -146,7 +144,7 @@ async function p_test_KeyChain(acl, verbose) {
         if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
 
         if (verbose) console.log("KEYCHAIN 6: Check can fetch and decrypt - should use viewerkeypair stored above");
-        let sb2 = await SmartDict.p_fetch(sb._urls, verbose); // Will be StructuredBlock, fetched and decrypted
+        let sb2 = await SmartDict.p_fetch(sb._urls, verbose); // Will be SmartDict, fetched and decrypted
         if (sb2.data !== qbf) throw new errors.CodingError("Data should survive round trip");
         if (testasync) { console.log("Waiting - expect no output"); await delay(1000); }
 

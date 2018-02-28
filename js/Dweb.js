@@ -17,7 +17,6 @@ Dweb.KeyValueTable = require("./KeyValueTable");
 Dweb.AccessControlList = require("./AccessControlList");
 Dweb.KeyChain = require('./KeyChain');
 Dweb.VersionList = require('./VersionList');
-Dweb.StructuredBlock = require('./StructuredBlock'); //TODO - will remove SB once have path traversal.
 Dweb.EventListenerHandler = require("./EventListenerHandler");
 Dweb.Domain = require("./Domain");
 Dweb.Leaf = Dweb.Domain.clsLeaf;

@@ -335,7 +335,7 @@ class SmartDict extends Transportable {
         and creates an object of the appropriate class and passes data to _setdata
         This should not need subclassing, (subclass _setdata or p_decrypt instead).
 
-        :resolves: New object - e.g. StructuredBlock or MutableBlock
+        :resolves: New object - e.g. VersionList or KeyChain
         :catch: TransportError - can probably, or should throw TransportError if transport fails
         :throws: TransportError if url invalid, ForbiddenError if cant decrypt
 
