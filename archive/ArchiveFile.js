@@ -33,12 +33,24 @@ export default class ArchiveFile {
         }
         return [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f => !!f);   // Multiple potential sources elimate any empty
     }
-
+    httpUrl() {
+        return `${Util.gateway.url_download}${this.itemid}/${this.metadata.name}`;
+    }
+    async mimetype() {
+       return Util.archiveMimeTypeFromFormat[this.metadata.format];
+    }
+    async data() {
+        return await Dweb.Transportable.p_fetch(await this.p_urls(), verbose);
+    }
+    async blob() {
+        return new Blob([await this.data], {type: this.mimetype()} );
+    }
+    async blobUrl() {
+        return URL.createObjectURL(await this.blob());
+    }
     async p_download(a, options) {
         let urls = await this.p_urls()   // Multiple potential sources elimating any empty
-        let blk = await  Dweb.Transportable.p_fetch(urls, verbose);  //Typically will be a Uint8Array
-        let blob = new Blob([blk._data], {type: Util.archiveMimeTypeFromFormat[this.metadata.format]}) // Works for data={Uint8Array|Blob}
-        let objectURL = URL.createObjectURL(blob);
+        let objectURL = this.blobUrl();
         if (verbose) console.log("Blob URL=",objectURL);
         //browser.downloads.download({filename: this.metadata.name, url: objectURL});   //Doesnt work
         //Downloads.fetch(objectURL, this.metadata.name);   // Doesnt work

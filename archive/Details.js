@@ -237,6 +237,7 @@ export default class Details extends ArchiveBase {
         let compressURL = `https://archive.org/compress/${itemid}`; //TODO-LINKS check direct link
         let compressAllURL = `https://archive.org/compress/${itemid}/formats=JSON,METADATA,JPEG,ARCHIVE BITTORRENT,MUSICBRAINZ METADATA`;  //TODO-LINKS check direct link
         let collections = Array.isArray(metadata.collection) ? metadata.collection : [ metadata.collection ];
+        let collectionTitles = item.collection_titles;   // Dictionary mapping collection itemid to title
         let mediatype = metadata.mediatype;
         let iconochiveIcon="iconochive-"+mediatype;
         let contributor = metadata.contributor;
@@ -457,7 +458,7 @@ export default class Details extends ArchiveBase {
                                         <a
                                                 onClick={`Nav.nav_details("${collection}")`}
                                                 data-event-click-tracking={`CollectionList|${collection}`}
-                                        >{collection}</a> {/*TODO get name of collection - its not in metadata*/}
+                                        >{collectionTitles[collection]}</a>
                                     </div>
                                 ) ) }
                             </section>

@@ -9,19 +9,21 @@ export default class Tile {
   render(item){
     //xxx shorten/safify certain title usages (compared to Lists.inc)
     const collections = (Array.isArray(item.collection) ? item.collection : (typeof(item.collection) === 'string' ? [item.collection] : []));
-    const collection = collections[0];
+    const collection0 = collections[0];
+    const collection0title = item.collection0title;
     const nFavorites = collections.filter(e => e.startsWith('fav-')).length;
     const is_collection = (item.mediatype === 'collection');
     const classes = 'item-ia' + (is_collection ? ' collection-ia' : '');
+    const collection0thumbnaillinks = item.collection0thumbnaillinks;
     const imgname = item.identifier + ".PNG"; // Required since rendermedia doesnt know the filetype otherwise
     //ARCHIVE-BROWSER on browser, want to load links locally (via APIs) rather than rebuilding HTML page
       // ARCHIVE-BROWSER added key= to keep react happy (I hope)
       return (
       <div className={classes} data-id={item.identifier}  key={item.identifier}>
-        <a className="stealth" tabIndex="-1" onClick={`Nav.nav_details("${collection}");`}>
+        <a className="stealth" tabIndex="-1" onClick={`Nav.nav_details("${collection0}");`}>
           <div className="item-parent">
-            <div className="item-parent-img"><img src={'https://archive.org/services/img/'+collection}/></div> {/*TODO-SERVICES-IMG get directly */}
-            <div className="item-parent-ttl">  </div>{/*TODO Need to find collection name for each tile - do on gateway*/}
+            <div className="item-parent-img"><img src={collection0thumbnaillinks}/></div>
+            <div className="item-parent-ttl">{collection0title}</div>
           </div>{/*.item-parent*/}
         </a>
 

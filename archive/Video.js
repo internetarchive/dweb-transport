@@ -2,6 +2,7 @@ require('babel-core/register')({ presets: ['env', 'react']}); // ES6 JS below!
 import React from './ReactFake';
 
 import AV from './AV'
+import Util from './Util'
 
 
 export default class Video extends AV {
@@ -18,7 +19,8 @@ export default class Video extends AV {
         const itemid = this.itemid;
         const detailsurl = `https://archive.org/details/${itemid}`;  {/*TODO-SERVICES-IMG get directly */}
         const title = item.title;
-        const videothumbnailurl = this._list.filter(fi => (fi.metadata.name.includes(`${itemid}.thumbs/`)))[1]; // 2nd thumbnail, first is usually black-sreen
+        // The videothumbnailurl is intentionally a direct Http link as its intended only for search engines etc
+        const videothumbnailurl = this._list.filter(fi => (fi.metadata.name.includes(`${itemid}.thumbs/`)))[1].httpUrl(); // 2nd thumbnail, first is usually black-sreen
         //let cfg  = {"aspectratio": 4/3 }; // Old version in Traceys code which was missing other parts of cfg below
         let cfg =    {"start":0,"embed":null,"so":false,"autoplay":false,"width":0,"height":0,"list_height":0,"audio":false,
             "responsive":true,"flash":false, "hide_list":true,
@@ -36,10 +38,8 @@ export default class Video extends AV {
         this.setupPlaylist();   // Creates this.avs
         const contenturl = `${Util.gateway.url_download}${itemid}/${this.avs[0].metadata.name}`;
         const embedurlname = (this.avs[0].metadata.source === "original") ? this.avs[0].metadata.name : this.avs[0].metadata.original;
-        const embedurlurl = `${Util.gateway.url_download}${itemid}/${embedurlname}`;
+        const embedurl = `${Util.gateway.url_download}${itemid}/${embedurlname}`;
         const schemacontentlength = `PT0M${parseInt(this.avs[0].metadata.length)}S`;
-
-        //TODO-DETAILS make next few lines between theatre-ia-wrap and theatre-ia not commute specific
         return (
             <div id="theatre-ia-wrap" class="container container-ia width-max ">
                 <link itemprop="url" href={detailsurl}/>
@@ -85,7 +85,8 @@ export default class Video extends AV {
                             </noscript>
 
                             <div id="videoContainerX" style="text-align: center;">
-                                <video id="streamContainer" src={this.avs[0]} controls></video>
+                                {/* This videothumbnailurl is http since if getting decentralized there is little value compared to loading video itself */}
+                                <video id="streamContainer" src={this.avs[0]} poster={videothumbnailurl} controls></video>
                             </div>
                             <div id="webtorrentStats" style="color: white; text-align: center;"></div>
                             {this.cherModal("video")}
