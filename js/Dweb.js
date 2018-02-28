@@ -22,6 +22,5 @@ exports.Transports = require('./Transports'); // Handles multiple transports
 
 exports.objbrowser = function(el, {maxdepth=2, verbose=false}={}) {
     if (typeof el === 'string') el = document.getElementById(el);
-    (new SmartDict()).objbrowser_arrayobj(el, "keychains", this.keychains, {links: true});
+    (new SmartDict()).objbrowser_arrayobj(el, "keychains", KeyChain.keychains, {links: true});
 };
-

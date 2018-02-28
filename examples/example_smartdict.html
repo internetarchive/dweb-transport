@@ -5,7 +5,6 @@
     <title>DWEB SmartDict example</title>
     <link rel='stylesheet' href='example_styles.css'>
     <script type="text/javascript" src="dweb_transport_ipfs_bundled.js"></script><!-- Dwebbundle via local filesystem when testing without Dweb-->
-    <script type="text/javascript" src="objbrowser.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript" src="htmlutils.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript" src="loginutils.js"></script><!--Login tools (used for p_connect) -->
     <script type="text/javascript">
@@ -35,8 +34,7 @@
         if (verbose) console.log("Fetched=",sd);
         destn.innerHTML = "My name is: "+sd.name;
         destn.style.color = sd.favcolor;
-        sd.objbrowser("ObjBrowserDiv")
-        //objbrowser(sd, sd._urls, null, "ObjBrowser", verbose);
+        sd.objbrowser("ObjBrowserDiv");
     }
 
     async function main() {

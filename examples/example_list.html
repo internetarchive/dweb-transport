@@ -8,7 +8,6 @@
     <script type="text/javascript" src="dweb_transport_ipfs_bundled.js"></script><!-- Dwebbundle via local filesystem when testing without Dweb-->
     <script type="text/javascript" src="htmlutils.js"></script><!--HTML tools (not specific to Dweb)-->
     <script type="text/javascript" src="loginutils.js"></script><!--Login tools (used for p_connect) -->
-    <script type="text/javascript" src="objbrowser.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript">
 
     var cl; // Will hold the list after fetching
@@ -38,7 +37,6 @@
             let obj = new Dweb.SmartDict(dict, verbose );
             await cl.p_push(obj, verbose);
             console.log("Added:",obj);                             // Show on the Javascript console
-            //objbrowser(cl, cl._url, null, "ObjBrowser", false))   // Redisplay in objbrowser just for debugging
             addtemplatedchild("listresults", obj);                  // Display locally as listmonitor will not pick up local entries
         } catch(err){ console.log("ERROR:",err); alert(err.message); }
         return false; // Stop form submission and page reloading reloading
@@ -79,7 +77,6 @@
                     .then((obj) => addtemplatedchild("listresults", obj))
                 });
             // Redisplay it in the object browser for debugging
-            // objbrowser(cl, cl._url, null, "ObjBrowser", verbose));
         } catch(err) {
             console.log("ERROR:", err);
             alert(err.message); // bad url generates TransportError
