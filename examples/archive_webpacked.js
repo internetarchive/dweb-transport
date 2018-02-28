@@ -80,7 +80,7 @@ module.exports = __webpack_require__(41);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_render_media__ = __webpack_require__(24);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_render_media___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_render_media__);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__ArchiveFile__ = __webpack_require__(22);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Util__ = __webpack_require__(5);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Util__ = __webpack_require__(4);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_from2__ = __webpack_require__(75);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_from2___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_3_from2__);
 /*
@@ -2391,35 +2391,6 @@ process.umask = function() { return 0; };
 
 /***/ }),
 /* 4 */
-/***/ (function(module, exports) {
-
-if (typeof Object.create === 'function') {
-  // implementation from standard node.js 'util' module
-  module.exports = function inherits(ctor, superCtor) {
-    ctor.super_ = superCtor
-    ctor.prototype = Object.create(superCtor.prototype, {
-      constructor: {
-        value: ctor,
-        enumerable: false,
-        writable: true,
-        configurable: true
-      }
-    });
-  };
-} else {
-  // old school shim for old browsers
-  module.exports = function inherits(ctor, superCtor) {
-    ctor.super_ = superCtor
-    var TempCtor = function () {}
-    TempCtor.prototype = superCtor.prototype
-    ctor.prototype = new TempCtor()
-    ctor.prototype.constructor = ctor
-  }
-}
-
-
-/***/ }),
-/* 5 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -2648,6 +2619,35 @@ Util.gateway = {
 };
 
 /***/ }),
+/* 5 */
+/***/ (function(module, exports) {
+
+if (typeof Object.create === 'function') {
+  // implementation from standard node.js 'util' module
+  module.exports = function inherits(ctor, superCtor) {
+    ctor.super_ = superCtor
+    ctor.prototype = Object.create(superCtor.prototype, {
+      constructor: {
+        value: ctor,
+        enumerable: false,
+        writable: true,
+        configurable: true
+      }
+    });
+  };
+} else {
+  // old school shim for old browsers
+  module.exports = function inherits(ctor, superCtor) {
+    ctor.super_ = superCtor
+    var TempCtor = function () {}
+    TempCtor.prototype = superCtor.prototype
+    ctor.prototype = new TempCtor()
+    ctor.prototype.constructor = ctor
+  }
+}
+
+
+/***/ }),
 /* 6 */
 /***/ (function(module, exports) {
 
@@ -2681,7 +2681,7 @@ module.exports = g;
 "use strict";
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(5);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__ = __webpack_require__(38);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__ArchiveFile__ = __webpack_require__(22);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
@@ -2986,6 +2986,7 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
         let compressURL = `https://archive.org/compress/${itemid}`; //TODO-LINKS check direct link
         let compressAllURL = `https://archive.org/compress/${itemid}/formats=JSON,METADATA,JPEG,ARCHIVE BITTORRENT,MUSICBRAINZ METADATA`; //TODO-LINKS check direct link
         let collections = Array.isArray(metadata.collection) ? metadata.collection : [metadata.collection];
+        let collectionTitles = item.collection_titles; // Dictionary mapping collection itemid to title
         let mediatype = metadata.mediatype;
         let iconochiveIcon = "iconochive-" + mediatype;
         let contributor = metadata.contributor;
@@ -3516,9 +3517,8 @@ class Details extends __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__["a" /* default 
                                         onClick: `Nav.nav_details("${collection}")`,
                                         'data-event-click-tracking': `CollectionList|${collection}`
                                     },
-                                    collection
-                                ),
-                                ' '
+                                    collectionTitles[collection]
+                                )
                             ))
                         )
                     )
@@ -3586,7 +3586,7 @@ module.exports = Duplex;
 
 /*<replacement>*/
 var util = __webpack_require__(12);
-util.inherits = __webpack_require__(4);
+util.inherits = __webpack_require__(5);
 /*</replacement>*/
 
 var Readable = __webpack_require__(26);
@@ -5061,7 +5061,7 @@ function nextTick(fn, arg1, arg2, arg3) {
 "use strict";
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(5);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveBase__ = __webpack_require__(38);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Tile__ = __webpack_require__(84);
 
@@ -5613,7 +5613,7 @@ function onceStrict (fn) {
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_render_media__ = __webpack_require__(24);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_render_media___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_render_media__);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Util__ = __webpack_require__(5);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Util__ = __webpack_require__(4);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_throttleit__ = __webpack_require__(73);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_throttleit___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_3_throttleit__);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_prettier_bytes__ = __webpack_require__(74);
@@ -5653,12 +5653,24 @@ class ArchiveFile {
         }
         return [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f => !!f); // Multiple potential sources elimate any empty
     }
-
+    httpUrl() {
+        return `${__WEBPACK_IMPORTED_MODULE_2__Util__["a" /* default */].gateway.url_download}${this.itemid}/${this.metadata.name}`;
+    }
+    async mimetype() {
+        return __WEBPACK_IMPORTED_MODULE_2__Util__["a" /* default */].archiveMimeTypeFromFormat[this.metadata.format];
+    }
+    async data() {
+        return await Dweb.Transportable.p_fetch((await this.p_urls()), verbose);
+    }
+    async blob() {
+        return new Blob([await this.data], { type: this.mimetype() });
+    }
+    async blobUrl() {
+        return URL.createObjectURL((await this.blob()));
+    }
     async p_download(a, options) {
         let urls = await this.p_urls(); // Multiple potential sources elimating any empty
-        let blk = await Dweb.Transportable.p_fetch(urls, verbose); //Typically will be a Uint8Array
-        let blob = new Blob([blk._data], { type: __WEBPACK_IMPORTED_MODULE_2__Util__["a" /* default */].archiveMimeTypeFromFormat[this.metadata.format] }); // Works for data={Uint8Array|Blob}
-        let objectURL = URL.createObjectURL(blob);
+        let objectURL = this.blobUrl();
         if (verbose) console.log("Blob URL=", objectURL);
         //browser.downloads.download({filename: this.metadata.name, url: objectURL});   //Doesnt work
         //Downloads.fetch(objectURL, this.metadata.name);   // Doesnt work
@@ -6111,7 +6123,7 @@ function parseOpts (opts) {
 
 module.exports = MediaElementWrapper
 
-var inherits = __webpack_require__(4)
+var inherits = __webpack_require__(5)
 var stream = __webpack_require__(14)
 var toArrayBuffer = __webpack_require__(54)
 
@@ -6428,7 +6440,7 @@ function _isUint8Array(obj) {
 
 /*<replacement>*/
 var util = __webpack_require__(12);
-util.inherits = __webpack_require__(4);
+util.inherits = __webpack_require__(5);
 /*</replacement>*/
 
 /*<replacement>*/
@@ -7538,7 +7550,7 @@ Writable.WritableState = WritableState;
 
 /*<replacement>*/
 var util = __webpack_require__(12);
-util.inherits = __webpack_require__(4);
+util.inherits = __webpack_require__(5);
 /*</replacement>*/
 
 /*<replacement>*/
@@ -8280,7 +8292,7 @@ var Duplex = __webpack_require__(8);
 
 /*<replacement>*/
 var util = __webpack_require__(12);
-util.inherits = __webpack_require__(4);
+util.inherits = __webpack_require__(5);
 /*</replacement>*/
 
 util.inherits(Transform, Duplex);
@@ -10443,7 +10455,7 @@ function done(stream, er, data) {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(5);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__ArchiveItem__ = __webpack_require__(83);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
@@ -10511,7 +10523,7 @@ class ArchiveBase extends __WEBPACK_IMPORTED_MODULE_2__ArchiveItem__["a" /* defa
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(5);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Details__ = __webpack_require__(7);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
@@ -11748,7 +11760,7 @@ var Transform = __webpack_require__(32);
 
 /*<replacement>*/
 var util = __webpack_require__(12);
-util.inherits = __webpack_require__(4);
+util.inherits = __webpack_require__(5);
 /*</replacement>*/
 
 util.inherits(PassThrough, Transform);
@@ -12430,7 +12442,7 @@ module.exports = eos;
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var bs = __webpack_require__(64)
 var EventEmitter = __webpack_require__(11).EventEmitter
-var inherits = __webpack_require__(4)
+var inherits = __webpack_require__(5)
 var mp4 = __webpack_require__(65)
 var Box = __webpack_require__(18)
 var RangeSliceStream = __webpack_require__(72)
@@ -12964,7 +12976,7 @@ exports.encode = __webpack_require__(71)
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var stream = __webpack_require__(14)
-var inherits = __webpack_require__(4)
+var inherits = __webpack_require__(5)
 var nextEvent = __webpack_require__(67)
 var Box = __webpack_require__(18)
 
@@ -14231,7 +14243,7 @@ exports.DecoderConfigDescriptor.decode = function (buf, start, end) {
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer, process) {var stream = __webpack_require__(14)
-var inherits = __webpack_require__(4)
+var inherits = __webpack_require__(5)
 var Box = __webpack_require__(18)
 
 module.exports = Encoder
@@ -14376,7 +14388,7 @@ emits 'stalled' once everything is written
 
 
 */
-var inherits = __webpack_require__(4)
+var inherits = __webpack_require__(5)
 var stream = __webpack_require__(14)
 
 module.exports = RangeSliceStream
@@ -14932,7 +14944,7 @@ PassThrough.prototype._transform = function (chunk, encoding, cb) {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ArchiveFile__ = __webpack_require__(22);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(5);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
 
 
 
@@ -14943,7 +14955,6 @@ __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 //TODO-NAMING url could be a name
 
 class ArchiveItem {
-    //extends SmartDict {  //TODO should extend SmartDict, but having Webpack issues loading it all into one webpack
     /*
     Base class representing an Item and/or a Search query (A Collection is both).
     This is just storage, the UI is in ArchiveBase and subclasses, theoretically this class could be used for a server or gateway app with no UI.
@@ -14979,6 +14990,12 @@ class ArchiveItem {
             throws: TypeError or Error if fails esp Unable to resolve name
             resolves to: this
          */
+        await this.fetch_metadata();
+        await this.fetch_query();
+        return this;
+    }
+
+    async fetch_metadata() {
         if (this.itemid && !this.item) {
             if (verbose) console.group('getting metadata for ' + this.itemid);
             //this.item = await Util.fetch_json(`https://archive.org/metadata/${this.itemid}`);
@@ -14999,14 +15016,19 @@ class ArchiveItem {
             console.assert(m.metadata.identifier === this.itemid);
             this.item = m;
             this._listLoad(); // Load _list with ArchiveFile
-            if (verbose) console.groupEnd('getting metadata for ' + this.itemid);
+            if (verbose) console.log("Got metadata for " + this.itemid);
+            if (verbose) console.groupEnd();
         }
+    }
+
+    async fetch_query() {
         if (this.query) {
             // This is for Search, Collection and Home.
+            const sort = this.item.collection_sort_order || this.sort;
             const url =
-            //`https://archive.org/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`; // Archive (CORS fail)
-            `https://gateway.dweb.me/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}&and[]=${this.and}`;
-            //`http://localhost:4244/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`; //Testing
+            //`https://archive.org/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${sort}`; // Archive (CORS fail)
+            `https://gateway.dweb.me/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${sort}&and[]=${this.and}`;
+            //`http://localhost:4244/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${sort}`; //Testing
             console.log(url);
             const j = await __WEBPACK_IMPORTED_MODULE_1__Util__["a" /* default */].fetch_json(url);
             this.items = j.response.docs;
@@ -15024,7 +15046,7 @@ class ArchiveItem {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(5);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 //import React from 'react';
@@ -15035,10 +15057,12 @@ class Tile {
   render(item) {
     //xxx shorten/safify certain title usages (compared to Lists.inc)
     const collections = Array.isArray(item.collection) ? item.collection : typeof item.collection === 'string' ? [item.collection] : [];
-    const collection = collections[0];
+    const collection0 = collections[0];
+    const collection0title = item.collection0title;
     const nFavorites = collections.filter(e => e.startsWith('fav-')).length;
     const is_collection = item.mediatype === 'collection';
     const classes = 'item-ia' + (is_collection ? ' collection-ia' : '');
+    const collection0thumbnaillinks = item.collection0thumbnaillinks;
     const imgname = item.identifier + ".PNG"; // Required since rendermedia doesnt know the filetype otherwise
     //ARCHIVE-BROWSER on browser, want to load links locally (via APIs) rather than rebuilding HTML page
     // ARCHIVE-BROWSER added key= to keep react happy (I hope)
@@ -15047,20 +15071,19 @@ class Tile {
       { className: classes, 'data-id': item.identifier, key: item.identifier },
       __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
         'a',
-        { className: 'stealth', tabIndex: '-1', onClick: `Nav.nav_details("${collection}");` },
+        { className: 'stealth', tabIndex: '-1', onClick: `Nav.nav_details("${collection0}");` },
         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
           'div',
           { className: 'item-parent' },
           __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
             'div',
             { className: 'item-parent-img' },
-            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { src: 'https://archive.org/services/img/' + collection })
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('img', { src: collection0thumbnaillinks })
           ),
-          ' ',
           __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
             'div',
             { className: 'item-parent-ttl' },
-            '  '
+            collection0title
           )
         )
       ),
@@ -15212,7 +15235,7 @@ class Tile {
 "use strict";
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(5);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Util__ = __webpack_require__(4);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Search__ = __webpack_require__(20);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__Details__ = __webpack_require__(7);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__Home__ = __webpack_require__(86);
@@ -15562,7 +15585,7 @@ class Collection extends __WEBPACK_IMPORTED_MODULE_1__Search__["default"] {
     constructor(itemid, item) {
         super({
             query: 'collection:' + itemid,
-            sort: '-downloads',
+            sort: '-downloads', // This will be overridden based on collection_sort_order
             itemid: itemid,
             item: item
         });
@@ -15736,7 +15759,7 @@ class Texts extends __WEBPACK_IMPORTED_MODULE_1__Details__["default"] {
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__Details__ = __webpack_require__(7);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Util__ = __webpack_require__(5);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Util__ = __webpack_require__(4);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
 
 
@@ -15992,7 +16015,9 @@ class Audio extends __WEBPACK_IMPORTED_MODULE_1__AV__["a" /* default */] {
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__ReactFake__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__AV__ = __webpack_require__(39);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__Util__ = __webpack_require__(4);
 __webpack_require__(0)({ presets: ['env', 'react'] }); // ES6 JS below!
+
 
 
 
@@ -16007,11 +16032,13 @@ class Video extends __WEBPACK_IMPORTED_MODULE_1__AV__["a" /* default */] {
     }
 
     theatreIaWrap() {
-        let item = this.item;
-        let itemid = this.itemid;
-        let detailsurl = `https://archive.org/details/${itemid}`;{/*TODO-SERVICES-IMG get directly */}
-        let title = item.title;
-        //let cfg  = {"aspectratio": 4/3 }; // Old version in Traceys code which was missign other parts of cfg below
+        const item = this.item;
+        const itemid = this.itemid;
+        const detailsurl = `https://archive.org/details/${itemid}`;{/*TODO-SERVICES-IMG get directly */}
+        const title = item.title;
+        // The videothumbnailurl is intentionally a direct Http link as its intended only for search engines etc
+        const videothumbnailurl = this._list.filter(fi => fi.metadata.name.includes(`${itemid}.thumbs/`))[1].httpUrl(); // 2nd thumbnail, first is usually black-sreen
+        //let cfg  = {"aspectratio": 4/3 }; // Old version in Traceys code which was missing other parts of cfg below
         let cfg = { "start": 0, "embed": null, "so": false, "autoplay": false, "width": 0, "height": 0, "list_height": 0, "audio": false,
             "responsive": true, "flash": false, "hide_list": true,
             "identifier": this.itemid, //TODO-DETAILS-ONLINE check another example and see if identifier should be itemid or title
@@ -16025,13 +16052,19 @@ class Video extends __WEBPACK_IMPORTED_MODULE_1__AV__["a" /* default */] {
                 {"file":"/download/commute/commute.ogv","type":"ogg","height":"304","width":"400","label":"304p"}],
             "tracks":[{"file":"https://archive.org/stream/commute/commute.thumbs/commute_000005.jpg&vtt=vtt.vtt","kind":"thumbnails"}]}],
         */
-        this.setupPlaylist();
-
-        //TODO-DETAILS make next few lines between theatre-ia-wrap and theatre-ia not commute specific
+        this.setupPlaylist(); // Creates this.avs
+        const contenturl = `${__WEBPACK_IMPORTED_MODULE_2__Util__["a" /* default */].gateway.url_download}${itemid}/${this.avs[0].metadata.name}`;
+        const embedurlname = this.avs[0].metadata.source === "original" ? this.avs[0].metadata.name : this.avs[0].metadata.original;
+        const embedurl = `${__WEBPACK_IMPORTED_MODULE_2__Util__["a" /* default */].gateway.url_download}${itemid}/${embedurlname}`;
+        const schemacontentlength = `PT0M${parseInt(this.avs[0].metadata.length)}S`;
         return __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
             'div',
             { id: 'theatre-ia-wrap', 'class': 'container container-ia width-max ' },
             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemprop: 'url', href: detailsurl }),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemprop: 'thumbnailUrl', href: videothumbnailurl }),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemprop: 'contentUrl', href: contenturl }),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('link', { itemprop: 'embedUrl', href: embedurl }),
+            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('meta', { itemprop: 'duration', content: schemacontentlength }),
             __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                 'h1',
                 { 'class': 'sr-only' },
@@ -16102,7 +16135,7 @@ class Video extends __WEBPACK_IMPORTED_MODULE_1__AV__["a" /* default */] {
                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement(
                             'div',
                             { id: 'videoContainerX', style: 'text-align: center;' },
-                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('video', { id: 'streamContainer', src: this.avs[0], controls: true })
+                            __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('video', { id: 'streamContainer', src: this.avs[0], poster: videothumbnailurl, controls: true })
                         ),
                         __WEBPACK_IMPORTED_MODULE_0__ReactFake__["a" /* default */].createElement('div', { id: 'webtorrentStats', style: 'color: white; text-align: center;' }),
                         this.cherModal("video")
