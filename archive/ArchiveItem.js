@@ -81,7 +81,7 @@ export default class ArchiveItem {
 
     async fetch_query() {
         if (this.query) {   // This is for Search, Collection and Home.
-            const sort = this.item.collection_sort_order || this.sort
+            const sort = (this.item && this.item.collection_sort_order) || this.sort
             const url =
                 //`https://archive.org/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${sort}`; // Archive (CORS fail)
                 `https://gateway.dweb.me/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${sort}&and[]=${this.and}`;
