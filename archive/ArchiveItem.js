@@ -48,6 +48,12 @@ export default class ArchiveItem {
             throws: TypeError or Error if fails esp Unable to resolve name
             resolves to: this
          */
+        await this.fetch_metadata();
+        await this.fetch_query();
+        return this;
+    }
+
+    async fetch_metadata() {
         if (this.itemid && !this.item) {
             if (verbose) console.group('getting metadata for ' + this.itemid);
             //this.item = await Util.fetch_json(`https://archive.org/metadata/${this.itemid}`);
@@ -62,7 +68,7 @@ export default class ArchiveItem {
             if (!res[0]) {
                 throw new Error(`Unable to resolve ${name}`);
             }
-            console.assert((res[0].fullname === "/"+name) && !res[1]);
+            console.assert((res[0].fullname === "/" + name) && !res[1]);
             let m = await Dweb.Transportable.p_fetch(res[0].urls, verbose); // Using Transportable as its multiurl and might not be HTTP urls
             m = Dweb.utils.objectfrom(m);
             console.assert(m.metadata.identifier === this.itemid);
@@ -71,11 +77,15 @@ export default class ArchiveItem {
             if (verbose) console.log("Got metadata for " + this.itemid);
             if (verbose) console.groupEnd();
         }
+    }
+
+    async fetch_query() {
         if (this.query) {   // This is for Search, Collection and Home.
+            const sort = this.item.collection_sort_order || this.sort
             const url =
-                //`https://archive.org/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`; // Archive (CORS fail)
-                `https://gateway.dweb.me/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}&and[]=${this.and}`;
-                //`http://localhost:4244/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${this.sort}`; //Testing
+                //`https://archive.org/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${sort}`; // Archive (CORS fail)
+                `https://gateway.dweb.me/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${sort}&and[]=${this.and}`;
+                //`http://localhost:4244/metadata/advancedsearch?output=json&q=${this.query}&rows=${this.limit}&sort[]=${sort}`; //Testing
             console.log(url);
             const j = await Util.fetch_json(url);
             this.items = j.response.docs;

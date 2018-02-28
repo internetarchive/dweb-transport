@@ -6,7 +6,7 @@ export default class Collection extends Search {
     constructor(itemid, item) {
         super({
             query:  'collection:'+itemid,
-            sort:   '-downloads',
+            sort:   '-downloads',   // This will be overridden based on collection_sort_order
             itemid: itemid,
             item:   item,
         });
