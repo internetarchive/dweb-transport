@@ -22,6 +22,9 @@
         deletechildren("ObjBrowserDiv");
         sd.objbrowser("ObjBrowserDiv");
     }
+    function quick_keychains() {
+        (new Dweb.SmartDict()).objbrowser_arrayobj(el, "keychains", Dweb.KeyChain.keychains, {links: true});
+    }
 
     async function main() {
         //This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
@@ -114,7 +117,7 @@
     <input type="text" class="propval" id="retrievalarea" placeholder="ipfs:/ipfs/12ab34cd" size="70"/>
     <input type="submit" value="Fetch"/>
 </form>
-<p>Quick links: <span onclick='Dweb.objbrowser("ObjBrowserDiv"); return false;'>Dweb</span> inc keychains;</p>
+<p>Quick links: <span onclick='quick_keychains(); return false;'>KeyChains</span>; </p>
 
 <ul id="ObjBrowserDiv"></ul>/* Object browser content will be expanded in here. */
 

@@ -4,7 +4,6 @@ const SmartDict = require("./SmartDict");   // _AccessControlListEntry extends t
 const KeyPair = require('./KeyPair'); // Encapsulate public/private key pairs and crypto libraries
 const KeyChain = require('./KeyChain'); // Hold a set of keys, and locked objects
 const utils = require('./utils'); // Utility functions
-//TODO-REQUIRE above here is done
 
 class AccessControlList extends CommonList {
     /*

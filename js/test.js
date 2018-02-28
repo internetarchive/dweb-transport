@@ -50,7 +50,6 @@ async function p_test(verbose) {
 
         // Note the order of these is significant, it will retrieve by preference from the first setup, try with both orders if in doubt.
         //SEE-OTHER-ADDTRANSPORT
-        //TODO-REQUIRE these will break
         let t_http = await TransportHTTP.p_test(opts, verbose);
         //let t_ipfs = await TransportIPFS.p_test(opts, verbose); // Note browser requires indexeddb
         //let t_yjs = await TransportYJS.p_test(opts, verbose); // Should find ipfs transport

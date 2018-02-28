@@ -1,26 +1,25 @@
-const errors = require('./Errors');
-// SEE-OTHER-ADDTRANSPORT */
-exports.Transportable = require('./Transportable');
-exports.Block = require('./Block');
-exports.SmartDict = require("./SmartDict");
-exports.KeyPair = require("./KeyPair");
-exports.Signature = require("./Signature");
-exports.PublicPrivate = require("./PublicPrivate");
-exports.CommonList = require("./CommonList");
-exports.KeyValueTable = require("./KeyValueTable");
-exports.AccessControlList = require("./AccessControlList");
-exports.KeyChain = require('./KeyChain');
-exports.VersionList = require('./VersionList');
-exports.StructuredBlock = require('./StructuredBlock'); //TODO - will remove SB once have path traversal.
-exports.EventListenerHandler = require("./EventListenerHandler");
-exports.Domain = require("./Domain");
-exports.Leaf = exports.Domain.clsLeaf;
-exports.Transports = require('./Transports'); // Handles multiple transports
-
+// Stub to run browserify on
 // Javascript library for dweb
 // The crypto uses https://github.com/jedisct1/libsodium.js but https://github.com/paixaop/node-sodium may also be suitable if we move to node
+window.Dweb = { }
+// This makes them available as "sodium" and "Dweb" from test.html etc
+//window.sodium = require("libsodium-wrappers");  // Needed for cryptotest maybe move there ?
 
-exports.objbrowser = function(el, {maxdepth=2, verbose=false}={}) {
-    if (typeof el === 'string') el = document.getElementById(el);
-    (new SmartDict()).objbrowser_arrayobj(el, "keychains", KeyChain.keychains, {links: true});
-};
+Dweb.errors = require('./Errors');
+Dweb.Transportable = require('./Transportable');
+Dweb.Block = require('./Block');
+Dweb.SmartDict = require("./SmartDict");
+Dweb.KeyPair = require("./KeyPair");
+Dweb.Signature = require("./Signature");
+Dweb.PublicPrivate = require("./PublicPrivate");
+Dweb.CommonList = require("./CommonList");
+Dweb.KeyValueTable = require("./KeyValueTable");
+Dweb.AccessControlList = require("./AccessControlList");
+Dweb.KeyChain = require('./KeyChain');
+Dweb.VersionList = require('./VersionList');
+Dweb.StructuredBlock = require('./StructuredBlock'); //TODO - will remove SB once have path traversal.
+Dweb.EventListenerHandler = require("./EventListenerHandler");
+Dweb.Domain = require("./Domain");
+Dweb.Leaf = Dweb.Domain.clsLeaf;
+Dweb.Transports = require('./Transports'); // Handles multiple transports
+

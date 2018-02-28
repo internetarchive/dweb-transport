@@ -386,7 +386,6 @@ class Transports {
         returns array of transport instances
          */
         // "IPFS" or "IPFS,LOCAL,HTTP"
-        //TODO-REQUIRE this will break
         let localoptions = {http: {urlbase: "http://localhost:4244"}};
         return transports.map((tabbrev) => {
             let transportclass;
