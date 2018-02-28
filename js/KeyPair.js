@@ -1,5 +1,5 @@
 const errors = require('./Errors');
-//const sodium = require("libsodium-wrappers"); //TODO-REQUIRE work on this to allow in webpack
+const sodium = require("libsodium-wrappers"); //TODO-REQUIRE work on this to allow in webpack
 const SmartDict = require("./SmartDict");
 const utils = require('./utils'); // Utility functions
 const crypto = require('crypto'); // Needed to do a simple sha256 which doesnt appear to be in libsodium

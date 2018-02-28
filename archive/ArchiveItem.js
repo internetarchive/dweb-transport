@@ -2,9 +2,10 @@ import ArchiveFile from "./ArchiveFile";
 import Util from "./Util";
 
 require('babel-core/register')({ presets: ['env', 'react']}); // ES6 JS below!
-
-//const Dweb = require('../js/Dweb');     // Gets SmartDict and the Transports
-//TODO-REFACTOR extends SmartDict to eventually allow loading via URL - having problems with webpack ... libsodium -> fs
+const Transportable = require('../js/Transportable').default;
+const Transports = require('../js/Transports').default;
+const Domain = require('../js/Domain').default;
+const utils = require('../js/utils').default;
 //TODO-NAMING url could be a name
 
 export default class ArchiveItem {
@@ -57,20 +58,20 @@ export default class ArchiveItem {
         if (this.itemid && !this.item) {
             if (verbose) console.group('getting metadata for ' + this.itemid);
             //this.item = await Util.fetch_json(`https://archive.org/metadata/${this.itemid}`);
-            const transports = Dweb.Transports.connectedNamesParm(); // Pass transports, as metadata (currently) much quicker if not using IPFS
+            const transports = Transports.connectedNamesParm(); // Pass transports, as metadata (currently) much quicker if not using IPFS
             /* OLD WAY VIA HTTP
                 this.item = await Util.fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}?${transports}`);
             */
             // Fetch via Domain record
             const name = `arc/archive.org/metadata/${this.itemid}`;
-            const res = await Dweb.Domain.p_rootResolve(name, {verbose});     // [ Leaf object, remainder ]
+            const res = await Domain.p_rootResolve(name, {verbose});     // [ Leaf object, remainder ]
             //TODO-DOMAIN note p_resolve is faking signature verification on FAKEFAKEFAKE - will also need to error check that which currently causes exception
             if (!res[0]) {
                 throw new Error(`Unable to resolve ${name}`);
             }
             console.assert((res[0].fullname === "/" + name) && !res[1]);
-            let m = await Dweb.Transportable.p_fetch(res[0].urls, verbose); // Using Transportable as its multiurl and might not be HTTP urls
-            m = Dweb.utils.objectfrom(m);
+            let m = await Transportable.p_fetch(res[0].urls, verbose); // Using Transportable as its multiurl and might not be HTTP urls
+            m = utils.objectfrom(m);
             console.assert(m.metadata.identifier === this.itemid);
             this.item = m;
             this._listLoad();   // Load _list with ArchiveFile

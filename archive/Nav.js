@@ -15,6 +15,7 @@ import Image from './Image'
 import Audio from './Audio'
 import Video from './Video'
 import DetailsError from './DetailsError'
+const Transports = require('../js/Transports').default;
 
 
 export default class Nav { //extends React.Component
@@ -155,7 +156,7 @@ static async factory(itemid, res, wanthistory=true) {
         console.group("Nav.factory",itemid);
         if (wanthistory) {
             let historystate = {itemid}; //TODO-HISTORY may want  to store verbose, transports etc here
-            history.pushState(historystate, `Internet Archive item ${itemid ? itemid : ""}`, `?${itemid ? "item="+itemid+"&" : ""}verbose=${verbose}&${Dweb.Transports.connectedNamesParm()}`); //TODO-HISTORY need to save state of transports
+            history.pushState(historystate, `Internet Archive item ${itemid ? itemid : ""}`, `?${itemid ? "item="+itemid+"&" : ""}verbose=${verbose}&${Transports.connectedNamesParm()}`); //TODO-HISTORY need to save state of transports
         }
         if (!itemid) {
             (await new Home(itemid, undefined).fetch()).render(res);

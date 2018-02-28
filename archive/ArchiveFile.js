@@ -4,6 +4,8 @@ import React from './ReactFake';
 import Util from './Util';
 import throttle from "throttleit";
 import prettierBytes from "prettier-bytes";
+var Transportable = require('../js/Transportable').default;
+var Transports = require('../js/Transports').default;
 
 export default class ArchiveFile {
     /*
@@ -28,7 +30,7 @@ export default class ArchiveFile {
         /*
         Return an array of URLs that might be a good place to get this item
          */
-        if (!this.metadata.ipfs && Dweb.Transports.connectedNames().includes("IPFS")) {   // Connected to IPFS but dont have IPFS URL yet (not included by default because IPFS caching is slow)
+        if (!this.metadata.ipfs && Transports.connectedNames().includes("IPFS")) {   // Connected to IPFS but dont have IPFS URL yet (not included by default because IPFS caching is slow)
             this.metadata = await Util.fetch_json(`${Util.gateway.url_metadata}${this.itemid}/${this.metadata.name}`);
         }
         return [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f => !!f);   // Multiple potential sources elimate any empty
@@ -40,7 +42,7 @@ export default class ArchiveFile {
        return Util.archiveMimeTypeFromFormat[this.metadata.format];
     }
     async data() {
-        return await Dweb.Transportable.p_fetch(await this.p_urls(), verbose);
+        return await Transportable.p_fetch(await this.p_urls(), verbose);
     }
     async blob() {
         return new Blob([await this.data], {type: this.mimetype()} );

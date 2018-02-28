@@ -10,6 +10,9 @@ import RenderMedia from 'render-media';
 import ArchiveFile from "./ArchiveFile";
 import Util from "./Util";
 import from2 from "from2";
+const Transportable = require('../js/Transportable').default;
+const Transports = require('../js/Transports').default;
+const Domain = require('../js/Domain').default;
 
 function deletechildren(el, keeptemplate) { //Note same function in htmlutils
     /*
@@ -38,7 +41,7 @@ export default class React  {
          */
         /*
         //This method makes use of the full Dweb library, can get any kind of link, BUT doesnt work in Firefox, the image doesn't get rendered.
-        let data = await  Dweb.Transportable.p_fetch(urls, verbose);  //Typically will be a Uint8Array
+        let data = await  Transportable.p_fetch(urls, verbose);  //Typically will be a Uint8Array
         let blob = new Blob([data], {type: Util.archiveMimeTypeFromFormat[this.metadata.format]}) // Works for data={Uint8Array|Blob}
         // This next code is bizarre combination needed to open a blob from within an HTML window.
         let objectURL = URL.createObjectURL(blob);
@@ -51,7 +54,7 @@ export default class React  {
         if (urls instanceof ArchiveFile) {
             urls = await urls.p_urls();   // This could be slow, may have to get the gateway to cache the file in IPFS
         }
-        const validCreateReadStream = Dweb.Transports.validFor(urls, "createReadStream").length;
+        const validCreateReadStream = Transports.validFor(urls, "createReadStream").length;
         if (validCreateReadStream) {
 
             const file = {
@@ -61,14 +64,14 @@ export default class React  {
                     // and "end" inclusive. This works just like fs.createReadStream(opts) from
                     // the node.js "fs" module.
 
-                    return Dweb.Transports.createReadStream(urls, opts, verbose)
+                    return Transports.createReadStream(urls, opts, verbose)
                 }
             }
 
             RenderMedia.append(file, jsx, cb);  // Render into supplied element - have to use append, as render doesnt work, the cb will set attributes and/or add children.
         } else {
             // Otherwise fetch the file, and pass via rendermedia and from2
-            const buff = await  Dweb.Transportable.p_fetch(urls, verbose);  //Typically will be a Uint8Array
+            const buff = await  Transportable.p_fetch(urls, verbose);  //Typically will be a Uint8Array
             if (verbose) console.log("Retrieved image size",buff.length);
             const file = {
                 name: name,
@@ -95,8 +98,8 @@ export default class React  {
         //TODO-SERVICES-IMG this code might move elsewhere, since static it should be easy.
         //TODO-SERVICES-IMG Note similar code in ArchiveItem.fetch to get metadata
         if (verbose) console.log('getting image for',name); //Dont use console.group because happening in parallel
-        const transports = Dweb.Transports.connectedNamesParm(); // Pass transports, as metadata (currently) much quicker if not using IPFS
-        const res = await Dweb.Domain.p_rootResolve(name, {verbose});     // [ Leaf object, remainder ] //TODO-NAME see comments in p_rootResolve about FAKEFAKEFAKE
+        const transports = Transports.connectedNamesParm(); // Pass transports, as metadata (currently) much quicker if not using IPFS
+        const res = await Domain.p_rootResolve(name, {verbose});     // [ Leaf object, remainder ] //TODO-NAME see comments in p_rootResolve about FAKEFAKEFAKE
         if (!(res[0] && (res[0].fullname === "/"+name) && !res[1] )) {
             throw new Error(`Unable to resolve ${name}`);
         }
@@ -110,7 +113,7 @@ export default class React  {
         //If its a HTTP URL use that
         //Dont try and use IPFS till get a fix for createReadStream
 
-        const validCreateReadStream = Dweb.Transports.validFor(urls, "createReadStream").length;
+        const validCreateReadStream = Transports.validFor(urls, "createReadStream").length;
         if (validCreateReadStream) {
             var file = {
                 name: name,
@@ -119,7 +122,7 @@ export default class React  {
                     // and "end" inclusive. This works just like fs.createReadStream(opts) from
                     // the node.js "fs" module.
 
-                    return Dweb.Transports.createReadStream(urls, opts, verbose)
+                    return Transports.createReadStream(urls, opts, verbose)
                 }
             }
 
@@ -155,12 +158,12 @@ export default class React  {
             // Next choice is to pass a HTTP url direct to <VIDEO> as it knows how to stream it.
             // TODO clean this nasty kludge up,
             // Find a HTTP transport if connected, then ask it for the URL (as will probably be contenthash) note it leaves non contenthash urls untouched
-            const url = Dweb.Transports._connected().find(t => t.name = "HTTP")._url(urls.find(u => (u.startsWith("contenthash") || u.startsWith("http"))), "content/rawfetch");
+            const url = Transports._connected().find(t => t.name = "HTTP")._url(urls.find(u => (u.startsWith("contenthash") || u.startsWith("http"))), "content/rawfetch");
             if (url) {
                 jsx.src = url;
             } else {
                 // Worst choice - getch the file, and pass via rendermedia and from2
-                const buff = await  Dweb.Transportable.p_fetch(urls, verbose);  //Typically will be a Uint8Array
+                const buff = await  Transportable.p_fetch(urls, verbose);  //Typically will be a Uint8Array
                 const file = {
                     name: name,
                     createReadStream: function (opts) {
