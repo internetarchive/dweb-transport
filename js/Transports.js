@@ -394,8 +394,13 @@ class Transports {
             } else {
                 transportclass = this._transportclasses[tabbrev];
             }
-            return transportclass.setup0(tabbrev === "LOCAL" ? localoptions : options, verbose);
-        });
+            if (!transportclass) {
+                console.error(`Requested ${tabbrev} but only ${this.this._transportclasses.map(t=>t.name)} have been required`)
+                return undefined;
+            } else {
+                return transportclass.setup0(tabbrev === "LOCAL" ? localoptions : options, verbose);
+            }
+        }).filter(f => !!f); // Trim out any undefined
     }
     static async p_setup1(verbose) {
         /* Second stage of setup, connect if possible */

@@ -10,9 +10,9 @@ import RenderMedia from 'render-media';
 import ArchiveFile from "./ArchiveFile";
 import Util from "./Util";
 import from2 from "from2";
-const Transportable = require('../js/Transportable').default;
-const Transports = require('../js/Transports').default;
-const Domain = require('../js/Domain').default;
+const Transportable = require('../js/Transportable');
+const Transports = require('../js/Transports');
+const Domain = require('../js/Domain');
 
 function deletechildren(el, keeptemplate) { //Note same function in htmlutils
     /*

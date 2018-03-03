@@ -13,10 +13,6 @@
 
 
  */
-//TODO-REQUIRE all these will break since its loading into HTML
-const errors = require('./Errors'); // Standard Dweb Errors
-const Transports = require('./Transports'); // Manage all Transports that are loaded
-//TODO-REQUIRE above here are done
 
 // Array of images can use
 const icon_images = {   //!SEE-OTHER-KC-CLASSES
@@ -215,11 +211,11 @@ async function p_connect(options) { //TODO-API its defaulttransports
         if (!tabbrevs.length) { tabbrevs = options.defaulttransports || [] }
         if (!tabbrevs.length) { tabbrevs = ["HTTP", "YJS", "IPFS", "WEBTORRENT"]; }
         tabbrevs = tabbrevs.map(n => n.toUpperCase());
-        let transports = Transports.setup0(tabbrevs);
-        replacetexts("transportstatuses", Transports._transports);
-        await Transports.p_setup1(verbose);
+        let transports = Dweb.Transports.setup0(tabbrevs);
+        replacetexts("transportstatuses", Dweb.Transports._transports);
+        await Dweb.Transports.p_setup1(verbose);
         refresh_transportstatuses("transportstatuses"); // Update status for anything,
-        await Transports.p_setup2(verbose);
+        await Dweb.Transports.p_setup2(verbose);
         refresh_transportstatuses("transportstatuses"); // Update status for anything,
         await Promise.all(transports.map(t => t.p_status(verbose)));
         refresh_transportstatuses("transportstatuses"); // Update status for anything,

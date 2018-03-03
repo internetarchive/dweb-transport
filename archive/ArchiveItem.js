@@ -2,10 +2,10 @@ import ArchiveFile from "./ArchiveFile";
 import Util from "./Util";
 
 require('babel-core/register')({ presets: ['env', 'react']}); // ES6 JS below!
-const Transportable = require('../js/Transportable').default;
-const Transports = require('../js/Transports').default;
-const Domain = require('../js/Domain').default;
-const utils = require('../js/utils').default;
+const Transportable = require('../js/Transportable');
+const Transports = require('../js/Transports');
+const Domain = require('../js/Domain');
+const utils = require('../js/utils');
 //TODO-NAMING url could be a name
 
 export default class ArchiveItem {
