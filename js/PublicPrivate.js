@@ -184,7 +184,6 @@ class PublicPrivate extends SmartDict {
         /*
         Create a signature -
         Note - its normally better to use p_push as stores signature and puts on _list and on Dweb
-        TODO-KEYVALUE its unclear if this is specific to CL and do differently on KV etc, if so move to CL from PP
 
         :param urls:    URL of object to sign
         :returns:       Signature
@@ -199,7 +198,6 @@ class PublicPrivate extends SmartDict {
     verify(sig, verbose) {
         /*
         Check that a signature is valid for this list, i.e. signed by this keypair.
-        TODO-KEYVALUE its unclear if this is specific to CL and do differently on KV etc, if so move to CL from PP
 
         sig:    Signature object
         returns:    true if verifies

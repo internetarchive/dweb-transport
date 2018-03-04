@@ -104,7 +104,8 @@ class KeyValueTable extends PublicPrivate {
 
     async p_set(name, value, {verbose=false, publicOnly=false, encryptIfAcl=true, fromNet=false}={}) {  //TODO-API
         // Subclased in Domain to avoid overwriting private version with public version from net
-        //TODO-KEYVALUE these sets need to be signed
+        //TODO-KEYVALUE these sets need to be signed if the transport overwrites the previous, rather than appending
+        //TODO-KEYVALUE the difference is that if appended, then an invalid signature (if reqd) in the value would cause it to be discarded.
         if (this._autoset && !fromNet && (this._map[name] !== value)) {
             await Transports.p_set(this.tableurls, name, this._storageFromMap(value, {publicOnly, encryptIfAcl}), verbose); // Note were not waiting for result but have to else hit locks
         }

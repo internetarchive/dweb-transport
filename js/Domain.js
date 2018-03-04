@@ -178,7 +178,7 @@ class Domain extends KeyValueTable {
             That is teh case if the subdomain has a cryptographically valid signatures by one of the domain's keys and the fullname matches the name we have it at.
          */
         // its called when we think we have a resolution.
-        //TODO-DOMAIN need to be cleverer about DOS, but at moment dont have failure case if KVT only accepts signed entries from table owner or verifies on retrieval.
+        //TODO-NAME need to be cleverer about DOS, but at moment dont have failure case if KVT only accepts signed entries from table owner or verifies on retrieval.
         // Throws error if doesnt verify
         return subdomain._verifyOwnSigs().some(key => this.keys.includes(key))                       // Check valid sig by this
             && ([this.fullname, name].join('/') === subdomain.fullname); // Check name matches
@@ -210,7 +210,6 @@ class Domain extends KeyValueTable {
       */
 
     async p_get(key, verbose) {
-        //TODO-DOMAIN reconstructing this from KeyValueTable so can merge incomplete tables - next choose best - then store to others
         if (Array.isArray(key)) {
             const res = {};
             const self = this;
@@ -223,10 +222,10 @@ class Domain extends KeyValueTable {
             .map(r => this._mapFromStorage(r))
         // Errors in above will result in an undefined in the res array, which will be filtered out.
         // res is now an array of returned values in same order as tablepublicurls
-        //TODO-DOMAIN should verify here before do this test but note Python gateway is still using FAKEFAKEFAKE as a signature
+        //TODO-NAME should verify here before do this test but note Python gateway is still using FAKEFAKEFAKE as a signature
         //
         const indexOfMostRecent = rr.reduce((iBest, r, i, arr) => (r && r.signatures[0].date) > (arr[iBest] || "" && arr[iBest].signatures[0].date) ? i : iBest, 0);
-        //TODO-DOMAIN save best results to others.
+        //TODO-NAME save best results to others.
         const value = rr[indexOfMostRecent];
         this._map[key] = value;
         return value;
@@ -293,12 +292,12 @@ class Domain extends KeyValueTable {
         return `${indent.repeat(indentlevel)}${this.fullname} @ ${this.tablepublicurls.join(', ')}${this.expires ? " expires:"+this.expires : ""}\n`
             + ((indentlevel >= maxindent) ? "..." : (await Promise.all((await this.p_keys()).map(k => this._map[k].p_printable({indent, indentlevel: indentlevel + 1, maxindent: maxindent})))).join(''))
     }
-    static async p_setupOnce({verbose=false} = {}) { //TODO-DOMAIN move to own file
+    static async p_setupOnce({verbose=false} = {}) {
         //const metadatagateway = 'http://localhost:4244/leaf/archiveid';
         const metadataGateway = 'https://gateway.dweb.me/leaf/archiveid'; //TODO-BOOTSTRAP need to run this against main gateway
         const pass = "Replace this with something secret";
-        const kc = await KeyChain.p_new({name: "test_keychain kc"}, {passphrase: pass}, verbose);    //TODO-DOMAIN replace with secret passphrase
-        //TODO-DOMAIN add ipfs address and ideally ipns address to archiveOrgDetails record
+        const kc = await KeyChain.p_new({name: "test_keychain kc"}, {passphrase: pass}, verbose);    //TODO-NAME replace with secret passphrase
+        //TODO-NAME add ipfs address and ideally ipns address to archiveOrgDetails record
         //p_new should add registrars at whichever compliant transports are connected (YJS, HTTP)
         Domain.root = await Domain.p_new({_acl: kc, fullname: ""}, true, {passphrase: pass+"/"}, verbose, [], {   //TODO-NAME will need a secure root key
             arc: await Domain.p_new({_acl: kc},true, {passphrase: pass+"/arc"}, verbose, [], { // /arc domain points at our top level resolver.
@@ -358,8 +357,6 @@ class Domain extends KeyValueTable {
             console.assert(typeof res[0] === "undefined");
             if (verbose) console.log("Structure of registrations");
             if (verbose) console.log(await Domain.root.p_printable());
-            //TODO-NAME build some more failure cases (bad key, bad fullname)
-            //TODO-NAME try resolving on other machine
             // Commented out as should run under setup.js with correct transports
             // await this.p_setupOnce(verbose);
 
@@ -369,15 +366,15 @@ class Domain extends KeyValueTable {
             let itemid = "commute";
             let name = `arc/archive.org/metadata/${itemid}`;
             res = await Domain.root.p_resolve(name, {verbose});
-            //TODO-DOMAIN note p_resolve is faking signature verification on FAKEFAKEFAKE - will also need to error check that which currently causes exception
+            //TODO-NAME note p_resolve is faking signature verification on FAKEFAKEFAKE - will also need to error check that which currently causes exception
             console.assert(res[0].fullname === "/"+name);
             if (verbose) console.log("Resolved",name,"to",await res[0].p_printable({maxindent:2}), res[1]);
             let metadata = await Transportable.p_fetch(res[0].urls); // Using Block as its multiurl and might not be HTTP urls
             if (verbose) console.log("Retrieved metadata",JSON.stringify(metadata));
             console.log("---Expect failure to resolve 'arc/archive.org/details/commute'");
             console.assert(metadata.metadata.identifier === itemid);
-            //TODO-DOMAIN dont think next will work.
-            try { //TODO-DOMAIN will need to figure out what want this to do
+            //TODO-NAME dont think next will work.
+            try { //TODO-NAME will need to figure out what want this to do
                 res = await Domain.root.p_resolve("arc/archive.org/details/commute", {verbose});
                 console.log("resolved to",await res[0].p_printable({maxindent:2}), res[1] ? `Remainder=${res[1]}`: "");
             } catch(err) {

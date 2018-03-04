@@ -164,7 +164,7 @@ class CommonList extends PublicPrivate {    //TODO-API split CL and PP
     }
 
     objbrowser_fields(propname) {
-        let fieldtypes = { _list: "arrayobj", listurls: "urlarraynolinks", listpublicurls: "urlarraynolinks"}  //TODO-OBJBROWSER check booleans work, and conversion of listners to strings.
+        let fieldtypes = { _list: "arrayobj", listurls: "urlarraynolinks", listpublicurls: "urlarraynolinks"};
         return fieldtypes[propname] || super.objbrowser_fields(propname);
     }
     async objbrowser(el, opts) {
