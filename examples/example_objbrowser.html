@@ -20,7 +20,7 @@
         let sd = await Dweb.SmartDict.p_fetch(urls, verbose);
         if (verbose) console.log("Fetched=",sd);
         deletechildren("ObjBrowserDiv");
-        sd.objbrowser("ObjBrowserDiv");
+        await sd.p_objbrowser("ObjBrowserDiv");
     }
     function quick_keychains() {
         (new Dweb.SmartDict()).objbrowser_arrayobj(el, "keychains", Dweb.KeyChain.keychains, {links: true});

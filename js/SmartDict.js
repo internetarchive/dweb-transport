@@ -195,19 +195,19 @@ class SmartDict extends Transportable {
     objbrowser_obj(el, name, val) {
         this._objbrowser_row(el, name,
             this.objbrowser_createElement('span',{className: 'propval', source: val},
-                this.objbrowser_createElement('span', {onclick: `SmartDict.objbrowser_expandurl(this.parentNode); return false;`},val.constructor.name)
+                this.objbrowser_createElement('span', {onclick: `SmartDict.p_objbrowser_expandurl(this.parentNode); return false;`},val.constructor.name)
 
             ));
     }
-    static async objbrowser_expandurl(el, obj) {
+    static async p_objbrowser_expandurl(el, obj) {
         if (typeof obj === "undefined") // If dont specify check source, which may also be undefined, but use if there.
             obj = el.source;
         if (Array.isArray(obj) && typeof obj[0] === "string")
             obj = await SmartDict.p_fetch(obj, verbose);
         else if (typeof obj === "string")
             obj = await SmartDict.p_fetch([obj], verbose);
-        //else // Expecting its subclass of SmartDict or otherwise has a objbrowser method
-        obj.objbrowser(el,{maxdepth: 2, verbose: false});    // TODO-OBJBROWSER could pass args here but this comes from UI onclick
+        //else // Expecting its subclass of SmartDict or otherwise has a p_objbrowser method
+        await obj.p_objbrowser(el,{maxdepth: 2, verbose: false});    // TODO-OBJBROWSER could pass args here but this comes from UI onclick
         return false;
     }
     objbrowser_urlarray(el, name, arr, {links=false}={}) {
@@ -215,7 +215,7 @@ class SmartDict extends Transportable {
             this.objbrowser_createElement('ul',{className: 'propurls propval'},
                 links
                     ? arr.map(l => this.objbrowser_createElement('li',{className: 'propurl', source: l},
-                        this.objbrowser_createElement('span', {onclick: `SmartDict.objbrowser_expandurl(this.parentNode); return false;`},l)
+                        this.objbrowser_createElement('span', {onclick: `SmartDict.p_objbrowser_expandurl(this.parentNode); return false;`},l)
                     ) )
                     : arr.map(l => this.objbrowser_createElement('li',{className: 'propurl'},l) )
             ) );
@@ -224,7 +224,7 @@ class SmartDict extends Transportable {
         this._objbrowser_row(el, name,
             this.objbrowser_createElement('ul',{className: 'propurls propval'},
                 arr.map((l,i) => this.objbrowser_createElement('li',{className: 'propurl', source: l},
-                    this.objbrowser_createElement('span', {onclick: `SmartDict.objbrowser_expandurl(this.parentNode); return false;`}, `${i}...`)
+                    this.objbrowser_createElement('span', {onclick: `SmartDict.p_objbrowser_expandurl(this.parentNode); return false;`}, `${i}...`)
                 ))
             ) );
     }
@@ -233,7 +233,7 @@ class SmartDict extends Transportable {
         this._objbrowser_row(el, name, ul);
         arr.map((l,i) => this._objbrowser_row(ul, name,
             this.objbrowser_createElement('span', {},
-                this.objbrowser_createElement('span', {onclick: `SmartDict.objbrowser_expandurl(this.parentNode); return false;`}, `${i}...`)
+                this.objbrowser_createElement('span', {onclick: `SmartDict.p_objbrowser_expandurl(this.parentNode); return false;`}, `${i}...`)
             )));
     }
     objbrowser_arraystr(el, name, arr) {
@@ -248,7 +248,7 @@ class SmartDict extends Transportable {
         let fieldtypes = { _acl: "obj", _urls: "urlarray", table: "str", name: "str" } // Note Name is not an explicit field, but is normally set
         return fieldtypes[propname]; //TODO || super if implement on Transportable
     }
-    objbrowser(el, {maxdepth=2, verbose=false}={}) {
+    p_objbrowser(el, {maxdepth=2, verbose=false}={}) {
         //TODO-OBJBROWSER empty values & condition on option
         if (typeof el === 'string') { el = document.getElementById(el); }
         for (let propname in this) {
@@ -278,7 +278,7 @@ class SmartDict extends Transportable {
                         case "key": this.objbrowser_key(el, propname, this[propname]); // Only defined on KeyPair
                             break;
                         default:
-                            // Super classes call super.objbrowser(el,options) here
+                            // Super classes call super.p_objbrowser(el,options) here
                             this.objbrowser_str(el, propname, this[propname].toString())
                             console.log("objbrowser warning, no field type specified for",propname);
                         //TODO-OBJBROWSER make Transportable.objbrowser

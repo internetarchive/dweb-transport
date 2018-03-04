@@ -34,7 +34,7 @@
         if (verbose) console.log("Fetched=",sd);
         destn.innerHTML = "My name is: "+sd.name;
         destn.style.color = sd.favcolor;
-        sd.objbrowser("ObjBrowserDiv");
+        await sd.p_objbrowser("ObjBrowserDiv")
     }
 
     async function main() {

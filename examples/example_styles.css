@@ -1,6 +1,6 @@
 /* Styles used for all the examples */
 
-/* Sty;es used for tables of properties, especially by objbrowser.js*/
+/* Styles used for tables of properties, especially by (now obsolete) objbrowser.js*/
 .props { padding-left: 0; } /*Move back directly under type name*/
 .prop {display:table-row; border: 1px dotted grey; } /*ignoring border*/
 .propname {display:table-cell; font-weight:bold;background-color:#cccccc;border: 1px dotted grey; padding-left:0.3em; padding-right:0.3em} /*width:15em */

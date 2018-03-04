@@ -126,7 +126,7 @@ class CommonList extends PublicPrivate {    //TODO-API split CL and PP
                 throw new errors.CodingError("CL.p_push obj should never be non-empty");
             }
             let sig;
-            console.assert(this.listpublicurls.length); // Should be set by now
+            console.assert(this.listpublicurls.length > 0); // Should be set by now
             await this.p_store(verbose);        // Make sure list is stored before store anything on it.
             if (verbose) console.log("CL.p_push", obj._urls, "onto", this._urls);
             let urls = obj;
@@ -167,9 +167,9 @@ class CommonList extends PublicPrivate {    //TODO-API split CL and PP
         let fieldtypes = { _list: "arrayobj", listurls: "urlarraynolinks", listpublicurls: "urlarraynolinks"};
         return fieldtypes[propname] || super.objbrowser_fields(propname);
     }
-    async objbrowser(el, opts) {
+    async p_objbrowser(el, opts) {
         await this.p_fetchlist();   // Fetch list before displaying (but not elements)
-        super.objbrowser(el, opts);
+        super.p_objbrowser(el, opts);
     }
 
     // ----- Listener interface ----- see https://developer.mozilla.org/en-US/docs/Web/API/EventTarget for the pattern
