@@ -211,7 +211,7 @@ class TransportIPFS extends Transport {
             } else { //c: not a file
                 buff = res.value;
             }
-            if (verbose) console.log("IPFS fetched ", buff.length);
+            if (verbose) console.log(`IPFS fetched ${buff.length} from ${ipfspath}`);
             return buff;
         } catch (err) {
             console.log("Caught misc error in TransportIPFS.p_rawfetch");

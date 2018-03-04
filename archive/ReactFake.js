@@ -55,6 +55,7 @@ export default class React  {
             urls = await urls.p_urls();   // This could be slow, may have to get the gateway to cache the file in IPFS
         }
         const validCreateReadStream = Transports.validFor(urls, "createReadStream").length;
+        // Two options - depending on whether can do a stream well (WEBSOCKET) or not (HTTP, IPFS)
         if (validCreateReadStream) {
 
             const file = {
