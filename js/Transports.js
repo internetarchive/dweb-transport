@@ -222,6 +222,7 @@ class Transports {
 
     // Stream handling ===========================================
 
+    //TODO-STREAM createReadStream is obsolete, check not used anywhere.
     static createReadStream(urls, options, verbose) {
         //Cant do this, this routine is sync .... urls = await this.p_resolveNames(urls); // If naming is loaded then convert to a name
         let tt = this.validFor(urls, "createReadStream", options); //[ [Url,t],[Url,t]]  // Passing options - most callers will ignore TODO-STREAM support options in validFor
@@ -243,7 +244,33 @@ class Transports {
         throw new errors.TransportError(errs.map((err)=>err.message).join(', '));  //Throw err with combined messages if none succeed
     }
 
-    // KeyValue support ===========================================
+
+    static f_createReadStream(urls, verbose) {
+        /*
+        urls:   Urls of the stream
+        returns:    f(opts) => stream returning bytes from opts.start || start of file to opts.end-1 || end of file
+         */
+        let tt = this.validFor(urls, "createReadStream", options); //[ [Url,t],[Url,t]]  // Passing options - most callers will ignore TODO-STREAM support options in validFor
+        if (!tt.length) {
+            throw new errors.TransportError("Transports.p_createReadStream cant find any transport for urls: " + urls);
+        }
+        //With multiple transports, it should return when the first one returns something.
+        let errs = [];
+        for (const [url, t] of tt) {
+            try {
+                return t.f_createReadStream(url, verbose);
+            } catch (err) {
+                errs.push(err);
+                console.log("Could not retrieve ", url.href, "from", t.name, err.message);
+                // Don't throw anything here, loop round for next, only throw if drop out bottom
+                //TODO-MULTI-GATEWAY potentially copy from success to failed URLs.
+            }
+        }
+        throw new errors.TransportError(errs.map((err)=>err.message).join(', '));  //Throw err with combined messages if none succeed
+}
+
+
+// KeyValue support ===========================================
 
     static async p_get(urls, keys, verbose) {
         /*

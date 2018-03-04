@@ -149,13 +149,11 @@ export default class React  {
             if (validCreateReadStream) {
                 const file = {
                     name: name,
-                    createReadStream: function (opts) {
-                        // Return a readable stream that provides the bytes between offsets "start"
-                        // and "end" inclusive. This works just like fs.createReadStream(opts) from
-                        // the node.js "fs" module.
-
-                        return Transports.createReadStream(urls, opts, verbose)
-                    }
+                    createReadStream: Transports.f_createReadStream(urls, verbose)
+                        // Return a function that returns a readable stream that provides the bytes between offsets "start" and "end" inclusive.
+                        // This function works just like fs.createReadStream(opts) from the node.js "fs" module.
+                        // f_createReadStream can initiate the stream before returning the function.
+                        //OLD WAY: function (opts) { return Transports.createReadStream(urls, opts, verbose); }
                 };
 
                 RenderMedia.render(file, jsx, cb);  // Render into supplied element

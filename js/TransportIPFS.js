@@ -15,6 +15,7 @@ const stream = require('readable-stream');  // Needed for the pullthrough - this
 
 // Library packages other than IPFS
 const Url = require('url');
+const through = require('through');
 
 // Utility packages (ours) And one-liners
 const promisify = require('promisify-es6');
@@ -246,6 +247,7 @@ class TransportIPFS extends Transport {
         //return this.ipfs.files.put(buf).then((block) => TransportIPFS.urlFrom(block.cid));
     }
 
+    /* OLD WAY - DOESNT WORK since cant seek into streams.
     createReadStream(url, opts = {}, verbose = false) {
         //TODO-API needs documentation and API update when working
         //TODO-STREAMS untested - doesnt work since cant seek into streams.
@@ -253,6 +255,67 @@ class TransportIPFS extends Transport {
         if (!url) throw new errors.CodingError("TransportIPFS.p_rawfetch: requires url");
         let stream = this.ipfs.files.catReadableStream(TransportIPFS.cidFrom(url));   // cidFrom Throws TransportError if url bad
         return stream;
+    }
+    */
+    // Based on https://github.com/ipfs/js-ipfs/pull/1231/files
+
+    offsetStream(links, startByte, endByte) {
+        // We will write the requested bytes into this stream
+        const stream = through()
+        let streamPosition = 0
+
+        series(links.map((link, index) => {
+            return () => {
+                if (!stream.writable) { return } // The stream has been closed
+                // DAGNode Links report unixfs object data sizes 14 bytes larger due to the protobuf wrapper
+                const bytesInLinkedObjectData = link.size - 14
+                if (startByte > (streamPosition + bytesInLinkedObjectData)) {
+                    // Start byte is after this block so skip it
+                    streamPosition += bytesInLinkedObjectData;
+                    return;
+                }
+                if (endByte && endByte < streamPosition) {  // TODO-STREAM this is copied from https://github.com/ipfs/js-ipfs/pull/1231/files but I think it should be endByte <= since endByte is first byte DONT want
+                    // End byte was before this block so skip it
+                    streamPosition += bytesInLinkedObjectData;
+                    return;
+                }
+                return ipfs.object.data(link.multihash)
+                        .then(data => unixFs.unmarshal(data).data)
+                        .then(data => {
+                            if (!stream.writable) {
+                                // The stream was closed while we were getting data
+                                return;
+                            }
+                            const length = data.length;
+                            if (startByte > streamPosition && startByte < (streamPosition + length)) {
+                                // If the startByte is in the current block, skip to the startByte
+                                data = data.slice(startByte - streamPosition);
+                            }
+                            stream.write(data);
+                            streamPosition += length;
+                        })
+            }
+        }))
+            .catch(error => log(error.message))
+        return stream;
+    }
+
+
+    f_createReadStream(url, verbose=false) {
+        url -> hash
+        const links = await ipfs.object.links(hash);
+        function crs(opts) {
+            let stream;  Holds pointer to stream between calls.
+            function (opts) {
+                // Return a readable stream that provides the bytes between offsets "start" and "end" inclusive
+                if (stream && stream.destroy) stream.destroy();
+                stream = offsetStream(links,
+                    opts.start, //TODO-STREAM may change
+                    opts.end ? opts.end + 1 : undefined) //TODO-STREAM may change
+                return stream;
+            }
+        }
+
     }
 
     static async p_test(opts, verbose) {
