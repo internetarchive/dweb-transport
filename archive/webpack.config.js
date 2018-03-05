@@ -10,13 +10,29 @@ var HTMLWebpackPluginConfig = new HTMLWebpackPlugin({
 module.exports = {
     entry: __dirname + '/archive.js',
     module: {
-        loaders: [
-            {
-                test: /\.js$/,
-                exclude: /node_modules/,
-                loader: 'babel-loader'
-            }
-        ]
+            rules: [
+                {
+                    test: /\.js$/,
+                    exclude: /(node_modules|bower_components)/,
+                    use: {
+                        loader: 'babel-loader'
+                        //options: {
+                        //    presets: ['@babel/preset-env']
+                        //}
+                    }
+                }
+            ]
+    },
+    node: {
+        //I copied this section from someone else's version that worked for WebTorrent, definately need fs, unclear if need others.
+        //global: true,
+        crypto: 'empty',
+        fs: 'empty',
+        process: true,
+        module: false,
+        clearImmediate: false,
+        setImmediate: false,
+        console: false
     },
     output: {
         filename: 'archive_webpacked.js',

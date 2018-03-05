@@ -8,7 +8,6 @@
     "custom-event": "~1.0.1",
     "es2015": "0.0.0",
     "from2": "^2.3.0",
-    "fs": "0.0.1-security",
     "ipfs": "^0.27.7",
     "jsdom": "^11.6.2",
     "leveldown": "^1.7.0-0",
@@ -18,12 +17,12 @@
     "node-fetch-npm": "^2.0.2",
     "prettier-bytes": "^1.0.4",
     "promisify-es6": "^1.0.3",
-    "readable-stream": "^2.3.4",
-    "render-media": "^2.11.0",
+    "readable-stream": "^2.3.5",
+    "render-media": "^2.12.0",
     "request": "^2.83.0",
     "sha3": "^1.2.0",
     "throttleit": "^1.0.0",
-    "webtorrent": "^0.98.23",
+    "webtorrent": "^0.98.24",
     "whatwg-fetch": "^2.0.3",
     "xmlhttprequest": "^1.8.0",
     "y-array": "^10.1.4",
@@ -48,7 +47,7 @@
     "babel-preset-es2015": "^6.24.1",
     "babelify": "^8.0.0",
     "browserify": "^14.5.0",
-    "watchify": "^3.10.0"
+    "watchify": "^3.11.0"
   },
   "scripts": {
     "bundle": "cd js; browserify ./Dweb.js > ../examples/dweb_bundled.js",
