@@ -18,7 +18,7 @@ import DetailsError from './DetailsError'
 const Transports = require('../js/Transports');
 
 
-export default class Nav { //extends React.Component
+export default class Nav {
   constructor() {
     //super();
     this.mts = ['web', 'texts', 'movies', 'audio', 'software', 'image'];

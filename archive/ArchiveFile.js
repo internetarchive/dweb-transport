@@ -4,8 +4,8 @@ import React from './ReactFake';
 import Util from './Util';
 import throttle from "throttleit";
 import prettierBytes from "prettier-bytes";
-var Transportable = require('../js/Transportable').default;
-var Transports = require('../js/Transports').default;
+var Transportable = require('../js/Transportable');
+var Transports = require('../js/Transports');
 
 export default class ArchiveFile {
     /*
