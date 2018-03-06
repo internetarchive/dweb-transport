@@ -4,7 +4,7 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>DWEB SmartDict example</title>
     <link rel='stylesheet' href='example_styles.css'>
-    <script type="text/javascript" src="dweb_transport_ipfs_bundled.js"></script><!-- Dwebbundle via local filesystem when testing without Dweb-->
+    <script type="text/javascript" src="dweb_bundled.js"></script><!-- Dwebbundle via local filesystem when testing without Dweb-->
     <script type="text/javascript" src="htmlutils.js"></script><!--objectbrowser functionality for debugging-->
     <script type="text/javascript" src="loginutils.js"></script><!--Login tools (used for p_connect) -->
     <script type="text/javascript">
@@ -83,7 +83,7 @@
 <ul>
     <li>As you open the page it tries to connect to the transports, which by default are HTTP and IPFS.</li>
     <li>These should change to Green when connected.</li>
-    <li>If it goes Red, it means it failed to connect - e.g. to get an "info" response from HTTP, or to conenct to IPFS.</li>
+    <li>If it goes Red, it means it failed to connect - e.g. to get an "info" response from HTTP, or to conndct to IPFS.</li>
 
     <li>You can edit the Name and color field (color is any HTML color, the obvious ones all work).</li>
     <li>This is happening entirely locally on your machine.</li>
@@ -93,7 +93,7 @@
     <li>The color is patched into the HTML style locally</li>
     <li>You can also paste that link into a different browser.</li>
 </ul>
-<b><a href="../index.html">See more demos</a></b>
+<b><a href="./index.html">See more demos</a></b>
 
 <script type="text/javascript">
     // This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed

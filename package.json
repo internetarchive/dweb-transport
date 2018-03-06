@@ -50,8 +50,8 @@
     "watchify": "^3.11.0"
   },
   "scripts": {
-    "bundle": "cd js; browserify ./Dweb.js > ../examples/dweb_bundled.js",
-    "watch": "watchify js/Dweb.js -o examples/dweb_bundled.js --verbose",
+    "bundle": "cd js; browserify ./Dweb_alltransports.js > ../examples/dweb_bundled.js",
+    "watch": "watchify js/Dweb_alltransports.js -o examples/dweb_bundled.js --verbose",
     "test": "cd js; node ./test.js",
     "bundletest": "cd js; browserify ./test_ipfs.js > ../examples/test_ipfs_bundled.js",
     "help": "echo 'test (prob not working)'; echo 'bundle (packs into ../examples)'; echo 'watch: continually bundles whenever files change'; echo 'bundletest: (pack for test.html)'"

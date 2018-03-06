@@ -2,7 +2,7 @@
     A set of common scripts for use in Dweb code to add key management and login functionality
     See example_versions.html for some usage and example_keys.html for instructions.
 
-    Requires Dweb to point to top level (e.g. by loading src="dweb_transport_ipfs_bundled.js"
+    Requires Dweb to point to top level (e.g. by loading src="dweb_bundled.js"
 
     keychains_ul should be something like:
     <ul id="keychains_ul"><li class='template vertical_li' onclick='keychain_click(this);'><span name='name'>PLACEHOLDER</span></li></ul>
@@ -211,7 +211,7 @@ async function p_connect(options) { //TODO-API its defaulttransports
         if (!tabbrevs.length) { tabbrevs = options.defaulttransports || [] }
         if (!tabbrevs.length) { tabbrevs = ["HTTP", "YJS", "IPFS", "WEBTORRENT"]; }
         tabbrevs = tabbrevs.map(n => n.toUpperCase());
-        let transports = Dweb.Transports.setup0(tabbrevs);
+        let transports = Dweb.Transports.setup0(tabbrevs, options, verbose);
         replacetexts("transportstatuses", Dweb.Transports._transports);
         await Dweb.Transports.p_setup1(verbose);
         refresh_transportstatuses("transportstatuses"); // Update status for anything,

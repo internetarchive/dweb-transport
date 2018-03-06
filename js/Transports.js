@@ -1,6 +1,5 @@
 const Url = require('url');
 const errors = require('./Errors');
-const utils = require('./utils'); // Utility functions
 
 /*
 Handles multiple transports, API should be (almost) the same as for an individual transport)
@@ -237,7 +236,7 @@ class Transports {
         }
         let errs = [];
         let success = false;
-        let rr = await Promise.all(tt.map(async function([url, t]) {
+        await Promise.all(tt.map(async function([url, t]) {
             try {
                 await t.p_set(url, keyvalues, value, verbose);
                 success = true; // Any one success will return true
@@ -263,7 +262,7 @@ class Transports {
         }
         let errs = [];
         let success = false;
-        let rr = await Promise.all(tt.map(async function([url, t]) {
+        await Promise.all(tt.map(async function([url, t]) {
             try {
                 await t.p_delete(url, keys, verbose);
                 success = true; // Any one success will return true
@@ -395,7 +394,8 @@ class Transports {
                 transportclass = this._transportclasses[tabbrev];
             }
             if (!transportclass) {
-                console.error(`Requested ${tabbrev} but only ${this.this._transportclasses.map(t=>t.name)} have been required`)
+                let tt = Object.keys(this._transportclasses);
+                console.error(`Requested ${tabbrev} but ${tt.length ? tt : "No"} transports have been loaded`);
                 return undefined;
             } else {
                 return transportclass.setup0(tabbrev === "LOCAL" ? localoptions : options, verbose);

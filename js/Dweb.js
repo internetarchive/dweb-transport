@@ -21,4 +21,5 @@ Dweb.EventListenerHandler = require("./EventListenerHandler");
 Dweb.Domain = require("./Domain");
 Dweb.Leaf = Dweb.Domain.clsLeaf;
 Dweb.Transports = require('./Transports'); // Handles multiple transports
-
+// Note that no transports are required here, the ones used are loaded in ../archive/archive.js or ./Dweb_alltransports.js
+Dweb.utils = require('./utils.js'); // Some short functions of relevance multiple places.

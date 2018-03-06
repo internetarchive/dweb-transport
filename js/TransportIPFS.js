@@ -102,7 +102,7 @@ class TransportIPFS extends Transport {
             First part of setup, create obj, add to Transports but dont attempt to connect, typically called instead of p_setup if want to parallelize connections.
         */
         let combinedoptions = Transport.mergeoptions(defaultoptions, options);
-        if (verbose) console.log("IPFS options %o", combinedoptions);
+        if (verbose) console.log("IPFS loading options %o", combinedoptions);
         let t = new TransportIPFS(combinedoptions, verbose);   // Note doesnt start IPFS
         Transports.addtransport(t);
         return t;
@@ -110,6 +110,7 @@ class TransportIPFS extends Transport {
 
     async p_setup1(verbose) {
         try {
+            if (verbose) console.log("IPFS starting and connecting");
             this.status = Transport.STATUS_STARTING;   // Should display, but probably not refreshed in most case
             await this.p_ipfsstart(verbose);    // Throws Error("websocket error") and possibly others.
         } catch(err) {
