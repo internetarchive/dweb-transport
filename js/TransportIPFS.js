@@ -12,6 +12,7 @@ const dagPB = require('ipld-dag-pb');
 // noinspection Annotator
 const DAGNode = dagPB.DAGNode; // So can check its type
 const stream = require('readable-stream');  // Needed for the pullthrough - this is NOT Ipfs streams
+const unixFs = require('ipfs-unixfs');
 
 // Library packages other than IPFS
 const Url = require('url');
@@ -27,7 +28,7 @@ const Transport = require('./Transport.js'); // Base class for TransportXyz
 const Transports = require('./Transports'); // Manage all Transports that are loaded
 const utils = require('./utils'); // Utility functions
 
-let defaultoptions = {
+const defaultoptions = {
     ipfs: {
         repo: '/tmp/dweb_ipfsv2700', //TODO-IPFS think through where, esp for browser
         //init: false,
@@ -60,7 +61,7 @@ class TransportIPFS extends Transport {
         this.options = options;         // Dictionary of options { ipfs: {...}, "yarrays", yarray: {...} }
         this.name = "IPFS";             // For console log etc
         this.supportURLs = ['ipfs'];
-        this.supportFunctions = ['fetch', 'store'];   // Does not support reverse, createReadStream fails as cant seek
+        this.supportFunctions = ['fetch', 'store', 'createReadStream'];   // Does not support reverse, createReadStream fails as cant seek
         this.status = Transport.STATUS_LOADED;
     }
 
@@ -81,7 +82,7 @@ class TransportIPFS extends Transport {
         Just start IPFS - not Y (note used with "yarrays" and will be used for non-IPFS list management)
         Note - can't figure out how to use async with this, as we resolve the promise based on the event callback
          */
-        let self = this;
+        const self = this;
         return new Promise((resolve, reject) => {
             this.ipfs = new IPFS(this.options.ipfs);
             this.ipfs.on('ready', () => {
@@ -102,9 +103,9 @@ class TransportIPFS extends Transport {
         /*
             First part of setup, create obj, add to Transports but dont attempt to connect, typically called instead of p_setup if want to parallelize connections.
         */
-        let combinedoptions = Transport.mergeoptions(defaultoptions, options);
+        const combinedoptions = Transport.mergeoptions(defaultoptions, options);
         if (verbose) console.log("IPFS loading options %o", combinedoptions);
-        let t = new TransportIPFS(combinedoptions, verbose);   // Note doesnt start IPFS
+        const t = new TransportIPFS(combinedoptions, verbose);   // Note doesnt start IPFS
         Transports.addtransport(t);
         return t;
     }
@@ -155,7 +156,7 @@ class TransportIPFS extends Transport {
         if (url instanceof CID) return url;
         if (typeof(url) === "string") url = Url.parse(url);
         if (url && url["pathname"]) { // On browser "instanceof Url" isn't valid)
-            let patharr = url.pathname.split('/');
+            const patharr = url.pathname.split('/');
             if ((url.protocol !== "ipfs:") || (patharr[1] !== 'ipfs') || (patharr.length < 3))
                 throw new errors.TransportError("TransportIPFS.cidFrom bad format for url should be ipfs:/ipfs/...: " + url.href);
             if (patharr.length > 3)
@@ -171,8 +172,31 @@ class TransportIPFS extends Transport {
         Convert to a ipfspath i.e. /ipfs/Qm....
         Required because of strange differences in APIs between files.cat and dag.get  see https://github.com/ipfs/js-ipfs/issues/1229
          */
-        return (typeof(url) === "string" ? url : url.href).slice(5);
+        if (url instanceof CID)
+            return "/ipfs/"+url.toBaseEncodedString();
+        if (typeof(url) !== "string") { // It better be URL which unfortunately is hard to test
+            url = url.path;
+        }
+        if (url.indexOf('/ipfs/')) {
+            return url.slice(url.indexOf('/ipfs/'));
+        }
+        throw new errors.CodingError(`TransportIPFS.ipfsFrom: Cant convert url ${url} into a path starting /ipfs/`);
     }
+
+    static multihashFrom(url) {
+        if (url instanceof CID)
+            return cid.toBaseEncodedString();
+        if (typeof url === 'object' && url.path)
+            url = url.path;     // /ipfs/Q...
+        if (typeof(url) === "string") {
+            const idx = url.indexOf("/ipfs/");
+            if (idx > -1) {
+                return url.slice(idx+6);
+            }
+        }
+        throw new errors.CodingError(`Cant turn ${url} into a multihash`);
+    }
+
     async p_rawfetch(url, {verbose=false, timeoutMS=60000, relay=false}={}) {
         /*
         Fetch some bytes based on a url of the form ipfs:/ipfs/Qm..... or ipfs:/ipfs/z....  .
@@ -193,7 +217,7 @@ class TransportIPFS extends Transport {
         const ipfspath = TransportIPFS.ipfsFrom(url) // Need because dag.get has different requirement than file.cat
 
         try {
-            let res = await utils.p_timeout(this.ipfs.dag.get(cid), timeoutMS);
+            const res = await utils.p_timeout(this.ipfs.dag.get(cid), timeoutMS);
             // noinspection Annotator
             if (res.remainderPath.length)
                 { // noinspection ExceptionCaughtLocallyJS
@@ -237,11 +261,11 @@ class TransportIPFS extends Transport {
         :resolve string: url of data stored
          */
         console.assert(data, "TransportIPFS.p_rawstore: requires data");
-        let buf = (data instanceof Buffer) ? data : new Buffer(data);
+        const buf = (data instanceof Buffer) ? data : new Buffer(data);
         //return this.promisified.ipfs.block.put(buf).then((block) => block.cid)
         //https://github.com/ipfs/interface-ipfs-core/blob/master/SPEC/DAG.md#dagput
         //let res = await this.ipfs.dag.put(buf,{ format: 'dag-cbor', hashAlg: 'sha2-256' });
-        let res = (await this.ipfs.files.add(buf,{ "cid-version": 1, hashAlg: 'sha2-256'}))[0];
+        const res = (await this.ipfs.files.add(buf,{ "cid-version": 1, hashAlg: 'sha2-256'}))[0];
         //TODO-IPFS has been suggested to move this to files.add with no filename.
         return TransportIPFS.urlFrom(res);
         //return this.ipfs.files.put(buf).then((block) => TransportIPFS.urlFrom(block.cid));
@@ -253,92 +277,92 @@ class TransportIPFS extends Transport {
         //TODO-STREAMS untested - doesnt work since cant seek into streams.
         if (verbose) console.log("TransportIPFS:createReadStream:%o, %o", url, opts);
         if (!url) throw new errors.CodingError("TransportIPFS.p_rawfetch: requires url");
-        let stream = this.ipfs.files.catReadableStream(TransportIPFS.cidFrom(url));   // cidFrom Throws TransportError if url bad
+        const stream = this.ipfs.files.catReadableStream(TransportIPFS.cidFrom(url));   // cidFrom Throws TransportError if url bad
         return stream;
     }
     */
     // Based on https://github.com/ipfs/js-ipfs/pull/1231/files
 
-    offsetStream(links, startByte, endByte) {
-        // We will write the requested bytes into this stream
-        const stream = through()
+    async p_offsetStream(stream, links, startByte, endByte) {
         let streamPosition = 0
-
-        series(links.map((link, index) => {
-            return () => {
+        try {
+            for (let l in links) {
+                const link = links[l];
                 if (!stream.writable) { return } // The stream has been closed
                 // DAGNode Links report unixfs object data sizes 14 bytes larger due to the protobuf wrapper
                 const bytesInLinkedObjectData = link.size - 14
                 if (startByte > (streamPosition + bytesInLinkedObjectData)) {
                     // Start byte is after this block so skip it
                     streamPosition += bytesInLinkedObjectData;
-                    return;
-                }
-                if (endByte && endByte < streamPosition) {  // TODO-STREAM this is copied from https://github.com/ipfs/js-ipfs/pull/1231/files but I think it should be endByte <= since endByte is first byte DONT want
+                } else if (endByte && endByte < streamPosition) {  // TODO-STREAM this is copied from https://github.com/ipfs/js-ipfs/pull/1231/files but I think it should be endByte <= since endByte is first byte DONT want
                     // End byte was before this block so skip it
                     streamPosition += bytesInLinkedObjectData;
-                    return;
+                } else {
+                    let lmh = link.multihash;
+                    console.log("XXX@285", lmh);
+                    let data;
+                    this.ipfs.object.data(lmh)
+                        .then ((d) => unixFs.unmarshal(d).data)
+                        .then ((d) => data = d )
+                        .catch((err) => {console.log("XXX@289 err=",err);});
+                    if (!stream.writable) { return; } // The stream was closed while we were getting data
+                    const length = data.length;
+                    if (startByte > streamPosition && startByte < (streamPosition + length)) {
+                        // If the startByte is in the current block, skip to the startByte
+                        data = data.slice(startByte - streamPosition);
+                    }
+                    stream.write(data);
+                    streamPosition += length;
                 }
-                return ipfs.object.data(link.multihash)
-                        .then(data => unixFs.unmarshal(data).data)
-                        .then(data => {
-                            if (!stream.writable) {
-                                // The stream was closed while we were getting data
-                                return;
-                            }
-                            const length = data.length;
-                            if (startByte > streamPosition && startByte < (streamPosition + length)) {
-                                // If the startByte is in the current block, skip to the startByte
-                                data = data.slice(startByte - streamPosition);
-                            }
-                            stream.write(data);
-                            streamPosition += length;
-                        })
             }
-        }))
-            .catch(error => log(error.message))
-        return stream;
-    }
-
-
-    f_createReadStream(url, verbose=false) {
-        url -> hash
-        const links = await ipfs.object.links(hash);
-        function crs(opts) {
-            let stream;  Holds pointer to stream between calls.
-            function (opts) {
-                // Return a readable stream that provides the bytes between offsets "start" and "end" inclusive
-                if (stream && stream.destroy) stream.destroy();
-                stream = offsetStream(links,
-                    opts.start, //TODO-STREAM may change
-                    opts.end ? opts.end + 1 : undefined) //TODO-STREAM may change
-                return stream;
-            }
+        } catch(err) {
+            console.log(err.message);
         }
-
+    }
+    async p_f_createReadStream(url, verbose=false) {  // Asynchronously return a function that can be used in createReadStream
+        verbose = true;
+        if (verbose) console.log("p_f_createReadStream",url);
+        const mh = TransportIPFS.multihashFrom(url);
+        const links = await this.ipfs.object.links(mh)
+        let stream;  //Holds pointer to stream between calls.
+        const self = this;
+        function crs(opts) {    // This is a synchronous function
+            // Return a readable stream that provides the bytes between offsets "start" and "end" inclusive
+            if (!opts)  return stream; //TODO-STREAM unclear why called without opts - take this out when figured out
+            if (stream && stream.destroy) stream.destroy();
+            stream = through();
+            console.log("opts=",JSON.stringify(opts));
+            self.p_offsetStream(       // Ignore promise returned
+                stream,
+                links,          // Uses the array of links created above in this function
+                opts ? opts.start : 0, //TODO-STREAM may change
+                (opts && opts.end) ? opts.end : undefined);
+            return stream;
+        }
+        return crs;
     }
 
     static async p_test(opts, verbose) {
         if (verbose) {console.log("TransportIPFS.test")}
         try {
-            let transport = await this.p_setup(opts, verbose); // Assumes IPFS already setup
+            const transport = await this.p_setup(opts, verbose); // Assumes IPFS already setup
             if (verbose) console.log(transport.name,"setup");
-            let res = await transport.p_status(verbose);
+            const res = await transport.p_status(verbose);
             console.assert(res === Transport.STATUS_CONNECTED)
 
             let urlqbf;
-            let qbf = "The quick brown fox";
-            let qbf_url = "ipfs:/ipfs/zdpuAscRnisRkYnEyJAp1LydQ3po25rCEDPPEDMymYRfN1yPK"; // Expected url
-            let testurl = "1114";  // Just a predictable number can work with
-            let url = await transport.p_rawstore(qbf, verbose);
+            const qbf = "The quick brown fox";
+            const qbf_url = "ipfs:/ipfs/zdpuAscRnisRkYnEyJAp1LydQ3po25rCEDPPEDMymYRfN1yPK"; // Expected url
+            const testurl = "1114";  // Just a predictable number can work with
+            const url = await transport.p_rawstore(qbf, verbose);
             if (verbose) console.log("rawstore returned", url);
-            let newcid = TransportIPFS.cidFrom(url);  // Its a CID which has a buffer in it
+            const newcid = TransportIPFS.cidFrom(url);  // Its a CID which has a buffer in it
             console.assert(url === qbf_url, "url should match url from rawstore");
-            let cidmultihash = url.split('/')[2];  // Store cid from first block in form of multihash
-            let newurl = TransportIPFS.urlFrom(newcid);
+            const cidmultihash = url.split('/')[2];  // Store cid from first block in form of multihash
+            const newurl = TransportIPFS.urlFrom(newcid);
             console.assert(url === newurl, "Should round trip");
             urlqbf = url;
-            let data = await transport.p_rawfetch(urlqbf, {verbose});
+            const data = await transport.p_rawfetch(urlqbf, {verbose});
             console.assert(data.toString() === qbf, "Should fetch block stored above");
             //console.log("TransportIPFS test complete");
             return transport

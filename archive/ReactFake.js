@@ -149,7 +149,7 @@ export default class React  {
             if (validCreateReadStream) {
                 const file = {
                     name: name,
-                    createReadStream: Transports.f_createReadStream(urls, verbose)
+                    createReadStream: await Transports.p_f_createReadStream(urls, verbose)
                         // Return a function that returns a readable stream that provides the bytes between offsets "start" and "end" inclusive.
                         // This function works just like fs.createReadStream(opts) from the node.js "fs" module.
                         // f_createReadStream can initiate the stream before returning the function.
@@ -293,8 +293,7 @@ export default class React  {
                 //Dont need mimetype currently
                 //const mimetype = Util.archiveMimeTypeFromFormat[af.metadata.format]; // Might be undefined for many formats still
                 //if (!mimetype) console.warning("Unknown mimetype for ",af.metadata.format, "on",af.metadata.name);
-                const urls = [af.metadata.ipfs, af.metadata.magnetlink, af.metadata.contenthash].filter(f=>!!f);   // Multiple potential sources, filter out nulls
-                this.loadStream(element, videoname, urls, undefined, rel);  // Cues up asynchronously to load the video/audio tag (dont need cb as this does the work of cb)
+                this.loadStream(element, videoname, af, undefined, rel);  // Cues up asynchronously to load the video/audio tag (dont need cb as this does the work of cb)
             } else if (["a.source"].includes(tag + "." + name) && attrs[name] instanceof ArchiveFile) {
                 element[name] = attrs[name];      // Store the ArchiveFile in the DOM, function e.g. onClick will access it.
             } else if (name && attrs.hasOwnProperty(name)) {

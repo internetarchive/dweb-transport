@@ -23,7 +23,7 @@ class Transports {
     static connectedNamesParm() {
         return this.connectedNames().map(n => "transport="+n).join('&')
     }
-    static validFor(urls, func) {
+    static validFor(urls, func, options) {
         /*
         Finds an array or Transports that can support this URL.
 
@@ -245,7 +245,7 @@ class Transports {
     }
 
 
-    static f_createReadStream(urls, verbose) {
+    static async p_f_createReadStream(urls, verbose, options) { // Note options is options for selecting a stream, not the start/end in a createReadStream call
         /*
         urls:   Urls of the stream
         returns:    f(opts) => stream returning bytes from opts.start || start of file to opts.end-1 || end of file
@@ -258,7 +258,7 @@ class Transports {
         let errs = [];
         for (const [url, t] of tt) {
             try {
-                return t.f_createReadStream(url, verbose);
+                return await t.p_f_createReadStream(url, verbose);
             } catch (err) {
                 errs.push(err);
                 console.log("Could not retrieve ", url.href, "from", t.name, err.message);

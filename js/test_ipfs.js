@@ -7,6 +7,7 @@ const multihash = require('multihashes');
 const dagPB = require('ipld-dag-pb');
 const DAGNode = dagPB.DAGNode;
 const dagCBOR = require('ipld-dag-cbor');
+const unixFs = require('ipfs-unixfs');
 //const IPLDResolver = require('ipld-resolver')
 var promisified;
 const promisify = require('promisify-es6');
@@ -54,8 +55,41 @@ function _makepromises() {
 function reportcidstring(cid) {
     console.log("Testing", "/ipfs/"+cid.toBaseEncodedString())
 }
+
+// Converstion routines - IPFS's API is odd, some functions want a multihash (e.g. "Q..." or "z...") some wanta path e.g. "/ipfs/Q..." and soem want a CID data structure
+function ipfsFrom(url) {
+    /*
+    Convert to a ipfspath i.e. /ipfs/Qm....
+    Required because of strange differences in APIs between files.cat and dag.get  see https://github.com/ipfs/js-ipfs/issues/1229
+     */
+    if (url instanceof CID)
+        return "/ipfs/"+url.toBaseEncodedString();
+    if (typeof(url) !== "string") { // It better be URL which unfortunately is hard to test
+        url = url.path;
+    }
+    if (url.indexOf('/ipfs/')) {
+        return url.slice(url.indexOf('/ipfs/'));
+    }
+    throw new errors.CodingError(`ipfsFrom: Cant convert url ${url} into a path starting /ipfs/`);
+}
+function multihashFrom(url) {
+    if (url instanceof CID)
+        return url.toBaseEncodedString();
+    if (typeof url === 'object' && url.path)
+        url = url.path;     // /ipfs/Q...
+    if (typeof(url) === "string") {
+        const idx = url.indexOf("/ipfs/");
+        if (idx > -1) {
+            return url.slice(idx+6);
+        }
+    }
+    throw new errors.CodingError(`Cant turn ${url} into a multihash`);
+}
+
+// Some other utility functions
 function p_streamToBuffer(stream, verbose) {
     // resolve to a promise that returns a stream.
+    // Note this was only needed with ipfs version <= 0.26 when files.cat returned a stream
     // Note this comes form one example ...
     // There is another example https://github.com/ipfs/js-ipfs/blob/master/examples/exchange-files-in-browser/public/js/app.js#L102 very different
     return new Promise((resolve, reject) => {
@@ -106,6 +140,7 @@ function check_result(name, buff, expected, expectfailure) {
     return buff; // Simplify promise chain
 }
 
+// Retrieval functions - each tests one different way to retrieve content
 async function test_block_get(cid, expected, expectfailure) {
     // Note we don't use block.get anymore , but its here for testing
     if (expectfailure && !tryexpectedfailures) return;
@@ -140,10 +175,33 @@ function test_files_catv026(cid, expected, expectfailure) {
 async function test_files_cat(cid, expected, expectfailure) {
     try {
         if (expectfailure && !tryexpectedfailures) return;
+        cid = ipfsFrom(cid);    // Turn it into the /ipfs/Q... form that files.cat now expects
         buff = await ipfs.files.cat(cid); //Error: Groups are not supported in the blocks case - never returns from this call.
         check_result("files.cat", buff, expected, expectfailure);
     } catch(err) {
         console.log("Error thrown in files.cat", err);
+    }
+}
+
+async function test_bylinks(cid, expected, expectfailure) {
+    //TODO still working on this
+    try {
+        const links = await ipfs.object.links(multihashFrom(cid))
+        console.log(`Retrieved ${links.length} links`);
+        chunks = []
+        for (let l in links) {
+            const link = links[l];
+            const lmh = link.multihash;
+            const d = await ipfs.object.data(lmh);
+            console.log(`Read ${d.length} bytes`);
+            const data = unixFs.unmarshal(d).data;
+            console.log(`Unmarshaled ${data.length} bytes`)
+            chunks.push(data);
+        }
+        const buff = Buffer.concat(chunks);
+        check_result("bylinks", buff, expected, expectfailure)
+    } catch (err) {
+        console.log("Error thrown in test_bylinks", err);
     }
 }
 async function test_universal_get(cid, expected, expectfailure) {
@@ -161,7 +219,7 @@ async function test_universal_get(cid, expected, expectfailure) {
             //console.log("Case a or b");
             //if (res.value._links.length > 0) { //b: Long file else short file but read stream anyway.
             //buff = await p_streamToBuffer(await ipfs.files.cat(cid), true); // js-ipfs v0.26 version,
-            buff = await ipfs.files.cat(cid);
+            buff = await ipfs.files.cat(ipfsFrom(cid));
             // Previously was going back to read as a block if got 0 bytes
             if (buff.length === 0) {    // Hit the Chrome bug
                 // This will get a file padded with ~14 bytes - 4 at front, 4 at end and cant find the other 6 !
@@ -241,14 +299,29 @@ async function test_httpapi_short() {
 }
 async function test_httpapi_long() {
     console.log("--------Testing long file sent to http API");
-    let multihash="Qmbzs7jhkBZuVixhnM3J3QhMrL6bcAoSYiRPZrdoX3DhzB";
+    let multihash="Qmbzs7jhkBZuVixhnM3J3QhMrL6bcAoSYiRPZrdoX3DhzB";  // 2 block file
     let cid = new CID(multihash);
     let len = 262438;
     await test_block_get(cid,len,true);              // As expected, Doesnt work - just gets the IPLD as a buffer
     await test_dag_get(cid, len,true);               // As expected,  Fails gets a data structure, not a buffer
     await test_files_cat(cid, len,false);             // Works in node and in Chrome
     await test_universal_get(cid, len,false);
+    await test_bylinks(cid, len, false);
 }
+
+async function test_video() {
+    console.log("--------Testing a video added via the http urladd interface");
+    let multihash="zdj7Wc9BBA2kar84oo8S6VotYc9PySAnmc8ji6kzKAFjqMxHS";  // commute video
+    let cid = new CID(multihash);
+    let len = 262438;
+    await test_block_get(cid,len,true);              // As expected, Doesnt work - just gets the IPLD as a buffer
+    await test_dag_get(cid, len,true);               // As expected,  Fails gets a data structure, not a buffer
+    await test_files_cat(cid, len,false);             // Works in node and in Chrome
+    await test_universal_get(cid, len,false);
+    await test_bylinks(cid, len, false);
+}
+
+
 
 async function sandbox() {
     console.log("--------Sandbox");
@@ -260,7 +333,8 @@ async function test_ipfs() {
     await p_ipfsstart(true);
     //await sandbox();
     await test_httpapi_short();     // No solution: *IPFS BUG* on files.cat; (work around also has bug of adding 14 bytes)
-    await test_httpapi_long();      // Works only on files.cat; Fails as expected on others
+    await test_httpapi_long();      // Works only on files.cat or bylinks; Fails as expected on others
+    await test_video();             // Should work on file.cat or bylinks;
     await test_block();             // Works on block.get; Fails *IPFS BUG REALLY BAD* on anything other than block.get
     await test_dag_string();        // Works on dag.get; fails (as expected) on others
     await test_dag_json();         // Works on dag.get; fails as expected on others
