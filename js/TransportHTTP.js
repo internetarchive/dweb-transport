@@ -1,7 +1,7 @@
 const errors = require('./Errors'); // Standard Dweb Errors
 const Transport = require('./Transport'); // Base class for TransportXyz
 const Transports = require('./Transports'); // Manage all Transports that are loaded
-const nodefetch = require('node-fetch-npm');
+const nodefetch = require('node-fetch');    // Was node-fetch-npm but node-fetch intended for clients
 const Url = require('url');
 
 var fetch,Headers,Request;

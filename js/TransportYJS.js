@@ -5,7 +5,7 @@ Y Lists have listeners and generate events - see docs at ...
 */
 const Url = require('url');
 
-const Y = require('yjs');
+const Y = require('yjs/dist/y.js'); // Explicity require of dist/y.js to get around a webpack warning
 require('y-memory')(Y);
 require('y-array')(Y);
 require('y-text')(Y);
