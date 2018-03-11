@@ -89,4 +89,18 @@ utils.keyFilter = function(dic, keys) {
     return keys.reduce(function(prev, key) { prev[key] = dic[key]; return prev; }, {});
 }
 
+utils.p_timeout = function(promise, ms, errorstr) {
+    let timer = null;
+
+    return Promise.race([
+        new Promise((resolve, reject) => {
+            timer = setTimeout(reject, ms, errorstr || `Timed out in ${ms}ms`);
+        }),
+        promise.then((value) => {
+            clearTimeout(timer);
+            return value;
+        })
+    ]);
+}
+
 exports = module.exports = utils;

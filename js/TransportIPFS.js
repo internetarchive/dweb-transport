@@ -185,7 +185,7 @@ class TransportIPFS extends Transport {
         const ipfspath = TransportIPFS.ipfsFrom(url) // Need because dag.get has different requirement than file.cat
 
         try {
-            let res = await this.ipfs.dag.get(cid);
+            let res = await utils.p_timeout(this.ipfs.dag.get(cid), 5000);
             // noinspection Annotator
             if (res.remainderPath.length)
                 { // noinspection ExceptionCaughtLocallyJS
