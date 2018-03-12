@@ -7,6 +7,8 @@ This expanded in use to make it easier to use HTML in as unchanged form from exi
 - look at onClick's especially if set window.location
  */
 import RenderMedia from 'render-media';
+import throttle from "throttleit";
+import prettierBytes from "prettier-bytes";
 import ArchiveFile from "./ArchiveFile";
 import Util from "./Util";
 import from2 from "from2";
@@ -113,73 +115,78 @@ export default class React  {
         //If the Transports supports urls/createReadStream (webtorrent only at this point) then load it.
         //If its a HTTP URL use that
         //Dont try and use IPFS till get a fix for createReadStream
-
-        const validCreateReadStream = Transports.validFor(urls, "createReadStream").length;
-        if (validCreateReadStream) {
-            var file = {
-                name: name,
-                createReadStream: function (opts) {
-                    // Return a readable stream that provides the bytes between offsets "start"
-                    // and "end" inclusive. This works just like fs.createReadStream(opts) from
-                    // the node.js "fs" module.
-
-                    return Transports.createReadStream(urls, opts, verbose)
-                }
-            }
-
-            RenderMedia.render(file, jsx, cb);  // Render into supplied element
-
-            if (window.WEBTORRENT_TORRENT) {
-                const torrent = window.WEBTORRENT_TORRENT
-
-                const updateSpeed = () => {
-                    if (window.WEBTORRENT_TORRENT === torrent) {    // Check still displaying ours
-                        const webtorrentStats = document.querySelector('#webtorrentStats'); // Not moved into updateSpeed as not in document when this is run first time
-                        const els = (
-                            <span>
-                            <b>Peers:</b> {torrent.numPeers}{' '}
-                        <b>Progress:</b> {(100 * torrent.progress).toFixed(1)}%{' '}
-                        <b>Download speed:</b> {prettierBytes(torrent.downloadSpeed)}/s{' '}
-                    <b>Upload speed:</b> {prettierBytes(torrent.uploadSpeed)}/s
-                        </span>
-                    )
-                        if (webtorrentStats) {
-                            deletechildren(webtorrentStats);
-                            webtorrentStats.appendChild(els);
-                        }
-                    }
-                }
-
-                torrent.on('download', throttle(updateSpeed, 250));
-                torrent.on('upload', throttle(updateSpeed, 250));
-                setInterval(updateSpeed, 1000)
-                updateSpeed(); //Do it once
-            }
-        } else {
-            // Next choice is to pass a HTTP url direct to <VIDEO> as it knows how to stream it.
-            // TODO clean this nasty kludge up,
-            // Find a HTTP transport if connected, then ask it for the URL (as will probably be contenthash) note it leaves non contenthash urls untouched
-            const url = Transports._connected().find(t => t.name = "HTTP")._url(urls.find(u => (u.startsWith("contenthash") || u.startsWith("http"))), "content/rawfetch");
-            if (url) {
-                jsx.src = url;
-            } else {
-                // Worst choice - getch the file, and pass via rendermedia and from2
-                const buff = await  Transportable.p_fetch(urls, verbose);  //Typically will be a Uint8Array
-                const file = {
+        try {
+            const validCreateReadStream = Transports.validFor(urls, "createReadStream").length;
+            if (validCreateReadStream) {
+                var file = {
                     name: name,
                     createReadStream: function (opts) {
-                        if (!opts) opts = {}
-                        return from2([buff.slice(opts.start || 0, opts.end || (buff.length - 1))])
+                        // Return a readable stream that provides the bytes between offsets "start"
+                        // and "end" inclusive. This works just like fs.createReadStream(opts) from
+                        // the node.js "fs" module.
+
+                        return Transports.createReadStream(urls, opts, verbose)
                     }
                 }
+
                 RenderMedia.render(file, jsx, cb);  // Render into supplied element
+
+                if (window.WEBTORRENT_TORRENT) {
+                    const torrent = window.WEBTORRENT_TORRENT
+
+                    const updateSpeed = () => {
+                        if (window.WEBTORRENT_TORRENT === torrent) {    // Check still displaying ours
+                            const webtorrentStats = document.querySelector('#webtorrentStats'); // Not moved into updateSpeed as not in document when this is run first time
+                            const els = (
+                                <span>
+                                <b>Peers:</b> {torrent.numPeers}{' '}
+                            <b>Progress:</b> {(100 * torrent.progress).toFixed(1)}%{' '}
+                            <b>Download speed:</b> {prettierBytes(torrent.downloadSpeed)}/s{' '}
+                        <b>Upload speed:</b> {prettierBytes(torrent.uploadSpeed)}/s
+                            </span>
+                        )
+                            if (webtorrentStats) {
+                                deletechildren(webtorrentStats);
+                                webtorrentStats.appendChild(els);
+                            }
+                        }
+                    }
+
+                    torrent.on('download', throttle(updateSpeed, 250));
+                    torrent.on('upload', throttle(updateSpeed, 250));
+                    setInterval(updateSpeed, 1000)
+                    updateSpeed(); //Do it once
+                }
+            } else {
+                // Next choice is to pass a HTTP url direct to <VIDEO> as it knows how to stream it.
+                // TODO clean this nasty kludge up,
+                // Find a HTTP transport if connected, then ask it for the URL (as will probably be contenthash) note it leaves non contenthash urls untouched
+                const url = Transports._connected().find(t => t.name = "HTTP")._url(urls.find(u => (u.startsWith("contenthash") || u.startsWith("http"))), "content/rawfetch");
+                if (url) {
+                    jsx.src = url;
+                } else {
+                    // Worst choice - getch the file, and pass via rendermedia and from2
+                    const buff = await  Transportable.p_fetch(urls, verbose);  //Typically will be a Uint8Array
+                    const file = {
+                        name: name,
+                        createReadStream: function (opts) {
+                            if (!opts) opts = {}
+                            return from2([buff.slice(opts.start || 0, opts.end || (buff.length - 1))])
+                        }
+                    }
+                    RenderMedia.render(file, jsx, cb);  // Render into supplied element
+                }
             }
+        } catch(err) {
+            console.error("Uncaught error in p_loadStream",err);
+            throw err;
         }
+
     }
     static loadStream(jsx, name, urls, cb) {
         //asynchronously loads file from one of metadata, turns into blob, and stuffs into element
         // usage like <VIDEO src=<ArchiveFile instance>  >
-        this.p_loadStream(jsx, name, urls, cb); /* Asynchronously load image*/
+        this.p_loadStream(jsx, name, urls, cb); /* Asynchronously load image, intentionally not waiting for it to complete*/
         return jsx;
     }
 
