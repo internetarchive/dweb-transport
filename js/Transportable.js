@@ -71,7 +71,7 @@ class Transportable {
         urls:	array of urls to retrieve (any are valid)
         verboseOrOpts: either:
             verbose - boolean
-             opts { timeoutMS, start, end, verbose }
+             opts { timeoutMS, start, end, verbose, relay }
         returns:	string - arbitrary bytes retrieved or possibly Buffer or sometimes even an object (like a dictionary)
         throws:     TransportError with messages of any errors if none succeeded
          */

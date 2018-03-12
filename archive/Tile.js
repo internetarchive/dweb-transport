@@ -20,13 +20,14 @@ export default class Tile {
       // ARCHIVE-BROWSER added key= to keep react happy (I hope)
       return (
       <div className={classes} data-id={item.identifier}  key={item.identifier}>
+      { (collection0) ?
         <a className="stealth" tabIndex="-1" onClick={`Nav.nav_details("${collection0}");`}>
           <div className="item-parent">
             <div className="item-parent-img"><img src={collection0thumbnaillinks}/></div>
             <div className="item-parent-ttl">{collection0title}</div>
           </div>{/*.item-parent*/}
         </a>
-
+       : undefined }
         <div className="hidden-tiles views C C1">
           <nobr className="hidden-xs">{Util.number_format(item.downloads)}</nobr>
           <nobr className="hidden-sm hidden-md hidden-lg">{Util.number_format(item.downloads)}</nobr>

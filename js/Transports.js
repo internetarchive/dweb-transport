@@ -50,19 +50,10 @@ class Transports {
         return Transports._transports.find((t) => t.name === "IPFS")
     }
 
-    static async p_rawstore(data, verbose) {
-        /*
-        data: Raw data to store - typically a string, but its passed on unmodified here
-        returns:    Array of urls of where stored
-        throws: TransportError with message being concatenated messages of transports if NONE of them succeed.
-         */
-        let tt = this.validFor(undefined, "store"); // Valid connected transports that support "store"
-        if (verbose) console.log("Valid for transports:", tt.map(([u,t]) => t.name))
-        if (!tt.length) {
-            throw new errors.TransportError('Transports.p_rawstore: Cant find transport for store');
-        }
+    static async _p_rawstore(tt, data, verbose) {
+        // Internal method to store at known transports
         let errs = [];
-        let rr = await Promise.all(tt.map(async function([undef, t]) {
+        let rr = await Promise.all(tt.map(async function(t) {
             try {
                 return await t.p_rawstore(data, verbose); //url
             } catch(err) {
@@ -76,6 +67,20 @@ class Transports {
             throw new errors.TransportError(errs.map((err)=>err.message).join(', ')); // New error with concatenated messages
         }
         return rr;
+
+    }
+    static async p_rawstore(data, verbose) {
+        /*
+        data: Raw data to store - typically a string, but its passed on unmodified here
+        returns:    Array of urls of where stored
+        throws: TransportError with message being concatenated messages of transports if NONE of them succeed.
+         */
+        let tt = this.validFor(undefined, "store").map(([u, t]) => t); // Valid connected transports that support "store"
+        if (verbose) console.log("Valid for transports:", tt.map(t => t.name));
+        if (!tt.length) {
+            throw new errors.TransportError('Transports.p_rawstore: Cant find transport for store');
+        }
+        return this._p_rawstore(tt, data, verbose);
     }
     static async p_rawlist(urls, verbose) {
         let tt = this.validFor(urls, "list"); // Valid connected transports that support "store"
@@ -109,20 +114,32 @@ class Transports {
             verbose,
             start,  integer - first byte wanted
             end     integer - last byte wanted (note this is inclusive start=0,end=1023 is 1024 bytes
+            timeoutMS   integer - max time to wait on transports (IPFS) that support it
             }
         returns:	string - arbitrary bytes retrieved.
         throws:     TransportError with concatenated error messages if none succeed.
          */
+        let verbose = opts.verbose;
         let tt = this.validFor(urls, "fetch"); //[ [Url,t],[Url,t]]
         if (!tt.length) {
             throw new errors.TransportError("Transports.p_fetch cant find any transport for urls: " + urls);
         }
         //With multiple transports, it should return when the first one returns something.
         let errs = [];
+        let failedtransports = [];  // Will accumulate any transports fail on before the success
         for (const [url, t] of tt) {
             try {
-                return await t.p_rawfetch(url, opts); //TODO-MULTI-GATEWAY potentially copy from success to failed URLs.
+                let data = await t.p_rawfetch(url, opts);   // throws errors if fails or timesout
+                //TODO-MULTI-GATEWAY working here
+                if (opts.relay && failedtransports.length) {
+                    console.log(`Relaying ${data.length} bytes from ${typeof url === "string" ? url : url.href} to ${failedtransports.map(t=>t.name)}`);
+                    this._p_rawstore(failedtransports, data, verbose)
+                        .then(uu => console.log(`Relayed to ${uu}`)); // Happening async, not waiting and dont care if fails
+                }
+                //END TODO-MULTI-GATEWAY
+                return data;
             } catch (err) {
+                failedtransports.push(t);
                 errs.push(err);
                 console.log("Could not retrieve ", url.href, "from", t.name, err.message);
                 // Don't throw anything here, loop round for next, only throw if drop out bottom

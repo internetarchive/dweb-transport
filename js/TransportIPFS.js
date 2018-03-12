@@ -130,11 +130,17 @@ class TransportIPFS extends Transport {
 
     // Everything else - unless documented here - should be opaque to the actual structure of a CID
     // or a url. This code may change as its not clear (from IPFS docs) if this is the right mapping.
-    static cid2url(cid) {
+    static urlFrom(unknown) {
         /*
         Convert a CID into a standardised URL e.g. ipfs:/ipfs/abc123
          */
-        return "ipfs:/ipfs/"+cid.toBaseEncodedString()
+        if (unknown instanceof CID)
+            return "ipfs:/ipfs/"+unknown.toBaseEncodedString();
+        if (typeof unknown === "object" && unknown.hash) // e.g. from files.add
+                return "ipfs:/ipfs/"+unknown.hash;
+        if (typeof unknown === "string")    // Not used currently
+            return "ipfs:/ipfs/"+unknown;
+        throw new errors.CodingError("TransportIPFS.urlFrom: Cant convert to url from",unknown);
     }
 
     static cidFrom(url) {
@@ -165,7 +171,7 @@ class TransportIPFS extends Transport {
          */
         return (typeof(url) === "string" ? url : url.href).slice(5);
     }
-    async p_rawfetch(url, {verbose=false, timeoutMS=60000}={}) {
+    async p_rawfetch(url, {verbose=false, timeoutMS=60000, relay=false}={}) {
         /*
         Fetch some bytes based on a url of the form ipfs:/ipfs/Qm..... or ipfs:/ipfs/z....  .
         No assumption is made about the data in terms of size or structure, nor can we know whether it was created with dag.put or ipfs add or http /api/v0/add/
@@ -232,10 +238,11 @@ class TransportIPFS extends Transport {
         let buf = (data instanceof Buffer) ? data : new Buffer(data);
         //return this.promisified.ipfs.block.put(buf).then((block) => block.cid)
         //https://github.com/ipfs/interface-ipfs-core/blob/master/SPEC/DAG.md#dagput
-        let cid = await this.ipfs.dag.put(buf,{ format: 'dag-cbor', hashAlg: 'sha2-256' });
+        //let res = await this.ipfs.dag.put(buf,{ format: 'dag-cbor', hashAlg: 'sha2-256' });
+        let res = (await this.ipfs.files.add(buf,{ "cid-version": 1, hashAlg: 'sha2-256'}))[0];
         //TODO-IPFS has been suggested to move this to files.add with no filename.
-        return TransportIPFS.cid2url(cid);
-        //return this.ipfs.files.put(buf).then((block) => TransportIPFS.cid2url(block.cid));
+        return TransportIPFS.urlFrom(res);
+        //return this.ipfs.files.put(buf).then((block) => TransportIPFS.urlFrom(block.cid));
     }
 
     createReadStream(url, opts = {}, verbose = false) {
@@ -264,7 +271,7 @@ class TransportIPFS extends Transport {
             let newcid = TransportIPFS.cidFrom(url);  // Its a CID which has a buffer in it
             console.assert(url === qbf_url, "url should match url from rawstore");
             let cidmultihash = url.split('/')[2];  // Store cid from first block in form of multihash
-            let newurl = TransportIPFS.cid2url(newcid);
+            let newurl = TransportIPFS.urlFrom(newcid);
             console.assert(url === newurl, "Should round trip");
             urlqbf = url;
             let data = await transport.p_rawfetch(urlqbf, {verbose});
