@@ -1,7 +1,7 @@
 const errors = require('./Errors'); // Standard Dweb Errors
 const Transport = require('./Transport'); // Base class for TransportXyz
 const Transports = require('./Transports'); // Manage all Transports that are loaded
-const nodefetch = require('node-fetch'); // Note, were using node-fetch-npm which had a warning in webpack see https://github.com/bitinn/node-fetch/issues/421
+const nodefetch = require('node-fetch'); // Note, were using node-fetch-npm which had a warning in webpack see https://github.com/bitinn/node-fetch/issues/421 and is intended for clients
 const Url = require('url');
 
 var fetch,Headers,Request;
