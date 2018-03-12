@@ -65,14 +65,23 @@ class Transportable {
         this._urls = [];
     }
 
-    static async p_fetch(urls, verbose) { //TODO-IPFSIMAGE Propogate API
+    static async p_fetch(urls, verboseOrOpts={}) { //TODO eventually propogate API - move verbose into opts
         /*
         Fetch the data for a url, subclasses act on the data, typically storing it.
         urls:	array of urls to retrieve (any are valid)
+        verboseOrOpts: either:
+            verbose - boolean
+             opts { timeoutMS, start, end, verbose }
         returns:	string - arbitrary bytes retrieved or possibly Buffer or sometimes even an object (like a dictionary)
         throws:     TransportError with messages of any errors if none succeeded
          */
-        return Transports.p_rawfetch(urls, {verbose});
+        let opts;
+        if (typeof verboseOrOpts !== "object") {
+            opts = {verbose: verboseOrOpts}; // Assume its old style "verbose"
+        } else {
+            opts = verboseOrOpts;
+        }
+        return Transports.p_rawfetch(urls, opts);
     }
 
     file() { throw new errors.ToBeImplementedError("Undefined function Transportable.file"); } //TODO-BACKPORT from Python
