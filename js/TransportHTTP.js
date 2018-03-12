@@ -119,10 +119,14 @@ class TransportHTTP extends Transport {
         }
     }
 
-    async p_GET(httpurl, verbose, opts={}) {
-        // Locate and return a block, based on its url
-        // Throws TransportError if fails
-        // resolves to: URL that can be used to fetch the resource, of form contenthash:/contenthash/Q123
+    async p_GET(httpurl, opts={}) {
+        /*  Locate and return a block, based on its url
+            Throws TransportError if fails
+            opts {
+                start, end,     // Range of bytes wanted - inclusive i.e. 0,1023 is 1024 bytes
+                verbose }
+            resolves to: URL that can be used to fetch the resource, of form contenthash:/contenthash/Q123
+        */
         let headers = new Headers();
         if (opts.start || opts.end) headers.append("range", `bytes=${opts.start || 0}-${opts.end || ""}`);
         let init = {    //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
@@ -132,7 +136,7 @@ class TransportHTTP extends Transport {
             cache: 'default',
             redirect: 'follow',  // Chrome defaults to manual
         };
-        return await this.p_httpfetch(httpurl, init, verbose); // This s a real http url
+        return await this.p_httpfetch(httpurl, init, opts.verbose); // This s a real http url
     }
     async p_POST(httpurl, type, data, verbose) {
         // Locate and return a block, based on its url
@@ -164,11 +168,12 @@ class TransportHTTP extends Transport {
         url = url + (parmstr ? "?"+parmstr : "");
         return url;
     }
-    async p_rawfetch(url, verbose, opts={}) {
+    async p_rawfetch(url, opts={}) {
         /*
         Fetch from underlying transport,
         Fetch is used both for contenthash requests and table as when passed to SmartDict.p_fetch may not know what we have
         url: Of resource - which is turned into the HTTP url in p_httpfetch
+        opts: {start, end, verbose} see p_GET for documentation
         throws: TransportError if fails
          */
         //if (!(url && url.includes(':') ))
@@ -179,7 +184,7 @@ class TransportHTTP extends Transport {
                 table: "keyvaluetable",
                 }
         } else {
-            return await this.p_GET(this._url(url, servercommands.rawfetch), verbose, opts);
+            return await this.p_GET(this._url(url, servercommands.rawfetch), opts);
         }
     }
 
@@ -187,7 +192,7 @@ class TransportHTTP extends Transport {
         // obj being loaded
         // Locate and return a block, based on its url
         if (!url) throw new errors.CodingError("TransportHTTP.p_rawlist: requires url");
-        return this.p_GET(this._url(url, servercommands.rawlist), verbose);
+        return this.p_GET(this._url(url, servercommands.rawlist), {verbose});
     }
     rawreverse() { throw new errors.ToBeImplementedError("Undefined function TransportHTTP.rawreverse"); }
 
@@ -269,23 +274,23 @@ class TransportHTTP extends Transport {
     async p_get(url, keys, verbose) {
         if (!url && keys) throw new errors.CodingError("TransportHTTP.p_get: requires url and at least one key");
         let parmstr =Array.isArray(keys)  ?  keys.map(k => this._keyparm(k)).join('&') : this._keyparm(keys)
-        let res = await this.p_GET(this._url(url, servercommands.get, parmstr),verbose);
+        let res = await this.p_GET(this._url(url, servercommands.get, parmstr), {verbose});
         return Array.isArray(keys) ? res : res[keys]
     }
 
     async p_delete(url, keys, verbose) {  //TODO-KEYVALUE-API need to think this one through
         if (!url && keys) throw new errors.CodingError("TransportHTTP.p_get: requires url and at least one key");
         let parmstr =  keys.map(k => this._keyparm(k)).join('&');
-        await this.p_GET(this._url(url, servercommands.delete, parmstr),verbose);
+        await this.p_GET(this._url(url, servercommands.delete, parmstr), {verbose});
     }
 
     async p_keys(url, verbose) {
         if (!url && keys) throw new errors.CodingError("TransportHTTP.p_get: requires url and at least one key");
-        return await this.p_GET(this._url(url, servercommands.keys), verbose);
+        return await this.p_GET(this._url(url, servercommands.keys), {verbose});
     }
     async p_getall(url, verbose) {
         if (!url && keys) throw new errors.CodingError("TransportHTTP.p_get: requires url and at least one key");
-        return await this.p_GET(this._url(url, servercommands.getall), verbose);
+        return await this.p_GET(this._url(url, servercommands.getall), {verbose});
     }
     /* Make sure doesnt shadow regular p_rawfetch
     async p_rawfetch(url, verbose) {
@@ -296,7 +301,7 @@ class TransportHTTP extends Transport {
     }
     */
 
-    p_info(verbose) { return this.p_GET(`${this.urlbase}/info`, verbose); } //TODO-BACKPORT
+    p_info(verbose) { return this.p_GET(`${this.urlbase}/info`, {verbose}); } //TODO-BACKPORT
 
     static async p_test(opts={}, verbose=false) {
         if (verbose) {console.log("TransportHTTP.test")}

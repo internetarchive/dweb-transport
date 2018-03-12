@@ -101,10 +101,15 @@ class Transports {
             .filter((x) => (!uniques[x.signature] && (uniques[x.signature] = true)));
     }
 
-    static async p_rawfetch(urls, verbose) {
+    static async p_rawfetch(urls, opts) {
         /*
         Fetch the data for a url, transports act on the data, typically storing it.
         urls:	array of urls to retrieve (any are valid)
+        opts {
+            verbose,
+            start,  integer - first byte wanted
+            end     integer - last byte wanted (note this is inclusive start=0,end=1023 is 1024 bytes
+            }
         returns:	string - arbitrary bytes retrieved.
         throws:     TransportError with concatenated error messages if none succeed.
          */
@@ -116,7 +121,7 @@ class Transports {
         let errs = [];
         for (const [url, t] of tt) {
             try {
-                return await t.p_rawfetch(url, verbose); //TODO-MULTI-GATEWAY potentially copy from success to failed URLs.
+                return await t.p_rawfetch(url, opts); //TODO-MULTI-GATEWAY potentially copy from success to failed URLs.
             } catch (err) {
                 errs.push(err);
                 console.log("Could not retrieve ", url.href, "from", t.name, err.message);

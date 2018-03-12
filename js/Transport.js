@@ -93,7 +93,7 @@ class Transport {
 
     //noinspection JSUnusedLocalSymbols
 
-    p_rawfetch(url, verbose) {
+    p_rawfetch(url, {verbose=false}={}) { //TODO-API
         /*
         Fetch some bytes based on a url, no assumption is made about the data in terms of size or structure.
         Where required by the underlying transport it should retrieve a number if its "blocks" and concatenate them.
@@ -171,12 +171,13 @@ class Transport {
             Locate and read a stream, based on its url
             This is the default version if the Transport hasn't defined one, and so by assumption doesnt natively support createReadStream.
         */
+        opts["verbose"] = verbose; //TODO-IPFSIMAGE propogating API up to createReadStream
         if (verbose) console.log("%s:createReadStream: %o, %o", this.name, url, opts);
         const through = new stream.PassThrough();
         ((opts.start || opts.end) && !this.supportFeatures.includes('fetch.range'))
-        ? this.p_rawfetch(url, verbose)
+        ? this.p_rawfetch(url, {verbose})
             .then((buff) => buff.slice(opts.start || 0, opts.end || buff.length))
-        : this.p_rawfetch(url, verbose, opts)
+        : this.p_rawfetch(url, opts)
             //TODO-STREAMS to be totally accurate we should check the range returned and check it matches what sent as HTTP servers can ignore range
         .then((buff) => {
             console.log("createReadStream read %s bytes",buff.length);

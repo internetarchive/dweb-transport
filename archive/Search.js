@@ -34,7 +34,7 @@ export default class Search extends ArchiveBase {
     Inherited from ArchiveBase: item
     items   List of items found
      */
-    constructor({query='*:*', sort='', and='', limit=75, banner='', page=1, item=undefined, itemid=undefined}={}) {
+    constructor({query='*:*', sort='', and='', limit=3, banner='', page=1, item=undefined, itemid=undefined}={}) { //TODO-IPFSIMAGE Remove
         super(itemid, {item: item});
         this.query = query;
         this.limit= limit;

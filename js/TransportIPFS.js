@@ -165,7 +165,7 @@ class TransportIPFS extends Transport {
          */
         return (typeof(url) === "string" ? url : url.href).slice(5);
     }
-    async p_rawfetch(url, verbose) {
+    async p_rawfetch(url, {verbose=false, timeoutMS=60000}={}) {
         /*
         Fetch some bytes based on a url of the form ipfs:/ipfs/Qm..... or ipfs:/ipfs/z....  .
         No assumption is made about the data in terms of size or structure, nor can we know whether it was created with dag.put or ipfs add or http /api/v0/add/
@@ -185,7 +185,7 @@ class TransportIPFS extends Transport {
         const ipfspath = TransportIPFS.ipfsFrom(url) // Need because dag.get has different requirement than file.cat
 
         try {
-            let res = await utils.p_timeout(this.ipfs.dag.get(cid), 5000);
+            let res = await utils.p_timeout(this.ipfs.dag.get(cid), timeoutMS);
             // noinspection Annotator
             if (res.remainderPath.length)
                 { // noinspection ExceptionCaughtLocallyJS
@@ -267,7 +267,7 @@ class TransportIPFS extends Transport {
             let newurl = TransportIPFS.cid2url(newcid);
             console.assert(url === newurl, "Should round trip");
             urlqbf = url;
-            let data = await transport.p_rawfetch(urlqbf, verbose);
+            let data = await transport.p_rawfetch(urlqbf, {verbose});
             console.assert(data.toString() === qbf, "Should fetch block stored above");
             //console.log("TransportIPFS test complete");
             return transport

@@ -290,7 +290,7 @@ class TransportYJS extends Transport {
         let keys = y.share.map.keys();   // Surprisingly this is sync, the p_connection should have synchronised
         return this._p_get(y, keys);
     }
-    async p_rawfetch(url, verbose) {
+    async p_rawfetch(url, {verbose=false}={}) {
         return { // See identical structure in TransportHTTP
             table: "keyvaluetable",         //TODO-KEYVALUE its unclear if this is the best way, as maybe want to know the real type of table e.g. domain
             _map: await this.p_getall(url, verbose)
