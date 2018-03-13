@@ -33,7 +33,8 @@ export default class ArchiveFile {
         if (!this.metadata.ipfs && Transports.connectedNames().includes("IPFS")) {   // Connected to IPFS but dont have IPFS URL yet (not included by default because IPFS caching is slow)
             this.metadata = await Util.fetch_json(`${Util.gateway.url_metadata}${this.itemid}/${this.metadata.name}`);
         }
-        return [this.metadata.ipfs, this.metadata.magnetlink, this.metadata.contenthash].filter(f => !!f);   // Multiple potential sources elimate any empty
+        // Includes both ipfs and ipfs via gateway link as the latter can prime the IPFS DHT so the former works for the next user
+        return [this.metadata.ipfs, this.metadata.ipfs.replace('ipfs:/ipfs/','https://ipfs.io/ipfs/'), this.metadata.magnetlink, this.metadata.contenthash].filter(f => !!f);   // Multiple potential sources elimate any empty
     }
     httpUrl() {
         return `${Util.gateway.url_download}${this.itemid}/${this.metadata.name}`;
