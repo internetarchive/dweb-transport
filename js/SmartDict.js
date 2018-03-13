@@ -329,7 +329,7 @@ class SmartDict extends Transportable {
         return new cls(decrypted);
         // Returns new object that should be a subclass of SmartDict
     }
-    static async p_fetch(urls, verbose) {
+    static async p_fetch(urls, verboseOrOpts) {
         /*
         Fetches the object from Dweb, passes to p_decrypt in case it needs decrypting,
         and creates an object of the appropriate class and passes data to _setdata
@@ -340,9 +340,16 @@ class SmartDict extends Transportable {
         :throws: TransportError if url invalid, ForbiddenError if cant decrypt
 
          */
+        let opts;
+        if (typeof verboseOrOpts !== "object") {
+            opts = {verbose: verboseOrOpts}; // Assume its old style "verbose"
+        } else {
+            opts = verboseOrOpts;
+        }
+
         try {
             if (verbose) console.log("SmartDict.p_fetch", urls);
-            let data = await super.p_fetch(urls, verbose);  // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
+            let data = await super.p_fetch(urls, opts);  // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
             let maybeencrypted = utils.objectfrom(data);         // Parse JSON (dont parse if p_fetch has returned object (e.g. from KeyValueTable
             let decrypted = await this._after_fetch(maybeencrypted, urls, verbose);
             return decrypted;

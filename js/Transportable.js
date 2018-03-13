@@ -65,7 +65,7 @@ class Transportable {
         this._urls = [];
     }
 
-    static async p_fetch(urls, verboseOrOpts={}) { //TODO eventually propogate API - move verbose into opts
+    static async p_fetch(urls, opts={}) { //TODO-API
         /*
         Fetch the data for a url, subclasses act on the data, typically storing it.
         urls:	array of urls to retrieve (any are valid)
@@ -75,12 +75,6 @@ class Transportable {
         returns:	string - arbitrary bytes retrieved or possibly Buffer or sometimes even an object (like a dictionary)
         throws:     TransportError with messages of any errors if none succeeded
          */
-        let opts;
-        if (typeof verboseOrOpts !== "object") {
-            opts = {verbose: verboseOrOpts}; // Assume its old style "verbose"
-        } else {
-            opts = verboseOrOpts;
-        }
         return Transports.p_rawfetch(urls, opts);
     }
 

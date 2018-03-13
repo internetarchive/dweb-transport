@@ -58,7 +58,8 @@
                     }
                 } else {
                     //TODO-BOOTSTRAP Not clear if parms make sense to a blob, if so can copy from above
-                    display_blob(await Dweb.Transportable.p_fetch(resolution.urls, verbose), {type: resolution.mimetype, target: opentarget});
+                    // Not setting timeoutMS as could be a slow load of a big file TODO-TIMEOUT make dependent on size
+                    display_blob(await Dweb.Transportable.p_fetch(resolution.urls, {verbose}), {type: resolution.mimetype, target: opentarget});
                 }
             }
         } catch(err) {

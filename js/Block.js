@@ -32,7 +32,7 @@ class Block extends Transportable {
         return this._data;
     }
     static async p_fetch(urls, verbose) {
-        return new Block(await super.p_fetch(urls, verbose)); // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
+        return new Block(await super.p_fetch(urls, {verbose})); // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
     }
     static async p_test(verbose) {
         try {

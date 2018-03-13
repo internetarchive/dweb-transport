@@ -43,7 +43,7 @@ export default class ArchiveFile {
        return Util.archiveMimeTypeFromFormat[this.metadata.format];
     }
     async data() {
-        return await Transportable.p_fetch(await this.p_urls(), verbose);
+        return await Transportable.p_fetch(await this.p_urls(), {verbose}); //TODO-TIMEOUT add timeoutMS depending on size of file
     }
     async blob() {
         return new Blob([await this.data], {type: this.mimetype()} );

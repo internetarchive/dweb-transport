@@ -106,7 +106,7 @@ class Leaf extends SmartDict {
         let obj;
         try {
             if (["application/json"].includes(this.mimetype) ) {
-                let data = Transportable.p_fetch(this.urls, verbose);
+                let data = Transportable.p_fetch(this.urls, { verbose, timeoutMS: 5000});
                 let datajson = (typeof data === "string" || data instanceof Buffer) ? JSON.parse(data) : data;          // Parse JSON (dont parse if p_fetch has returned object (e.g. from KeyValueTable
                 if (this.metadata["jsontype"] === "archive.org.dweb") {
                     let obj = await this._after_fetch(datajson, urls, verbose);   // Interpret as dweb - look at its "table" and possibly decrypt
@@ -237,7 +237,7 @@ class Domain extends KeyValueTable {
             //TODO-CONFIG put this (and other TODO-CONFIG into config file)
             const rootpublicurls = ['ipfs:/ipfs/zdpuAp5dg6LphYwebkqGqqebhgLgxW26VAxe76k68D7dVa1oa',
                 'contenthash:/contenthash/QmPxMb15iFcCiCnx6oWu6JJdNnwiqNkb5PVoAjbMBCAWLA'];
-            this.root = await SmartDict.p_fetch(rootpublicurls, verbose);
+            this.root = await SmartDict.p_fetch(rootpublicurls, {verbose, timeoutMS: 5000});
         }
         const res = this.root.p_resolve(path, {verbose});
         console.log("Resolved path",path);
