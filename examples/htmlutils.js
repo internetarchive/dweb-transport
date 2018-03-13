@@ -134,6 +134,8 @@ function replacetexts(el, ...dict) {
     el = elementFrom(el);
     if (Array.isArray(dict[0])) {
         _replacetexts("", el, dict[0])
+    } else if (typeof dict[0] === "string") {   // Its just text string, no field name, so look for "_"
+        _replacetexts("", el, {"_": dict[0]});
     } else {
         el.source = dict[0];    // Usually used with one object, if append fields its usually just calculated for display
         _replacetexts("", el, Object.assign({}, ...dict))
@@ -146,7 +148,7 @@ function _replacetexts(prefix, el, oo) {
      */
     if (Array.isArray(oo)) {    // Add a templated element for each member of array
         deletechildren(el);
-        oo.map((f) => addtemplatedchild(el, f))
+        oo.map((f) => addtemplatedchild(el, {}, f))
     } else {
         for (let prop in oo) {
             try {
@@ -182,7 +184,7 @@ function _replacetexts(prefix, el, oo) {
     }
 }
 
-function addtemplatedchild(el, ...dict) {
+function addtemplatedchild(el, {templatename="template"}={}, ...dict) {
     /*
     Standardised tool to add fields to html,  add that as the last child (or children) of el
     The slightly convulated way of doing this is because of the limited set of functions available
@@ -193,7 +195,7 @@ function addtemplatedchild(el, ...dict) {
     dict: Dictionary with parameters to replace in html, it looks for nodes with name="xyz" and replaces text inside it with dict[xyz]
     */
     el = elementFrom(el);
-    let el_li = el.getElementsByClassName("template")[0].cloneNode(true);   // Copy first child with class=Template
+    let el_li = el.getElementsByClassName(templatename)[0].cloneNode(true);   // Copy first child with class=Template
     el_li.classList.remove("template");                                 // Remove the "template" class so it displays
     replacetexts(el_li, ...dict);                          // Safe since only replace text - sets el_li.source to dict
     el.appendChild(el_li);

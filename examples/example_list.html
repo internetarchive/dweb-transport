@@ -37,7 +37,7 @@
             let obj = new Dweb.SmartDict(dict, verbose );
             await cl.p_push(obj, verbose);
             console.log("Added:",obj);                             // Show on the Javascript console
-            addtemplatedchild("listresults", obj);                  // Display locally as listmonitor will not pick up local entries
+            addtemplatedchild("listresults", {}, obj);                  // Display locally as listmonitor will not pick up local entries
         } catch(err){ console.log("ERROR:",err); alert(err.message); }
         return false; // Stop form submission and page reloading reloading
     }
@@ -68,13 +68,13 @@
             let objs = await cl.p_list_then_elements(verbose);   //This adds the listmonitor as a side effect, so updated as changes
             console.log("objs=",JSON.stringify(objs));
             //Add the elements to the list
-            objs.map((obj) => addtemplatedchild("listresults", obj));
+            objs.map((obj) => addtemplatedchild("listresults", {}, obj));
             // Setup a EventListener so anything new added to the list us added to the display
             cl.addEventListener("insert", (event) => {
                 if (verbose) console.log("fetchanddisplay",event);
                 let sig = event.detail;
                 sig.p_fetchdata(verbose)
-                    .then((obj) => addtemplatedchild("listresults", obj))
+                    .then((obj) => addtemplatedchild("listresults", {}, obj))
                 });
             // Redisplay it in the object browser for debugging
         } catch(err) {

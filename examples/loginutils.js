@@ -41,7 +41,7 @@ async function p_login(dict) {
     try {
         let passphrase = dict.name + "/" + dict.passphrase;
         let kc = await Dweb.KeyChain.p_new({name: dict.name}, {passphrase: passphrase}, verbose);
-        addtemplatedchild("keychains_ul", kc);      // returns el, but unused
+        addtemplatedchild("keychains_ul", {}, kc);      // returns el, but unused
         show('logout');                             // And show the logout button
     } catch(err) {
         console.log("Unable to _login",err);
@@ -69,7 +69,7 @@ async function loginformsubmit() {
 
 function _showkeyorlock(el, obj) {
     // Utility function to add new or existing element to Key List
-    addtemplatedchild(el, obj, {objsym: icon_images[obj.table === "sd" && obj.token ? "tok" : obj.table ] });
+    addtemplatedchild(el, {}, obj, {objsym: icon_images[obj.table === "sd" && obj.token ? "tok" : obj.table ] });
 }
 
 function keychain_click(el) {

@@ -60,7 +60,7 @@
             working.textarea = content;
             working.dirty();                // Make sure saved
             let sig = await vl.p_saveversion(verbose);
-            addtemplatedchild("vl_list", sig);
+            addtemplatedchild("vl_list", {}, sig);
             console.groupEnd("p_updatecontent ---");
         }
 

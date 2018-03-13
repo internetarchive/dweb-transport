@@ -230,15 +230,19 @@ class Domain extends KeyValueTable {
         this._map[key] = value;
         return value;
     }
+    // use p_getall to get all registered names
+
+    static async p_rootSet( {verbose=false}={}){
+        //TODO-CONFIG put this (and other TODO-CONFIG into config file)
+        const rootpublicurls = ['ipfs:/ipfs/zdpuAp5dg6LphYwebkqGqqebhgLgxW26VAxe76k68D7dVa1oa',
+            'contenthash:/contenthash/QmPxMb15iFcCiCnx6oWu6JJdNnwiqNkb5PVoAjbMBCAWLA'];
+        this.root = await SmartDict.p_fetch(rootpublicurls,  {verbose, timeoutMS: 5000});
+    }
 
     static async p_rootResolve(path, {verbose=false}={}) {
         console.group("Resolving:",path);
-        if (!this.root) {
-            //TODO-CONFIG put this (and other TODO-CONFIG into config file)
-            const rootpublicurls = ['ipfs:/ipfs/zdpuAp5dg6LphYwebkqGqqebhgLgxW26VAxe76k68D7dVa1oa',
-                'contenthash:/contenthash/QmPxMb15iFcCiCnx6oWu6JJdNnwiqNkb5PVoAjbMBCAWLA'];
-            this.root = await SmartDict.p_fetch(rootpublicurls, {verbose, timeoutMS: 5000});
-        }
+        if (!this.root)
+            await p_rootSet({verbose});
         const res = this.root.p_resolve(path, {verbose});
         console.log("Resolved path",path);
         console.groupEnd();

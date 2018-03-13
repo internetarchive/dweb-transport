@@ -16,7 +16,7 @@ class KeyValueTable extends PublicPrivate {
     _map           Where the KV mapping is stored.
 
     Fields Inherited from PublicPrivate:
-    keypair         Key used to sign - not used here (yet), but is in DOmain
+    keypair         Key used to sign - not used here (yet), but is in Domain
 
     Three ordering use cases
     a) Create new object via p_new, store it the setart setting
