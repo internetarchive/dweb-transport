@@ -114,31 +114,19 @@ async function test_bylinks(cid, expected, expectfailure) {
 
 /* Each of this set of routines uploads with one method, and tries retrieving with multiple */
 
-async function test_httpapi_long() {
-    console.log("--------Testing long file sent to http API");
-    let multihash="Qmbzs7jhkBZuVixhnM3J3QhMrL6bcAoSYiRPZrdoX3DhzB";  // 2 block file
+async function test_long_file(note, multihash, len) {
+    console.log(`--------Testing ${note}`);
     // Note this hash is fetchable via https://ipfs.io/ipfs/Qmbzs7jhkBZuVixhnM3J3QhMrL6bcAoSYiRPZrdoX3DhzB
     let cid = new CID(multihash);
-    let len = 262438;
     await test_files_cat(cid, len,false);             // Works in node and in Chrome
     await test_bylinks(cid, len, false);
 }
-
-async function test_video() {
-    console.log("--------Testing a video added via the http urladd interface");
-    let multihash="zdj7Wc9BBA2kar84oo8S6VotYc9PySAnmc8ji6kzKAFjqMxHS";  // commute video
-    // Note this hash is fetchable via https://ipfs.io/ipfs/zdj7Wc9BBA2kar84oo8S6VotYc9PySAnmc8ji6kzKAFjqMxHS
-    let cid = new CID(multihash);
-    let len = 262438;
-    await test_files_cat(cid, len,false);             // Works in node and in Chrome
-    await test_bylinks(cid, len, false);
-}
-
 async function test_ipfs() {
-    await p_ipfsstart(true);
-    //await sandbox();
-    await test_httpapi_long();      // Works only on files.cat or bylinks; Fails as expected on others
-    await test_video();             // Should work on file.cat or bylinks;
+	await p_ipfsstart(true);
+	await test_long_file('PDF sent to http api a long time ago', "Qmbzs7jhkBZuVixhnM3J3QhMrL6bcAoSYiRPZrdoX3DhzB", 262438);
+	await test_long_file('Commute 11Mb video sent a few months ago almost certainly via urlstore', 'zdj7Wc9BBA2kar84oo8S6VotYc9PySAnmc8ji6kzKAFjqMxHS', 11919082);
+	await test_long_file('500Mb file sent few days ago via urlstore', 'zdj7WfaG5e1PWoqxWUyUyS2nTe4pgNQZ4tRnrfd5uoxrXAANA', 521998952);
+	await test_long_file('Smaller 22Mb video sent 2018-03-13', 'zdj7WaHjDtE2e7g614UfXNwyrBwRUd6JkujRsLc9M2ufozLct', 22207578);
     console.log('---- finished --- ')
 }
 

@@ -177,7 +177,7 @@ class TransportIPFS extends Transport {
         if (typeof(url) !== "string") { // It better be URL which unfortunately is hard to test
             url = url.path;
         }
-        if (url.indexOf('/ipfs/')) {
+        if (url.indexOf('/ipfs/') > -1) {
             return url.slice(url.indexOf('/ipfs/'));
         }
         throw new errors.CodingError(`TransportIPFS.ipfsFrom: Cant convert url ${url} into a path starting /ipfs/`);
