@@ -94,7 +94,7 @@
                 el_li.classList.add("expanded");
                 el_li.classList.remove("fa-folder");
                 el_li.classList.add("fa-folder-open");
-                for (let k of Object.keys(kids)) {
+                for (let k of Object.keys(kids).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))) {
                     addsubdomain(el_ul, k, kids[k]);
                 }
             } else if (el_li.classList.contains("expanded")) {
@@ -201,7 +201,7 @@
             <li><span class="propname">Expires</span><span name="expires" class="propval"></span></li>
             <li><span class="propname">Signatures</span><ul name="signatures" class="proplist">
                 <li class="template"><span name="date"></span><br/><span name="signedby"></span><br/><span name="signature"></span></li></ul>
-            <li><span class="propname">URLs</span><ul name="urls" class="proplist"><li class="template"><span name="_"></span></li></ul></li>
+            <li><span class="propname">URLs</span><ul name="urls" class="proplist"><li class="template"><a href="_"><span name="_"></span></a></li></ul></li>
             <li><span class="propname">Mimetype</span>:&nbsp;<span name="mimetype" class="propval"></span></li>
             <li><span class="propname">Metadata</span>:&nbsp;<span name="metadatajson" class="propval"></span></li>
         </ul>
