@@ -158,7 +158,7 @@ class Domain extends KeyValueTable {
         }
     }
     static async p_new(data, master, key, verbose, seedurls, kids) {
-        const obj = await super.p_new(data, master, key, verbose, {keyvaluetable: "domains", seedurls: seedurls}); // Will default to call constructor and p_store if master
+        const obj = await super.p_new(data, master, key, verbose, {keyvaluetable: "domain", seedurls: seedurls}); // Will default to call constructor and p_store if master
         for (let j in kids ) {
             await obj.p_register(j, kids[j]);
         }
@@ -234,8 +234,8 @@ class Domain extends KeyValueTable {
 
     static async p_rootSet( {verbose=false}={}){
         //TODO-CONFIG put this (and other TODO-CONFIG into config file)
-        const rootpublicurls = ['ipfs:/ipfs/zdpuAp5dg6LphYwebkqGqqebhgLgxW26VAxe76k68D7dVa1oa',
-            'contenthash:/contenthash/QmPxMb15iFcCiCnx6oWu6JJdNnwiqNkb5PVoAjbMBCAWLA'];
+        const rootpublicurls = ['ipfs:/ipfs/zdj7WkqfUhnc9o5FJmnkwP5gFFkac7WoGprMKnzNAQTwxHQpR',
+            'contenthash:/contenthash/QmUE1yBSf1FhU5dgcLhdPrhkBqbrc5R4mu3hz993N7q4Qt'];
         this.root = await SmartDict.p_fetch(rootpublicurls,  {verbose, timeoutMS: 5000});
     }
 
@@ -317,6 +317,10 @@ class Domain extends KeyValueTable {
         }); //root
         const testing = Domain.root.tablepublicurls.map(u => u.includes("localhost")).includes(true);
         console.log("Domain.root publicurls for",testing ? "testing:" : "inclusion in bootloader.html:",Domain.root._publicurls);
+        const metadatatableurl = Domain.root._map["arc"]._map["archive.org"]._map["metadata"].tablepublicurls.find(u=>u.includes("getall/table"))
+        if (!testing) {
+            console.log("Put this in gateway config.py config.domains.metadata:", metadatatableurl);
+        }
         if (verbose) console.log(await this.root.p_printable());
     }
 

@@ -77,19 +77,24 @@ class KeyValueTable extends PublicPrivate {
     }
     _mapFromStorage(storageVal, verbose=false) { //TODO-API
         /*
-        Convert a value as stored in the map into a value suitable for storage dictionary. Pair of _mapFromStorage.
+        Convert a value as stored in the storage dictionary into a value suitable for the map. Pair of _storageFromMap.
          */
-        let obj = storageVal && JSON.parse(storageVal);   // Could be a string, or an integer, or a object or array of any of these
-        if (Array.isArray(obj)) {
-            return obj.map( m => this._storageFromMap(m))
-        } else if (typeof(obj) === "object") {
-            if (obj["table"]) {
-                obj = SmartDict._sync_after_fetch(obj, [], verbose);   // Convert object to subclass of Transportable, note cant decrypt as sync
+        try {
+            let obj = storageVal && JSON.parse(storageVal);   // Could be a string, or an integer, or a object or array of any of these
+            if (Array.isArray(obj)) {
+                return obj.map(m => this._storageFromMap(m))
+            } else if (typeof(obj) === "object") {
+                if (obj["table"]) {
+                    obj = SmartDict._sync_after_fetch(obj, [], verbose);   // Convert object to subclass of Transportable, note cant decrypt as sync
+                }
+                //else If no "table" field, then just return the object.
             }
-            //else If no "table" field, then just return the object.
+            //else  if its not an object, return the string or integer.
+            return obj;
+        } catch(err) {
+            console.error("KeyValueTable._mapFromStorage Unable to decode", err);
+            throw(err);
         }
-        //else  if its not an object, return the string or integer.
-        return obj;
     }
     preflight(dd) {
         let master = dd._master; //Save before super.preflight
@@ -117,7 +122,7 @@ class KeyValueTable extends PublicPrivate {
         //TODO_KEYVALUE copy semantics from __setattr_ for handling Dates, maybe other types
     }
     _updatemap(res) {
-        Object.keys(res).map(key => { this._map[key] = this._mapFromStorage(res[key])});
+        Object.keys(res).map(key => { try { this._map[key] = this._mapFromStorage(res[key])} catch(err) { console.log("Not updating",key)} } );
     }
     async p_get(keys, verbose) {
         /*

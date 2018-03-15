@@ -89,7 +89,7 @@
         async function domain_open(el_li, el_ul, dom) {
             // el is the li, want the ui inside it
             if (el_li.classList.contains("collapsed")) {
-                let kids = await dom.p_getall();
+                let kids = await dom.p_getall(verbose);
                 el_li.classList.remove("collapsed");
                 el_li.classList.add("expanded");
                 el_li.classList.remove("fa-folder");

@@ -8,6 +8,7 @@ document = dom.window.document;   // Note in JS can't see "document" like can in
 // Dweb constituents
 const Transports = require('./Transports'); // Manage all Transports that are loaded
 const TransportHTTP = require('./TransportHTTP');
+const TransportIPFS = require('./TransportIPFS');
 const TransportYJS = require('./TransportYJS');
 const TransportWEBTORRENT = require('./TransportWEBTORRENT');
 const Domain = require('./Domain');
