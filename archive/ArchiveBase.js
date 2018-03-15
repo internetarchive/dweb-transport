@@ -53,8 +53,11 @@ export default class ArchiveBase extends ArchiveItem {
     preprocessDescription(description) {
         //console.log(description)
         // Now catch some things that often appear in descriptions because it assumes running on archive page
+        // And handle multivalue (array) descriptions by concatenating with <br/>
 
-        return !description ? description : description.replace(/src=(['"])\//gi, 'src=$1'+React._config.root+'/');
+        return  !description ? description
+                : (Array.isArray(description) ? description.join('<br/>') : description)
+                    .replace(/src=(['"])\//gi, 'src=$1'+React._config.root+'/');
     }
 }
 
