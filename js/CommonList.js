@@ -8,7 +8,7 @@ const utils = require('./utils'); // Utility functions
 //https://www.npmjs.com/package/custom-event && https://github.com/webmodules/custom-event
 const CustomEvent = require('custom-event'); // From web, Not present in node - this code uses global.CustomEvent if it exists so safe on browser/node
 
-class CommonList extends PublicPrivate {    //TODO-API split CL and PP
+class CommonList extends PublicPrivate {
     /*
     CommonList is a superclass for anything that manages a storable list of other urls
     e.g. MutableBlock, KeyChain, AccessControlList

@@ -38,7 +38,7 @@ export default class Tile {
           <div className="item-ttl C C2">
             <a onClick={`Nav.nav_details("${item.identifier}");`} title={item.title}>
               <div className="tile-img">
-                <img className="item-img" xxxstyle="height:180px" imgname={imgname} src={item.thumbnaillinks}/>  {/*TODO-SERVICES-IMG get directly unclear where height comes from*/}
+                <img className="item-img" imgname={imgname} src={item.thumbnaillinks}/>  {/*TODO-SERVICES-IMG get directly unclear where height comes from*/}
               </div>{/*.tile-img*/}
               <div className="ttl">
                 {item.title}

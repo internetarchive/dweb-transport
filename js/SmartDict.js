@@ -75,7 +75,7 @@ class SmartDict extends Transportable {
         return res
     }
 
-    _getdata({ publicOnly=false, encryptIfAcl=true}={}) { //TODO-API
+    _getdata({ publicOnly=false, encryptIfAcl=true}={}) {
         /*
         Prepares data for sending. Retrieves attributes, runs through preflight.
             If there is an _acl field then it passes data through it for encrypting (see AccessControl library)
@@ -253,7 +253,7 @@ class SmartDict extends Transportable {
         if (typeof el === 'string') { el = document.getElementById(el); }
         for (let propname in this) {
             switch(propname) {
-                case "xx":   el.appendChild("XXX"); // This is how to special case a field
+                case "xx":   el.appendChild("XX"); // This is how to special case a field
                     break;
                 default:
                     switch (this.objbrowser_fields(propname)) {  // Note this is just types for this particular superclass, each recursion will look at different set
@@ -287,8 +287,12 @@ class SmartDict extends Transportable {
             }
         }
     }
-    static _sync_after_fetch(retrievedobj, urls, verbose) {   //TODO-NAMING check if still used
-        // Takes a structure after JSON.parse
+    static _sync_after_fetch(retrievedobj, urls, verbose) {
+        /*
+         Turn a data structure retrieved from transport into a class based on retrievedobj[“table”]
+        retrievedobj	An object as retrieved from the transport
+        urls	        set to _urls field to show where retrieved from
+        */
         let table = retrievedobj.table;               // Find the class it belongs to
         if (!table) {
             throw new errors.ToBeImplementedError("SmartDict.p_fetch: no table field, whatever this is we cant decode it");
@@ -308,7 +312,7 @@ class SmartDict extends Transportable {
         // Returns new object that should be a subclass of SmartDict
 
     }
-    static async _after_fetch(maybeencrypted, urls, verbose) {  //TODO-NAMING check if still used
+    static async _after_fetch(maybeencrypted, urls, verbose) {
         // Takes a structure after JSON.parse
         let table = maybeencrypted.table;               // Find the class it belongs to
         if (!table) {
@@ -336,7 +340,6 @@ class SmartDict extends Transportable {
         This should not need subclassing, (subclass _setdata or p_decrypt instead).
 
         :resolves: New object - e.g. VersionList or KeyChain
-        :catch: TransportError - can probably, or should throw TransportError if transport fails
         :throws: TransportError if url invalid, ForbiddenError if cant decrypt
 
          */

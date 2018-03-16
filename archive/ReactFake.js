@@ -214,7 +214,6 @@ export default class React  {
                 console.log("Caught error in createElement callback in loadImg",err.message);
                 throw err;
             }
-            //console.log("XXX@113",tag,attrs)
             React.buildoutElement(element, tag, attrs, kids);
         }
         if (tag === "img" && Object.keys(attrs).includes("src") && attrs["src"] instanceof ArchiveFile) {

@@ -93,7 +93,7 @@ class Transport {
 
     //noinspection JSUnusedLocalSymbols
 
-    p_rawfetch(url, {verbose=false}={}) { //TODO-API
+    p_rawfetch(url, {verbose=false}={}) {
         /*
         Fetch some bytes based on a url, no assumption is made about the data in terms of size or structure.
         Where required by the underlying transport it should retrieve a number if its "blocks" and concatenate them.

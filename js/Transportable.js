@@ -65,7 +65,7 @@ class Transportable {
         this._urls = [];
     }
 
-    static async p_fetch(urls, opts={}) { //TODO-API
+    static async p_fetch(urls, opts={}) {
         /*
         Fetch the data for a url, subclasses act on the data, typically storing it.
         urls:	array of urls to retrieve (any are valid)

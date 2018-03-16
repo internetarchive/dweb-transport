@@ -398,7 +398,7 @@ class Transports {
 
     // Setup Transports - setup0 is called once, and should return quickly, p_setup1 and p_setup2 are asynchronous and p_setup2 relies on p_setup1 having resolved.
 
-    static setup0(transports, options, verbose) {   //TODO-API transports now an array
+    static setup0(transports, options, verbose) {
         /*
         Setup Transports for a range of classes
         transports is abbreviation HTTP, IPFS, LOCAL or list of them e.g. "HTTP,IPFS"
