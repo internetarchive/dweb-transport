@@ -135,6 +135,7 @@ class TransportHTTP extends Transport {
             mode: 'cors',
             cache: 'default',
             redirect: 'follow',  // Chrome defaults to manual
+            keepalive: true    // Keep alive - mostly we'll be going back to same places a lot
         };
         return await this.p_httpfetch(httpurl, init, opts.verbose); // This s a real http url
     }
@@ -153,6 +154,7 @@ class TransportHTTP extends Transport {
             mode: 'cors',
             cache: 'default',
             redirect: 'follow',  // Chrome defaults to manual
+            keepalive: true    // Keep alive - mostly we'll be going back to same places a lot
         };
         return await this.p_httpfetch(httpurl, init, verbose);
     }
