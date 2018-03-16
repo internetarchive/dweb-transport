@@ -103,7 +103,7 @@ export default class React  {
         if (verbose) console.log('getting image for',name); //Dont use console.group because happening in parallel
         const transports = Transports.connectedNamesParm(); // Pass transports, as metadata (currently) much quicker if not using IPFS
         const res = await Domain.p_rootResolve(name, {verbose});     // [ Leaf object, remainder ] //TODO-NAME see comments in p_rootResolve about FAKEFAKEFAKE
-        if (!(res[0] && (res[0].fullname === "/"+name) && !res[1] )) {
+        if (!(res[0] && (res[0].name === name) && !res[1] )) {
             throw new Error(`Unable to resolve ${name}`);
         }
         el = this.loadImg(name, res[0].urls, cb);

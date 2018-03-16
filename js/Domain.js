@@ -56,7 +56,7 @@ const NameMixin = function(options) {
     urls | tablepublicurls    Where to find the object (or table if its a domain)
     expires: ISODATE         When this name should be considered expired (it might still be resolved, but not if newer names available.
     (there is no validfrom time, this is implicitly when it was signed)
-    fullname: str           Names that this record applies to. e.g.  company/people/fred  family/smith/father. Mostly useful to go UP the path.
+    name: str               Names that this record applies to relative to table its in. e.g.  fred, father
 
      */
     this.nameConstructor = function() {
@@ -68,7 +68,7 @@ class Leaf extends SmartDict {
     /*
         The Leaf class is used to register another object in a domain.
 
-        Fields inherited from NameMixin: expires; fullname;
+        Fields inherited from NameMixin: expires; name;
         urls: Points at object being named (for a Transportable object its obj._publicurls)
         mimetype:   Mimetype of content esp application/json
         metadata:   Other information about the object needed before or during retrieval.
@@ -94,13 +94,13 @@ class Leaf extends SmartDict {
     }
 
     objbrowser_fields(propname) {
-        const fieldtypes = { expires: "str", "urls": "urlarray", "fullname": "str", "signatures": "arrayjsonobj"};
+        const fieldtypes = { expires: "str", "urls": "urlarray", "name": "str", "signatures": "arrayjsonobj"};
         return fieldtypes[propname] || super.objbrowser_fields(propname);
     }
 
     async p_printable({indent="  ",indentlevel=0}={}) {
         // Output something that can be displayed for debugging
-        return `${indent.repeat(indentlevel)}${this.fullname} = ${this.urls.join(', ')}${this.expires ? " expires:"+this.expires : ""}\n`
+        return `${indent.repeat(indentlevel)}${this.name} = ${this.urls.join(', ')}${this.expires ? " expires:"+this.expires : ""}\n`
     }
     async p_resolve(path, {verbose=false}={}) {
         let obj;
@@ -113,13 +113,13 @@ class Leaf extends SmartDict {
                     return obj.p_resolve(path, {verbose: false});   // This wont work unless the object implements p_resolve (most dont)
                 } else {
                     console.error("Leaf.p_resolve unknown type of JSON", this.mimetype);
-                    throw new errors.ResolutionError(`Leaf.p_resolve unable to resolve path: ${path} in ${this.fullname} because jsontype ${this.metadata["jsontype"]} unrecognized`);
+                    throw new errors.ResolutionError(`Leaf.p_resolve unable to resolve path: ${path} in ${this.name} because jsontype ${this.metadata["jsontype"]} unrecognized`);
                 }
             } else if (["text/html"].includes(this.mimetype) ) {
                 return [ this, path];
             } else {
                 console.error("Leaf.p_resolve, unknown mimetype", this.mimetype)
-                throw new errors.ResolutionError(`Leaf.p_resolve unable to resolve path: ${path} in ${this.fullname} because mimetype ${this.mimetype} unrecognized`);
+                throw new errors.ResolutionError(`Leaf.p_resolve unable to resolve path: ${path} in ${this.name} because mimetype ${this.mimetype} unrecognized`);
             }
         } catch(err) {
             throw new errors.ResolutionError(err.message);
@@ -128,7 +128,7 @@ class Leaf extends SmartDict {
 
 }
 NameMixin.call(Leaf.prototype);
-SignatureMixin.call(Leaf.prototype, ["urls", "fullname", "expires"]);
+SignatureMixin.call(Leaf.prototype, ["urls", "name", "expires"]);
 SmartDict.table2class["leaf"] = Leaf;
 
 class Domain extends KeyValueTable {
@@ -142,7 +142,7 @@ class Domain extends KeyValueTable {
     Fields:
     keys: [NACL VERIFY:xyz*]   Public Key to use to verify entries - identified by type, any of these keys can be used to sign a record
 
-    Fields inherited from NameMixin: fullname; expires; signatures
+    Fields inherited from NameMixin: name; expires; signatures
 
     Fields inherited from KeyValueTable
     tablepublicurls: [ str* ]       Where to find the table.
@@ -175,13 +175,13 @@ class Domain extends KeyValueTable {
     }
     verify(name, subdomain) { // Pair of sign
         /* Check the subdomain is valid.
-            That is teh case if the subdomain has a cryptographically valid signatures by one of the domain's keys and the fullname matches the name we have it at.
+            That is teh case if the subdomain has a cryptographically valid signatures by one of the domain's keys and the name matches the name we have it at.
          */
         // its called when we think we have a resolution.
         //TODO-NAME need to be cleverer about DOS, but at moment dont have failure case if KVT only accepts signed entries from table owner or verifies on retrieval.
         // Throws error if doesnt verify
         return subdomain._verifyOwnSigs().some(key => this.keys.includes(key))                       // Check valid sig by this
-            && ([this.fullname, name].join('/') === subdomain.fullname); // Check name matches
+            && (name === subdomain.name); // Check name matches
     }
 
     async p_register(name, registrable, verbose) {
@@ -196,7 +196,7 @@ class Domain extends KeyValueTable {
             // If it isnt a Domain or Leaf then build a name to point at it
             registrable = await Leaf.p_new(registrable, verbose)
         }
-        registrable.fullname =  [this.fullname, name].join("/");    // Set fullname to be this path
+        registrable.name =  name;
         this.sign(registrable);
         console.assert(this.verify(name, registrable));   // It better verify !
         await this.p_set(name, registrable, {publicOnly: true, encryptIfAcl: false, verbose: verbose});
@@ -234,15 +234,15 @@ class Domain extends KeyValueTable {
 
     static async p_rootSet( {verbose=false}={}){
         //TODO-CONFIG put this (and other TODO-CONFIG into config file)
-        const rootpublicurls = ['ipfs:/ipfs/zdj7WkqfUhnc9o5FJmnkwP5gFFkac7WoGprMKnzNAQTwxHQpR',
-            'contenthash:/contenthash/QmUE1yBSf1FhU5dgcLhdPrhkBqbrc5R4mu3hz993N7q4Qt'];
+        const rootpublicurls = [ 'ipfs:/ipfs/zdj7WmmDLq6W3GvWFuPoPSw53dbij2oPRYBTVa7hbRWoNeE5P',
+            'contenthash:/contenthash/QmRQUywWx6jxc32FPBNAZT6LdWvqFMwN3cmshSn32Pcwan' ];
         this.root = await SmartDict.p_fetch(rootpublicurls,  {verbose, timeoutMS: 5000});
     }
 
     static async p_rootResolve(path, {verbose=false}={}) {
         console.group("Resolving:",path);
         if (!this.root)
-            await p_rootSet({verbose});
+            await this.p_rootSet({verbose});
         const res = this.root.p_resolve(path, {verbose});
         console.log("Resolved path",path);
         console.groupEnd();
@@ -256,7 +256,7 @@ class Domain extends KeyValueTable {
          */
 
         //TODO check for / at start, if so remove it and get root
-        if (verbose) console.log("resolving",path,"in",this.fullname);
+        if (verbose) console.log("resolving",path,"in",this.name);
         let res;
         /*
         // Look for path, try longest combination first, then work back to see if can find partial path
@@ -286,14 +286,14 @@ class Domain extends KeyValueTable {
             return await res.p_resolve(remainder.join('/'), {verbose});           // ===== Note recursion ====
             //TODO need other classes e.g. SD  etc to handle p_resolve as way to get path
         } else {
-            console.log("Unable to resolve",name,"in",this.fullname);
+            console.log("Unable to resolve",name,"in",this.name);
             return [ undefined, path ];
         }
     }
 
     async p_printable({indent="  ",indentlevel=0, maxindent=9}={}) {
         // Output something that can be displayed for debugging
-        return `${indent.repeat(indentlevel)}${this.fullname} @ ${this.tablepublicurls.join(', ')}${this.expires ? " expires:"+this.expires : ""}\n`
+        return `${indent.repeat(indentlevel)}${this.name} @ ${this.tablepublicurls.join(', ')}${this.expires ? " expires:"+this.expires : ""}\n`
             + ((indentlevel >= maxindent) ? "..." : (await Promise.all((await this.p_keys()).map(k => this._map[k].p_printable({indent, indentlevel: indentlevel + 1, maxindent: maxindent})))).join(''))
     }
     static async p_setupOnce({verbose=false} = {}) {
@@ -303,7 +303,7 @@ class Domain extends KeyValueTable {
         const kc = await KeyChain.p_new({name: "test_keychain kc"}, {passphrase: pass}, verbose);    //TODO-NAME replace with secret passphrase
         //TODO-NAME add ipfs address and ideally ipns address to archiveOrgDetails record
         //p_new should add registrars at whichever compliant transports are connected (YJS, HTTP)
-        Domain.root = await Domain.p_new({_acl: kc, fullname: ""}, true, {passphrase: pass+"/"}, verbose, [], {   //TODO-NAME will need a secure root key
+        Domain.root = await Domain.p_new({_acl: kc, name: ""}, true, {passphrase: pass+"/"}, verbose, [], {   //TODO-NAME will need a secure root key
             arc: await Domain.p_new({_acl: kc},true, {passphrase: pass+"/arc"}, verbose, [], { // /arc domain points at our top level resolver.
                 "archive.org": await Domain.p_new({_acl: kc}, true, {passphrase: pass+"/arc/archive.org"}, verbose, [], {
                             "details": await Leaf.p_new({urls: ["https://dweb.me/examples/archive.html"], mimetype: "text/html",
@@ -334,7 +334,7 @@ class Domain extends KeyValueTable {
             const mnemonic = "coral maze mimic half fat breeze thought champion couple muscle snack heavy gloom orchard tooth alert cram often ask hockey inform broken school cotton"; // 32 byte
             const kc = await KeyChain.p_new({name: "test_keychain kc"}, {mnemonic: mnemonic}, verbose);    //Note in KEYCHAIN 4 we recreate exactly same way.
             Domain.root = await Domain.p_new({
-                fullname: "",   // Root is "" so that [fullname,name].join('/' is consistent for next level.
+                name: "",   // Root is "" so that [name,name].join('/' is consistent for next level.
                 keys: [],
                 signatures: [],    // TODO-NAME Root record itself needs signing - but by who (maybe /arc etc)
                 expires: undefined,
@@ -375,7 +375,7 @@ class Domain extends KeyValueTable {
             let name = `arc/archive.org/metadata/${itemid}`;
             res = await Domain.root.p_resolve(name, {verbose});
             //TODO-NAME note p_resolve is faking signature verification on FAKEFAKEFAKE - will also need to error check that which currently causes exception
-            console.assert(res[0].fullname === "/"+name);
+            console.assert(res[0].name === "/"+name);
             if (verbose) console.log("Resolved",name,"to",await res[0].p_printable({maxindent:2}), res[1]);
             let metadata = await Transportable.p_fetch(res[0].urls); // Using Block as its multiurl and might not be HTTP urls
             if (verbose) console.log("Retrieved metadata",JSON.stringify(metadata));
@@ -400,7 +400,7 @@ class Domain extends KeyValueTable {
 
 }
 NameMixin.call(Domain.prototype);   // Add in the Mixin
-SignatureMixin.call(Domain.prototype, ["tablepublicurls", "fullname", "keys", "expires"]);
+SignatureMixin.call(Domain.prototype, ["tablepublicurls", "name", "keys", "expires"]);
 
 Domain.clsLeaf = Leaf;  // Just So exports can find it and load into Dweb TODO move to own file
 SmartDict.table2class["domain"] = Domain;

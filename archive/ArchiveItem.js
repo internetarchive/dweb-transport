@@ -69,7 +69,7 @@ export default class ArchiveItem {
             if (!res[0]) {
                 throw new Error(`Unable to resolve ${name}`);
             }
-            console.assert((res[0].fullname === "/" + name) && !res[1]);
+            console.assert((res[0].name === this.itemid) && !res[1]);
             let m = await Transportable.p_fetch(res[0].urls, {verbose, timeoutMS: 5000}); // Using Transportable as its multiurl and might not be HTTP urls
             m = utils.objectfrom(m);
             console.assert(m.metadata.identifier === this.itemid);
