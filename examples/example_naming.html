@@ -177,6 +177,7 @@
         .propname { display: inline-block; background-color: inherit; border: none; vertical-align: top; }
         .propval, .proplist {display: inline-block; background-color: inherit; border: none;}
         .proplist {padding-left: 0px;}
+
     </style>
 
 </head>
@@ -291,11 +292,50 @@
     <ul>
     <li><strong>Domain:</strong>A collection of names as defined by its owner.</li>
     </ul>
-<h3>Usage</h3>
-<h4>Registration</h4>
-<p>
-    First step ...
-</p>
+<h3>Use Cases</h3>
+<p>Note these don't actually work yet ... require code at most steps</p>
+<!--fa-check-square, fa-square fa-times-square fa-tasks fa-spinner used for tasks-->
+<ul>
+    <li class="fas fa-square">Create a leaf under test domain<ul>
+        <li class="fas fa-tasks">Login as test<ul>
+            <li class="fas fa-square">Create test user</li>
+            <li class="fas fa-square">Create test ACL - with test user in it</li>
+            <li class="fas fa-tasks">Create test domain under /arc<ul>
+                <li class="fas fa-square">Locked with ACL</li>
+                <li class="fas fa-square">Stored meta (with priv key) In Keychain of Test user</li>
+                <li class="fas fa-square">Keys for test domain are random</li>
+                <li class="fas fa-square">UI to show unlock in list when we have the key keychain>domains>pubkeys>checkInUI</li>
+            </ul></li>
+        </ul></li>
+        <li class="fas fa-tasks">New Leaf<ul>
+            <li class="fas fa-square">UI enables "New Leaf" based on keys</li>
+            <li class="fas fa-square">Display form instead of Leaf in box</li>
+        </ul></li>
+        <li class="fas fa-square">Fill in details</li>
+        <li class="fas fa-tasks">"Register"<ul>
+            <li class="fas fa-square">Form submission to local function</li>
+            <li class="fas fa-square">Call function on Leaf to create</li>
+            <li class="fas fa-square">Call function on Domain to register</li>
+        </ul></li>
+
+    </ul></li>
+    <li class="fas fa-tasks">Create a domain under test domain<ul>
+        <li class="fas fa-tasks">Login as test</li>
+        <li class="fas fa-tasks">New Domain (as for New Leaf)</li>
+        <li class="fas fa-tasks">Fill in details</li>
+        <li class="fas fa-tasks">"Register" (as for New Leaf)</li>
+    </ul></li>
+    <li class="fas fa-tasks">Create/Register a domain belonging to other user<ul>
+        <li class="fas fa-tasks">Login as someone new</li>
+        <li class="fas fa-tasks">New Domain</li>
+        <li class="fas fa-tasks">Fill in details</li>
+        <li class="fas fa-tasks">Create (replaces Register when dont have perms on current domain)</li>
+        <li class="fas fa-tasks">Get Link</li>
+        <li class="fas fa-square">Login as test user</li>
+        <li class="fas fa-square">Register link</li>
+    </ul></li>
+
+</ul>
 
 <script type="text/javascript">
     // These have to be at global level so they can be found anywhere.
