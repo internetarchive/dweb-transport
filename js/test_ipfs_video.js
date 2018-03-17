@@ -123,10 +123,13 @@ async function test_long_file(note, multihash, len) {
 }
 async function test_ipfs() {
 	await p_ipfsstart(true);
-	await test_long_file('PDF sent to http api a long time ago', "Qmbzs7jhkBZuVixhnM3J3QhMrL6bcAoSYiRPZrdoX3DhzB", 262438);
-	await test_long_file('Commute 11Mb video sent a few months ago almost certainly via urlstore', 'zdj7Wc9BBA2kar84oo8S6VotYc9PySAnmc8ji6kzKAFjqMxHS', 11919082);
-	await test_long_file('500Mb file sent few days ago via urlstore', 'zdj7WfaG5e1PWoqxWUyUyS2nTe4pgNQZ4tRnrfd5uoxrXAANA', 521998952);
-	await test_long_file('Smaller 22Mb video sent 2018-03-13', 'zdj7WaHjDtE2e7g614UfXNwyrBwRUd6JkujRsLc9M2ufozLct', 22207578);
+	//await test_long_file('PDF sent to http api a long time ago', "Qmbzs7jhkBZuVixhnM3J3QhMrL6bcAoSYiRPZrdoX3DhzB", 262438);
+	//await test_long_file('Commute 11Mb video sent a few months ago almost certainly via urlstore', 'zdj7Wc9BBA2kar84oo8S6VotYc9PySAnmc8ji6kzKAFjqMxHS', 11919082);
+	//await test_long_file('500Mb file sent few days ago via urlstore', 'zdj7WfaG5e1PWoqxWUyUyS2nTe4pgNQZ4tRnrfd5uoxrXAANA', 521998952);
+	//await test_long_file('Smaller 22Mb video sent 2018-03-13', 'zdj7WaHjDtE2e7g614UfXNwyrBwRUd6JkujRsLc9M2ufozLct', 22207578);
+	//await test_long_file('Using ipfs add', 'QmUrp54J5E2jxf8stDiCa56uXASjqHeX2oFWSx35qRE4SV', 0);
+	//await test_long_file('Using curl urlstore add', 'zdj7WkPCyjRgfCAMosMxCx8UhtW6rZvPNRsxCzg3mrxTLRVBr', 321761);
+    await test_long_file('Using ipfs add on standard deploy', 'QmRfcgjWEWdzKBnnSYwmV7Kt5wVVuWZvLm96o4dj7myWuy', 321761);
     console.log('---- finished --- ')
 }
 
