@@ -8,10 +8,10 @@ This expanded in use to make it easier to use HTML in as unchanged form from exi
  */
 import RenderMedia from 'render-media';
 import throttle from "throttleit";
-import prettierBytes from "prettier-bytes";
-import ArchiveFile from "./ArchiveFile";
-import Util from "./Util";
 import from2 from "from2";
+import prettierBytes from "prettier-bytes";
+const Url = require('url');
+import ArchiveFile from "./ArchiveFile";
 const Transportable = require('../js/Transportable');
 const Transports = require('../js/Transports');
 const Domain = require('../js/Domain');
@@ -33,7 +33,56 @@ function deletechildren(el, keeptemplate) { //Note same function in htmlutils
 
 export default class React  {
 
-    static async p_loadImg(jsx, name, urls, cb) {
+    static relativeurl(r, url) {
+        /* Convert a relative url into a real one based on a possible base URL
+            r       Url to try and go relative to
+            url     Relative URL of form ./xyz
+            returns a url relative to r, or undefined if dont have one
+        */
+        let l = Url.parse(r); // Parse url into a Url structure
+        if (["https:","http:","file:"].includes(l.protocol)
+            || (l.path.startsWith('/ipfs/')  && (l.lastIndexOf('/') > l.indexOf("/ipfs/")+5))
+            ) {
+            return  r.substr(0, r.lastIndexOf('/'))+url.substr(1);
+        }
+        return undefined
+    }
+    static async p_urlsFromName(name) {
+        // Try and resolve a name, return array of urls which will be empty if not resolved (which is quite likely if relative name not defined)
+        name = name.replace("dweb:/",""); // Strip leading dweb:/ before resolving in root
+        const res = await Domain.p_rootResolve(name, {verbose});     // [ Leaf object, remainder ] //TODO-NAME see comments in p_rootResolve about FAKEFAKEFAKE
+        if (!(res[0] && (res[0].name === name) && !res[1] )) {
+            return undefined
+        }
+        return res[0].urls;
+    }
+    static async p_resolveNames(urls) {
+        // Turn an array of urls into another array, resolving any names if possible
+        return [].concat(...await Promise.all(urls.map(u => u.startsWith("dweb:/arc")  ? this.p_urlsFromName(u) : [u])))
+    }
+    static async p_resolveUrls(url, rel) { //TODO-RELATIVEURLS see also TODO-SERVICES-IMG
+        /*
+        url:   Array or Single url, each could be relative("./foo.jpg", or root relative ("/images.foo.jpg") and could also be a ArchiveFile
+        resolves:   Array of URLs suitable for passing to Transports
+         */
+        if (Array.isArray(url)) {
+            let urls = await Promise.all(url.map(u => this.p_resolveUrls(u, rel)));    // Recurse urls is now array of arrays (most of which will probably be single value
+            return [].concat(...urls);  // Flatten, for now accept there might be dupes
+        }
+        // Its now a singular URL
+        if (url instanceof ArchiveFile) {
+            return await url.p_urls();  // This could be slow, may have to get the gateway to cache the file in IPFS
+        } else if (url.startsWith("/")) {    //TODO-RELATIVEURLS could genericise to use rel instead of config
+            if (!React._config.root) console.error("Need to React.config({root: 'https://xyz.abc'");
+            return [React._config.root + url];  // e.g. /foo => [https://bar.com/foo]
+        } else if (url.startsWith("./")) {
+            return rel.map(r => this.relativeurl(r, url)).filter(u => !!u);
+        } else {
+            return url; // Not relative, just pass it back
+        }
+    }
+
+    static async p_loadImg(jsx, name, urls, cb, rel) {
         /*
         This is the asyncronous part of loadImg, runs in the background to update the image.
         Previous version got a static (non stream) content and puts in an existing IMG tag but this fails in Firefox
@@ -52,14 +101,18 @@ export default class React  {
         jsx.src = objectURL;
         //TODO-SERVICES-IMG make this get smart about kinds of urls e.g. if http or IPFS then skip the createstream and load the image
         */
-        if (verbose) console.log("Loading Image");
-        if (urls instanceof ArchiveFile) {
-            urls = await urls.p_urls();   // This could be slow, may have to get the gateway to cache the file in IPFS
-        }
+        if (verbose) console.log(`Loading Image ${urls}`);
+        urls = await this.p_resolveUrls(urls, rel);
+        urls = await this.p_resolveNames(urls); // TODO-RELATIVEURLS for now resolve names as transports cant yet handle dweb:/arc
         const validCreateReadStream = Transports.validFor(urls, "createReadStream").length;
-        // Two options - depending on whether can do a stream well (WEBSOCKET) or not (HTTP, IPFS)
-        if (validCreateReadStream) {
-
+        // Three options - depending on whether can do a stream well (WEBSOCKET) or not (HTTP, IPFS); or local (File:)
+        if (urls[0].startsWith("file:")) {
+            // This should only happen if the original script was loaded from local disk
+            let el = document.createElement("img");
+            el.setAttribute("src", urls[0]);
+            cb(undefined, el);  // Set attributes (shouldnt have kids)
+            jsx.appendChild(el);
+        } else if (validCreateReadStream) {
             const file = {
                 name: name,
                 createReadStream: function (opts) {
@@ -69,7 +122,7 @@ export default class React  {
 
                     return Transports.createReadStream(urls, opts, verbose)
                 }
-            }
+            };
 
             RenderMedia.append(file, jsx, cb);  // Render into supplied element - have to use append, as render doesnt work, the cb will set attributes and/or add children.
         } else {
@@ -79,38 +132,25 @@ export default class React  {
             const file = {
                 name: name,
                 createReadStream: function (opts) {
-                    if (!opts) opts = {}
+                    if (!opts) opts = {};
                     return from2([buff.slice(opts.start || 0, opts.end || (buff.length - 1))])
                 }
-            }
+            };
             RenderMedia.append(file, jsx, cb);  // Render into supplied element - have to use append, as render doesnt work, the cb will set attributes and/or add children.
         }
     }
 
-    static loadImg(name, urls, cb) {
+    static loadImg(name, urls, cb, rel) { //TODO-RELATIVE make sure all uses pass rel
         //asynchronously loads file from one of metadata, turns into blob, and stuffs into element
         // urls can be a array of URLs of an ArchiveFile (which is passed as an ArchiveFile because ArchiveFile.p_urls() is async as may require expanding metadata
         // Usage like  {this.loadImg(<img width=10>))
-        var element = document.createElement("div");
-        this.p_loadImg(element, name, urls, cb); /* Asynchronously load image under element - note NOT awaiting return*/
+        const element = document.createElement("span");
+        // noinspection JSIgnoredPromiseFromCall
+        this.p_loadImg(element, name, urls, cb, rel); /* Asynchronously load image under element - note NOT awaiting return*/
         return element;
     }
 
-    static async p_loadImgByName(name, cb) {
-        // Load an image by resolving its name, this was tested but isnt currently used as including urls of thumbnails in metadata
-        //TODO-SERVICES-IMG this code might move elsewhere, since static it should be easy.
-        //TODO-SERVICES-IMG Note similar code in ArchiveItem.fetch to get metadata
-        if (verbose) console.log('getting image for',name); //Dont use console.group because happening in parallel
-        const transports = Transports.connectedNamesParm(); // Pass transports, as metadata (currently) much quicker if not using IPFS
-        const res = await Domain.p_rootResolve(name, {verbose});     // [ Leaf object, remainder ] //TODO-NAME see comments in p_rootResolve about FAKEFAKEFAKE
-        if (!(res[0] && (res[0].name === name) && !res[1] )) {
-            throw new Error(`Unable to resolve ${name}`);
-        }
-        el = this.loadImg(name, res[0].urls, cb);
-        return el;
-    }
-
-    static async p_loadStream(jsx, name, urls, cb) {
+    static async p_loadStream(jsx, name, urls, cb) { //TODO-RELATIVE adapt code from loadImg
         //More complex strategy. ....
         //If the Transports supports urls/createReadStream (webtorrent only at this point) then load it.
         //If its a HTTP URL use that
@@ -118,7 +158,7 @@ export default class React  {
         try {
             const validCreateReadStream = Transports.validFor(urls, "createReadStream").length;
             if (validCreateReadStream) {
-                var file = {
+                const file = {
                     name: name,
                     createReadStream: function (opts) {
                         // Return a readable stream that provides the bytes between offsets "start"
@@ -127,12 +167,12 @@ export default class React  {
 
                         return Transports.createReadStream(urls, opts, verbose)
                     }
-                }
+                };
 
                 RenderMedia.render(file, jsx, cb);  // Render into supplied element
 
                 if (window.WEBTORRENT_TORRENT) {
-                    const torrent = window.WEBTORRENT_TORRENT
+                    const torrent = window.WEBTORRENT_TORRENT;
 
                     const updateSpeed = () => {
                         if (window.WEBTORRENT_TORRENT === torrent) {    // Check still displaying ours
@@ -150,11 +190,11 @@ export default class React  {
                                 webtorrentStats.appendChild(els);
                             }
                         }
-                    }
+                    };
 
                     torrent.on('download', throttle(updateSpeed, 250));
                     torrent.on('upload', throttle(updateSpeed, 250));
-                    setInterval(updateSpeed, 1000)
+                    setInterval(updateSpeed, 1000);
                     updateSpeed(); //Do it once
                 }
             } else {
@@ -170,10 +210,10 @@ export default class React  {
                     const file = {
                         name: name,
                         createReadStream: function (opts) {
-                            if (!opts) opts = {}
+                            if (!opts) opts = {};
                             return from2([buff.slice(opts.start || 0, opts.end || (buff.length - 1))])
                         }
-                    }
+                    };
                     RenderMedia.render(file, jsx, cb);  // Render into supplied element
                 }
             }
@@ -186,6 +226,7 @@ export default class React  {
     static loadStream(jsx, name, urls, cb) {
         //asynchronously loads file from one of metadata, turns into blob, and stuffs into element
         // usage like <VIDEO src=<ArchiveFile instance>  >
+        // noinspection JSIgnoredPromiseFromCall
         this.p_loadStream(jsx, name, urls, cb); /* Asynchronously load image, intentionally not waiting for it to complete*/
         return jsx;
     }
@@ -208,38 +249,39 @@ export default class React  {
         /* First we handle cases where we dont actually build the tag requested */
 
         const kids = Array.prototype.slice.call(arguments).slice(2);
+        const rel = [ window.location.href ]; // TODO-RELATIVE figure out how to get name here maybe hard code !
         
         function cb(err, element) {
             if (err) {
                 console.log("Caught error in createElement callback in loadImg",err.message);
                 throw err;
             }
-            React.buildoutElement(element, tag, attrs, kids);
+            React.setAttributes(element, tag, attrs);
+            React.addKids(element, kids);
+            return element;
         }
-        if (tag === "img" && Object.keys(attrs).includes("src") && attrs["src"] instanceof ArchiveFile) {
-            //Its an image loaded from an ArchiveFile, so wrap in a DIV and pass children and attrs to renderer
-            const af = attrs.src;
-            delete attrs.src;   // Make sure dont get passed to cb for building into img (which wont like an array)
-            return this.loadImg(af.name(), af, cb);   //Creates a <div></div>, asynchronously creates an <img> under it and calls cb on that IMG. The <div> is returned immediately.
-        } else if (tag === "img" && Object.keys(attrs).includes("src") && Array.isArray(attrs["src"])) {
-            const urls = attrs.src;
-            delete attrs.src;   // Make sure dont get passed to cb for building into img (which wont like an array)
-            return this.loadImg(attrs["imgname"] || "DummyName.PNG", urls, cb);   //Creates a <div></div>, asynchronously creates an <img> under it and calls cb on that IMG. The <div> is returned immediately.}
-        } else if (tag === "img" && Object.keys(attrs).includes("src") && (attrs["src"].startsWith('dweb:/arc') )) {
-            //TODO-SERVICES-IMG check this once called
-            const name = attrs["src"]
-                .replace('https://archive.org/','/arc/archive.org/')
-                .replace('dweb:/','');
-            return this.p_loadImgByName(name, cb);   //Creates a <div></div>, asynchronously creates an <img> under it and calls cb on that IMG. The <div> is returned immediately.
+        if (tag === "img") {
+            if (Object.keys(attrs).includes("src")) {
+                // <IMG src=ArchiveFile >
+                //Its an image loaded from an ArchiveFile, so wrap in a DIV and pass children and attrs to renderer
+                const src = attrs.src;
+                const name = attrs["imgname"]
+                    ? attrs["imgname"]
+                    : ( (src instanceof ArchiveFile) ? src.name() : "DummyName.PNG");
+                delete attrs.src;   // Make sure dont get passed to cb for building into img (which wont like an array)
+                return this.loadImg(name, src, cb, rel);   //Creates a <div></div>, asynchronously creates an <img> under it and calls cb on that IMG. The <div> is returned immediately.
+            }
         } else {
-            return this.buildoutElement(document.createElement(tag), tag, attrs, kids);
+            let element = document.createElement(tag);
+            React.setAttributes(element, tag, attrs);
+            React.addKids(element, kids);
+            return element;
         }
     }
-    static buildoutElement(element, tag, attrs, kids) {
+    static setAttributes(element, tag, attrs) {
         /* Build out a created element adding Attributes and Children
         tag:    Lower case string of element e.g. "img"
         attrs:  Object {attr: value}
-        kids:   Array of children
         /* This is called back by loadImg after creating the tag. */
         for (let name in attrs) {
             const attrname = (name.toLowerCase() === "classname" ? "class" : name);
@@ -247,8 +289,13 @@ export default class React  {
                 element.innerHTML = attrs[name]["__html"];
                 delete attrs.dangerouslySetInnerHTML;
             }
-            // Turn relative URLS in IMG and A into absolute urls - ideally these are also caught by special cases
+            // Turn root-relative URLS in IMG and A into absolute urls - ideally these are also caught by special cases (note don't appear to be any of these in most code)
             if (["img.src", "a.href"].includes(tag + "." + name) && (typeof attrs[name] === "string") && attrs[name].startsWith('/')) {
+                if (!React._config.root) console.error("Need to React.config({root: 'https://xyz.abc'");
+                attrs[name] = React._config.root + attrs[name];  // e.g. /foo => https://bar.com/foo
+            }
+            // Turn root-relative URLS in IMG and A into absolute urls - ideally these are also caught by special cases (note don't appear to be any of these in most code)
+            if (["img.src", "a.href"].includes(tag + "." + name) && (typeof attrs[name] === "string") && attrs[name].startsWith('./')) {
                 if (!React._config.root) console.error("Need to React.config({root: 'https://xyz.abc'");
                 attrs[name] = React._config.root + attrs[name];  // e.g. /foo => https://bar.com/foo
             }
@@ -276,6 +323,12 @@ export default class React  {
                 }
             }
         }
+        return element;
+    }
+    static addKids(element, kids) {
+        /* add kids to a created element
+        kids:   Array of children
+        /* This is called back by loadImg after creating the tag. */
         for (let i = 0; i < kids.length; i++) {
             const child = kids[i];
             if (!child) {
@@ -300,4 +353,4 @@ export default class React  {
 //Default configuration
 React._config = {
     root: "https://archive.org",
-}
+};
