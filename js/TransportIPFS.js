@@ -113,6 +113,7 @@ class TransportIPFS extends Transport {
             if (verbose) console.log("IPFS starting and connecting");
             this.status = Transport.STATUS_STARTING;   // Should display, but probably not refreshed in most case
             await this.p_ipfsstart(verbose);    // Throws Error("websocket error") and possibly others.
+            this.status =  (await this.ipfs.isOnline()) ? Transport.STATUS_CONNECTED : Transport.STATUS_FAILED;
         } catch(err) {
             console.error("IPFS failed to connect",err);
             this.status = Transport.STATUS_FAILED;

@@ -4,7 +4,7 @@ import Util from "./Util";
 require('babel-core/register')({ presets: ['env', 'react']}); // ES6 JS below!
 const Transportable = require('../js/Transportable');
 const Transports = require('../js/Transports');
-const Domain = require('../js/Domain');
+const Domain = require('../js/Domain');     // So can resolve names like dweb:/arc
 const utils = require('../js/utils');
 //TODO-NAMING url could be a name
 
@@ -63,14 +63,8 @@ export default class ArchiveItem {
                 this.item = await Util.fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}?${transports}`);
             */
             // Fetch via Domain record
-            const name = `arc/archive.org/metadata/${this.itemid}`;
-            const res = await Domain.p_rootResolve(name, {verbose});     // [ Leaf object, remainder ]
-            //TODO-NAME note p_resolve is faking signature verification on FAKEFAKEFAKE - will also need to error check that which currently causes exception
-            if (!res[0]) {
-                throw new Error(`Unable to resolve ${name}`);
-            }
-            console.assert((res[0].name === this.itemid) && !res[1]);
-            let m = await Transportable.p_fetch(res[0].urls, {verbose, timeoutMS: 5000}); // Using Transportable as its multiurl and might not be HTTP urls
+            const name = `dweb:/arc/archive.org/metadata/${this.itemid}`;
+            let m = await Transportable.p_fetch([name], {verbose, timeoutMS: 5000}); // Using Transportable as its multiurl and might not be HTTP urls
             m = utils.objectfrom(m);
             console.assert(m.metadata.identifier === this.itemid);
             this.item = m;

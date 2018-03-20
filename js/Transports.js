@@ -45,9 +45,13 @@ class Transports {
                             .map((t) => [url, t]))); // [[ u, t1], [u, t2]]
         }
     }
+    static http(verbose) {
+        // Find an http transport if it exists, so for example YJS can use it.
+        return Transports._connected().find((t) => t.name === "HTTP")
+    }
     static ipfs(verbose) {
         // Find an ipfs transport if it exists, so for example YJS can use it.
-        return Transports._transports.find((t) => t.name === "IPFS")
+        return Transports._connected().find((t) => t.name === "IPFS")
     }
 
     static async p_resolveNames(urls) {

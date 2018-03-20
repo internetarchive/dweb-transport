@@ -324,6 +324,24 @@ class Domain extends KeyValueTable {
         if (verbose) console.log(await this.root.p_printable());
     }
 
+    static async p_resolveNames(name, {verbose=false}={}) {
+        /* Turn an array of urls into another array, resolving any names if possible and leaving other URLs untouched
+        /* Try and resolve a name,
+        name:   One, or an array of Names of the form dweb:/ especially dweb:/arc/archive.org/foo
+        resolves to:    [ url ]  Array of urls which will be empty if not resolved (which is quite likely if relative name not defined)
+        */
+        if (Array.isArray(name)) {
+            // Note can't use "this" in here, as since its passed as a callback to Transports, "this" is Transports
+            return [].concat(...await Promise.all(name.map(u => u.startsWith("dweb:/arc") ? Domain.p_resolveNames(u, {verbose}) : [u])))
+        } else {
+            name = name.replace("dweb:/", ""); // Strip leading dweb:/ before resolving in root
+            const res = await Domain.p_rootResolve(name, {verbose});     // [ Leaf object, remainder ] //TODO-NAME see comments in p_rootResolve about FAKEFAKEFAKE
+            if (!(res[0] && (res[0].name === name.split('/').splice(-1)[0]) && !res[1])) {
+                return undefined
+            }
+            return res[0].urls;
+        }
+    }
 
     static async p_test(verbose) {
         if (verbose) console.log("KeyValueTable testing starting");
@@ -396,6 +414,19 @@ class Domain extends KeyValueTable {
             throw(err)
         }
     }
+    static async p_test_gateway(opts={}, verbose=false) {
+        // Has to be tested against the gateway, not localhost
+        if (verbose) {console.log("Domain.p_test_gateway")}
+        try {
+            Domain.root = undefined; // Clear out test root
+            if (verbose) console.log("NAMES connected");
+            let res = await this.p_resolveNames(["dweb:/arc/archive.org/metadata/commute"], {verbose});
+            console.assert(res.includes("https://gateway.dweb.me/metadata/archiveid/commute"))
+        } catch(err) {
+            console.log("Exception thrown in Domain.p_test_gateway:", err.message);
+            throw err;
+        }
+    }
 
 
 }
@@ -404,5 +435,5 @@ SignatureMixin.call(Domain.prototype, ["tablepublicurls", "name", "keys", "expir
 
 Domain.clsLeaf = Leaf;  // Just So exports can find it and load into Dweb TODO move to own file
 SmartDict.table2class["domain"] = Domain;
-
+Transports.resolveNamesWith(Domain.p_resolveNames)
 exports = module.exports = Domain;

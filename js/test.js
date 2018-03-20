@@ -22,7 +22,6 @@ const KeyChain = require('./KeyChain'); // Hold a set of keys, and locked object
 const AccessControlList = require('./AccessControlList'); // Parent of list classes
 const VersionList = require('./VersionList'); // Hold a list that manages versions of something
 const Domain = require('./Domain');
-const TransportNAME = require('./TransportNAME');   // Note different structure than other transports, and load late as depends on Domain
 
 /*
     This file is intended to be run under node, e.g. "node test.js" to test as many features as possible.
@@ -71,7 +70,12 @@ async function p_test(verbose) {
         console.log("------END OF PREVIOUS TESTING PAUSING=====");
         await delay(1000);
         console.log("------AWAITED ANY BACKGROUND OUTPUT STARTING NEXT TEST =====");
-        await TransportNAME.p_test(verbose);
+        verbose=true;
+        let t = Transports.http();
+        turlbaseold = t.urlbase;
+        t.urlbase = "https://gateway.dweb.me:443";  // Switchc to real gateway to test resolution
+        await Domain.p_test_gateway(verbose);
+        t.urlbase = turlbaseold;
         console.log("------END OF NEW TESTING PAUSING=====");
         await delay(1000);
         console.log("------AND FINISHED WAITING =====");
