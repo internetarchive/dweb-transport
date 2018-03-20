@@ -50,6 +50,21 @@ class Transports {
         return Transports._transports.find((t) => t.name === "IPFS")
     }
 
+    static async p_resolveNames(urls) {
+        /* If and only if TransportNAME was loaded (it might not be as it depends on higher level classes like Domain and SmartDict)
+            then resolve urls that might be names, returning a modified array.
+         */
+        if (this.namingcb) {        //
+            return await this.namingcb(urls);  // Array of resolved urls
+        } else {
+            return urls;
+        }
+    }
+    static resolveNamesWith(cb) {
+        // Set a callback for p_resolveNames
+        this.namingcb = cb;
+    }
+
     static async _p_rawstore(tt, data, verbose) {
         // Internal method to store at known transports
         let errs = [];
@@ -83,6 +98,7 @@ class Transports {
         return this._p_rawstore(tt, data, verbose);
     }
     static async p_rawlist(urls, verbose) {
+        urls = await this.p_resolveNames(urls); // If naming is loaded then convert to a name
         let tt = this.validFor(urls, "list"); // Valid connected transports that support "store"
         if (!tt.length) {
             throw new errors.TransportError('Transports.p_rawlist: Cant find transport for urls:'+urls.join(','));
@@ -120,6 +136,7 @@ class Transports {
         throws:     TransportError with concatenated error messages if none succeed.
          */
         let verbose = opts.verbose;
+        urls = await this.p_resolveNames(urls); // If naming is loaded then convert to a name
         let tt = this.validFor(urls, "fetch"); //[ [Url,t],[Url,t]]
         if (!tt.length) {
             throw new errors.TransportError("Transports.p_fetch cant find any transport for urls: " + urls);
@@ -157,6 +174,7 @@ class Transports {
         throws: TransportError with message being concatenated messages of transports if NONE of them succeed.
          */
         //TODO-MULTI-GATEWAY might be smarter about not waiting but Promise.race is inappropriate as returns after a failure as well.
+        urls = await this.p_resolveNames(urls); // If naming is loaded then convert to a name
         let tt = this.validFor(urls, "add"); // Valid connected transports that support "store"
         if (!tt.length) {
             throw new errors.TransportError('Transports.p_rawstore: Cant find transport for urls:'+urls.join(','));
@@ -184,6 +202,7 @@ class Transports {
         /*
         Add a listmonitor for each transport - note this means if multiple transports support it, then will get duplicate events back if everyone else is notifying all of them.
          */
+        // Note cant do p_resolveNames since sync but should know real urls of resource by here.
         this.validFor(urls, "listmonitor")
             .map(([u, t]) => t.listmonitor(u, cb));
     }
@@ -200,6 +219,7 @@ class Transports {
     // Stream handling ===========================================
 
     static createReadStream(urls, options, verbose) {
+        //Cant do this, this routine is sync .... urls = await this.p_resolveNames(urls); // If naming is loaded then convert to a name
         let tt = this.validFor(urls, "createReadStream", options); //[ [Url,t],[Url,t]]  // Passing options - most callers will ignore TODO-STREAM support options in validFor
         if (!tt.length) {
             throw new errors.TransportError("Transports.p_createReadStream cant find any transport for urls: " + urls);
@@ -252,6 +272,7 @@ class Transports {
          value: if kv is a string, this is the value to set
         throws: TransportError with message being concatenated messages of transports if NONE of them succeed.
         */
+        urls = await this.p_resolveNames(urls); // If naming is loaded then convert to a name
         let tt = this.validFor(urls, "set"); //[ [Url,t],[Url,t]]
         if (!tt.length) {
             throw new errors.TransportError("Transports.p_set cant find any transport for urls: " + urls);
@@ -278,6 +299,7 @@ class Transports {
          value: if kv is a string, this is the value to set
         throws: TransportError with message being concatenated messages of transports if NONE of them succeed.
         */
+        urls = await this.p_resolveNames(urls); // If naming is loaded then convert to a name
         let tt = this.validFor(urls, "set"); //[ [Url,t],[Url,t]]
         if (!tt.length) {
             throw new errors.TransportError("Transports.p_set cant find any transport for urls: " + urls);
@@ -305,6 +327,7 @@ class Transports {
         returns:	string - arbitrary bytes retrieved or dict of key: value
         throws:     TransportError with concatenated error messages if none succeed.
          */
+        urls = await this.p_resolveNames(urls); // If naming is loaded then convert to a name
         let tt = this.validFor(urls, "keys"); //[ [Url,t],[Url,t]]
         if (!tt.length) {
             throw new errors.TransportError("Transports.p_keys cant find any transport for urls: " + urls);
@@ -331,6 +354,7 @@ class Transports {
         returns:	array of strings returned for the keys. //TODO consider issues around return a data type rather than array of strings
         throws:     TransportError with concatenated error messages if none succeed.
          */
+        urls = await this.p_resolveNames(urls); // If naming is loaded then convert to a name
         let tt = this.validFor(urls, "getall"); //[ [Url,t],[Url,t]]
         if (!tt.length) {
             throw new errors.TransportError("Transports.p_getall cant find any transport for urls: " + urls);
@@ -375,6 +399,7 @@ class Transports {
         /*
         Do any asynchronous connection opening work prior to potentially synchronous methods (like monitor)
          */
+        urls = await this.p_resolveNames(urls); // If naming is loaded then convert to a name
         await Promise.all(
             this.validFor(urls, "connection")
             .map(([u, t]) => t.p_connection(u, verbose)));
@@ -385,6 +410,7 @@ class Transports {
         Add a listmonitor for each transport - note this means if multiple transports support it, then will get duplicate events back if everyone else is notifying all of them.
         Stack: KVT()|KVT.p_new => KVT.monitor => (a: Transports.monitor => YJS.monitor)(b: dispatchEvent)
          */
+        //Cant' its async. urls = await this.p_resolveNames(urls); // If naming is loaded then convert to a name
         this.validFor(urls, "monitor")
             .map(([u, t]) => t.monitor(u, cb, verbose));
     }
@@ -482,6 +508,7 @@ class Transports {
 
 }
 Transports._transports = [];    // Array of transport instances connected
+Transports.namingcb = undefined;
 Transports._transportclasses = {};  // Pointers to classes whose code is loaded.
 
 exports = module.exports = Transports;

@@ -349,6 +349,7 @@ class SmartDict extends Transportable {
         } else {
             opts = verboseOrOpts;
         }
+        let verbose = opts.verbose;
 
         try {
             if (verbose) console.log("SmartDict.p_fetch", urls);
@@ -388,7 +389,7 @@ class SmartDict extends Transportable {
 
 }
 
-SmartDict.decryptdb = undefined;
+SmartDict.decryptcb = undefined;
 SmartDict.table2class = { // Each of these needs a constructor that takes data and is ok with no other parameters, (otherwise define a set of these methods as factories)
     "sd": SmartDict
 }
