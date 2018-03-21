@@ -247,7 +247,7 @@ class TransportIPFS extends Transport {
     }
 
     createReadStream(url, opts = {}, verbose = false) {
-        //TODO-API needs documentation and API update
+        //TODO-API needs documentation and API update when working
         //TODO-STREAMS untested - doesnt work since cant seek into streams.
         if (verbose) console.log("TransportIPFS:createReadStream:%o, %o", url, opts);
         if (!url) throw new errors.CodingError("TransportIPFS.p_rawfetch: requires url");

@@ -36,11 +36,12 @@ class KeyValueTable extends PublicPrivate {
         this._map = this._map || {};
     }
 
-    static async p_new(data, master, key, verbose, options) { //TODO-API
-        // p_fetch is standard via SmartDict - gets passed to TransportYJS etc which returns a dict which goes to constructor
-        // options: {
-        //  keyvaluetable   Which table at the DB to store this in
-        //  seedurls        extra urls to use for tablepublicurls, typically a http server
+    static async p_new(data, master, key, verbose, options) {
+        /*
+            options: {
+            keyvaluetable   Which table at the DB to store this in
+            seedurls        extra urls to use for tablepublicurls, typically a http server
+        */
         const keyvaluetable = options.keyvaluetable;  // Dont store this, use it to generate newtable
         delete options.keyvaluetable;
         const seedurls = options.seedurls || [];
@@ -62,12 +63,14 @@ class KeyValueTable extends PublicPrivate {
         return fieldtypes[propname] || super.objbrowser_fields(propname);
     }
 
-    _storageFromMap(mapVal, {publicOnly=false, encryptIfAcl=true}={}) { //TODO-API
+    _storageFromMap(mapVal, {publicOnly=false, encryptIfAcl=true}={}) {
         /*
         Convert a value as stored on a transport medium into a value suitable for the _map dictionary. Pair of _storageFromMap.
         This is working from the assumption that the underlying transport needs a JSON string to store.
         If change that assumption - and store Objects - then these two functions should be only place that needs changing.
         This pair should be able to be subclassed safely as long as _mapFromStorage(_storageFromMap(x)) == x for your definition of equality.
+        publicOnly  If true massage the data to store a safe value
+        encryptIfAcl    If true, and there is an acl field, then use the encryption process before storing
          */
         if (mapVal instanceof Transportable) {
             return mapVal._getdata({publicOnly, encryptIfAcl});               // This should also take care of not storing unencrypted private keys, and encrypting if requested.
@@ -75,7 +78,7 @@ class KeyValueTable extends PublicPrivate {
             return JSON.stringify(mapVal)
         }
     }
-    _mapFromStorage(storageVal, verbose=false) { //TODO-API
+    _mapFromStorage(storageVal, verbose=false) {
         /*
         Convert a value as stored in the storage dictionary into a value suitable for the map. Pair of _storageFromMap.
          */
@@ -107,7 +110,15 @@ class KeyValueTable extends PublicPrivate {
 
 
 
-    async p_set(name, value, {verbose=false, publicOnly=false, encryptIfAcl=true, fromNet=false}={}) {  //TODO-API
+    async p_set(name, value, {verbose=false, publicOnly=false, encryptIfAcl=true, fromNet=false}={}) {
+        /* Set a value to a named key in the table setup during creating of this KeyValueTable
+            name            of key to store under
+            value           value to store
+            publicOnly      If true massage the data to store a safe value
+            encryptIfAcl    If true, and there is an acl field, then use the encryption process before storing
+            fromNet         If true this data came from a notification from the net, store locally but don't send back to net
+
+         */
         // Subclased in Domain to avoid overwriting private version with public version from net
         //TODO-KEYVALUE these sets need to be signed if the transport overwrites the previous, rather than appending
         //TODO-KEYVALUE the difference is that if appended, then an invalid signature (if reqd) in the value would cause it to be discarded.
@@ -125,8 +136,9 @@ class KeyValueTable extends PublicPrivate {
         Object.keys(res).map(key => { try { this._map[key] = this._mapFromStorage(res[key])} catch(err) { console.log("Not updating",key)} } );
     }
     async p_get(keys, verbose) {
-        /*
+        /*  Get the value stored at a key
         keys:   single key or array of keys
+        returns:    single result or dictionary, will convert from storage format
          */
         if (!Array.isArray(keys)) { // Handle single by doing plural and returning the key
             return (await this.p_get([keys], verbose))[keys]

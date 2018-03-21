@@ -198,7 +198,7 @@ function transportclick(el) { // Similar routines to this could display status, 
     t.togglePaused();
     refresh_transportstatuses("transportstatuses");
 }
-async function p_connect(options) { //TODO-API its defaulttransports
+async function p_connect(options) {
     /*
         This is a standardish starting process, feel free to copy and reuse !
         options = { defaulttransports: ["IPFS"]; }
