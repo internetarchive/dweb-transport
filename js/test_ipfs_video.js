@@ -129,7 +129,7 @@ async function test_ipfs() {
 	//await test_long_file('Smaller 22Mb video sent 2018-03-13', 'zdj7WaHjDtE2e7g614UfXNwyrBwRUd6JkujRsLc9M2ufozLct', 22207578);
 	//await test_long_file('Using ipfs add', 'QmUrp54J5E2jxf8stDiCa56uXASjqHeX2oFWSx35qRE4SV', 0);
 	//await test_long_file('Using curl urlstore add', 'zdj7WkPCyjRgfCAMosMxCx8UhtW6rZvPNRsxCzg3mrxTLRVBr', 321761);
-    await test_long_file('Using ipfs add on standard deploy', 'QmRfcgjWEWdzKBnnSYwmV7Kt5wVVuWZvLm96o4dj7myWuy', 321761);
+    await test_long_file('Using ipfs add on standard deploy', 'QmRfcgjWEWdzKBnnSYwmV7Kt5wVVuWZvLm96o4dj7myWuy', 321761);    // Same file as above
     console.log('---- finished --- ')
 }
 

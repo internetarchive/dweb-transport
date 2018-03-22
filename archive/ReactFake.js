@@ -143,6 +143,7 @@ export default class React  {
         //If its a HTTP URL use that
         //Dont try and use IPFS till get a fix for createReadStream
         try {
+            //urls = [ 'ipfs:/ipfs/QmRfcgjWEWdzKBnnSYwmV7Kt5wVVuWZvLm96o4dj7myWuy']  - TODO delete this line once Kyle fixes files.cat for urlstored files - this replaces all with a test video
             urls = await this.p_resolveUrls(urls, rel); // Allow relative urls
             urls = await Transports.p_resolveNames(urls); // Allow names among urls
             const validCreateReadStream = Transports.validFor(urls, "createReadStream").length;

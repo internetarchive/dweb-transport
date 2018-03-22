@@ -11,12 +11,12 @@ const CID = require('cids');
 const dagPB = require('ipld-dag-pb');
 // noinspection Annotator
 const DAGNode = dagPB.DAGNode; // So can check its type
-const stream = require('readable-stream');  // Needed for the pullthrough - this is NOT Ipfs streams
 const unixFs = require('ipfs-unixfs');
 
 // Library packages other than IPFS
 const Url = require('url');
-const through = require('through');
+const stream = require('readable-stream');  // Needed for the pullthrough - this is NOT Ipfs streams
+// Alternative to through - as used in WebTorrent
 
 // Utility packages (ours) And one-liners
 const promisify = require('promisify-es6');
@@ -61,7 +61,7 @@ class TransportIPFS extends Transport {
         this.options = options;         // Dictionary of options { ipfs: {...}, "yarrays", yarray: {...} }
         this.name = "IPFS";             // For console log etc
         this.supportURLs = ['ipfs'];
-        this.supportFunctions = ['fetch', 'store', 'createReadStream'];   // Does not support reverse, createReadStream fails as cant seek
+        this.supportFunctions = ['fetch', 'store'];   // Does not support reverse, createReadStream fails on files uploaded with urlstore TODO reenable when Kyle fixes urlstore
         this.status = Transport.STATUS_LOADED;
     }
 
@@ -231,6 +231,7 @@ class TransportIPFS extends Transport {
                 // Works on Node, but fails on Chrome, cant figure out how to get data from the DAGNode otherwise (its the wrong size)
                 //buff = await utils.p_streamToBuffer(await this.ipfs.files.cat(cid), true); //js-ipfs v0.26 version
                 buff = await this.ipfs.files.cat(ipfspath); //See js-ipfs v0.27 version and  https://github.com/ipfs/js-ipfs/issues/1229 and https://github.com/ipfs/interface-ipfs-core/blob/master/SPEC/FILES.md#cat
+
                 /* Was needed on v0.26, not on v0.27
                 if (buff.length === 0) {    // Hit the Chrome bug
                     // This will get a file padded with ~14 bytes - 4 at front, 4 at end and cant find the other 6 !
@@ -299,9 +300,8 @@ class TransportIPFS extends Transport {
                     streamPosition += bytesInLinkedObjectData;
                 } else {
                     let lmh = link.multihash;
-                    console.log("XXX@285", lmh);
                     let data;
-                    this.ipfs.object.data(lmh)
+                    await this.ipfs.object.data(lmh)
                         .then ((d) => unixFs.unmarshal(d).data)
                         .then ((d) => data = d )
                         .catch((err) => {console.log("XXX@289 err=",err);});
@@ -311,6 +311,7 @@ class TransportIPFS extends Transport {
                         // If the startByte is in the current block, skip to the startByte
                         data = data.slice(startByte - streamPosition);
                     }
+                    console.log(`Writing ${data.length} to stream`)
                     stream.write(data);
                     streamPosition += length;
                 }
@@ -319,25 +320,29 @@ class TransportIPFS extends Transport {
             console.log(err.message);
         }
     }
-    async p_f_createReadStream(url, verbose=false) {  // Asynchronously return a function that can be used in createReadStream
+    async p_f_createReadStream(url, verbose=false) {  // Asynchronously return a function that can be used in createReadStream  TODO-API
         verbose = true;
         if (verbose) console.log("p_f_createReadStream",url);
         const mh = TransportIPFS.multihashFrom(url);
         const links = await this.ipfs.object.links(mh)
-        let stream;  //Holds pointer to stream between calls.
+        let throughstream;  //Holds pointer to stream between calls.
         const self = this;
         function crs(opts) {    // This is a synchronous function
             // Return a readable stream that provides the bytes between offsets "start" and "end" inclusive
-            if (!opts)  return stream; //TODO-STREAM unclear why called without opts - take this out when figured out
-            if (stream && stream.destroy) stream.destroy();
-            stream = through();
             console.log("opts=",JSON.stringify(opts));
-            self.p_offsetStream(       // Ignore promise returned
-                stream,
+            /* Can replace rest of crs with this when https://github.com/ipfs/js-ipfs/pull/1231/files lands (hopefully v0.28.3)
+            return self.ipfs.catReadableStream(mh, opts ? opts.start : 0, opts && opts.end) ? opts.end+1 : undefined)
+            */
+            if (!opts)  return throughstream; //TODO-STREAM unclear why called without opts - take this out when figured out
+            if (throughstream && throughstream.destroy) throughstream.destroy();
+            throughstream = new stream.PassThrough();
+
+            self.p_offsetStream(       // Ignore promise returned, this will right to the stream asynchronously
+                throughstream,
                 links,          // Uses the array of links created above in this function
                 opts ? opts.start : 0, //TODO-STREAM may change
                 (opts && opts.end) ? opts.end : undefined);
-            return stream;
+            return throughstream;
         }
         return crs;
     }

@@ -200,8 +200,10 @@ class TransportWEBTORRENT extends Transport {
         });
     }
 
-    createReadStream(url, opts, verbose) {
+    async p_f_createReadStream(url, verbose) {  //TODO-API
         /*
+        Asynchronously return a function that can be used in createReadStream
+
         Fetch bytes progressively, using a node.js readable stream, based on a url of the form:
 
             magnet:xyzabc/path/to/file
@@ -219,22 +221,15 @@ class TransportWEBTORRENT extends Transport {
         :throws:        TransportError if url invalid - note this happens immediately, not as a catch in the promise
          */
         if (verbose) console.log("TransportWEBTORRENT createreadstream %o %o", url, opts);
-
-        const through = new stream.PassThrough();
-        const { torrentId, path } = this.webtorrentparseurl(url);
-
-        this.p_webtorrentadd(torrentId)
-            .then((torrent) => {
-                const file = this.webtorrentfindfile(torrent, path);
-                const fileStream = file.createReadStream(opts);
-                fileStream.pipe(through);
-            })
-            .catch((err) => {
-                if (typeof through.destroy === 'function') through.destroy(err)
-                else through.emit('error', err)
-            });
-
-        return through;
+        try {
+            const { torrentId, path } = this.webtorrentparseurl(url);
+            const torrent = await p_webtorrentadd(torrentId);
+            const file = await this.webtorrentfindfile(torrent, path);
+            return function(opts) { return file.createReadStream(opts); }
+        } catch(err) {
+                console.log(`p_f_creatReadStream cant open ${url}, ${err.message}`);
+                throw(err);
+        }
     }
 
     static async p_test(opts, verbose) {
