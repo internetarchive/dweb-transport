@@ -29,7 +29,7 @@
    Some specific styles used by difference examples
  */
 .floatright {margin: 0 0 3px 10px; float: right; clear: right; text-align: right} /* Grouped in top right corner */
-.examplesarchive .floatright { position: fixed; z-index: 999999; top: 30px; right: 10px; font-size: 50% }
+.examplesarchive .floatright { position: fixed; z-index: 999999; top: 100px; right: 10px; font-size: 50% }
 .examplesarchive .floatright ul {display: grid;  grid-template-columns: repeat(auto-fit, minmax(7em, 1fr));  grid-auto-flow: dense;}
 .floatleft {margin: 0 0 3px 10px;  clear: left; float: left; text-align: left} /* Grouped in top left corner */
 .floatright li {margin: 0 0 3px 10px; }
