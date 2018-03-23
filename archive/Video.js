@@ -17,7 +17,7 @@ export default class Video extends AV {
     theatreIaWrap() {
         const item = this.item;
         const itemid = this.itemid;
-        const detailsurl = `https://archive.org/details/${itemid}`;  {/*TODO-SERVICES-IMG get directly */}
+        const detailsurl = `https://archive.org/details/${itemid}`; // OK to be direct url since its an itemprop
         const title = item.title;
         // The videothumbnailurl is intentionally a direct Http link as its intended only for search engines etc
         const videothumbnailurl = this._list.filter(fi => (fi.metadata.name.includes(`${itemid}.thumbs/`)))[1].httpUrl(); // 2nd thumbnail, first is usually black-sreen
