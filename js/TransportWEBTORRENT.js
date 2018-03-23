@@ -201,9 +201,23 @@ class TransportWEBTORRENT extends Transport {
     }
 
     async p_f_createReadStream(url, verbose) {  //TODO-API
-        /*
-        Asynchronously return a function that can be used in createReadStream
+        if (verbose) console.log("TransportWEBTORRENT p_f_createreadstream %o", url);
+        try {
+            const {torrentId, path} = this.webtorrentparseurl(url);
+            let torrent = await this.p_webtorrentadd(torrentId);
+            let filet = this.webtorrentfindfile(torrent, path);
+            let self = this;
+            return function (opts) {
+                return self.createReadStream(filet, opts, verbose);
+            };
+        } catch(err) {
+            console.log(`p_f_createReadStream failed on ${url} ${err.message}`);
+            throw(err);
+        };
+    }
 
+    createReadStream(file, opts, verbose) {
+        /*
         Fetch bytes progressively, using a node.js readable stream, based on a url of the form:
 
             magnet:xyzabc/path/to/file
@@ -220,16 +234,17 @@ class TransportWEBTORRENT extends Transport {
         :returns stream: The readable stream.
         :throws:        TransportError if url invalid - note this happens immediately, not as a catch in the promise
          */
-        if (verbose) console.log("TransportWEBTORRENT createreadstream %o %o", url, opts);
+        if (verbose) console.log("TransportWEBTORRENT createreadstream %o %o", file.name, opts);
+
         try {
-            const { torrentId, path } = this.webtorrentparseurl(url);
-            const torrent = await p_webtorrentadd(torrentId);
-            const file = await this.webtorrentfindfile(torrent, path);
-            return function(opts) { return file.createReadStream(opts); }
+            const through = new stream.PassThrough();
+            const fileStream = file.createReadStream(opts);
+            fileStream.pipe(through);
+            return through;
         } catch(err) {
-                console.log(`p_f_creatReadStream cant open ${url}, ${err.message}`);
-                throw(err);
-        }
+            if (typeof through.destroy === 'function') through.destroy(err)
+            else through.emit('error', err)
+        };
     }
 
     static async p_test(opts, verbose) {
