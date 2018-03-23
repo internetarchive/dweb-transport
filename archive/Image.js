@@ -27,14 +27,13 @@ export default class Image extends Details {
         let mainArchiveFile = this._list.find((fi) => Util.imageFormats.includes(fi.metadata.format)); // Can be undefined if none included
         let detailsURL = `https://archive.org/details/${itemid}`; //This is probably correct to remain pointed at archive.org since used as an itemprop
         let embedurl = `https://archive.org/embed/${itemid}`; //This is probably correct to remain pointed at archive.org since passed to social media
-        //TODO-LINKS check how thumbnailUrl used below and associatedMedia
         return (
             <div id="theatre-ia-wrap" className="container container-ia width-max  resized" style={{height: "600px"}}>
                 <link itemProp="url" href={detailsURL}/>
 
-                <link itemProp="thumbnailUrl" href="https://archive.org/services/img/{itemid}"/>{/*TODO-DETAILS-ONLINE is there a better thumbnail*/}
+                <link itemProp="thumbnailUrl" href="https://archive.org/services/img/{itemid}"/>{/*OK for direct link since itemprop*/}
 
-                { item.files.filter((fi)=> fi.source !== "metadata").map((fi) => ( //TODO-DETAILS-LIST Maybe use _list instead of .files
+                { item.files.filter((fi)=> fi.source !== "metadata").map((fi) => ( //TODO-DETAILS-LIST Maybe use _list instead of .files - OK for direct link since itemprop
                     <link itemProp="associatedMedia" href={`https://archive.org/download/${itemid}/${fi.name}`} key={`${itemid}/${fi.name}`}/>
                 )) }
 
@@ -60,8 +59,9 @@ export default class Image extends Details {
                                     <div className="carousel-inner">
                                         <div className="item active">
                                             <a className="carousel-image-wrapper"
-                                               href={`https://archive.org/download/${itemid}/${mainArchiveFile.metadata.name}`}
-                                               title="Open full sized image" target="_blank">{/*--Separate window so dont break Dweb--*/}{/*TODO-LINKS make download directly (we do this somewhere else already maybe in download side-bar)*/}
+                                                onclick="Nav.nav_download(this);"
+                                                source={mainArchiveFile}
+                                                title="Open full sized image" target="_blank">{/*--Separate window so dont break Dweb--*/}
                                                     <img src={mainArchiveFile} id="streamContainer" className="rot0 carousel-image" alt="item image #1"/> {/*--Note this div not img to work around ffox bug, see ArchiveFile.loadImg--*/}
                                             </a>
                                             <div className="carousel-caption">

@@ -46,14 +46,14 @@ export default class ArchiveFile {
         return await Transportable.p_fetch(await this.p_urls(), {verbose}); //TODO-TIMEOUT add timeoutMS depending on size of file
     }
     async blob() {
-        return new Blob([await this.data], {type: this.mimetype()} );
+        return new Blob([await this.data()], {type: this.mimetype()} );
     }
     async blobUrl() {
         return URL.createObjectURL(await this.blob());
     }
     async p_download(a, options) {
-        let urls = await this.p_urls()   // Multiple potential sources elimating any empty
-        let objectURL = this.blobUrl();
+        let urls = await this.p_urls()   // Multiple potential sources elimating any empty - may fetch file metadata in process
+        let objectURL = await this.blobUrl();
         if (verbose) console.log("Blob URL=",objectURL);
         //browser.downloads.download({filename: this.metadata.name, url: objectURL});   //Doesnt work
         //Downloads.fetch(objectURL, this.metadata.name);   // Doesnt work
