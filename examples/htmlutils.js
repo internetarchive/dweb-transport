@@ -240,7 +240,7 @@ async function p_httpget(url, headers) {
     }
 }
 
-function display_blob(bb, options) {//TODO-STREAMS figure out how to pass streams to this and how to pass from IPFS
+function display_blob(bb, options) {
     /*
         Display a blob of data
         Typical usage display_blob(await Dweb.Transportable.p_fetch(urls), {type: "application/pdf"})
@@ -260,8 +260,8 @@ function display_blob(bb, options) {//TODO-STREAMS figure out how to pass stream
     console.log("display_blob:",typeof bb);
     // This next code is bizarre combination needed to open a blob from within an HTML window.
     let a = window.document.createElement('a');
-    //bb = new Blob([datapdf], {type: 'application/pdf'});    //TODO-STREAMS make this work on streams
-    let objectURL = URL.createObjectURL(bb);    //TODO-STREAMS make this work on streams
+    //bb = new Blob([datapdf], {type: 'application/pdf'});
+    let objectURL = URL.createObjectURL(bb);
     a.href = objectURL;
     a.target= (options && options.target) || "_blank";                      // Open in new window by default
     document.body.appendChild(a);

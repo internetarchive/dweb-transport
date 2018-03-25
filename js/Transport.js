@@ -166,28 +166,6 @@ class Transport {
         throw new errors.ToBeImplementedError("Undefined function Transport.p_rawreverse");
     }
 
-    createReadStream(url, opts = {}, verbose = false) {
-        /*
-            Locate and read a stream, based on its url
-            This is the default version if the Transport hasn't defined one, and so by assumption doesnt natively support createReadStream.
-        */
-        opts["verbose"] = verbose; //TODO-IPFSIMAGE propogating API up to createReadStream
-        if (verbose) console.log("%s:createReadStream: %o, %o", this.name, url, opts);
-        const through = new stream.PassThrough();
-        ((opts.start || opts.end) && !this.supportFeatures.includes('fetch.range'))
-        ? this.p_rawfetch(url, {verbose})
-            .then((buff) => buff.slice(opts.start || 0, opts.end || buff.length))
-        : this.p_rawfetch(url, opts)
-            //TODO-STREAMS to be totally accurate we should check the range returned and check it matches what sent as HTTP servers can ignore range
-        .then((buff) => {
-            console.log("createReadStream read %s bytes",buff.length);
-            through.write(buff);
-            through.end();
-        }); // Should be a buffer we can pass to through
-        // Return the stream immediately. wont output anything till promise above resolves and writes the buffer to it.
-        return through;
-    }
-
     listmonitor(url, callback, verbose) {
         /*
         Setup a callback called whenever an item is added to a list, typically it would be called immediately after a p_rawlist to get any more items not returned by p_rawlist.

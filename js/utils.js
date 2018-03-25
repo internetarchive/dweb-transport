@@ -20,6 +20,7 @@ utils.mergeTypedArraysUnsafe = function(a, b) { // Take care of inability to con
     return c;
 };
 
+/*
 //TODO-STREAM, use this code and return stream from p_rawfetch that this can be applied to
 utils.p_streamToBuffer = function(stream, verbose) {
     // resolve to a promise that returns a stream.
@@ -42,6 +43,8 @@ utils.p_streamToBuffer = function(stream, verbose) {
         }
     })
 };
+*/
+/*
 //TODO-STREAM, use this code and return stream from p_rawfetch that this can be applied to
 //TODO-STREAM debugging in streamToBuffer above, copy to here when fixed above
 utils.p_streamToBlob = function(stream, mimeType, verbose) {
@@ -66,6 +69,7 @@ utils.p_streamToBlob = function(stream, mimeType, verbose) {
         }
     })
 };
+*/
 
 utils.stringfrom = function(foo, hints={}) {
     try {

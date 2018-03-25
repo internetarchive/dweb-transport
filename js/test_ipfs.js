@@ -86,30 +86,6 @@ function multihashFrom(url) {
     throw new errors.CodingError(`Cant turn ${url} into a multihash`);
 }
 
-// Some other utility functions
-function p_streamToBuffer(stream, verbose) {
-    // resolve to a promise that returns a stream.
-    // Note this was only needed with ipfs version <= 0.26 when files.cat returned a stream
-    // Note this comes form one example ...
-    // There is another example https://github.com/ipfs/js-ipfs/blob/master/examples/exchange-files-in-browser/public/js/app.js#L102 very different
-    return new Promise((resolve, reject) => {
-        try {
-            let chunks = [];
-            stream
-                .on('data', (chunk) => { if (verbose) console.log('on', chunk.length); chunks.push(chunk); })
-                .once('end', () => { if (verbose) console.log('end chunks', chunks.length); resolve(Buffer.concat(chunks)); })
-                .on('error', (err) => { // Note error behavior untested currently
-                    console.log("Error event in p_streamToBuffer",err);
-                    reject(new Error('Error in stream'))
-                });
-            stream.resume();
-        } catch (err) {
-            console.log("Error thrown in p_streamToBuffer", err);
-            reject(err);
-        }
-    })
-}
-
 function p_ipfsstart(verbose) {
     return new Promise((resolve, reject) => {
         ipfs = new IPFS(defaultipfsoptions);
@@ -163,15 +139,6 @@ function test_dag_get(cid, expected, expectfailure) {
         .then(() => delay(500))    // Allow error on other stream to appear
         .catch((err) => console.log("Error thrown in dag.cat", err))
 }
-function test_files_catv026(cid, expected, expectfailure) {
-    if (expectfailure && !tryexpectedfailures) return;
-    return ipfs.files.cat(cid) //Error: Groups are not supported in the blocks case - never returns from this call.
-    // BUT Thows an error on the IPFS thread, not catchable
-        .then((stream) => p_streamToBuffer(stream, true))
-        .then((buff) => check_result("files.cat",buff, expected, expectfailure))
-        .then(() => delay(500))    // Allow error on other stream to appear
-        .catch((err) => console.log("Error thrown in files.cat", err)) // Note the HTTP test doesn't throw here, but in separate thread
-}
 async function test_files_cat(cid, expected, expectfailure) {
     try {
         if (expectfailure && !tryexpectedfailures) return;
@@ -218,7 +185,6 @@ async function test_universal_get(cid, expected, expectfailure) {
         if (res.value instanceof DAGNode) {
             //console.log("Case a or b");
             //if (res.value._links.length > 0) { //b: Long file else short file but read stream anyway.
-            //buff = await p_streamToBuffer(await ipfs.files.cat(cid), true); // js-ipfs v0.26 version,
             buff = await ipfs.files.cat(ipfsFrom(cid));
             // Previously was going back to read as a block if got 0 bytes
             if (buff.length === 0) {    // Hit the Chrome bug

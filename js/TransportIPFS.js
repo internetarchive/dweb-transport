@@ -229,7 +229,6 @@ class TransportIPFS extends Transport {
                 //console.log("Case a or b" - we can tell the difference by looking at (res.value._links.length > 0) but dont need to
                 // as since we dont know if we are on node or browser best way is to try the files.cat and if it fails try the block to get an approximate file);
                 // Works on Node, but fails on Chrome, cant figure out how to get data from the DAGNode otherwise (its the wrong size)
-                //buff = await utils.p_streamToBuffer(await this.ipfs.files.cat(cid), true); //js-ipfs v0.26 version
                 buff = await this.ipfs.files.cat(ipfspath); //See js-ipfs v0.27 version and  https://github.com/ipfs/js-ipfs/issues/1229 and https://github.com/ipfs/interface-ipfs-core/blob/master/SPEC/FILES.md#cat
 
                 /* Was needed on v0.26, not on v0.27
@@ -272,16 +271,6 @@ class TransportIPFS extends Transport {
         //return this.ipfs.files.put(buf).then((block) => TransportIPFS.urlFrom(block.cid));
     }
 
-    /* OLD WAY - DOESNT WORK since cant seek into streams.
-    createReadStream(url, opts = {}, verbose = false) {
-        //TODO-API needs documentation and API update when working
-        //TODO-STREAMS untested - doesnt work since cant seek into streams.
-        if (verbose) console.log("TransportIPFS:createReadStream:%o, %o", url, opts);
-        if (!url) throw new errors.CodingError("TransportIPFS.p_rawfetch: requires url");
-        const stream = this.ipfs.files.catReadableStream(TransportIPFS.cidFrom(url));   // cidFrom Throws TransportError if url bad
-        return stream;
-    }
-    */
     // Based on https://github.com/ipfs/js-ipfs/pull/1231/files
 
     async p_offsetStream(stream, links, startByte, endByte) {
@@ -340,7 +329,7 @@ class TransportIPFS extends Transport {
             self.p_offsetStream(       // Ignore promise returned, this will right to the stream asynchronously
                 throughstream,
                 links,          // Uses the array of links created above in this function
-                opts ? opts.start : 0, //TODO-STREAM may change
+                opts ? opts.start : 0,
                 (opts && opts.end) ? opts.end : undefined);
             return throughstream;
         }

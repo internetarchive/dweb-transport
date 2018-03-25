@@ -102,13 +102,11 @@ export default class React  {
         } else if (validCreateReadStream) {
             const file = {
                 name: name,
-                createReadStream: function (opts) {
-                    // Return a readable stream that provides the bytes between offsets "start"
-                    // and "end" inclusive. This works just like fs.createReadStream(opts) from
-                    // the node.js "fs" module.
-
-                    return Transports.createReadStream(urls, opts, verbose)
-                }
+                createReadStream: await Transports.p_f_createReadStream(urls, verbose)
+                // Return a function that returns a readable stream that provides the bytes between offsets "start" and "end" inclusive.
+                // This function works just like fs.createReadStream(opts) from the node.js "fs" module.
+                // f_createReadStream can initiate the stream before returning the function.
+                //OLD WAY: function (opts) { return Transports.createReadStream(urls, opts, verbose); }
             };
 
             RenderMedia.append(file, jsx, cb);  // Render into supplied element - have to use append, as render doesnt work, the cb will set attributes and/or add children.

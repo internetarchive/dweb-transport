@@ -221,30 +221,7 @@ class Transports {
     }
 
     // Stream handling ===========================================
-
-    //TODO-STREAM createReadStream is obsolete, check not used anywhere.
-    static createReadStream(urls, options, verbose) {
-        //Cant do this, this routine is sync .... urls = await this.p_resolveNames(urls); // If naming is loaded then convert to a name
-        let tt = this.validFor(urls, "createReadStream", options); //[ [Url,t],[Url,t]]  // Passing options - most callers will ignore TODO-STREAM support options in validFor
-        if (!tt.length) {
-            throw new errors.TransportError("Transports.p_createReadStream cant find any transport for urls: " + urls);
-        }
-        //With multiple transports, it should return when the first one returns something.
-        let errs = [];
-        for (const [url, t] of tt) {
-            try {
-                return t.createReadStream(url, options, verbose);
-            } catch (err) {
-                errs.push(err);
-                console.log("Could not retrieve ", url.href, "from", t.name, err.message);
-                // Don't throw anything here, loop round for next, only throw if drop out bottom
-                //TODO-MULTI-GATEWAY potentially copy from success to failed URLs.
-            }
-        }
-        throw new errors.TransportError(errs.map((err)=>err.message).join(', '));  //Throw err with combined messages if none succeed
-    }
-
-
+    
     static async p_f_createReadStream(urls, verbose, options) { // Note options is options for selecting a stream, not the start/end in a createReadStream call
         /*
         urls:   Urls of the stream
