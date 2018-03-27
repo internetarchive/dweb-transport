@@ -65,7 +65,7 @@
             displayobj("retrievaldestn", cl);
             deletechildren("listresults");
             // Fetch the current elements from the list if any
-            let objs = await cl.p_list_then_elements(verbose);   //This adds the listmonitor as a side effect, so updated as changes
+            let objs = await cl.p_list_then_elements({verbose});   //This adds the listmonitor as a side effect, so updated as changes
             console.log("objs=",JSON.stringify(objs));
             //Add the elements to the list
             objs.map((obj) => addtemplatedchild("listresults", {}, obj));

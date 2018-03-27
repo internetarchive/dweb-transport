@@ -89,9 +89,11 @@ class Signature extends SmartDict {
         Fetch the data related to a Signature, store on .data
 
         :resolves to: obj - object that was signed
+        :raises:  AuthenticationError if can't decrypt
+
          */
         if (!this.data) {   // Fetch data if have not already fetched it
-            this.data = await SmartDict.p_fetch(this.urls, verbose); // Resolves to new obj
+            this.data = await SmartDict.p_fetch(this.urls, verbose); // Resolves to new obj AuthenticationError if can't decrypt
         }
         return this.data;
     }

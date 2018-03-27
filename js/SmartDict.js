@@ -65,7 +65,9 @@ class SmartDict extends Transportable {
                 if (dd[i] instanceof Transportable) {
                     // Any field that contains an object will be turned into an array of urls for the object.
                     if (!dd[i].stored()) throw new errors.CodingError("Should store subobjects before calling preflight");
-                    res[i] = dd[i]._urls
+                    // Mostly want _urls, but for example even master of KeyChain is stored with _publicurls only
+                    res[i] = dd[i]._urls.length ? dd[i]._urls : dd[i]._publicurls
+
                 } else {
                     res[i] = dd[i];
                 }
@@ -313,7 +315,9 @@ class SmartDict extends Transportable {
 
     }
     static async _after_fetch(maybeencrypted, urls, verbose) {
-        // Takes a structure after JSON.parse
+        /* Takes a structure after JSON.parse that might be encrypted, tried to decrypt
+        raises: AuthenticationError if can't decrypt
+         */
         let table = maybeencrypted.table;               // Find the class it belongs to
         if (!table) {
             throw new errors.ToBeImplementedError("SmartDict.p_fetch: no table field, whatever this is we cant decode it");
@@ -355,7 +359,8 @@ class SmartDict extends Transportable {
             if (verbose) console.log("SmartDict.p_fetch", urls);
             let data = await super.p_fetch(urls, opts);  // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
             let maybeencrypted = utils.objectfrom(data);         // Parse JSON (dont parse if p_fetch has returned object (e.g. from KeyValueTable
-            let decrypted = await this._after_fetch(maybeencrypted, urls, verbose);
+            let decrypted = await this._after_fetch(maybeencrypted, urls, verbose); // AuthenticationError if can't decrypt
+
             return decrypted;
             // Returns new object that should be a subclass of SmartDict
         } catch(err) {
@@ -371,6 +376,7 @@ class SmartDict extends Transportable {
 
          :param data: possibly encrypted object produced from json stored on Dweb
          :return: same object if not encrypted, or decrypted version
+         :raises: AuthenticationError if can't decrypt
          */
         if (this.decryptcb) {
             return await this.decryptcb(data, verbose);
@@ -381,6 +387,7 @@ class SmartDict extends Transportable {
         /*
         Takes a callback that should be used to decrypt data (see AccessControlList) for setting it.
         The callback should return a promise.
+        raises: AuthenticationError if can't decrypt
 
         cb(encrypteddata, verbose) => resolves to data
          */

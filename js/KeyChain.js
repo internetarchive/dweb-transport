@@ -39,8 +39,8 @@ class KeyChain extends CommonList {
         }
         // The order here is important - kc has to be on keychains to decrypt the elements, and eventhandler has to be
         // after elements are loaded so cant be inside addkeychains()
-        KeyChain.addkeychains(kc);  // Add after fetching elements as triggers events
-        await kc.p_list_then_elements(verbose);
+        KeyChain.addkeychains(kc);  // Could trigger events - which would then be incomplete, but some of the items retrievd for the list in p_list_then_elements() might need this to be on keychains in order to self-decrypt.
+        await kc.p_list_then_elements({verbose, ignoreerrors: true});
         this.eventHandler.callEventListeners({type: "login", values: kc})
         return kc;
     }
@@ -49,7 +49,7 @@ class KeyChain extends CommonList {
         return KeyPair.KEYTYPESIGNANDENCRYPT;
     }  // Inform keygen
 
-    async p_list_then_elements(verbose) {
+    async p_list_then_elements({verbose=false, ignoreerrors=false}={}) {
         /*
         Subclasses CommonList to store elements in a _keys array.
 
@@ -57,7 +57,7 @@ class KeyChain extends CommonList {
         throws: AuthenticationError if cant decrypt keys
          */
         try {
-            this._keys = await super.p_list_then_elements(verbose);
+            this._keys = await super.p_list_then_elements({verbose, ignoreerrors});
             if (verbose) console.log("KC.p_list_then_elements Got keys", ...utils.consolearr(this._keys))
             return this._keys;
         } catch (err) {
