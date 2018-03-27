@@ -3,7 +3,7 @@ const IPFS = require('ipfs');
 var ipfs;
 const CID = require('cids');
 const unixFs = require('ipfs-unixfs');
-
+const multihashes = require('multihashes');
 let tryexpectedfailures = false; // Set to false if want to check the things we expect to fail.
 
 let defaultipfsoptions = {
@@ -12,6 +12,7 @@ let defaultipfsoptions = {
     //start: false,
     config: {
         Addresses: { Swarm: [ '/dns4/ws-star.discovery.libp2p.io/tcp/443/wss/p2p-websocket-star']},
+
     },
     EXPERIMENTAL: {
         pubsub: true
@@ -99,6 +100,7 @@ async function test_bylinks(cid, expected, expectfailure) {
         for (let l in links) {
             const link = links[l];
             const lmh = link.multihash;
+            console.log("Link",l,"multihash=",multihashes.toB58String(lmh), lmh)
             const d = await ipfs.object.data(lmh);
             console.log(`Read ${d.length} bytes`);
             const data = unixFs.unmarshal(d).data;
@@ -115,7 +117,7 @@ async function test_bylinks(cid, expected, expectfailure) {
 /* Each of this set of routines uploads with one method, and tries retrieving with multiple */
 
 async function test_long_file(note, multihash, len) {
-    console.log(`--------Testing ${note}`);
+    console.log(`--------Testing ${note} ${multihash}`);
     // Note this hash is fetchable via https://ipfs.io/ipfs/Qmbzs7jhkBZuVixhnM3J3QhMrL6bcAoSYiRPZrdoX3DhzB
     let cid = new CID(multihash);
     await test_files_cat(cid, len,false);             // Works in node and in Chrome
@@ -123,13 +125,17 @@ async function test_long_file(note, multihash, len) {
 }
 async function test_ipfs() {
 	await p_ipfsstart(true);
-	//await test_long_file('PDF sent to http api a long time ago', "Qmbzs7jhkBZuVixhnM3J3QhMrL6bcAoSYiRPZrdoX3DhzB", 262438);
-	//await test_long_file('Commute 11Mb video sent a few months ago almost certainly via urlstore', 'zdj7Wc9BBA2kar84oo8S6VotYc9PySAnmc8ji6kzKAFjqMxHS', 11919082);
-	//await test_long_file('500Mb file sent few days ago via urlstore', 'zdj7WfaG5e1PWoqxWUyUyS2nTe4pgNQZ4tRnrfd5uoxrXAANA', 521998952);
-	//await test_long_file('Smaller 22Mb video sent 2018-03-13', 'zdj7WaHjDtE2e7g614UfXNwyrBwRUd6JkujRsLc9M2ufozLct', 22207578);
-	//await test_long_file('Using ipfs add', 'QmUrp54J5E2jxf8stDiCa56uXASjqHeX2oFWSx35qRE4SV', 0);
-	//await test_long_file('Using curl urlstore add', 'zdj7WkPCyjRgfCAMosMxCx8UhtW6rZvPNRsxCzg3mrxTLRVBr', 321761);
-    await test_long_file('Using ipfs add on standard deploy', 'QmRfcgjWEWdzKBnnSYwmV7Kt5wVVuWZvLm96o4dj7myWuy', 321761);    // Same file as above
+	/*
+	await test_long_file('PDF sent to http api a long time ago', "Qmbzs7jhkBZuVixhnM3J3QhMrL6bcAoSYiRPZrdoX3DhzB", 262438);
+	await test_long_file('Commute 11Mb video sent a few months ago almost certainly via urlstore', 'zdj7Wc9BBA2kar84oo8S6VotYc9PySAnmc8ji6kzKAFjqMxHS', 11919082);
+	await test_long_file('500Mb file sent few days ago via urlstore', 'zdj7WfaG5e1PWoqxWUyUyS2nTe4pgNQZ4tRnrfd5uoxrXAANA', 521998952);
+	await test_long_file('Smaller 22Mb video sent 2018-03-13', 'zdj7WaHjDtE2e7g614UfXNwyrBwRUd6JkujRsLc9M2ufozLct', 22207578);
+	await test_long_file('Using ipfs add', 'QmUrp54J5E2jxf8stDiCa56uXASjqHeX2oFWSx35qRE4SV', 0);
+	await test_long_file('Using curl urlstore add', 'zdj7WkPCyjRgfCAMosMxCx8UhtW6rZvPNRsxCzg3mrxTLRVBr', 321761);
+	*/
+    //await test_long_file('Using a hash from the DHT Provide logs', 'zb2rhmFWNJ7TVEKQF6UEjnPbw4ESoq8CwbVTPHwQbacnoRd9M', 321761);  // files.cat says invalid node type, object.links returns undefined
+    //await test_long_file('Using ipfs add on standard deployment on my mac', 'QmRfcgjWEWdzKBnnSYwmV7Kt5wVVuWZvLm96o4dj7myWuy', 321761);    // Same file as above as of 27Mar doesnt respond on links?
+    await test_long_file('Using a hash from the DHT Provide logs', 'zdj7WXHDDkXthYNLKNQg2DZkBD8vmAQ2K37dURNRwAAM1iMSQ', 321761);  // files.cat says invalid node type, object.links returns undefined
     console.log('---- finished --- ')
 }
 
