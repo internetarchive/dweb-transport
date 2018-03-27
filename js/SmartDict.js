@@ -195,13 +195,13 @@ class SmartDict extends Transportable {
     objbrowser_obj(el, name, val) {
         this._objbrowser_row(el, name,
             this.objbrowser_createElement('span',{className: 'propval', source: val},
-                this.objbrowser_createElement('span', {onclick: `SmartDict.p_objbrowser_expandurl(this.parentNode); return false;`},val.constructor.name)
+                this.objbrowser_createElement('span', {onclick: `Dweb.SmartDict.p_objbrowser_expandurl(this.parentNode); return false;`},val.constructor.name)
 
             ));
     }
     static async p_objbrowser_expandurl(el, obj) {
         if (typeof obj === "undefined") // If dont specify check source, which may also be undefined, but use if there.
-            obj = el.source;
+            obj = el.source || el.getAttribute("source"); // Note el.source wont work for elements
         if (Array.isArray(obj) && typeof obj[0] === "string")
             obj = await SmartDict.p_fetch(obj, verbose);
         else if (typeof obj === "string")
@@ -215,7 +215,7 @@ class SmartDict extends Transportable {
             this.objbrowser_createElement('ul',{className: 'propurls propval'},
                 links
                     ? arr.map(l => this.objbrowser_createElement('li',{className: 'propurl', source: l},
-                        this.objbrowser_createElement('span', {onclick: `SmartDict.p_objbrowser_expandurl(this.parentNode); return false;`},l)
+                        this.objbrowser_createElement('span', {onclick: `Dweb.SmartDict.p_objbrowser_expandurl(this.parentNode); return false;`},l)
                     ) )
                     : arr.map(l => this.objbrowser_createElement('li',{className: 'propurl'},l) )
             ) );
@@ -224,7 +224,7 @@ class SmartDict extends Transportable {
         this._objbrowser_row(el, name,
             this.objbrowser_createElement('ul',{className: 'propurls propval'},
                 arr.map((l,i) => this.objbrowser_createElement('li',{className: 'propurl', source: l},
-                    this.objbrowser_createElement('span', {onclick: `SmartDict.p_objbrowser_expandurl(this.parentNode); return false;`}, `${i}...`)
+                    this.objbrowser_createElement('span', {onclick: `Dweb.SmartDict.p_objbrowser_expandurl(this.parentNode); return false;`}, `${i}...`)
                 ))
             ) );
     }
@@ -233,7 +233,7 @@ class SmartDict extends Transportable {
         this._objbrowser_row(el, name, ul);
         arr.map((l,i) => this._objbrowser_row(ul, name,
             this.objbrowser_createElement('span', {},
-                this.objbrowser_createElement('span', {onclick: `SmartDict.p_objbrowser_expandurl(this.parentNode); return false;`}, `${i}...`)
+                this.objbrowser_createElement('span', {onclick: `Dweb.SmartDict.p_objbrowser_expandurl(this.parentNode); return false;`}, `${i}...`)
             )));
     }
     objbrowser_arraystr(el, name, arr) {
