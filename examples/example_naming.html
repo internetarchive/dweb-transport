@@ -83,7 +83,7 @@
 
 
         async function onlogin(kc) {
-            alert(`${kc.name} just logged in`)
+            alert(`Welcome ${kc.name}`)
             //TODO-NAMING adjust permissions, locks etc
         }
         async function domain_open(el_li, el_ul, dom) {
@@ -189,7 +189,7 @@
         </ul>
     </div>
     <div class="naming_details" id="naming_details"><!--Details-->
-        <ul class="template domain">
+        <ul class="template domain fas">
                 <li><span class="propname">Name</span><span name="name" class="propval"></span></li>
                 <li><span class="propname">Expires</span><span name="expires" class="propval"></span></li>
                 <li><span class="propname">Keys</span><ul name="keys" class="proplist"><li class="template"><span name="_"></span></li></ul></li>
@@ -295,12 +295,20 @@
 <h3>Use Cases</h3>
 <p>Note these don't actually work yet ... require code at most steps</p>
 <!--fa-check-square, fa-square fa-times-square fa-tasks fa-spinner used for tasks-->
-<ul>
-    <li class="fas fa-square">Create a leaf under test domain<ul>
-        <li class="fas fa-tasks">Login as test<ul>
-            <li class="fas fa-square">Create test user</li>
-            <li class="fas fa-square">Create test ACL - with test user in it</li>
-            <li class="fas fa-tasks">Create test domain under /arc<ul>
+<ul class="fa">
+    <li class="fas fa-square"> Create a leaf under test domain<ul>
+        <li class="fas fa-tasks"> Login as test<ul>
+            <li class="fas fa-check-square"> Click on bunch of keys, Name: "Iam Testing", phrase: "one two three"; [Login]</li>
+            <li class="fas fa-check-square"> Click on the name; If there are no keys shown, click on New Key - and name it "Name Key"</li>
+        </ul></li>
+        <li class="fas fa-tasks"> Create a Lock (or Access Control list)<ul>
+            <li class="fas fa-check-square"> If there are no locks shown, click on New Lock - and name it "Name Lock"</li>
+            <li class="fas fa-check-square"> Click on the Name Lock, if no token is shown, then:<ul>
+                <li class="fas fa-check-square"> close dialog, click on Key and copy URL</li>
+                <li class="fas fa-check-square"> click on "Name Lock, "New Token", name it "Iam Testing", and paste URL, "Add" </li>
+            </ul></li>
+        </ul></li>
+        <li class="fas fa-tasks">Create test domain under /arc<ul>
                 <li class="fas fa-square">Locked with ACL</li>
                 <li class="fas fa-square">Stored meta (with priv key) In Keychain of Test user</li>
                 <li class="fas fa-square">Keys for test domain are random</li>

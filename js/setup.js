@@ -45,8 +45,8 @@ async function p_setup(verbose) {
         // Note the order of these is significant, it will retrieve by preference from the first setup, try with both orders if in doubt.
         //SEE-OTHER-ADDTRANSPORT
         //TODO-REQUIRE these will break
-        let t_ipfs = await TransportIPFS.p_setup(opts, verbose); await t_ipfs.p_status(); // Note browser requires indexeddb
-        let t_yjs = await TransportYJS.p_setup(opts, verbose);  await t_yjs.p_status(); // Should find ipfs transport
+        //let t_ipfs = await TransportIPFS.p_setup(opts, verbose); await t_ipfs.p_status(); // Note browser requires indexeddb
+        //let t_yjs = await TransportYJS.p_setup(opts, verbose);  await t_yjs.p_status(); // Should find ipfs transport
         let t_http = await TransportHTTP.p_setup(opts, verbose); await t_http.p_status();
         //let t_webtorrent = await TransportWEBTORRENT.p_test(opts, verbose); await t_webtorrent.p_status();
         if (verbose) console.log("setup returned and transport(s) connected:", Transports.connectedNames());
