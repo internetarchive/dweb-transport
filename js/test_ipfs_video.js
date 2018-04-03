@@ -5,14 +5,18 @@ const CID = require('cids');
 const unixFs = require('ipfs-unixfs');
 const multihashes = require('multihashes');
 let tryexpectedfailures = false; // Set to false if want to check the things we expect to fail.
+const ipfsAPI = require('ipfs-api')
+// connect to ipfs daemon API server
+
+const usehttpapi=false; // True uses local ipfs instance on machine where doing test, otherwise uses Javascript library
 
 let defaultipfsoptions = {
     repo: '/tmp/ipfs_testipfsv7', //TODO-IPFS think through where, esp for browser
     //init: true,
     //start: false,
     config: {
-        Addresses: { Swarm: [ '/dns4/ws-star.discovery.libp2p.io/tcp/443/wss/p2p-websocket-star']},
-
+        //Addresses: { Swarm: [ '/dns4/ws-star.discovery.libp2p.io/tcp/443/wss/p2p-websocket-star']},
+        Bootstrap: ['/dns4/gateway.dweb.me/tcp/443/wss/ipfs/QmPNgKEjC7wkpu3aHUzKKhZmbEfiGzL5TP1L8zZoHJyXZW'],
     },
     EXPERIMENTAL: {
         pubsub: true
@@ -51,11 +55,17 @@ function multihashFrom(url) {
 
 function p_ipfsstart(verbose) {
     return new Promise((resolve, reject) => {
-        ipfs = new IPFS(defaultipfsoptions);
-        ipfs.on('ready', () => {
+        if (!usehttpapi) {
+            ipfs = new IPFS(defaultipfsoptions);
+
+            ipfs.on('ready', () => {
+                resolve();
+            });
+            ipfs.on('error', (err) => reject(err));
+        } else {
+            ipfs = ipfsAPI('localhost', '5001', {protocol: 'http'}) // leaving out the arguments will default to these values
             resolve();
-        });
-        ipfs.on('error', (err) => reject(err));
+        }
     })
         .then(() => ipfs.version())
         .then((version) => console.log('IPFS READY', version))
@@ -120,22 +130,23 @@ async function test_long_file(note, multihash, len) {
     console.log(`--------Testing ${note} ${multihash}`);
     // Note this hash is fetchable via https://ipfs.io/ipfs/Qmbzs7jhkBZuVixhnM3J3QhMrL6bcAoSYiRPZrdoX3DhzB
     let cid = new CID(multihash);
+    // Uncomment one or both of these tests
     await test_files_cat(cid, len,false);             // Works in node and in Chrome
-    await test_bylinks(cid, len, false);
+    //await test_bylinks(cid, len, false);
 }
 async function test_ipfs() {
 	await p_ipfsstart(true);
-	/*
 	await test_long_file('PDF sent to http api a long time ago', "Qmbzs7jhkBZuVixhnM3J3QhMrL6bcAoSYiRPZrdoX3DhzB", 262438);
-	await test_long_file('Commute 11Mb video sent a few months ago almost certainly via urlstore', 'zdj7Wc9BBA2kar84oo8S6VotYc9PySAnmc8ji6kzKAFjqMxHS', 11919082);
-	await test_long_file('500Mb file sent few days ago via urlstore', 'zdj7WfaG5e1PWoqxWUyUyS2nTe4pgNQZ4tRnrfd5uoxrXAANA', 521998952);
-	await test_long_file('Smaller 22Mb video sent 2018-03-13', 'zdj7WaHjDtE2e7g614UfXNwyrBwRUd6JkujRsLc9M2ufozLct', 22207578);
-	await test_long_file('Using ipfs add', 'QmUrp54J5E2jxf8stDiCa56uXASjqHeX2oFWSx35qRE4SV', 0);
-	await test_long_file('Using curl urlstore add', 'zdj7WkPCyjRgfCAMosMxCx8UhtW6rZvPNRsxCzg3mrxTLRVBr', 321761);
-	*/
+	//await test_long_file('Commute 11Mb video sent a few months ago almost certainly via urlstore', 'zdj7Wc9BBA2kar84oo8S6VotYc9PySAnmc8ji6kzKAFjqMxHS', 11919082);
+	//await test_long_file('500Mb file sent few days ago via urlstore', 'zdj7WfaG5e1PWoqxWUyUyS2nTe4pgNQZ4tRnrfd5uoxrXAANA', 521998952);
+	//await test_long_file('Smaller 22Mb video sent 2018-03-13', 'zdj7WaHjDtE2e7g614UfXNwyrBwRUd6JkujRsLc9M2ufozLct', 22207578);
+	//await test_long_file('Using ipfs add', 'QmUrp54J5E2jxf8stDiCa56uXASjqHeX2oFWSx35qRE4SV', 0);
+	//await test_long_file('Using curl urlstore add', 'zdj7WkPCyjRgfCAMosMxCx8UhtW6rZvPNRsxCzg3mrxTLRVBr', 321761);
     //await test_long_file('Using a hash from the DHT Provide logs', 'zb2rhmFWNJ7TVEKQF6UEjnPbw4ESoq8CwbVTPHwQbacnoRd9M', 321761);  // files.cat says invalid node type, object.links returns undefined
     //await test_long_file('Using ipfs add on standard deployment on my mac', 'QmRfcgjWEWdzKBnnSYwmV7Kt5wVVuWZvLm96o4dj7myWuy', 321761);    // Same file as above as of 27Mar doesnt respond on links?
-    await test_long_file('Using a hash from the DHT Provide logs', 'zdj7WXHDDkXthYNLKNQg2DZkBD8vmAQ2K37dURNRwAAM1iMSQ', 321761);  // files.cat says invalid node type, object.links returns undefined
+    //await test_long_file('Using a hash from the DHT Provide logs', 'zdj7WXHDDkXthYNLKNQg2DZkBD8vmAQ2K37dURNRwAAM1iMSQ', 321761);  // files.cat says invalid node type, object.links returns undefined
+    await test_long_file('Using a hash from add.csv using http add', 'QmfWQzucB7QWq32meSSKk8xLEtouAEWnWs7RatbxJz9wkj', 13980);  // files.cat says invalid node type, object.links returns undefined
+    await test_long_file('Using a hash from add.csv using http urlstore', 'zb2rhXDUQRraHn3tQcq8MHVMVSVP9RwRyEMzyBhehssVjnPWb', 9613);  // files.cat says invalid node type, object.links returns undefined
     console.log('---- finished --- ')
 }
 
