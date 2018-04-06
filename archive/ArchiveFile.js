@@ -1,5 +1,5 @@
-import RenderMedia from 'render-media';
 require('babel-core/register')({ presets: ['env', 'react']}); // ES6 JS below!
+import RenderMedia from 'render-media';
 import React from './ReactFake';
 import Util from './Util';
 import throttle from "throttleit";

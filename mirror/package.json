@@ -1,0 +1,7 @@
+{
+  "name": "mirror",
+  "version": "0.0.1",
+  "dependencies": {
+    "level": "latest"
+  }
+}
