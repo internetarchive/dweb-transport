@@ -79,7 +79,7 @@
                 //verbose = true;
                 let multihash = el.getAttribute("href"); // Note this is not el.href which has the domain as well
                 if (verbose) console.log("display_ipfs:", multihash);
-                let data = await Transportable.p_fetch([`ipfs:/ipfs/${multihash}`], {verbose}); //TODO-TIMEOUT make dependent on file size
+                let data = await Transports.p_rawfetch([`ipfs:/ipfs/${multihash}`], {verbose}); //TODO-TIMEOUT make dependent on file size
                 if (verbose) console.log("display_ipfs retrieved", data.constructor.name, blk.size());
                 if (verbose && data.length < 1000) console.log("Buffer=", data.toString());
                 display_blob(data, {type: 'application/pdf'}); //TODO allow for multiple types

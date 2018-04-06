@@ -4,7 +4,6 @@ import React from './ReactFake';
 import Util from './Util';
 import throttle from "throttleit";
 import prettierBytes from "prettier-bytes";
-var Transportable = require('../js/Transportable');
 var Transports = require('../js/Transports');
 
 export default class ArchiveFile {
@@ -14,7 +13,7 @@ export default class ArchiveFile {
 
     Fields:
     metadata: metadata of item - (note will be a pointer into a Detail or Search's metadata so treat as read-only)
-    sd: pointer to SmartDict or Block ? created with Urls (see how did it with Academic)
+    sd: pointer to SmartDict created with Urls (see how did it with Academic)
      */
 
     constructor({itemid = undefined, metadata = undefined}={}) {
@@ -43,7 +42,7 @@ export default class ArchiveFile {
        return Util.archiveMimeTypeFromFormat[this.metadata.format];
     }
     async data() {
-        return await Transportable.p_fetch(await this.p_urls(), {verbose}); //TODO-TIMEOUT add timeoutMS depending on size of file
+        return await Transports.p_rawfetch(await this.p_urls(), {verbose}); //TODO-TIMEOUT add timeoutMS depending on size of file
     }
     async blob() {
         return new Blob([await this.data()], {type: this.mimetype()} );

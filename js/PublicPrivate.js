@@ -20,10 +20,10 @@ class PublicPrivate extends SmartDict {
     _listeners      Any event listeners  //TODO-LISTENER - maybe move to SmartDict as generically useful
 
     CL.p_store, KVP.p_store, _p_storepublic, _getdata and preflight work closely together as summarised below.
-    CL.p_store:  this._p_storepublic; Transportable.p_store
-    KVP.p_store: Transportable.p_store
+    CL.p_store:  this._p_storepublic; SmartDict.p_store
+    KVP.p_store: SmartDict.p_store
     _p_storepublic: constructor(preflight, false) -> p_store -> set _publicurls
-    Transportable.p_store: this._getdata -> Transports.p_rawstore
+    SmartDict.p_store: this._getdata -> Transports.p_rawstore
         SD._getdata: build dd -> preflight -> JSON.stringify
             SD.preflight: filter out _*
             <class>.preflight: other filters
@@ -169,7 +169,7 @@ class PublicPrivate extends SmartDict {
             await this._p_storepublic(verbose); // Stores a public copy and sets _publicurls
         }
         if (!(this._master && this.dontstoremaster)) {
-            await super.p_store(verbose);    // Transportable.store(verbose)
+            await super.p_store(verbose);    // SmartDict.store(verbose)
         }
     }
 

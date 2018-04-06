@@ -1,6 +1,5 @@
 const errors = require('./Errors'); // Standard Dweb Errors
 const Transports = require('./Transports'); // Manage all Transports that are loaded
-const Transportable = require('./Transportable'); // Base class of any object the transports can handle
 const SmartDict = require('./SmartDict'); // General handling of JSON structures
 const Signature = require('./Signature'); // Encapsulate a signature as used for items on a CommonList
 const PublicPrivate = require("./PublicPrivate"); //for extends
@@ -117,7 +116,7 @@ class CommonList extends PublicPrivate {
          Equivalent to Array.push but returns a promise because asynchronous
          Sign and store a object on a list, stores both locally on _list and sends to Dweb
 
-         :param obj: Should be subclass of SmartDict, (Block is not supported), can be an array of URLs of such an obj
+         :param obj: Should be subclass of SmartDict, can be an array of URLs of such an obj
          :resolves: sig created in process - for adding to lists etc.
          :throws:   ForbiddenError if not master;
          */
@@ -130,7 +129,7 @@ class CommonList extends PublicPrivate {
             await this.p_store(verbose);        // Make sure list is stored before store anything on it.
             if (verbose) console.log("CL.p_push", obj._urls, "onto", this._urls);
             let urls = obj;
-            if (obj instanceof Transportable) {
+            if (obj instanceof SmartDict) {
                 await obj.p_store(verbose);     // Make sure any object is stored
                 urls = obj._urls;
             }

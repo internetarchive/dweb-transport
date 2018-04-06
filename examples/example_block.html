@@ -24,13 +24,10 @@
             let verbose = true; // See commentary in console.log
             let content = tinyMCE.get('mytextarea').getContent();
             // alert(content);
-            let blk = new Dweb.Block(content);
-            blk.p_store(verbose)
-                .then(() => {
-                    let el = document.getElementById("retrievalarea");
-                    el.value = blk._urls; // Use as default on input
-                })
-                .catch((err) => alert(err));
+            let el = document.getElementById("retrievalarea");
+            let urls = Dweb.Transports.p_rawstore(content, verbose)
+                .then((urls) => el.value = urls)
+                .catch((err) => {console.error("saveoncallback", err); alert(err)});
         }
     });
 
@@ -45,10 +42,11 @@
             console.log("Fetching urls=", urls);
             let destn = document.getElementById("retrievaldestn");
             destn.innerHTML = ""; // Clear it first
-            Dweb.Block.p_fetch(urls, verbose)
-                .then((blk) => {
-                    console.log("content=", blk.content());
-                    destn.innerHTML = blk.content()
+
+            Dweb.Transports.p_rawfetch(urls, {verbose})
+                .then((data) => {
+                    console.log("content=", data);
+                    destn.innerHTML = data;
                 })
         } catch(err) {
             console.log("fetchanddisplay: Error",err.message);
@@ -81,7 +79,7 @@
 <div class="floatright" style="position:relative;">
     <ul id="transportstatuses"><li class='template vertical_li' onclick="transportclick(this);"><span name='name'></span></li></ul>
 </div><!--End of standard network status and login panel-->
-<h1>Dweb - Block Example</h1>
+<h1>Dweb - Transports Example - unstructured data store and retrieval</h1>
 <h4>Create something here, and when its saved its urls will appear below</h4>
 <form method="post">
     <textarea id="mytextarea" width="60%">Testing</textarea>

@@ -243,7 +243,7 @@ async function p_httpget(url, headers) {
 function display_blob(bb, options) {
     /*
         Display a blob of data
-        Typical usage display_blob(await Dweb.Transportable.p_fetch(urls), {type: "application/pdf"})
+        Typical usage display_blob(await Dweb.Transports.p_rawfetch(urls), {type: "application/pdf"})
         bb: Data to display, either as blob or something that can be passed to Blob([bb]) e.g. a buffer
         options:    {
             type: mimetype  (required if bb not already a blob)

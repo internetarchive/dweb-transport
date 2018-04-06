@@ -19,13 +19,13 @@ function delay(ms, val) { return new Promise(resolve => {setTimeout(() => { reso
 /*
 This file consists of:
 A set of test routines, each of which takes a CID and an expected length and tries a different way to fetch it.
-    test_block_get      using block.get
+    //test_block_get      using block.get
     test_dag_get        using dag.get
     test_files_cat      using files.cat
     test_universal_get  a nasty kludge that tries different ways to fetch
 
 There are then a set of routines that upload with one method, and test retrieval by each of the non-crashing mechanisms above
-    test_block          using block.put
+    //test_block          using block.put
     test_dag_string     uses dag.put to upload a string (not JSON)
     test_dag_json       same but uploads an object (not really JSON since encode with CBOR)
     test_httpapi_short  Accesses a file previously stored with the http api, short enough that it doesnt get sharded
@@ -44,6 +44,7 @@ let defaultipfsoptions = {
         pubsub: true
     }
 };
+/*
 function _makepromises() {
     //Utility function to promisify Block
     promisified = { ipfs: { block: {
@@ -51,7 +52,7 @@ function _makepromises() {
         get: promisify(ipfs.block.get)
     }}}
 }
-
+*/
 function reportcidstring(cid) {
     console.log("Testing", "/ipfs/"+cid.toBaseEncodedString())
 }
@@ -90,8 +91,8 @@ function p_ipfsstart(verbose) {
     return new Promise((resolve, reject) => {
         ipfs = new IPFS(defaultipfsoptions);
         ipfs.on('ready', () => {
-            _makepromises();
-            console.log(promisified);
+            //_makepromises();
+            //console.log(promisified);
             resolve();
         });
         ipfs.on('error', (err) => reject(err));
@@ -115,7 +116,7 @@ function check_result(name, buff, expected, expectfailure) {
     }
     return buff; // Simplify promise chain
 }
-
+/*
 // Retrieval functions - each tests one different way to retrieve content
 async function test_block_get(cid, expected, expectfailure) {
     // Note we don't use block.get anymore , but its here for testing
@@ -129,7 +130,7 @@ async function test_block_get(cid, expected, expectfailure) {
         console.log("Error thrown in block.cat", err);
     }
 }
-
+*/
 function test_dag_get(cid, expected, expectfailure) {
     //Try and retrieve with dag.get
     if (expectfailure && !tryexpectedfailures) return;
@@ -186,6 +187,7 @@ async function test_universal_get(cid, expected, expectfailure) {
             //console.log("Case a or b");
             //if (res.value._links.length > 0) { //b: Long file else short file but read stream anyway.
             buff = await ipfs.files.cat(ipfsFrom(cid));
+            /*
             // Previously was going back to read as a block if got 0 bytes
             if (buff.length === 0) {    // Hit the Chrome bug
                 // This will get a file padded with ~14 bytes - 4 at front, 4 at end and cant find the other 6 !
@@ -194,6 +196,7 @@ async function test_universal_get(cid, expected, expectfailure) {
                 let blk = await promisified.ipfs.block.get(cid);
                 buff = blk.data;
             }
+            */
 
         } else { //c: not a file
             buff = res.value;
@@ -206,7 +209,7 @@ async function test_universal_get(cid, expected, expectfailure) {
 }
 
 /* Each of this set of routines uploads with one method, and tries retrieving with multiple */
-
+/*
 async function test_block() {
     let qbf = "The quick brown fox"; // String for testing
     console.log("--------testing block.put:",qbf);
@@ -222,7 +225,7 @@ async function test_block() {
     //await test_universal_get(cid, len, true);             // Untested but dont expect to work as will fail in dag.get
     console.log("test_block completed");
 }
-
+*/
 async function test_dag_string() {
     let qbf = "the quick brown fox"; // String for testing
     //https://github.com/ipfs/interface-ipfs-core/blob/master/SPEC/DAG.md#dagput
@@ -301,7 +304,7 @@ async function test_ipfs() {
     await test_httpapi_short();     // No solution: *IPFS BUG* on files.cat; (work around also has bug of adding 14 bytes)
     await test_httpapi_long();      // Works only on files.cat or bylinks; Fails as expected on others
     await test_video();             // Should work on file.cat or bylinks;
-    await test_block();             // Works on block.get; Fails *IPFS BUG REALLY BAD* on anything other than block.get
+    //await test_block();             // Works on block.get; Fails *IPFS BUG REALLY BAD* on anything other than block.get
     await test_dag_string();        // Works on dag.get; fails (as expected) on others
     await test_dag_json();         // Works on dag.get; fails as expected on others
     console.log('---- finished --- ')

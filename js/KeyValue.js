@@ -14,10 +14,10 @@ class KeyValue extends SmartDict {
 
     //TODO-KEYVALUE make sure to clear _dirty in p_store()
 
-    dirty() {  // Overrides Transportable.dirty()
+    dirty() {  // Overrides SmartDict.dirty()
         this._dirty = true;
     }
-    stored() { // Overrides Transportable.stored()
+    stored() { // Overrides SmartDict.stored()
         return ! this._dirty;
     }
 

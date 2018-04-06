@@ -6,8 +6,6 @@ window.Dweb = { }
 //window.sodium = require("libsodium-wrappers");  // Needed for cryptotest maybe move there ?
 
 Dweb.errors = require('./Errors');
-Dweb.Transportable = require('./Transportable');
-Dweb.Block = require('./Block');
 Dweb.SmartDict = require("./SmartDict");
 Dweb.KeyPair = require("./KeyPair");
 Dweb.Signature = require("./Signature");

@@ -12,7 +12,6 @@ const TransportYJS = require('./TransportYJS');
 const TransportIPFS = require('./TransportIPFS');
 const TransportWEBTORRENT = require('./TransportWEBTORRENT');
 // Higher level object classes
-const Block = require('./Block');
 const SmartDict = require('./SmartDict');
 const KeyPair = require('./KeyPair'); // Encapsulate public/private key pairs and crypto libraries
 const Signature = require('./Signature'); // Encapsulate a signature as used for items on a CommonList
@@ -57,7 +56,6 @@ async function p_test(verbose) {
         if (verbose) console.log("setup returned and transport(s) set");
         await Transports.test(verbose);
         if (verbose) console.log("Transports tested");
-        await Block.p_test(verbose);
         await p_test_Signature(verbose);
         await KeyPair.test(verbose);
         let res = await AccessControlList.p_test(verbose);

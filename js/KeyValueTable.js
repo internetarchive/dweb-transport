@@ -1,5 +1,4 @@
 const Transports = require('./Transports'); // Manage all Transports that are loaded
-const Transportable = require('./Transportable'); // Base class of any object the transports can handle
 const SmartDict = require("./SmartDict");   // _AccessControlListEntry extends this
 const PublicPrivate = require("./PublicPrivate"); //for extends
 const utils = require('./utils'); // Utility functions
@@ -72,7 +71,7 @@ class KeyValueTable extends PublicPrivate {
         publicOnly  If true massage the data to store a safe value
         encryptIfAcl    If true, and there is an acl field, then use the encryption process before storing
          */
-        if (mapVal instanceof Transportable) {
+        if (mapVal instanceof SmartDict) {
             return mapVal._getdata({publicOnly, encryptIfAcl});               // This should also take care of not storing unencrypted private keys, and encrypting if requested.
         } else {
             return JSON.stringify(mapVal)
@@ -88,7 +87,7 @@ class KeyValueTable extends PublicPrivate {
                 return obj.map(m => this._storageFromMap(m))
             } else if (typeof(obj) === "object") {
                 if (obj["table"]) {
-                    obj = SmartDict._sync_after_fetch(obj, [], verbose);   // Convert object to subclass of Transportable, note cant decrypt as sync
+                    obj = SmartDict._sync_after_fetch(obj, [], verbose);   // Convert object to subclass of SmartDict, note cant decrypt as sync
                 }
                 //else If no "table" field, then just return the object.
             }

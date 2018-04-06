@@ -1,11 +1,11 @@
 const errors = require('./Errors');
-const Transportable = require("./Transportable");   //Superclass
 const utils = require('./utils'); // Utility functions
+const Transports = require('./Transports'); // Manage all Transports that are loaded
 
 // See CommonBlock.py for Python version
+//TODO-API merge Transportable into here, delete Block
 
-
-class SmartDict extends Transportable {
+class SmartDict {
     /*
     Subclass of Transport that stores a data structure, usually a single layer Javascript dictionary object.
     SmartDict is intended to support the mechanics of storage and retrieval while being  subclassed to implement functionality
@@ -19,9 +19,9 @@ class SmartDict extends Transportable {
 
     Fields:
     _acl    if set (on master) to a AccessControlList or KeyChain, defines storage as encrypted -
-
-    Inherited from Transportable:
-    _urls
+    _urls   Array of URLs of data stored
+    _data   Data (if its opaque)
+    table   Name of class as looked up in Dweb.table2class
      */
 
     constructor(data, verbose, options) {
@@ -32,10 +32,12 @@ class SmartDict extends Transportable {
                 A object with attributes to set on SmartDict via _setdata
         options	Passed to _setproperties, by default overrides attributes set by data
          */
-        super(data); // will call _setdata (which usually set fields), does not store or set _url
+        this._urls = []; // Empty URLs - will be loaded by SmartDict.p_fetch if loading from an URL
+        this._setdata(data); // The data being stored - note _setdata usually subclassed does not store or set _url
         this._setproperties(options);   // Note this will override any properties set with data
         if (!this.table) { this.table = "sd"; } // Set it if the data doesnt set it, should be overridden by subclasses
     }
+
 
     __setattr__(name, value) { // Call chain is ... success or constructor > _setdata > _setproperties > __setattr__
         // Subclass this to catch any field (other than _data) which has its own setter
@@ -52,6 +54,18 @@ class SmartDict extends Transportable {
         }
     }
 
+    stored() {  // Check if stored (Note overridden in KeyValue to use a _dirty flag)
+        return !!(this._urls && this._urls.length);
+    }
+
+    dirty() {  //(Note overridden in KeyValue to use a _dirty flag)
+        /*
+        Mark an object as needing storing again, for example because one of its fields changed.
+        Flag as dirty so needs uploading - subclasses may delete other, now invalid, info like signatures
+        */
+        this._urls = [];
+    }
+
     preflight(dd) { // Called on outgoing dictionary of outgoing data prior to sending - note order of subclassing can be significant
         /*
         Default handler for preflight, strips attributes starting “_” and stores and converts objects to urls.
@@ -62,7 +76,7 @@ class SmartDict extends Transportable {
         let res = {};
         for (let i in dd) {
             if (i.indexOf('_') !== 0) { // Ignore any attributes starting _
-                if (dd[i] instanceof Transportable) {
+                if (dd[i] instanceof SmartDict) {
                     // Any field that contains an object will be turned into an array of urls for the object.
                     if (!dd[i].stored()) throw new errors.CodingError("Should store subobjects before calling preflight");
                     res[i] = dd[i]._urls
@@ -114,6 +128,26 @@ class SmartDict extends Transportable {
         this._setproperties(value); // Note value should not contain a "_data" field, so wont recurse even if catch "_data" at __setattr__()
     }
 
+    async p_store(verbose) {
+        /*
+        Store the data on Dweb, if it has not already been, stores any urls in _url field
+        Resolves to	obj
+        Throws TransportError if no transports or unable to fetch, leaves in !stored state (empty _urls field)
+         */
+        try {
+            if (this.stored())
+                return this;  // No-op if already stored, use dirty() if change after retrieved
+            let data = this._getdata();
+            if (verbose) console.log("SmartDict.p_store data=", data);
+            this._urls = await Transports.p_rawstore(data, verbose);
+            if (verbose) console.log("SmartDict.p_store urls=", this._urls);
+            return this;
+        } catch (err) {
+            console.log("SmartDict p_store failed");
+            throw err;
+        }
+    }
+
     match(dict) {
         /*
         Checks if a object matches for each key:value pair in the dictionary.
@@ -153,7 +187,7 @@ class SmartDict extends Transportable {
                 if (value === true) {
                     element.setAttribute(attrname, name);
                 } else if (typeof value === "object" && !Array.isArray(value)) { // e.g. style: {{fontSize: "124px"}}
-                    if (value instanceof Transportable) {
+                    if (value instanceof SmartDict) {
                         // We are really trying to set the value to an object, allow it
                         element[attrname] = value;  // Wont let us use setAttribute(attrname, value) unclear if because unknow attribute or object
                     } else {
@@ -246,7 +280,7 @@ class SmartDict extends Transportable {
     }
     objbrowser_fields(propname) {
         let fieldtypes = { _acl: "obj", _urls: "urlarray", table: "str", name: "str" } // Note Name is not an explicit field, but is normally set
-        return fieldtypes[propname]; //TODO || super if implement on Transportable
+        return fieldtypes[propname];
     }
     p_objbrowser(el, {maxdepth=2, verbose=false}={}) {
         //TODO-OBJBROWSER empty values & condition on option
@@ -281,7 +315,6 @@ class SmartDict extends Transportable {
                             // Super classes call super.p_objbrowser(el,options) here
                             this.objbrowser_str(el, propname, this[propname].toString())
                             console.log("objbrowser warning, no field type specified for",propname);
-                        //TODO-OBJBROWSER make Transportable.objbrowser
                         //TODO-OBJBROWSER do superclasses
                     }
             }
@@ -353,7 +386,7 @@ class SmartDict extends Transportable {
 
         try {
             if (verbose) console.log("SmartDict.p_fetch", urls);
-            let data = await super.p_fetch(urls, opts);  // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
+            let data = await Transports.p_rawfetch(urls, opts);  // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
             let maybeencrypted = utils.objectfrom(data);         // Parse JSON (dont parse if p_fetch has returned object (e.g. from KeyValueTable
             let decrypted = await this._after_fetch(maybeencrypted, urls, verbose);
             return decrypted;

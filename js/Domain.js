@@ -1,6 +1,5 @@
 const errors = require('./Errors'); // Standard Dweb Errors
 const Transports = require('./Transports'); // Manage all Transports that are loaded
-const Transportable = require('./Transportable'); // Base class of any object the transports can handle
 const SmartDict = require("./SmartDict"); //for extends
 const KeyPair = require('./KeyPair'); // Encapsulate public/private key pairs and crypto libraries
 const utils = require('./utils'); // Utility functions
@@ -69,7 +68,7 @@ class Leaf extends SmartDict {
         The Leaf class is used to register another object in a domain.
 
         Fields inherited from NameMixin: expires; name;
-        urls: Points at object being named (for a Transportable object its obj._publicurls)
+        urls: Points at object being named (for a SmartDict object its obj._publicurls)
         mimetype:   Mimetype of content esp application/json
         metadata:   Other information about the object needed before or during retrieval.
                     This is a good place to extend, please document any here for now.
@@ -87,7 +86,7 @@ class Leaf extends SmartDict {
         this.metadata = this.metadata || {};         // Other information about the object needed before or during retrieval
     }
     static async p_new(data, verbose, options) {
-        if (data instanceof Transportable) {
+        if (data instanceof SmartDict) {
             data = {urls: data._publicurls || data._urls };  // Public if appropriate else _urls
         }
         return new this(data, verbose, options)
@@ -106,7 +105,7 @@ class Leaf extends SmartDict {
         let obj;
         try {
             if (["application/json"].includes(this.mimetype) ) {
-                let data = Transportable.p_fetch(this.urls, { verbose, timeoutMS: 5000});
+                let data = Transports.p_rawfetch(this.urls, { verbose, timeoutMS: 5000});
                 let datajson = (typeof data === "string" || data instanceof Buffer) ? JSON.parse(data) : data;          // Parse JSON (dont parse if p_fetch has returned object (e.g. from KeyValueTable
                 if (this.metadata["jsontype"] === "archive.org.dweb") {
                     let obj = await this._after_fetch(datajson, urls, verbose);   // Interpret as dweb - look at its "table" and possibly decrypt
@@ -395,7 +394,7 @@ class Domain extends KeyValueTable {
             //TODO-NAME note p_resolve is faking signature verification on FAKEFAKEFAKE - will also need to error check that which currently causes exception
             console.assert(res[0].name === "/"+name);
             if (verbose) console.log("Resolved",name,"to",await res[0].p_printable({maxindent:2}), res[1]);
-            let metadata = await Transportable.p_fetch(res[0].urls); // Using Block as its multiurl and might not be HTTP urls
+            let metadata = await Transports.p_rawfetch(res[0].urls); // Using Block as its multiurl and might not be HTTP urls
             if (verbose) console.log("Retrieved metadata",JSON.stringify(metadata));
             console.log("---Expect failure to resolve 'arc/archive.org/details/commute'");
             console.assert(metadata.metadata.identifier === itemid);

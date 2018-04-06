@@ -2,7 +2,6 @@ import ArchiveFile from "./ArchiveFile";
 import Util from "./Util";
 
 require('babel-core/register')({ presets: ['env', 'react']}); // ES6 JS below!
-const Transportable = require('../js/Transportable');
 const Transports = require('../js/Transports');
 const Domain = require('../js/Domain');     // So can resolve names like dweb:/arc
 const utils = require('../js/utils');
@@ -64,7 +63,7 @@ export default class ArchiveItem {
             */
             // Fetch via Domain record
             const name = `dweb:/arc/archive.org/metadata/${this.itemid}`;
-            let m = await Transportable.p_fetch([name], {verbose, timeoutMS: 5000}); // Using Transportable as its multiurl and might not be HTTP urls
+            let m = await Transports.p_rawfetch([name], {verbose, timeoutMS: 5000}); // Using Transports as its multiurl and might not be HTTP urls
             m = utils.objectfrom(m);
             console.assert(m.metadata.identifier === this.itemid);
             this.item = m;

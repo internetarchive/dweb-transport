@@ -65,7 +65,7 @@ class TransportIPFS extends Transport {
         this.status = Transport.STATUS_LOADED;
     }
 
-
+/*
     _makepromises() {
         //Utility function to promisify Block
         //Replaced promisified utility since only two to promisify
@@ -76,7 +76,7 @@ class TransportIPFS extends Transport {
             get: promisify(this.ipfs.block.get)
         }}}
     }
-
+*/
     p_ipfsstart(verbose) {
         /*
         Just start IPFS - not Y (note used with "yarrays" and will be used for non-IPFS list management)
@@ -86,7 +86,7 @@ class TransportIPFS extends Transport {
         return new Promise((resolve, reject) => {
             this.ipfs = new IPFS(this.options.ipfs);
             this.ipfs.on('ready', () => {
-                this._makepromises();
+                //this._makepromises();
                 resolve();
             });
             this.ipfs.on('error', (err) => reject(err));

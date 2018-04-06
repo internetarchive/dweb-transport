@@ -12,7 +12,7 @@ class Signature extends SmartDict {
     urls:       URLs of object signed - note this is intentionally "urls" not "_urls" since its a stored field.
     signature:  Signature of the date and url
     signedby:   Public URLs of list signing this (list should have a public key)
-    Inherits from SmartDict: _acl and from Transportable: _urls, _data
+    Inherits from SmartDict: _acl, _urls, _data
      */
     constructor(dic, verbose) {
         /*

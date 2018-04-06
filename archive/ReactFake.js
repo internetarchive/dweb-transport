@@ -12,7 +12,6 @@ import from2 from "from2";
 import prettierBytes from "prettier-bytes";
 const Url = require('url');
 import ArchiveFile from "./ArchiveFile";
-const Transportable = require('../js/Transportable');
 const Transports = require('../js/Transports');
 const Domain = require('../js/Domain');
 
@@ -80,7 +79,7 @@ export default class React  {
          */
         /*
         //This method makes use of the full Dweb library, can get any kind of link, BUT doesnt work in Firefox, the image doesn't get rendered.
-        let data = await  Transportable.p_fetch(urls, {verbose});  //Typically will be a Uint8Array
+        let data = await  Transports.p_rawfetch(urls, {verbose});  //Typically will be a Uint8Array
         let blob = new Blob([data], {type: Util.archiveMimeTypeFromFormat[this.metadata.format]}) // Works for data={Uint8Array|Blob}
         // This next code is bizarre combination needed to open a blob from within an HTML window.
         let objectURL = URL.createObjectURL(blob);
@@ -112,7 +111,7 @@ export default class React  {
             RenderMedia.append(file, jsx, cb);  // Render into supplied element - have to use append, as render doesnt work, the cb will set attributes and/or add children.
         } else {
             // Otherwise fetch the file, and pass via rendermedia and from2
-            const buff = await  Transportable.p_fetch(urls, {verbose, timeoutMS: 5000, relay: true});  //Typically will be a Uint8Array TODO-TIMEOUT make timeoutMS depend on size of file
+            const buff = await  Transports.p_rawfetch(urls, {verbose, timeoutMS: 5000, relay: true});  //Typically will be a Uint8Array TODO-TIMEOUT make timeoutMS depend on size of file
             if (verbose) console.log("Retrieved image size",buff.length);
             const file = {
                 name: name,
@@ -192,7 +191,7 @@ export default class React  {
                     jsx.src = url;
                 } else {
                     // Worst choice - fetch the file, and pass via rendermedia and from2
-                    const buff = await  Transportable.p_fetch(urls, {verbose});  //Typically will be a Uint8Array, TODO-TIMEOUT make timeoutMS dependent on file size
+                    const buff = await  Transports.p_rawfetch(urls, {verbose});  //Typically will be a Uint8Array, TODO-TIMEOUT make timeoutMS dependent on file size
                     const file = {
                         name: name,
                         createReadStream: function (opts) {
