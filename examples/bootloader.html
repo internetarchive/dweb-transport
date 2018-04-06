@@ -31,16 +31,13 @@
         document.write("Connecting to decentralized transports","<BR>");
         document.write('<div><ul id="transportstatuses"><li class="template vertical_li" onclick="transportclick(this);"><span name="name"></span></li></ul></div>');
         await p_connect();
-        //TODO-BOOSTRAP - remove next couple of lines test
-        //res = await Dweb.Domain.root.p_resolve("arc/archive.org/metadata/commute", {verbose});
-        //console.log("Just checked resolves ok",res);
         try {
             const res = await Dweb.Domain.p_rootResolve(name, {verbose});
             const resolution = res[0];
             const remainder = res[1];
-            const opentarget="_self"; //TODO-BOOTSTRAP Use "_blank" when testing "_self" normally
+            const opentarget="_self";
             if ((resolution instanceof Dweb.Leaf) && ["text/html"].includes(resolution.mimetype)) {
-                //Its an HTML file, open it (TODO-BOOTSTRAP see iterations in google doc)
+                //Its an HTML file, open it 
                 if (resolution.metadata.htmlusesrelativeurls) {
                     let tempurls = resolution.urls;
                     const pathatt = resolution.metadata.htmlpath || "path";
