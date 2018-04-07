@@ -4,7 +4,7 @@ import React from './ReactFake';
 import Util from './Util';
 import throttle from "throttleit";
 import prettierBytes from "prettier-bytes";
-var Transports = require('../js/Transports');
+var Transports = require('dweb-transports');
 
 export default class ArchiveFile {
     /*

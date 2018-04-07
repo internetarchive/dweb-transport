@@ -84,14 +84,26 @@ class Signature extends SmartDict {
         return arr.filter((x) => (!res[x.urls] && (res[x.urls] = true)))
     }
 
-    async p_fetchdata(verbose) {
+    async p_fetchdata({verbose=false, ignoreerrors=false} = {}) {
         /*
         Fetch the data related to a Signature, store on .data
 
+        ignoreerrors: Passed if should ignore any failures, especially failures to decrypt
         :resolves to: obj - object that was signed
+        :raises:  AuthenticationError if can't decrypt
+
          */
         if (!this.data) {   // Fetch data if have not already fetched it
-            this.data = await SmartDict.p_fetch(this.urls, verbose); // Resolves to new obj
+            try {
+                this.data = await SmartDict.p_fetch(this.urls, verbose); // Resolves to new obj AuthenticationError if can't decrypt
+            } catch(err) {
+                if (ignoreerrors) {
+                    console.error("Ignoring in Signature.p_fetchdata: ", err.message);
+                    return undefined;
+                } else {
+                    throw err;
+                }
+            }
         }
         return this.data;
     }

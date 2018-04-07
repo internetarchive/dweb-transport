@@ -82,10 +82,10 @@ function keychain_click(el) {
         if (verbose) console.log("keychain.eventlistener",event);
         let sig = event.detail;
         if (Dweb.utils.intersects(kc._publicurls, el_keychain_header.source._publicurls))   // Check its still this KeyChain being displayed in keylist
-            sig.p_fetchdata(verbose)                            // Get the data from a sig, its not done automatically as in other cases could be large
+            sig.p_fetchdata({verbose})                            // Get the data from a sig, its not done automatically as in other cases could be large
                 .then((obj) => _showkeyorlock("keychain_ul", obj))             // Show on the list
     });
-    kc.p_list_then_elements()                            // Retrieve the keys for the keylist
+    kc.p_list_then_elements({verbose, ignoreerrors: true})                            // Retrieve the keys for the keylist - ignore any cant decrypt
         .then(() => kc._keys.map((key)=> _showkeyorlock("keychain_ul", key)));  // And add to the HTML
 }
 async function kcitem_click(el) { //!SEE-OTHER-KC-CLASSES
@@ -131,9 +131,9 @@ async function keynew_click() {
     hide('keynew_form');
     let dict = form2dict("keynew_form"); //name
     let keychain = document.getElementById('keychain_header').source;   // Keychain of parent of this dialog
-    let key = new Dweb.KeyPair({name: dict.name, key: {keygen: true}, _acl: keychain}, verbose );
+    let key = new Dweb.KeyPair({name: dict.name, key: {keygen: true}, _acl: keychain}, verbose ); // Doesnt store
     _showkeyorlock("keychain_ul", key);   // Put in UI, as listmonitor response will be deduplicated.
-    await keychain.p_push(key, verbose);
+    await keychain.p_push(key, verbose);    // Will store on the way
     if (verbose) console.groupEnd("keynew_click ---");
 }
 
@@ -161,7 +161,7 @@ async function p_lock_click(el) {
             if (verbose) console.log("lock.eventlistener",event);
             let sig = event.detail;
             if (Dweb.utils.intersects(acl._publicurls, el_lockheader.source._publicurls))  // Check its still this ACL being displayed in keylist
-                sig.p_fetchdata(verbose)                    // Get the data from a sig, its not done automatically as in other cases could be large
+                sig.p_fetchdata({verbose})                    // Get the data from a sig, its not done automatically as in other cases could be large
                     .then((tok) => _showkeyorlock("lock_ul", tok))           // Show on the list
         });
     } catch(err) {

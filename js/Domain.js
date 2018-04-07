@@ -1,10 +1,11 @@
 const errors = require('./Errors'); // Standard Dweb Errors
-const Transports = require('./Transports'); // Manage all Transports that are loaded
+const Transports = require('dweb-transports'); // Manage all Transports that are loaded
 const SmartDict = require("./SmartDict"); //for extends
 const KeyPair = require('./KeyPair'); // Encapsulate public/private key pairs and crypto libraries
 const utils = require('./utils'); // Utility functions
 const KeyValueTable = require("./KeyValueTable"); //for extends
 const KeyChain = require('./KeyChain'); // Hold a set of keys, and locked objects
+const AccessControlList = require('./AccessControlList');
 
 //Mixins based on https://javascriptweblog.wordpress.com/2011/05/31/a-fresh-look-at-javascript-mixins/
 
@@ -52,7 +53,7 @@ const NameMixin = function(options) {
         Typically this will be either: another Domain; another SmartDict or class; raw content (e.g a PDF or HTML.
 
     Signed Fields
-    urls | tablepublicurls    Where to find the object (or table if its a domain)
+    tableurls | tablepublicurls    Where to find the object (or table if its a domain)
     expires: ISODATE         When this name should be considered expired (it might still be resolved, but not if newer names available.
     (there is no validfrom time, this is implicitly when it was signed)
     name: str               Names that this record applies to relative to table its in. e.g.  fred, father
@@ -67,7 +68,7 @@ class Leaf extends SmartDict {
     /*
         The Leaf class is used to register another object in a domain.
 
-        Fields inherited from NameMixin: expires; name;
+        Fields
         urls: Points at object being named (for a SmartDict object its obj._publicurls)
         mimetype:   Mimetype of content esp application/json
         metadata:   Other information about the object needed before or during retrieval.
@@ -75,6 +76,7 @@ class Leaf extends SmartDict {
                     jsontype: archive.org.dweb   is a way to say its a Dweb object,
                     jsontype: archive.org.metadata is for archive.org metadata
         Fields inherited from SignatureMixin: signatures
+        Fields inherited from NameMixin: expires; name;
 
      */
     constructor(data, verbose, options) {
@@ -93,7 +95,8 @@ class Leaf extends SmartDict {
     }
 
     objbrowser_fields(propname) {
-        const fieldtypes = { expires: "str", "urls": "urlarray", "name": "str", "signatures": "arrayjsonobj"};
+        const fieldtypes = {  "urls": "urlarray", "mimetype": "str", "metadata": "dictobj",
+            "signatures": "arrayjsonobj", "name": "str", expires: "str" };
         return fieldtypes[propname] || super.objbrowser_fields(propname);
     }
 
@@ -141,7 +144,9 @@ class Domain extends KeyValueTable {
     Fields:
     keys: [NACL VERIFY:xyz*]   Public Key to use to verify entries - identified by type, any of these keys can be used to sign a record
 
+
     Fields inherited from NameMixin: name; expires; signatures
+    Fields inherited from SignatureMixin: signatures
 
     Fields inherited from KeyValueTable
     tablepublicurls: [ str* ]       Where to find the table.
@@ -158,6 +163,9 @@ class Domain extends KeyValueTable {
     }
     static async p_new(data, master, key, verbose, seedurls, kids) {
         const obj = await super.p_new(data, master, key, verbose, {keyvaluetable: "domain", seedurls: seedurls}); // Will default to call constructor and p_store if master
+        if (obj.keychain) {
+            await obj.keychain.p_push(obj, verbose);
+        }
         for (let j in kids ) {
             await obj.p_register(j, kids[j]);
         }
@@ -165,7 +173,8 @@ class Domain extends KeyValueTable {
     }
 
     objbrowser_fields(propname) {
-        const fieldtypes = { _map: "dictobj", "keys": "arraystr"};
+        const fieldtypes = { _map: "dictobj", "keys": "arraystr",
+            "signatures": "arrayjsonobj", "name": "str", expires: "str" };
         return fieldtypes[propname] || super.objbrowser_fields(propname);
     }
 
@@ -233,8 +242,8 @@ class Domain extends KeyValueTable {
 
     static async p_rootSet( {verbose=false}={}){
         //TODO-CONFIG put this (and other TODO-CONFIG into config file)
-        const rootpublicurls = [ 'ipfs:/ipfs/zdj7WmmDLq6W3GvWFuPoPSw53dbij2oPRYBTVa7hbRWoNeE5P',
-            'contenthash:/contenthash/QmRQUywWx6jxc32FPBNAZT6LdWvqFMwN3cmshSn32Pcwan' ];
+        const rootpublicurls = [
+            "contenthash:/contenthash/QmRgvjFsRMNAGstAUZUcBxYsg6zejHFEZfcFzvzV6osPyF" ]; //'ipfs:/ipfs/zdj7WmmDLq6W3GvWFuPoPSw53dbij2oPRYBTVa7hbRWoNeE5P',
         this.root = await SmartDict.p_fetch(rootpublicurls,  {verbose, timeoutMS: 5000});
     }
 
@@ -298,16 +307,30 @@ class Domain extends KeyValueTable {
     static async p_setupOnce({verbose=false} = {}) {
         //const metadatagateway = 'http://localhost:4244/leaf/archiveid';
         const metadataGateway = 'https://gateway.dweb.me/leaf/archiveid'; //TODO-BOOTSTRAP need to run this against main gateway
-        const pass = "Replace this with something secret";
-        const kc = await KeyChain.p_new({name: "test_keychain kc"}, {passphrase: pass}, verbose);    //TODO-NAME replace with secret passphrase
+        //TODO-NAMING change passphrases to something secret, figure out what need to change
+        const pass1 = "all knowledge for all time to everyone for free"; // TODO-NAMING make something secret
+        const pass2 = "Replace this with something secret"; // Base for other keys during testing - TODO-NAMING replace with keygen: true so noone knows private key
+        const archiveadminkc = await KeyChain.p_new({name: "Archive.org Admin"}, {passphrase: "Archive.org Admin/" + pass1}, verbose);  // << THis is what you login as
+        //const archiveadminacl = await AccessControlList.p_new({name: "Archive.org Administrators", _acl: archiveadminkc}, true, {keygen: true}, verbose, {}, archiveadminkc);  //data, master, key, verbose, options, kc
+        //const archiveadminkey = new KeyPair({name: "Archive.org Admin", key: {keygen: true}, _acl: archiveadminkc}, verbose );
+        //await archiveadminkc.p_push(archiveadminkey);
+        //await archiveadminacl.p_add_acle(archiveadminkey, {name: "Archive.org Admin"}, verbose );
+
+        /* SECURITY DOCS
+            archiveadminkc is the keychain owned by the Archive Administrator (who logs in with its ID/passphrase)
+            Each domain has a random private key (for now I've used a passphase to generate them so that tests dont rebuild data structures)
+            / /arc /arc/archive.org /arc/archive.org/metadata domains have _acl=archiveadminkc so only Archive Admin can see the private key which is needed to register
+
+
+        */
         //TODO-NAME add ipfs address and ideally ipns address to archiveOrgDetails record
         //p_new should add registrars at whichever compliant transports are connected (YJS, HTTP)
-        Domain.root = await Domain.p_new({_acl: kc, name: ""}, true, {passphrase: pass+"/"}, verbose, [], {   //TODO-NAME will need a secure root key
-            arc: await Domain.p_new({_acl: kc},true, {passphrase: pass+"/arc"}, verbose, [], { // /arc domain points at our top level resolver.
-                "archive.org": await Domain.p_new({_acl: kc}, true, {passphrase: pass+"/arc/archive.org"}, verbose, [], {
+        Domain.root = await Domain.p_new({_acl: archiveadminkc, name: "", keychain: archiveadminkc}, true, {passphrase: pass2+"/"}, verbose, [], {   //TODO-NAME will need a secure root key
+            arc: await Domain.p_new({_acl: archiveadminkc, keychain: archiveadminkc},true, {passphrase: pass2+"/arc"}, verbose, [], { // /arc domain points at our top level resolver.
+                "archive.org": await Domain.p_new({_acl: archiveadminkc, keychain: archiveadminkc}, true, {passphrase: pass2+"/arc/archive.org"}, verbose, [], {
                             "details": await Leaf.p_new({urls: ["https://dweb.me/examples/archive.html"], mimetype: "text/html",
                                 metadata: {htmlusesrelativeurls: true, htmlpath: "item"}}, verbose,[], {}),
-                            metadata: await Domain.p_new({_acl: kc}, true, {passphrase: pass+"/arc/archive.org/metadata"}, verbose, [metadataGateway], {}),
+                            metadata: await Domain.p_new({_acl: archiveadminkc, keychain: archiveadminkc}, true, {passphrase: pass2+"/arc/archive.org/metadata"}, verbose, [metadataGateway], {}),
                             "search.php": await Leaf.p_new({urls: ["https://dweb.me/examples/archive.html"], mimetype: "text/html",
                                 metadata: {htmlusesrelativeurls: true, htmlpath: "path"}}, verbose,[], {})
                             //Note I was seeing a lock error here, but cant repeat now - commenting out one of these last two lines seemed to clear it.
@@ -315,7 +338,7 @@ class Domain extends KeyValueTable {
             })
         }); //root
         const testing = Domain.root.tablepublicurls.map(u => u.includes("localhost")).includes(true);
-        console.log("Domain.root publicurls for",testing ? "testing:" : "inclusion in bootloader.html:",Domain.root._publicurls);
+        console.log("Domain.root publicurls for",testing ? "testing:" : "inclusion in Domain.js:p_rootSet():",Domain.root._publicurls);
         const metadatatableurl = Domain.root._map["arc"]._map["archive.org"]._map["metadata"].tablepublicurls.find(u=>u.includes("getall/table"))
         if (!testing) {
             console.log("Put this in gateway config.py config.domains.metadata:", metadatatableurl);
@@ -341,7 +364,12 @@ class Domain extends KeyValueTable {
             return res[0].urls;
         }
     }
-
+    privateFromKeyChain() {
+        /* Look in the logged in user's keychains to see if have the private version of this domain, in which case can work on it
+        returns:    undefined or Domain
+         */
+        return KeyChain.find_in_keychains({tablepublicurls: this.tablepublicurls})
+    }
     static async p_test(verbose) {
         if (verbose) console.log("KeyValueTable testing starting");
         try {

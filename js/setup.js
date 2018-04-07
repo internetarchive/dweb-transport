@@ -6,11 +6,7 @@ const dom = new JSDOM(htmlfake);
 document = dom.window.document;   // Note in JS can't see "document" like can in python
 
 // Dweb constituents
-const Transports = require('./Transports'); // Manage all Transports that are loaded
-const TransportHTTP = require('./TransportHTTP');
-const TransportIPFS = require('./TransportIPFS');
-const TransportYJS = require('./TransportYJS');
-const TransportWEBTORRENT = require('./TransportWEBTORRENT');
+const Transports = require('dweb-transports'); // Manage all Transports that are loaded //TODO-REFACTOR mvoe to DwebTransports
 const Domain = require('./Domain');
 
 /*
@@ -45,8 +41,8 @@ async function p_setup(verbose) {
         // Note the order of these is significant, it will retrieve by preference from the first setup, try with both orders if in doubt.
         //SEE-OTHER-ADDTRANSPORT
         //TODO-REQUIRE these will break
-        let t_ipfs = await TransportIPFS.p_setup(opts, verbose); await t_ipfs.p_status(); // Note browser requires indexeddb
-        let t_yjs = await TransportYJS.p_setup(opts, verbose);  await t_yjs.p_status(); // Should find ipfs transport
+        //let t_ipfs = await TransportIPFS.p_setup(opts, verbose); await t_ipfs.p_status(); // Note browser requires indexeddb
+        //let t_yjs = await TransportYJS.p_setup(opts, verbose);  await t_yjs.p_status(); // Should find ipfs transport
         let t_http = await TransportHTTP.p_setup(opts, verbose); await t_http.p_status();
         //let t_webtorrent = await TransportWEBTORRENT.p_test(opts, verbose); await t_webtorrent.p_status();
         if (verbose) console.log("setup returned and transport(s) connected:", Transports.connectedNames());

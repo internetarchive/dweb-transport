@@ -1,5 +1,5 @@
 const errors = require('./Errors'); // Standard Dweb Errors
-const Transports = require('./Transports'); // Manage all Transports that are loaded
+const Transports = require('dweb-transports'); // Manage all Transports that are loaded
 const SmartDict = require('./SmartDict'); // General handling of JSON structures
 const Signature = require('./Signature'); // Encapsulate a signature as used for items on a CommonList
 const PublicPrivate = require("./PublicPrivate"); //for extends
@@ -92,7 +92,7 @@ class CommonList extends PublicPrivate {
             .sort((a,b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);  // Sort signatures by date
     }
 
-    async p_list_then_elements(verbose) {
+    async p_list_then_elements({verbose=false, ignoreerrors=false}={}) {
         /*
          Utility function to simplify nested functions, fetches body, list and each element in the list.
 
@@ -101,10 +101,11 @@ class CommonList extends PublicPrivate {
         try {
             await this.p_fetchlist(verbose);
             this.listmonitor(verbose);  // Track any future objects  - will call event Handler on any added
-            return await Promise.all(
+            return (await Promise.all(
                 Signature.filterduplicates(this._list) // Dont load multiple copies of items on list (might need to be an option?)
-                    .map((sig) => sig.p_fetchdata(verbose))
-            ); // Return is array result of p_fetchdata which is array of new objs (suitable for storing in keys etc)
+                    .map((sig) => sig.p_fetchdata({verbose, ignoreerrors}))))
+                .filter(f => !!f);    // Note filters out any undefined from errors
+            // Return is array result of p_fetchdata which is array of new objs (suitable for storing in keys etc)
         } catch(err) {
             console.log("CL.p_list_then_elements: failed",err.message);
             throw err;

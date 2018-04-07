@@ -79,7 +79,9 @@ class SmartDict {
                 if (dd[i] instanceof SmartDict) {
                     // Any field that contains an object will be turned into an array of urls for the object.
                     if (!dd[i].stored()) throw new errors.CodingError("Should store subobjects before calling preflight");
-                    res[i] = dd[i]._urls
+                    // Mostly want _urls, but for example even master of KeyChain is stored with _publicurls only
+                    res[i] = dd[i]._urls.length ? dd[i]._urls : dd[i]._publicurls
+
                 } else {
                     res[i] = dd[i];
                 }
@@ -159,7 +161,7 @@ class SmartDict {
          */
         return Object.keys(dict).every((key) => {
             return (
-                (["_publicurls","_urls"].includes(key))  ? utils.intersects(this[key], dict[key])
+                (["_publicurls","_urls", "tablepublicurls"].includes(key))  ? utils.intersects(this[key], dict[key])
                 :   (key[0] !== '.')            ? (this[key] === dict[key])
                 :   ( key === ".instanceof")    ? (this instanceof dict[key])
                 :   false)
@@ -229,13 +231,13 @@ class SmartDict {
     objbrowser_obj(el, name, val) {
         this._objbrowser_row(el, name,
             this.objbrowser_createElement('span',{className: 'propval', source: val},
-                this.objbrowser_createElement('span', {onclick: `SmartDict.p_objbrowser_expandurl(this.parentNode); return false;`},val.constructor.name)
+                this.objbrowser_createElement('span', {onclick: `Dweb.SmartDict.p_objbrowser_expandurl(this.parentNode); return false;`},val.constructor.name)
 
             ));
     }
     static async p_objbrowser_expandurl(el, obj) {
         if (typeof obj === "undefined") // If dont specify check source, which may also be undefined, but use if there.
-            obj = el.source;
+            obj = el.source || el.getAttribute("source"); // Note el.source wont work for elements
         if (Array.isArray(obj) && typeof obj[0] === "string")
             obj = await SmartDict.p_fetch(obj, verbose);
         else if (typeof obj === "string")
@@ -249,7 +251,7 @@ class SmartDict {
             this.objbrowser_createElement('ul',{className: 'propurls propval'},
                 links
                     ? arr.map(l => this.objbrowser_createElement('li',{className: 'propurl', source: l},
-                        this.objbrowser_createElement('span', {onclick: `SmartDict.p_objbrowser_expandurl(this.parentNode); return false;`},l)
+                        this.objbrowser_createElement('span', {onclick: `Dweb.SmartDict.p_objbrowser_expandurl(this.parentNode); return false;`},l)
                     ) )
                     : arr.map(l => this.objbrowser_createElement('li',{className: 'propurl'},l) )
             ) );
@@ -258,7 +260,7 @@ class SmartDict {
         this._objbrowser_row(el, name,
             this.objbrowser_createElement('ul',{className: 'propurls propval'},
                 arr.map((l,i) => this.objbrowser_createElement('li',{className: 'propurl', source: l},
-                    this.objbrowser_createElement('span', {onclick: `SmartDict.p_objbrowser_expandurl(this.parentNode); return false;`}, `${i}...`)
+                    this.objbrowser_createElement('span', {onclick: `Dweb.SmartDict.p_objbrowser_expandurl(this.parentNode); return false;`}, `${i}...`)
                 ))
             ) );
     }
@@ -267,7 +269,7 @@ class SmartDict {
         this._objbrowser_row(el, name, ul);
         arr.map((l,i) => this._objbrowser_row(ul, name,
             this.objbrowser_createElement('span', {},
-                this.objbrowser_createElement('span', {onclick: `SmartDict.p_objbrowser_expandurl(this.parentNode); return false;`}, `${i}...`)
+                this.objbrowser_createElement('span', {onclick: `Dweb.SmartDict.p_objbrowser_expandurl(this.parentNode); return false;`}, `${i}...`)
             )));
     }
     objbrowser_arraystr(el, name, arr) {
@@ -346,7 +348,9 @@ class SmartDict {
 
     }
     static async _after_fetch(maybeencrypted, urls, verbose) {
-        // Takes a structure after JSON.parse
+        /* Takes a structure after JSON.parse that might be encrypted, tried to decrypt
+        raises: AuthenticationError if can't decrypt
+         */
         let table = maybeencrypted.table;               // Find the class it belongs to
         if (!table) {
             throw new errors.ToBeImplementedError("SmartDict.p_fetch: no table field, whatever this is we cant decode it");
@@ -388,7 +392,8 @@ class SmartDict {
             if (verbose) console.log("SmartDict.p_fetch", urls);
             let data = await Transports.p_rawfetch(urls, opts);  // Fetch the data Throws TransportError immediately if url invalid, expect it to catch if Transport fails
             let maybeencrypted = utils.objectfrom(data);         // Parse JSON (dont parse if p_fetch has returned object (e.g. from KeyValueTable
-            let decrypted = await this._after_fetch(maybeencrypted, urls, verbose);
+            let decrypted = await this._after_fetch(maybeencrypted, urls, verbose); // AuthenticationError if can't decrypt
+
             return decrypted;
             // Returns new object that should be a subclass of SmartDict
         } catch(err) {
@@ -404,6 +409,7 @@ class SmartDict {
 
          :param data: possibly encrypted object produced from json stored on Dweb
          :return: same object if not encrypted, or decrypted version
+         :raises: AuthenticationError if can't decrypt
          */
         if (this.decryptcb) {
             return await this.decryptcb(data, verbose);
@@ -414,6 +420,7 @@ class SmartDict {
         /*
         Takes a callback that should be used to decrypt data (see AccessControlList) for setting it.
         The callback should return a promise.
+        raises: AuthenticationError if can't decrypt
 
         cb(encrypteddata, verbose) => resolves to data
          */

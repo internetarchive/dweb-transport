@@ -23,7 +23,7 @@
         await sd.p_objbrowser("ObjBrowserDiv");
     }
     function quick_keychains() {
-        (new Dweb.SmartDict()).objbrowser_arrayobj(el, "keychains", Dweb.KeyChain.keychains, {links: true});
+        (new Dweb.SmartDict()).objbrowser_arrayobj(elementFrom("ObjBrowserDiv"), "keychains", Dweb.KeyChain.keychains, {links: true});
     }
 
     async function main() {

@@ -15,7 +15,7 @@ import Image from './Image'
 import Audio from './Audio'
 import Video from './Video'
 import DetailsError from './DetailsError'
-const Transports = require('../js/Transports');
+const Transports = require('dweb-transports');
 
 
 export default class Nav {

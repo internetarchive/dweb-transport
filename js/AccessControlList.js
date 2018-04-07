@@ -101,7 +101,7 @@ class AccessControlList extends CommonList {
         Return the list of tokens on this ACL. Side effect of loading data on each Signature in this._list
         resolves to: [ SmartDict{token:, viewer:, name: }, ... ]
          */
-        return this.p_list_then_elements(verbose);      // Trivial
+        return this.p_list_then_elements({verbose});      // Trivial
     }
     _findtokens(viewerkeypair, decrypt, verbose) {
         /*

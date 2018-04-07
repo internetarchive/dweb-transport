@@ -1,4 +1,4 @@
-const Transports = require('./Transports'); // Manage all Transports that are loaded
+const Transports = require('dweb-transports'); // Manage all Transports that are loaded
 const SmartDict = require("./SmartDict");   // _AccessControlListEntry extends this
 const PublicPrivate = require("./PublicPrivate"); //for extends
 const utils = require('./utils'); // Utility functions
