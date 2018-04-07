@@ -1,5 +1,5 @@
 const errors = require('./Errors'); // Standard Dweb Errors
-const Transports = require('./Transports'); // Manage all Transports that are loaded
+const Transports = require('dweb-transports'); // Manage all Transports that are loaded
 const Transportable = require('./Transportable'); // Base class of any object the transports can handle
 const SmartDict = require("./SmartDict"); //for extends
 const KeyPair = require('./KeyPair'); // Encapsulate public/private key pairs and crypto libraries

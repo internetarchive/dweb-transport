@@ -5,7 +5,7 @@ import Util from './Util';
 import throttle from "throttleit";
 import prettierBytes from "prettier-bytes";
 var Transportable = require('../js/Transportable');
-var Transports = require('../js/Transports');
+var Transports = require('dweb-transports');
 
 export default class ArchiveFile {
     /*

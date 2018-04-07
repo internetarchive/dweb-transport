@@ -1,4 +1,8 @@
 {
+  "bugs": {
+    "url": "https://github.com/internetarchive/dweb-transport/issues"
+  },
+  "homepage": "https://github.com/internetarchive/dweb-transport#readme",
   "name": "dweb-transport",
   "version": "0.0.1",
   "description": "Javascript library for Internet Archive Decentralized Web project: Transport",
@@ -6,6 +10,7 @@
     "cids": "^0.5.3",
     "crypto": ">=0.0.3",
     "custom-event": "~1.0.1",
+    "dweb-transports": "git+https://git@github.com/mitra42/dweb-transports.git",
     "es2015": "0.0.0",
     "from2": "^2.3.0",
     "ipfs": "^0.28.2",
@@ -50,6 +55,10 @@
     "browserify": "^14.5.0",
     "chai": "^4.1.2",
     "watchify": "^3.11.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/internetarchive/dweb-transport.git"
   },
   "scripts": {
     "bundle": "cd js; browserify ./Dweb_alltransports.js > ../examples/dweb_bundled.js",

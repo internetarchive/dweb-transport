@@ -6,11 +6,7 @@ const dom = new JSDOM(htmlfake);
 document = dom.window.document;   // Note in JS can't see "document" like can in python
 
 // Dweb constituents
-const Transports = require('./Transports'); // Manage all Transports that are loaded
-const TransportHTTP = require('./TransportHTTP');
-const TransportIPFS = require('./TransportIPFS');
-const TransportYJS = require('./TransportYJS');
-const TransportWEBTORRENT = require('./TransportWEBTORRENT');
+const Transports = require('dweb-transports'); // Manage all Transports that are loaded //TODO-REFACTOR mvoe to DwebTransports
 const Domain = require('./Domain');
 
 /*

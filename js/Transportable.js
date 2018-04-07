@@ -1,5 +1,5 @@
 const errors = require('./Errors'); // Standard Dweb Errors
-const Transports = require('./Transports'); // Manage all Transports that are loaded
+const Transports = require('dweb-transports'); // Manage all Transports that are loaded
 
 class Transportable {
     /*

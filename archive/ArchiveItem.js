@@ -3,7 +3,7 @@ import Util from "./Util";
 
 require('babel-core/register')({ presets: ['env', 'react']}); // ES6 JS below!
 const Transportable = require('../js/Transportable');
-const Transports = require('../js/Transports');
+const Transports = require('dweb-transports');
 const Domain = require('../js/Domain');     // So can resolve names like dweb:/arc
 const utils = require('../js/utils');
 //TODO-NAMING url could be a name

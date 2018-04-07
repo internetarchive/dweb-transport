@@ -13,7 +13,7 @@ import prettierBytes from "prettier-bytes";
 const Url = require('url');
 import ArchiveFile from "./ArchiveFile";
 const Transportable = require('../js/Transportable');
-const Transports = require('../js/Transports');
+const Transports = require('dweb-transports');
 const Domain = require('../js/Domain');
 
 function deletechildren(el, keeptemplate) { //Note same function in htmlutils

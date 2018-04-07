@@ -5,6 +5,8 @@ window.Dweb = { }
 // This makes them available as "sodium" and "Dweb" from test.html etc
 //window.sodium = require("libsodium-wrappers");  // Needed for cryptotest maybe move there ?
 
+Dweb.Transports = require('dweb-transports'); // Handles multiple transports    //TODO-REFACTOR start using window.DwebTransports
+
 Dweb.errors = require('./Errors');
 Dweb.Transportable = require('./Transportable');
 Dweb.Block = require('./Block');
@@ -20,6 +22,5 @@ Dweb.VersionList = require('./VersionList');
 Dweb.EventListenerHandler = require("./EventListenerHandler");
 Dweb.Domain = require("./Domain");
 Dweb.Leaf = Dweb.Domain.clsLeaf;
-Dweb.Transports = require('./Transports'); // Handles multiple transports
 // Note that no transports are required here, the ones used are loaded in ../archive/archive.js or ./Dweb_alltransports.js
 Dweb.utils = require('./utils.js'); // Some short functions of relevance multiple places.
