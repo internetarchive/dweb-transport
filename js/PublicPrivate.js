@@ -141,19 +141,9 @@ class PublicPrivate extends SmartDict {
         return dd;
     }
 
-
-    async OBS_p_storepublic(verbose) {
-        this._publicurls = await Transports.p_rawstore(
-            JSON.stringify(
-                this.preflight(                 // Hides master urls and _acl since !master
-                    Object.assign({}, this,     // Copy the data
-                        {_master: false}))),    // cause preflight to trim keys to public
-            verbose);
-    }
-
     async _p_storepublic(verbose) {
         // Store public version, dont encrypt on storing as want public part to be publicly visible (esp for Domain)
-        this._publicurls = await Transports.p_rawstore( this._getdata({publicOnly: true, encryptIfAcl:false}), verbose);
+        this._publicurls = await Transports.p_rawstore( this._getdata({publicOnly: true, encryptIfAcl:false}), {verbos}e);
     }
     storedpublic() {
         return this._publicurls.length > 0

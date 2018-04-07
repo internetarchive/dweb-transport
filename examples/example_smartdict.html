@@ -6,7 +6,7 @@
     <link rel='stylesheet' href='example_styles.css'>
     <script type="text/javascript" src="dweb_bundled.js"></script><!-- Dwebbundle via local filesystem when testing without Dweb-->
     <script type="text/javascript" src="htmlutils.js"></script><!--objectbrowser functionality for debugging-->
-    <script type="text/javascript" src="loginutils.js"></script><!--Login tools (used for p_connect) -->
+    <script type="text/javascript" src="loginutils.js"></script>
     <script type="text/javascript">
 
     function sendit() {     // Send form data to Dweb, and display the url
@@ -22,7 +22,7 @@
 
     function fetchit() {
         let el = document.getElementById("retrievalarea");
-        let urls = urlsFrom(el.value);
+        let urls = DwebTransports.urlsFrom(el.value);
         fetchanddisplay(urls);
     }
 
@@ -40,7 +40,7 @@
     async function main() {
         //This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
         try {
-            await p_connect({defaulttransport: ["HTTP", "IPFS"]}); // Default startup beavior from loginutils.js // {http: {urlbase: "http://localhost:4244"}} for local
+            await DwebTransports.p_connect({statuselement: document.getElementById("statuselement"), transports: searchparams.getAll("transport")});
             // Any code you want to run once online goes here.
             if (url) fetchanddisplay(url);
             //Setup a callback so once logged in it will populate drop-downs (comment out if not using logins or defining onlogin)
@@ -55,9 +55,7 @@
 </head>
 <body>
 <!--Ntwork status box - this is standard for any app requiring logging in -- if edit, change on at least example_list, example_keys, eample_smartdict -->
-<div class="floatright" style="position:relative;">
-    <ul id="transportstatuses"><li class='template vertical_li' onclick="transportclick(this);"><span name='name'></span></li></ul>
-</div><!--End of standard network status and login panel-->
+<div class="floatright" id="statuselement" style="position:relative;"></div><!--End of standard network status and login panel-->
 <h1>Dweb - SmartDict Example</h1>
 <h4>Create something here, and when its saved its urls will appear below</h4>
 <form method="post" name="myform" onsubmit="sendit(); return false;">

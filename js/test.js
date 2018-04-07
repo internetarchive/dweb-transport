@@ -198,19 +198,19 @@ async function p_test_TransportYJS(opts={}, verbose) {
         console.assert(res === Transport.STATUS_CONNECTED)
         //TODO move this to Transport.p_test_list -=-=-=-=
         let testurl = "yjs:/yjs/THISATEST";  // Just a predictable number can work with
-        res = await transport.p_rawlist(testurl, verbose);
+        res = await transport.p_rawlist(testurl, {verbose});
         let listlen = res.length;   // Holds length of list run intermediate
         if (verbose) console.log("rawlist returned ", ...utils.consolearr(res));
         let monitoredobj;
         transport.listmonitor(testurl, (obj) => (monitoredobj = obj), verbose);
         let sig = new Signature({urls: ["123"], date: new Date(Date.now()), signature: "Joe Smith", signedby: [testurl]}, verbose);
-        await transport.p_rawadd(testurl, sig, verbose);
+        await transport.p_rawadd(testurl, sig, {verbose});
         if (verbose) console.log("TransportYJS.p_rawadd returned ");
-        res = await transport.p_rawlist(testurl, verbose);
+        res = await transport.p_rawlist(testurl, {verbose});
         if (verbose) console.log("rawlist returned ", ...utils.consolearr(res)); // Note not showing return
         await delay(500);
         console.assert(monitoredobj.urls[0] === "123"); // Should have been caught by the listmonitor above
-        res = await transport.p_rawlist(testurl, verbose);
+        res = await transport.p_rawlist(testurl, {verbose});
         console.assert(res.length === listlen + 1, "Should have added one item");
         //console.log("TransportYJS test complete");
         // -=-=-=-===-=- Now test KeyValue using common test -=-=-=-=-=-=-

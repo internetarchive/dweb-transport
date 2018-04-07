@@ -226,7 +226,7 @@ class Domain extends KeyValueTable {
         }
         if (this._map[key])
             return this._map[key]; // If already have a defined result then return it (it will be from this session so reasonable to cache)
-        const rr = (await Promise.all(this.tablepublicurls.map(u => Transports.p_get([u], key, verbose).catch((err) => undefined))))
+        const rr = (await Promise.all(this.tablepublicurls.map(u => Transports.p_get([u], key, {verbose}).catch((err) => undefined))))
             .map(r => this._mapFromStorage(r))
         // Errors in above will result in an undefined in the res array, which will be filtered out.
         // res is now an array of returned values in same order as tablepublicurls

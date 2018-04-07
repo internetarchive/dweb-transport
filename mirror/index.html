@@ -22,7 +22,7 @@
             //This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
             // These next two lines reqd at this level to get the global scope
             try {
-                await p_connect(); // Default startup beavior from loginutils.js
+                await DwebTransports.p_connect({statuselement: document.getElementById("statuselement"), transports: searchparams.getAll("transport")});
                 /* COPIED OVER FROM example_naming.html BUT NOT USED HERE YET
                 // Any code you want to run once online goes here.
                 var url = searchparams.get("url"); // Unused in this example
@@ -64,7 +64,7 @@
 
 </head>
 <body class="mirroring">
-
+<div id="statuselement"></div>
 <h1>Dweb - Mirroring - Documentation and Planning notes</h1>
 <p>This page is an example UI for mirroring connections.</p>
 <ul>

@@ -40,7 +40,7 @@
             console.group("newversionlist ---");
             try {
                 let dict = form2dict(el);                               // Get the data from the form
-                dict.contentacl = urlsFrom(dict.contentacl);            // May be in variety of forms but especially JSON version of array of urls
+                dict.contentacl = DwebTransports.urlsFrom(dict.contentacl);            // May be in variety of forms but especially JSON version of array of urls
                 // VersionList(data, master, keypair, keygen, mnemonic, verbose, options)
                 let obj = await Dweb.VersionList.p_new(dict, true, {keygen: true}, newversion(), verbose);
                 await p_vl_target_display(el, obj)                      // Display in the HTML target defined below
@@ -105,7 +105,7 @@
             //This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
             // These next two lines reqd at this level to get the global scope
             try {
-                await p_connect(); // Default startup beavior from loginutils.js // {http: {urlbase: "http://localhost:4244"}} for local
+                await DwebTransports.p_connect({statuselement: document.getElementById("statuselement"), transports: searchparams.getAll("transport")});
                 // Any code you want to run once online goes here.
                 starteditor();
                 //Setup a callback so once logged in it will populate drop-downs
@@ -128,7 +128,7 @@
 <body class="examples">
 <!--Login and network status box - this is standard for any app requiring logging in -- if edit, change on at least example_keys, example_versions -->
 <div class="floatright" style="position:relative;">
-    <ul id="transportstatuses"><li class='template vertical_li' onclick="transportclick(this);"><span name='name'></span></li></ul>
+    <div id="statuselement"></div>
     <ul id="keychains_ul"><li class='template vertical_li' onclick='keychain_click(this);'><span name='name'></span></li></ul>
     <form><input id="logout" class="button" type="button" onclick="logout_click();" style="display:none;" value="Logout"/></form><!--logout all keychains-->
     <img src="noun_186903_cc.png" alt="keychain" class="iconopener" onclick="show('loginform','');"/>

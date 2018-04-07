@@ -1,6 +1,6 @@
 const errors = require('./Errors');
 const utils = require('./utils'); // Utility functions
-const Transports = require('./Transports'); // Manage all Transports that are loaded
+const Transports = require('dweb-transports'); // Manage all Transports that are loaded
 
 // See CommonBlock.py for Python version
 //TODO-API merge Transportable into here, delete Block
@@ -141,7 +141,7 @@ class SmartDict {
                 return this;  // No-op if already stored, use dirty() if change after retrieved
             let data = this._getdata();
             if (verbose) console.log("SmartDict.p_store data=", data);
-            this._urls = await Transports.p_rawstore(data, verbose);
+            this._urls = await Transports.p_rawstore(data, {verbose});
             if (verbose) console.log("SmartDict.p_store urls=", this._urls);
             return this;
         } catch (err) {
@@ -177,45 +177,7 @@ class SmartDict {
     }
 
     objbrowser_createElement(tag, attrs, children) {        // Note arguments is set to tag, attrs, child1, child2 etc
-        var element = document.createElement(tag);
-        for (let name in attrs) {
-            let attrname = (name.toLowerCase() === "classname" ? "class" : name);
-            if (name === "dangerouslySetInnerHTML") {
-                element.innerHTML = attrs[name]["__html"];
-                delete attrs.dangerouslySetInnerHTML;
-            }
-            if (attrs.hasOwnProperty(name)) {
-                let value = attrs[name];
-                if (value === true) {
-                    element.setAttribute(attrname, name);
-                } else if (typeof value === "object" && !Array.isArray(value)) { // e.g. style: {{fontSize: "124px"}}
-                    if (value instanceof SmartDict) {
-                        // We are really trying to set the value to an object, allow it
-                        element[attrname] = value;  // Wont let us use setAttribute(attrname, value) unclear if because unknow attribute or object
-                    } else {
-                        for (let k in value) {
-                            element[attrname][k] = value[k];
-                        }
-                    }
-                } else if (value !== false && value != null) {
-                    element.setAttribute(attrname, value.toString());
-                }
-            }
-        }
-        for (let i = 2; i < arguments.length; i++) { // Everything after attrs
-            let child = arguments[i];
-            if (!child) {
-            } else if (Array.isArray(child)) {
-                child.map((c) => element.appendChild(c.nodeType == null ?
-                    document.createTextNode(c.toString()) : c))
-            }
-            else {
-                element.appendChild(
-                    child.nodeType == null ?
-                        document.createTextNode(child.toString()) : child);
-            }
-        }
-        return element;
+        return utils.createElement(...arguments);           // Use ... because "children" is a placeholder for a long list of arguments
     }
 
     _objbrowser_row(el, name, valueElement) {

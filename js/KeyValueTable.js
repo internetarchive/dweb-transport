@@ -48,7 +48,7 @@ class KeyValueTable extends PublicPrivate {
         const obj = await super.p_new(data, master, key, verbose, options);
         // Should set this._autoset to true if and only if master && urls set in data or options
         if (master && !(obj.tablepublicurls && obj.tablepublicurls.length)) {
-            const res = await Transports.p_newtable(obj, keyvaluetable);
+            const res = await Transports.p_newtable(obj, keyvaluetable, {verbose});
             obj.tableurls = res.privateurls;
             obj.tablepublicurls = res.publicurls.concat(seedurls);
             obj._autoset = true;
@@ -122,7 +122,7 @@ class KeyValueTable extends PublicPrivate {
         //TODO-KEYVALUE these sets need to be signed if the transport overwrites the previous, rather than appending
         //TODO-KEYVALUE the difference is that if appended, then an invalid signature (if reqd) in the value would cause it to be discarded.
         if (this._autoset && !fromNet && (this._map[name] !== value)) {
-            await Transports.p_set(this.tableurls, name, this._storageFromMap(value, {publicOnly, encryptIfAcl}), verbose); // Note were not waiting for result but have to else hit locks
+            await Transports.p_set(this.tableurls, name, this._storageFromMap(value, {publicOnly, encryptIfAcl}), {verbose}); // Note were not waiting for result but have to else hit locks
         }
         if (!((value instanceof PublicPrivate) && this._map[name] && this._map[name]._master)) {
             // Dont overwrite the name:value pair if we already hold the master copy. This is needed for Domain, but probably generally useful
@@ -144,7 +144,7 @@ class KeyValueTable extends PublicPrivate {
         }
         if (!keys.every(k => this._map[k])) {
             // If we dont have all the keys, get from transport
-            const res = await Transports.p_get(this.tablepublicurls, keys, verbose);
+            const res = await Transports.p_get(this.tablepublicurls, keys, {verbose});
             this._updatemap(res);
         }
         // Return from _map after possibly updating it
@@ -154,7 +154,7 @@ class KeyValueTable extends PublicPrivate {
         /*
         returns array of all keys
          */
-        return await Transports.p_keys(this.tablepublicurls, verbose)
+        return await Transports.p_keys(this.tablepublicurls, {verbose})
     }
     async p_getall(verbose) {
         /*
@@ -168,7 +168,7 @@ class KeyValueTable extends PublicPrivate {
     async p_delete(name, {fromNet=false, verbose=false}={}) {
         delete this._map[name]; // Delete locally
         if (!fromNet) {
-            Transports.delete(this.tablepublicurls, name, verbose);    // and remotely.
+            await Transports.p_delete(this.tablepublicurls, name, {verbose});    // and remotely.
         }
     }
     //get(name, default) cant be defined as overrides this.get()

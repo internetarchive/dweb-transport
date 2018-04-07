@@ -111,7 +111,8 @@ export default class React  {
             RenderMedia.append(file, jsx, cb);  // Render into supplied element - have to use append, as render doesnt work, the cb will set attributes and/or add children.
         } else {
             // Otherwise fetch the file, and pass via rendermedia and from2
-            const buff = await  Transports.p_rawfetch(urls, {verbose, timeoutMS: 5000, relay: true});  //Typically will be a Uint8Array TODO-TIMEOUT make timeoutMS depend on size of file
+            //TODO-MULTI-GATEwAY need to set relay: true once IPFS different CIDs (hashes) from browser/server adding
+            const buff = await  Transports.p_rawfetch(urls, {verbose, timeoutMS: 5000, relay: false});  //Typically will be a Uint8Array TODO-TIMEOUT make timeoutMS depend on size of file
             if (verbose) console.log("Retrieved image size",buff.length);
             const file = {
                 name: name,

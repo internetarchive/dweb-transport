@@ -4,23 +4,6 @@
  */
 
 
-function urlsFrom(url) {
-    /* Convert to urls,
-    url:    Array of urls, or string representing url or representing array of urls
-    return: Array of strings representing url
-     */
-    if (typeof(url) === "string") {
-        if (url[0] === '[')
-            url = JSON.parse(url);
-        else if (url.includes(','))
-            url = url.split(',');
-        else
-            url = [ url ];
-    }
-    if (!Array.isArray(url)) throw new Error(`Unparsable url: ${url}`);
-    return url;
-}
-
 function elementFrom(el) {
     /* Make sure we have an element, if passed a string then find the element with that id.
       el:       Element or string being the id of an element.
@@ -238,36 +221,6 @@ async function p_httpget(url, headers) {
             console.log("Probably misleading error from fetch:", url, err);
             throw new Error(`Transport error thrown by ${url}`)
     }
-}
-
-function display_blob(bb, options) {
-    /*
-        Display a blob of data
-        Typical usage display_blob(await Dweb.Transports.p_rawfetch(urls), {type: "application/pdf"})
-        bb: Data to display, either as blob or something that can be passed to Blob([bb]) e.g. a buffer
-        options:    {
-            type: mimetype  (required if bb not already a blob)
-            target:     Where to display e.g. "_blank" or "_self"
-        }
-        TODO probably extend this to do a download which has some code in archive/*js to handle
-     */
-    // See https://developer.mozilla.org/en-US/docs/Web/API/URL/createObjectURL
-    // and https://stackoverflow.com/questions/3665115/create-a-file-in-memory-for-user-to-download-not-through-server
-    if (!(bb instanceof Blob)) {
-        console.log("display_blob: creating with type",options.type);
-        bb = new Blob([bb], {type: options.type})
-    }
-    console.log("display_blob:",typeof bb);
-    // This next code is bizarre combination needed to open a blob from within an HTML window.
-    let a = window.document.createElement('a');
-    //bb = new Blob([datapdf], {type: 'application/pdf'});
-    let objectURL = URL.createObjectURL(bb);
-    a.href = objectURL;
-    a.target= (options && options.target) || "_blank";                      // Open in new window by default
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    //URL.revokeObjectURL(objectURL)    //TODO figure out when can do this - maybe last one, or maybe dont care?
 }
 
 //------- For dealing with MCE editor ----------

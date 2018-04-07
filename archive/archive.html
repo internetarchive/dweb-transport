@@ -19,7 +19,7 @@
     <!--<script src="./dweb_bundled.js" type="text/javascript"></script> <!--Obsoleted by new combined archive.js -->
     <!--TODO strip htmlutils nad loginutils and example_styles.css to only things needed with Archive details page-->
     <script type="text/javascript" src="htmlutils.js"></script>
-    <script type="text/javascript" src="loginutils.js"></script><!--Login tools (used for p_connect) -->
+    <script type="text/javascript" src="loginutils.js"></script>
     <link rel='stylesheet' href='example_styles.css'>
     <style>
         #jw6, #jw6__list { backgroundColor:black; }
@@ -34,7 +34,7 @@
     $(function(){ $('.navbar [data-toggle="tooltip"]').tooltip({}); });
 
     async function main() {
-        await p_connect();
+        await DwebTransports.p_connect({statuselement: document.getElementById("statuselement"), transports: searchparams.getAll("transport")});
         if (query) {
             Nav.nav_search(query)
         } else if (item) {
@@ -45,8 +45,7 @@
     }
 
 </script>
-<div class="floatright">
-    <ul id="transportstatuses"><li class='template vertical_li' onclick="transportclick(this);"><span name='name'></span></li></ul>
+<div class="floatright" id="statuselement">
 </div><!--End of standard network status and login panel-->
 
 <div id="main"></div><!-- destination for part accumulated by Details.js etc as html-->

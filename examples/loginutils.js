@@ -177,53 +177,9 @@ async function tokennew_click() { //Called by "Add" button on new token dialog
     hide('tokennew_form');
     let dict = form2dict("tokennew_form"); //url
     let acl = document.getElementById('lock_header').source;
-    let tok = await acl.p_add_acle(urlsFrom(dict.urls), {name: dict["name"]}, verbose);
+    let tok = await acl.p_add_acle(DwebTransports.urlsFrom(dict.urls), {name: dict["name"]}, verbose);
     _showkeyorlock("lock_ul", tok) // Push to visual list, as listmonitor will be a duplicate
     if (verbose) console.groupEnd("tokennew_click ---");
-}
-
-function refresh_transportstatuses(el) {
-    statusclasses = ["transportstatus0","transportstatus1","transportstatus2","transportstatus3","transportstatus4"];
-    el = Array.prototype.slice.call(elementFrom(el).children) // Find all children of the main element, convert to array
-        .map((el_t) => {
-            if (el_t.source) {  // Set class to e.g. transportstatus0
-                el_t.classList.remove(...statusclasses);
-                el_t.classList.add("transportstatus" + el_t.source.status);
-            }
-        })
-}
-function transportclick(el) { // Similar routines to this could display status, toggle activity etc.
-    t = el.source;
-    console.log("Clicked on Transport",t.name);
-    t.togglePaused();
-    refresh_transportstatuses("transportstatuses");
-}
-async function p_connect(options) {
-    /*
-        This is a standardish starting process, feel free to copy and reuse !
-        options = { defaulttransports: ["IPFS"]; }
-     */
-    if (verbose) console.group("p_connect ---");
-    try {
-        options = options || {};
-        let setupoptions = {};
-        let tabbrevs = searchparams.getAll("transport");    // Array of transports
-        if (!tabbrevs.length) { tabbrevs = options.defaulttransports || [] }
-        if (!tabbrevs.length) { tabbrevs = ["HTTP", "YJS", "IPFS", "WEBTORRENT"]; }
-        tabbrevs = tabbrevs.map(n => n.toUpperCase());
-        let transports = Dweb.Transports.setup0(tabbrevs, options, verbose);
-        replacetexts("transportstatuses", Dweb.Transports._transports);
-        await Dweb.Transports.p_setup1(verbose);
-        refresh_transportstatuses("transportstatuses"); // Update status for anything,
-        await Dweb.Transports.p_setup2(verbose);
-        refresh_transportstatuses("transportstatuses"); // Update status for anything,
-        await Promise.all(transports.map(t => t.p_status(verbose)));
-        refresh_transportstatuses("transportstatuses"); // Update status for anything,
-    } catch(err) {
-        console.error("ERROR in p_connect:",err.message);
-        throw(err);
-    }
-    if (verbose) console.groupEnd("p_connect ---");
 }
 
 
