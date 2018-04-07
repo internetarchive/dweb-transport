@@ -139,6 +139,17 @@ class KeyChain extends CommonList {
         return this.keychains.find((kc) => kc.match(dict))  // Returns undefined if none match or keychains is empty, else first match
     }
 
+    static find_in_keychains(dict, verbose) {
+        /*
+        Locate a needed KeyChain on this.keychains by some filter.
+
+        :param dict:    dictionary to check against the keychain (see CommonList.match() for interpretation
+        :return:        AccessControlList or KeyChain or null
+        */
+        return [].concat(...this.keychains.map((kc) => kc._keys))  // Iterate over keychains, and flatten resulting arrays
+            .find((key) => key.match(dict));                // Find first key that matches dict
+    }
+
     static mykeys(clstarget) {
         /*
         Utility function to find any keys in any of this.keychains for the target class.

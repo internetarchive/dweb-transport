@@ -73,7 +73,7 @@
             cl.addEventListener("insert", (event) => {
                 if (verbose) console.log("fetchanddisplay",event);
                 let sig = event.detail;
-                sig.p_fetchdata(verbose)
+                sig.p_fetchdata({verbose})
                     .then((obj) => addtemplatedchild("listresults", {}, obj))
                 });
             // Redisplay it in the object browser for debugging

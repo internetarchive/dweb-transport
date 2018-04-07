@@ -79,7 +79,7 @@ class VersionList extends CommonList {
             Go back to version from a specific sig
             sig:    Signature to go back to
          */
-        await sig.p_fetchdata(verbose); // Get data - we won't necessarily have fetched it, since it could be large.
+        await sig.p_fetchdata({verbose}); // Get data - we won't necessarily have fetched it, since it could be large.
         this._working = sig.data.copy(verbose);
     }
     async p_fetchlistandworking(verbose) {
@@ -88,7 +88,7 @@ class VersionList extends CommonList {
          */
         await this.p_fetchlist(verbose);    // Get the list
         if (this._list.length) { // There was some data
-            this._working = await this._list[this._list.length - 1].p_fetchdata(verbose);    // Find last sig, fetch the data
+            this._working = await this._list[this._list.length - 1].p_fetchdata({verbose});    // Find last sig, fetch the data
         }
     }
 

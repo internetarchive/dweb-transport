@@ -127,7 +127,7 @@ class SmartDict extends Transportable {
          */
         return Object.keys(dict).every((key) => {
             return (
-                (["_publicurls","_urls"].includes(key))  ? utils.intersects(this[key], dict[key])
+                (["_publicurls","_urls", "tablepublicurls"].includes(key))  ? utils.intersects(this[key], dict[key])
                 :   (key[0] !== '.')            ? (this[key] === dict[key])
                 :   ( key === ".instanceof")    ? (this instanceof dict[key])
                 :   false)

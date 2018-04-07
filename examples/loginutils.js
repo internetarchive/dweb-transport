@@ -82,7 +82,7 @@ function keychain_click(el) {
         if (verbose) console.log("keychain.eventlistener",event);
         let sig = event.detail;
         if (Dweb.utils.intersects(kc._publicurls, el_keychain_header.source._publicurls))   // Check its still this KeyChain being displayed in keylist
-            sig.p_fetchdata(verbose)                            // Get the data from a sig, its not done automatically as in other cases could be large
+            sig.p_fetchdata({verbose})                            // Get the data from a sig, its not done automatically as in other cases could be large
                 .then((obj) => _showkeyorlock("keychain_ul", obj))             // Show on the list
     });
     kc.p_list_then_elements({verbose, ignoreerrors: true})                            // Retrieve the keys for the keylist - ignore any cant decrypt
@@ -161,7 +161,7 @@ async function p_lock_click(el) {
             if (verbose) console.log("lock.eventlistener",event);
             let sig = event.detail;
             if (Dweb.utils.intersects(acl._publicurls, el_lockheader.source._publicurls))  // Check its still this ACL being displayed in keylist
-                sig.p_fetchdata(verbose)                    // Get the data from a sig, its not done automatically as in other cases could be large
+                sig.p_fetchdata({verbose})                    // Get the data from a sig, its not done automatically as in other cases could be large
                     .then((tok) => _showkeyorlock("lock_ul", tok))           // Show on the list
         });
     } catch(err) {
