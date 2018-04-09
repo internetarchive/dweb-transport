@@ -24,9 +24,9 @@
     "request": "latest",
     "sha3": "latest",
     "throttleit": "latest",
-    "y-leveldb": "latest",
     "whatwg-fetch": "latest",
-    "xmlhttprequest": "latest"
+    "xmlhttprequest": "latest",
+    "y-leveldb": "latest"
   },
   "keywords": [],
   "license": "AGPL-3.0",

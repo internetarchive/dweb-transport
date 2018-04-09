@@ -84,7 +84,7 @@ utils.keyFilter = function(dic, keys) {
     return keys.reduce(function(prev, key) { prev[key] = dic[key]; return prev; }, {});
 }
 
-utils.display_blob(bb, options) {
+utils.display_blob = function(bb, options) {
     /*
         Display a blob of data (in a browser)
         Typical usage Dweb.utils.display_blob(await Dweb.Transports.p_rawfetch(urls), {type: "application/pdf"})
