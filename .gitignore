@@ -9,3 +9,5 @@ archive_minchanges/build
 archive/node_modules
 leveldb_dweb
 mirror/testleveldb.Testtable
+sw_client_bundle.js
+sw_server_bundle.js
