@@ -2,6 +2,10 @@
 
 'use strict'
 
+const DwebTransports = require('dweb-transports'); // Handles multiple transports
+const Domain = require('../js/Domain');
+const Leaf = Domain.clsLeaf;
+
 self.addEventListener('install', (event) => {
     console.log('service-worker 2018apr10 1102 installing');
     event.waitUntil(self.skipWaiting());
@@ -16,29 +20,35 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-    /* Called each time client tries to load a URL in the domain
-     */
+    //Called each time client tries to load a URL in the domain
     if (event.request.url.startsWith(self.location.origin + '/ping')) {
         // Just for testing
         event.respondWith(p_ping(event.request.url));
     } else if (event.request.url.startsWith(self.location.origin + '/ipfs')) {
         console.log('Handling IPFS fetch event for', event.request.url);
         const multihash = event.request.url.split('/ipfs/')[1];
+        //event.respondWith(catAndRespond(multihash));
         event.respondWith(p_ping(event.request.url, "Not implemented yet"))
     } else {
-        // The browser will now attempt to get it in the normal way
-        return console.log('Fetch not in scope', event.request.url);
+        event.respondWith(p_responseFrom(url))
+            .catch((err) => return console.log('Fetch not in scope', event.request.url));
     }
-    //event.respondWith(catAndRespond(multihash));
+    // The browser will now attempt to get it in the normal way
+    // return console.log('Fetch not in scope', event.request.url);
 })
 
+async function p_responseFrom(url) {
+    // Resolves to a HTTP response with the data from the url
+    return new Response(await filefrom(url), {status: 200, statusText: 'OK', headers: {}});
+
+}
 async function p_ping(url, text) {
     //TODO check here that any persistent things like IPFS still running.
     const headers = {status: 200, statusText: 'OK', headers: {}};
     return new Response(`${text || "Ping response to:"} ${url}`, headers)
 }
-
-async function main(url) {
+async function filefrom(url) {
+    /* Retrieve a URL being smart about resolving domains etc */
     let name;
     if (url.hostname.startsWith("dweb.")) {                                 // e.g. https://dweb.archive.org/details/commute
         name = ["arc/", url.hostname.substring(5), url.pathname].join("");   // arc/archive.org/details/commute
@@ -46,23 +56,25 @@ async function main(url) {
         name = ["arc",url.pathname].join("");                               // arc/archive.org/details/commute
     } else {
         console.error("Unable to bootstrap",url.href, "unrecognized pattern");
-        document.write("Unable to bootstrap ",url.href, " unrecognized pattern");
-        return;
+        return `Unable to bootstrap ${url.href} unrecognized pattern`;
     }
     const search_supplied = url.search.slice(1); // Skip initial ?
     console.log("Name to lookup=",name);
-    document.write("Resolving name: ",name,"<BR>");   // Appears after loading
-    document.write("Connecting to decentralized transports","<BR>");
-    document.write('<div id="statuselement"></div>');
-    await DwebTransports.p_connect({statuselement: document.getElementById("statuselement"), transports: searchparams.getAll("transport")});
+    console.log("Connecting to decentralized transports");
+    //document.write('<div id="statuselement"></div>');
+    await DwebTransports.p_connect({transports: searchparams.getAll("transport")}); //statuselement: document.getElementById("statuselement")
     try {
-        const res = await Dweb.Domain.p_rootResolve(name, {verbose});
+        const res = await Domain.p_rootResolve(name, {verbose});
         const resolution = res[0];
         const remainder = res[1];
         const opentarget="_self";
-        if ((resolution instanceof Dweb.Leaf) && ["text/html"].includes(resolution.mimetype)) {
+        if ((resolution instanceof Leaf) && ["text/html"].includes(resolution.mimetype)) {
+            OK - WEVE GOT A PROBLEM HERE - CANT PASS THE REMAINDER TO THE FILE - NOR IS IT IN THE URL SO CLIENT WONT SEE IT
+            TRY PASSING BACK IN A FAKE HTTP HEADER
             //Its an HTML file, open it
             if (resolution.metadata.htmlusesrelativeurls) {
+                console.log("Not handling metadata.htmlusesrelativeurls YET"); // see bootstrap.html for how this was handled
+                /*
                 let tempurls = resolution.urls;
                 const pathatt = resolution.metadata.htmlpath || "path";
                 while (tempurls.length) {
@@ -77,7 +89,9 @@ async function main(url) {
                         console.error("Unable to load ",url.href)
                     }
                 }
-            } else {
+                */
+            }
+                return DwebTransports.p_rawfetch()
                 //TODO-BOOTSTRAP Not clear if parms make sense to a blob, if so can copy from above
                 // Not setting timeoutMS as could be a slow load of a big file TODO-TIMEOUT make dependent on size
                 Dweb.utils.display_blob(await DwebTransports.p_rawfetch(resolution.urls, {verbose}), {type: resolution.mimetype, target: opentarget});
