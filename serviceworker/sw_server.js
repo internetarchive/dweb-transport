@@ -37,3 +37,53 @@ async function p_ping(url, text) {
     const headers = {status: 200, statusText: 'OK', headers: {}};
     return new Response(`${text || "Ping response to:"} ${url}`, headers)
 }
+
+async function main(url) {
+    let name;
+    if (url.hostname.startsWith("dweb.")) {                                 // e.g. https://dweb.archive.org/details/commute
+        name = ["arc/", url.hostname.substring(5), url.pathname].join("");   // arc/archive.org/details/commute
+    } else if ( url.pathname.startsWith("/archive.org")) {                     // e.g. https://localhost:4244/archive.org/details/commu
+        name = ["arc",url.pathname].join("");                               // arc/archive.org/details/commute
+    } else {
+        console.error("Unable to bootstrap",url.href, "unrecognized pattern");
+        document.write("Unable to bootstrap ",url.href, " unrecognized pattern");
+        return;
+    }
+    const search_supplied = url.search.slice(1); // Skip initial ?
+    console.log("Name to lookup=",name);
+    document.write("Resolving name: ",name,"<BR>");   // Appears after loading
+    document.write("Connecting to decentralized transports","<BR>");
+    document.write('<div id="statuselement"></div>');
+    await DwebTransports.p_connect({statuselement: document.getElementById("statuselement"), transports: searchparams.getAll("transport")});
+    try {
+        const res = await Dweb.Domain.p_rootResolve(name, {verbose});
+        const resolution = res[0];
+        const remainder = res[1];
+        const opentarget="_self";
+        if ((resolution instanceof Dweb.Leaf) && ["text/html"].includes(resolution.mimetype)) {
+            //Its an HTML file, open it
+            if (resolution.metadata.htmlusesrelativeurls) {
+                let tempurls = resolution.urls;
+                const pathatt = resolution.metadata.htmlpath || "path";
+                while (tempurls.length) {
+                    url = new URL(tempurls.shift());
+                    try {
+                        if (remainder) url.search = url.search + (url.search ? '&' : "") + `${pathatt}=${remainder}`;
+                        if (search_supplied) url.search = url.search + (url.search ? '&' : "") + search_supplied;
+                        if (verbose) console.log("Bootstrap loading url:", url.href);
+                        window.open(url.href, opentarget); //if opentarget is blank then I think should end this script.
+                        break; // Only try and open one
+                    } catch(err) {
+                        console.error("Unable to load ",url.href)
+                    }
+                }
+            } else {
+                //TODO-BOOTSTRAP Not clear if parms make sense to a blob, if so can copy from above
+                // Not setting timeoutMS as could be a slow load of a big file TODO-TIMEOUT make dependent on size
+                Dweb.utils.display_blob(await DwebTransports.p_rawfetch(resolution.urls, {verbose}), {type: resolution.mimetype, target: opentarget});
+            }
+        }
+    } catch(err) {
+        console.error("Got error",err);
+    }
+}
