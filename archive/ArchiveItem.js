@@ -2,7 +2,7 @@ import ArchiveFile from "./ArchiveFile";
 import Util from "./Util";
 
 require('babel-core/register')({ presets: ['env', 'react']}); // ES6 JS below!
-const Transports = require('dweb-transports');
+const Transports = require('dweb-transports');   //TODO-SW find all usages
 const Domain = require('../js/Domain');     // So can resolve names like dweb:/arc
 const utils = require('../js/utils');
 //TODO-NAMING url could be a name
@@ -61,8 +61,9 @@ export default class ArchiveItem {
             /* OLD WAY VIA HTTP
                 this.item = await Util.fetch_json(`https://gateway.dweb.me/metadata/archiveid/${this.itemid}?${transports}`);
             */
-            // Fetch via Domain record
+            // Fetch via Domain record - the dweb:/arc/archive.org/metadata resolves into a table that is dynamic on gateway.dweb.me
             const name = `dweb:/arc/archive.org/metadata/${this.itemid}`;
+            //TODO-SW push this through the SW
             let m = await Transports.p_rawfetch([name], {verbose, timeoutMS: 5000}); // Using Transports as its multiurl and might not be HTTP urls
             m = utils.objectfrom(m);
             console.assert(m.metadata.identifier === this.itemid);

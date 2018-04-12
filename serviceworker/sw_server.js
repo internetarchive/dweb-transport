@@ -7,97 +7,99 @@ const Domain = require('../js/Domain');
 const Leaf = Domain.clsLeaf;
 
 self.addEventListener('install', (event) => {
-    console.log('service-worker 2018apr10 1102 installing');
+    console.log('service-worker 2018apr10 1914 installing');
     event.waitUntil(self.skipWaiting());
+    console.log('service-worker clients.skipWaiting completed');
 })
 
 self.addEventListener('activate', (event) => {
     console.log('service-worker activating');
+    event.waitUntil(DwebTransports.p_connect().then(console.log("XXX@17"))); //{transports: searchparams.getAll("transport")}; statuselement: document.getElementById("statuselement")
     /*
     ipfsstart();  // Ignore promise
     */
+    console.log('service-worker p_connect complete');
     event.waitUntil(self.clients.claim())
+    console.log('service-worker clients.claim completed');
 });
 
 self.addEventListener('fetch', (event) => {
+    // self.location.origin is e.g. "localhost:8080" and URL should always match this or Service Worker wont catch it
     //Called each time client tries to load a URL in the domain
-    if (event.request.url.startsWith(self.location.origin + '/ping')) {
-        // Just for testing
-        event.respondWith(p_ping(event.request.url));
-    } else if (event.request.url.startsWith(self.location.origin + '/ipfs')) {
-        console.log('Handling IPFS fetch event for', event.request.url);
-        const multihash = event.request.url.split('/ipfs/')[1];
-        //event.respondWith(catAndRespond(multihash));
-        event.respondWith(p_ping(event.request.url, "Not implemented yet"))
-    } else {
-        event.respondWith(p_responseFrom(url))
-            .catch((err) => return console.log('Fetch not in scope', event.request.url));
+    let url = new URL(event.request.url);
+    let verbose = url.searchParams.get("verbose") || false;
+    console.log("Service Worker called with url=",url.href);
+    if (url.pathname.startsWith('/ping')) {                 // Just for testing
+        event.respondWith(p_ping(`Ping: ${url.href}`));
+    } else if (url.pathname.startsWith('/test')) {          // Feel free to change this
+        event.respondWith(p_redirect("./temp.html"));
+    } else if (url.hostname.startsWith("dweb.") && (url.hostname !== "dweb.me")) {          // https://dweb.archive.org/details/foo -> dweb.archive.org/arc/archive.org/details/foo
+        url.pathname = `/arc/${url.hostname.substring(5)}${url.pathname}`
+        event.respondWith(p_redirect(url.href));
+    } else if ( url.pathname.startsWith("/archive.org")) {  // https://localhost:4244/archive.org/details/foo -> /arc/archive.org/details/foo
+        url.pathname = `/arc${url.pathname}`
+        event.respondWith(p_redirect(url.href));
+    //TODO-SW this group just here till "BASE" in version on gateway
+    } else if (url.pathname.startsWith("/arc/archive.org/details/includes/")) {
+        event.respondWith(p_redirect(`https://dweb.me/examples/includes/${url.pathname.slice(34)}`));
+    } else if (url.pathname === "/arc/archive.org/details/htmlutils.js") {
+        event.respondWith(p_redirect(`https://dweb.me/examples/htmlutils.js`));
+    } else if (url.pathname === "/arc/archive.org/details/loginutils.js") {
+        event.respondWith(p_redirect(`https://dweb.me/examples/loginutils.js`));
+    } else if (url.pathname === "/arc/archive.org/details/example_styles.css") {
+        event.respondWith(p_redirect(`https://dweb.me/examples/example_styles.css`));
+    } else if (url.pathname === "/arc/archive.org/details/archive_webpacked.js") {
+        event.respondWith(p_redirect(`https://dweb.me/examples/archive_webpacked.js`));
+    //TODO-SW end of material to remove once BASE established
+    } else if ( url.pathname.startsWith("/arc/")) {         // https://localhost:4244/arc/archive.org/details/foo -> archive.html (from resolution)
+        event.respondWith(p_responseFromName(url.pathname, url.search.slice(1), {verbose}));   // Skip initial "?" in search
+    //TODO-SW implement ipfs catch (and magnet)
+    //TODO-SW makesure archive.html doesnt start p_connect, and passes requests to SW
+    //TODO-SW see how handling /metadata
+    //TODO-SW build bootstrap into things like archive.html
+    } else if ((url.pathname.startsWith('/ipfs')) && (url.hostname !== "ipfs.io")) {
+        //TODO-SW move https://ipfs.io check into TransportsIPFS so use one URL dweb:/ipfs of ipfs:/ipfs and tries IPFS & http://ipfs.io
+        event.respondWith(p_respondFromDwebUrl(`ipfs:${url.pathname}`));
     }
     // The browser will now attempt to get it in the normal way
-    // return console.log('Fetch not in scope', event.request.url);
+    else {
+        return console.log("Out of scope trying from browser", url.href);
+    }
 })
 
-async function p_responseFrom(url) {
-    // Resolves to a HTTP response with the data from the url
-    return new Response(await filefrom(url), {status: 200, statusText: 'OK', headers: {}});
-
-}
 async function p_ping(url, text) {
-    //TODO check here that any persistent things like IPFS still running.
-    const headers = {status: 200, statusText: 'OK', headers: {}};
+    const headers = {status: 200, statusText: 'OK', headers: {"Location": "FOO.html"}};
     return new Response(`${text || "Ping response to:"} ${url}`, headers)
 }
-async function filefrom(url) {
+async function p_redirect(newurl) {
+    //TODO-SW maybe use the redirect status that doesnt change the URL
+    //TODO-SW make sure search queries make it htrough the redirections
+    console.log("Redirecting to", newurl)
+    return new Response(undefined,  {status: 307, statusText: 'OK', headers: {"Location": newurl}})
+}
+async function p_respondFromDwebUrl(url) {
+    let data = await DwebTransports.p_rawfetch(resolution.urls, {verbose});
+    //TODO-SW one problem is that we dont know the mime type here
+    return new Response(data, {status: 200, statusText: 'OK', headers: {}});
+}
+async function p_responseFromName(name, search_supplied, {verbose=false}={}) {
     /* Retrieve a URL being smart about resolving domains etc */
-    let name;
-    if (url.hostname.startsWith("dweb.")) {                                 // e.g. https://dweb.archive.org/details/commute
-        name = ["arc/", url.hostname.substring(5), url.pathname].join("");   // arc/archive.org/details/commute
-    } else if ( url.pathname.startsWith("/archive.org")) {                     // e.g. https://localhost:4244/archive.org/details/commu
-        name = ["arc",url.pathname].join("");                               // arc/archive.org/details/commute
-    } else {
-        console.error("Unable to bootstrap",url.href, "unrecognized pattern");
-        return `Unable to bootstrap ${url.href} unrecognized pattern`;
-    }
-    const search_supplied = url.search.slice(1); // Skip initial ?
     console.log("Name to lookup=",name);
     console.log("Connecting to decentralized transports");
     //document.write('<div id="statuselement"></div>');
-    await DwebTransports.p_connect({transports: searchparams.getAll("transport")}); //statuselement: document.getElementById("statuselement")
+    //TODO - connect at start
     try {
         const res = await Domain.p_rootResolve(name, {verbose});
         const resolution = res[0];
         const remainder = res[1];
-        const opentarget="_self";
-        if ((resolution instanceof Leaf) && ["text/html"].includes(resolution.mimetype)) {
-            OK - WEVE GOT A PROBLEM HERE - CANT PASS THE REMAINDER TO THE FILE - NOR IS IT IN THE URL SO CLIENT WONT SEE IT
-            TRY PASSING BACK IN A FAKE HTTP HEADER
-            //Its an HTML file, open it
-            if (resolution.metadata.htmlusesrelativeurls) {
-                console.log("Not handling metadata.htmlusesrelativeurls YET"); // see bootstrap.html for how this was handled
-                /*
-                let tempurls = resolution.urls;
-                const pathatt = resolution.metadata.htmlpath || "path";
-                while (tempurls.length) {
-                    url = new URL(tempurls.shift());
-                    try {
-                        if (remainder) url.search = url.search + (url.search ? '&' : "") + `${pathatt}=${remainder}`;
-                        if (search_supplied) url.search = url.search + (url.search ? '&' : "") + search_supplied;
-                        if (verbose) console.log("Bootstrap loading url:", url.href);
-                        window.open(url.href, opentarget); //if opentarget is blank then I think should end this script.
-                        break; // Only try and open one
-                    } catch(err) {
-                        console.error("Unable to load ",url.href)
-                    }
-                }
-                */
-            }
-                return DwebTransports.p_rawfetch()
-                //TODO-BOOTSTRAP Not clear if parms make sense to a blob, if so can copy from above
-                // Not setting timeoutMS as could be a slow load of a big file TODO-TIMEOUT make dependent on size
-                Dweb.utils.display_blob(await DwebTransports.p_rawfetch(resolution.urls, {verbose}), {type: resolution.mimetype, target: opentarget});
-            }
+        if (remainder.length) {
+            // TODO make leaf clear about remainder - can specify to ignore it, or its a redirect (which would only work with one URL returned)
         }
+        let data = await DwebTransports.p_rawfetch(resolution.urls, {verbose});
+        return new Response(data, {status: 200, statusText: 'OK', headers: {"Content-type": resolution.mimetype}});
+
     } catch(err) {
         console.error("Got error",err);
+        throw(err);
     }
 }

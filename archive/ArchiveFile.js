@@ -4,7 +4,7 @@ import React from './ReactFake';
 import Util from './Util';
 import throttle from "throttleit";
 import prettierBytes from "prettier-bytes";
-var Transports = require('dweb-transports');
+var Transports = require('dweb-transports');  //TODO-SW find all usages
 
 export default class ArchiveFile {
     /*
@@ -51,7 +51,7 @@ export default class ArchiveFile {
         return URL.createObjectURL(await this.blob());
     }
     async p_download(a, options) {
-        let urls = await this.p_urls()   // Multiple potential sources elimating any empty - may fetch file metadata in process
+        let urls = await this.p_urls();   // Multiple potential sources elimating any empty - may fetch file metadata in process
         let objectURL = await this.blobUrl();
         if (verbose) console.log("Blob URL=",objectURL);
         //browser.downloads.download({filename: this.metadata.name, url: objectURL});   //Doesnt work

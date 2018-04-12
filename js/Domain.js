@@ -251,8 +251,11 @@ class Domain extends KeyValueTable {
         console.group("Resolving:",path);
         if (!this.root)
             await this.p_rootSet({verbose});
-        const res = this.root.p_resolve(path, {verbose});
-        console.log("Resolved path",path);
+        if (path[0] === "/") {  // Path should start at root, but sometimes will be relative
+            path = path.slice(1);
+        }
+        const res = await this.root.p_resolve(path, {verbose});
+        console.log("Resolved path",path, "to", res);
         console.groupEnd();
         return res;
 
@@ -261,9 +264,11 @@ class Domain extends KeyValueTable {
         /*
         Resolves a path, should resolve to the leaf
         resolves to:    [ Leaf, remainder ]
+        raises:     CodingError
          */
-
-        //TODO check for / at start, if so remove it and get root
+        if (path[0] === "/") {
+            throw new errors.CodingError(`p_resolve paths should be relative, got: ${path}`)
+        }
         if (verbose) console.log("resolving",path,"in",this.name);
         let res;
         /*
@@ -291,7 +296,7 @@ class Domain extends KeyValueTable {
         if (res) { // Found one
             if (!remainder.length) // We found it
                 return [ res, undefined ] ;
-            return await res.p_resolve(remainder.join('/'), {verbose});           // ===== Note recursion ====
+                return await res.p_resolve(remainder.join('/'), {verbose});           // ===== Note recursion ====
             //TODO need other classes e.g. SD  etc to handle p_resolve as way to get path
         } else {
             console.log("Unable to resolve",name,"in",this.name);

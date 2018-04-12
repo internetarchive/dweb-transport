@@ -15,7 +15,7 @@ import Image from './Image'
 import Audio from './Audio'
 import Video from './Video'
 import DetailsError from './DetailsError'
-const Transports = require('dweb-transports');
+const Transports = require('dweb-transports');  //TODO-SW find all usages
 
 
 export default class Nav {

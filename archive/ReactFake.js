@@ -12,7 +12,7 @@ import from2 from "from2";
 import prettierBytes from "prettier-bytes";
 const Url = require('url');
 import ArchiveFile from "./ArchiveFile";
-const Transports = require('dweb-transports');
+const Transports = require('dweb-transports');  //TODO-SW find all usages
 const Domain = require('../js/Domain');
 
 function deletechildren(el, keeptemplate) { //Note same function in htmlutils
