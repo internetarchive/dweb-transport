@@ -12,7 +12,16 @@ self.addEventListener('activate', (event) => {
     /*
     ipfsstart();  // Ignore promise
     */
-    event.waitUntil(self.clients.claim())
+    event.waitUntil(self.clients.claim());
+    // After the activation and claiming is complete, send a message to each of the controlled
+    // pages letting it know that it's active.
+    // This will trigger navigator.serviceWorker.onmessage in each client.
+    return self.clients.matchAll().then(function(clients) {
+        return Promise.all(clients.map(function (client) {
+            return client.postMessage('The service worker has activated and ' +
+                'taken control.');
+        }));
+    });
 });
 
 self.addEventListener('fetch', (event) => {
@@ -30,6 +39,12 @@ self.addEventListener('fetch', (event) => {
         return console.log('Fetch not in scope', event.request.url);
     }
     //event.respondWith(catAndRespond(multihash));
+})
+
+self.addEventListener('message', (event) => {
+    console.log("SW handling event", event);
+    event.ports[0].postMessage("Responding from SW");
+    return false;
 })
 
 async function p_ping(url, text) {
