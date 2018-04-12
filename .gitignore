@@ -11,3 +11,4 @@ leveldb_dweb
 mirror/testleveldb.Testtable
 sw_client_bundle.js
 sw_server_bundle.js
+test_serviceworker_bundle.js
