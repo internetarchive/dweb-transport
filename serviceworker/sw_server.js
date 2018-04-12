@@ -3,7 +3,7 @@
 'use strict'
 
 const DwebTransports = require('dweb-transports'); // Handles multiple transports
-const Domain = require('../js/Domain');
+const Domain = require('../js/Domain'); // Must be after DwebTransports, plugs into DwebTransports to resolve names
 const Leaf = Domain.clsLeaf;
 
 self.addEventListener('install', (event) => {
@@ -21,6 +21,15 @@ self.addEventListener('activate', (event) => {
     console.log('service-worker p_connect complete');
     event.waitUntil(self.clients.claim())
     console.log('service-worker clients.claim completed');
+    // After the activation and claiming is complete, send a message to each of the controlled
+    // pages letting it know that it's active.
+    // This will trigger navigator.serviceWorker.onmessage in each client.
+    return self.clients.matchAll().then(function(clients) {
+        return Promise.all(clients.map(function (client) {
+            return client.postMessage('The service worker has activated and ' +
+                'taken control.');
+        }));
+    });
 });
 
 self.addEventListener('fetch', (event) => {
@@ -65,6 +74,12 @@ self.addEventListener('fetch', (event) => {
     else {
         return console.log("Out of scope trying from browser", url.href);
     }
+})
+
+self.addEventListener('message', (event) => {
+    console.log("SW handling event", event);
+    event.ports[0].postMessage("Responding from SW");
+    return false;
 })
 
 async function p_ping(url, text) {
