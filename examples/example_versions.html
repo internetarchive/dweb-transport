@@ -40,7 +40,7 @@
             console.group("newversionlist ---");
             try {
                 let dict = form2dict(el);                               // Get the data from the form
-                dict.contentacl = DwebTransports.urlsFrom(dict.contentacl);            // May be in variety of forms but especially JSON version of array of urls
+                dict.contentacl = await DwebTransports.p_urlsFrom(dict.contentacl);            // May be in variety of forms but especially JSON version of array of urls
                 // VersionList(data, master, keypair, keygen, mnemonic, verbose, options)
                 let obj = await Dweb.VersionList.p_new(dict, true, {keygen: true}, newversion(), verbose);
                 await p_vl_target_display(el, obj)                      // Display in the HTML target defined below

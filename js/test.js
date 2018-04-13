@@ -34,6 +34,7 @@ let verbose = false;
     // In general it should be possible to comment out failing tests EXCEPT where they provide a value to the next */
 
 async function p_test(verbose) {
+    // TODO-SW get p_test working with service workers or direct
     try {
         //SEE-OTHER-ADDTRANSPORT - note these are options just for testing that override default options for the transport.
         let opts = {

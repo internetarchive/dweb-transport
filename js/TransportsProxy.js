@@ -7,7 +7,7 @@ where much of this code came from
 Note expect to see this loaded with const DwebTransport = require(TransportsProxy) to reuse code that calls DwebTransport
  */
 const errors = require("../js/Errors");
-
+//TODO-SW should have one-line edit of this to give direct to Transports version so can always "require TransportsProxy
 class TransportsProxy {
     constructor(options, verbose) {
         if (verbose) console.log("Transports(%o)", options);
@@ -16,7 +16,7 @@ class TransportsProxy {
     static async p_registerServiceWorker() {
         if ('serviceWorker' in navigator) {
 
-            await navigator.serviceWorker.register('serviceworker_bundle.js');
+            await navigator.serviceWorker.register(window.location.origin+'/serviceworker_bundle.js');
             console.log('-> Registered the service worker successfully');
             navigator.serviceWorker.addEventListener('message', function(event) {
                 // Set up a listener for messages posted from the service worker.
@@ -25,7 +25,7 @@ class TransportsProxy {
                 console.log("Client received SW message:",event.data); // Just a placeholder for async messages back
             });
         } else {
-            console.log("Unable to register service worker as not in 'navigator'");
+            console.error("Unable to register service worker as not in 'navigator'");
         }
     }
 
@@ -56,7 +56,12 @@ class TransportsProxy {
         });
     }
 
-    //TODO-SW complete this list
+    static async p_connectedNames() {
+        return await this._p_proxy("p_connectedNames", []);
+    }
+    static async p_connectedNamesParm() {
+        return await this._p_proxy("p_connectedNamesParm", []);
+    }
     static async p_rawfetch(urls, opts) {
         return await this._p_proxy("p_rawfetch", [urls, opts]);
     }
@@ -82,7 +87,7 @@ class TransportsProxy {
         return await this._p_proxy("p_resolveNames", [urls]);
     }
     static async p_keys(urls, opts) {
-        return await this._p_proxy("p_resolveNames", [urls, opts]);
+        return await this._p_proxy("p_keys", [urls, opts]);
     }
     static async p_getall(urls, opts) {
         return await this._p_proxy("p_getall", [urls, opts]);
@@ -92,6 +97,12 @@ class TransportsProxy {
     }
     static async p_newtable(pubkey, table, opts) {
         return await this._p_proxy("p_newtable", [pubkey, table, opts]);
+    }
+    static async p_httpfetchurls(urls) {
+        return await this._p_proxy("p_httpfetchurls", [urls]);
+    }
+    static async p_urlsFrom(url) {
+        return await this._p_proxy("p_urlsFrom", [url]);
     }
 
     /*

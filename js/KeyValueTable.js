@@ -181,7 +181,7 @@ class KeyValueTable extends PublicPrivate {
         Stack: KVT()|KVT.p_new => KVT.monitor => (a: Transports.monitor => YJS.monitor)(b: dispatchEvent)
          */
         if (verbose) console.log("Monitoring", this.tablepublicurls);
-        Transports.monitor(this.tablepublicurls,
+        Transports.monitor(this.tablepublicurls, //TODO-SW this wont work with service workers yet,
             (event) => {    // event of form {type, key, value} with value being an obj, so already done JSON.parse (see YJS for example)
                 if (verbose) console.log("KVT monitor",event,this.tablepublicurls);
                 switch (event.type) {

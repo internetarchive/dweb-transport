@@ -177,7 +177,7 @@ async function tokennew_click() { //Called by "Add" button on new token dialog
     hide('tokennew_form');
     let dict = form2dict("tokennew_form"); //url
     let acl = document.getElementById('lock_header').source;
-    let tok = await acl.p_add_acle(DwebTransports.urlsFrom(dict.urls), {name: dict["name"]}, verbose);
+    let tok = await acl.p_add_acle(await DwebTransports.p_urlsFrom(dict.urls), {name: dict["name"]}, verbose);
     _showkeyorlock("lock_ul", tok) // Push to visual list, as listmonitor will be a duplicate
     if (verbose) console.groupEnd("tokennew_click ---");
 }

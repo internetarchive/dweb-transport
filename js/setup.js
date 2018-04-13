@@ -45,7 +45,7 @@ async function p_setup(verbose) {
         //let t_yjs = await TransportYJS.p_setup(opts, verbose);  await t_yjs.p_status(); // Should find ipfs transport
         let t_http = await TransportHTTP.p_setup(opts, verbose); await t_http.p_status();
         //let t_webtorrent = await TransportWEBTORRENT.p_test(opts, verbose); await t_webtorrent.p_status();
-        if (verbose) console.log("setup returned and transport(s) connected:", Transports.connectedNames());
+        if (verbose) console.log("setup returned and transport(s) connected:", await Transports.p_connectedNames());
         await Domain.p_setupOnce(verbose);
     } catch (err) {
         console.log("Test failed", err);

@@ -149,7 +149,7 @@ class CommonList extends PublicPrivate {
         }
     }
 
-    p_add(sig, verbose) {
+    async p_add(sig, verbose) {
         /*
         Add a signature to the Dweb for this list
         Note, there is an assumption that sig.signedby is the same as the commonlist
@@ -160,7 +160,7 @@ class CommonList extends PublicPrivate {
          */
         if (!sig) throw new errors.CodingError("CommonList.p_add is meaningless without a sig");
         if (! utils.intersects(sig.signedby, this._publicurls)) throw new errors.CodingError(`CL.p_add: sig.signedby ${sig.signedby} should overlap with this._publicurls ${this._publicurls}`);
-        return Transports.p_rawadd(this.listpublicurls, sig, {verbose});
+        return await Transports.p_rawadd(this.listpublicurls, sig, {verbose});
     }
 
     objbrowser_fields(propname) {
@@ -178,7 +178,7 @@ class CommonList extends PublicPrivate {
         /*
         Add a listmonitor for each transport - note this means if multiple transports support it, then will get duplicate events back if everyone else is notifying all of them.
          */
-        Transports.listmonitor(this.listpublicurls,
+        Transports.listmonitor(this.listpublicurls, //TODO-SW wont work yet
                 (obj) => {
                     if (verbose) console.log("listmonitor added",obj,"to",this.listpublicurls);
                     let sig = new Signature(obj, verbose);

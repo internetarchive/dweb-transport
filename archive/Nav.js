@@ -15,7 +15,8 @@ import Image from './Image'
 import Audio from './Audio'
 import Video from './Video'
 import DetailsError from './DetailsError'
-const Transports = require('dweb-transports');  //TODO-SW find all usages
+//const Transports = require('dweb-transports');
+const Transports = require('../js/TransportsProxy');  //Use this version to go through proxy to ServiceWorker
 
 
 export default class Nav {
@@ -139,7 +140,9 @@ export default class Nav {
         console.log("Navigating to Search");
         if (wanthistory) {
             let historystate = {query: q}; //TODO-HISTORY may want  to store verbose, transports etc here
-            history.pushState(historystate, `Internet Archive search ${q}`, `?query=${q}&verbose=${verbose}`); //TODO-HISTORY need to save state of transports
+            let cnp = await Transports.p_connectedNamesParm();
+            history.pushState(historystate, `Internet Archive search ${q}`,
+                `${window.origin}/arc/archive.org/details?query=${q}&${verbose ? "verbose=true&" : ""}${cnp}`);
         }
         let destn = document.getElementById('main'); // Blank window (except Nav) as loading
         Nav.clear(destn);
@@ -156,7 +159,9 @@ static async factory(itemid, res, wanthistory=true) {
         console.group("Nav.factory",itemid);
         if (wanthistory) {
             let historystate = {itemid}; //TODO-HISTORY may want  to store verbose, transports etc here
-            history.pushState(historystate, `Internet Archive item ${itemid ? itemid : ""}`, `?${itemid ? "item="+itemid+"&" : ""}verbose=${verbose}&${Transports.connectedNamesParm()}`); //TODO-HISTORY need to save state of transports
+            let cnp = await Transports.p_connectedNamesParm();
+            history.pushState(historystate, `Internet Archive item ${itemid ? itemid : ""}`,
+                `${window.origin}/arc/archive.org/details${itemid ? "/"+itemid :""}?${verbose ? "verbose=true&" : ""}${cnp}`);
         }
         if (!itemid) {
             (await new Home(itemid, undefined).fetch()).render(res);

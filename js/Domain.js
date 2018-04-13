@@ -108,7 +108,7 @@ class Leaf extends SmartDict {
         let obj;
         try {
             if (["application/json"].includes(this.mimetype) ) {
-                let data = Transports.p_rawfetch(this.urls, { verbose, timeoutMS: 5000});
+                let data = await Transports.p_rawfetch(this.urls, { verbose, timeoutMS: 5000});
                 let datajson = (typeof data === "string" || data instanceof Buffer) ? JSON.parse(data) : data;          // Parse JSON (dont parse if p_fetch has returned object (e.g. from KeyValueTable
                 if (this.metadata["jsontype"] === "archive.org.dweb") {
                     let obj = await this._after_fetch(datajson, urls, verbose);   // Interpret as dweb - look at its "table" and possibly decrypt
@@ -467,5 +467,5 @@ SignatureMixin.call(Domain.prototype, ["tablepublicurls", "name", "keys", "expir
 
 Domain.clsLeaf = Leaf;  // Just So exports can find it and load into Dweb TODO move to own file
 SmartDict.table2class["domain"] = Domain;
-Transports.resolveNamesWith(Domain.p_resolveNames)
+Transports.resolveNamesWith(Domain.p_resolveNames); // Note this won't work if tried in Client to a Service Worker, must be in same thread as Transport
 exports = module.exports = Domain;

@@ -20,9 +20,9 @@
         return false;
     }
 
-    function fetchit() {
+    async function fetchit() {
         let el = document.getElementById("retrievalarea");
-        let urls = DwebTransports.urlsFrom(el.value);
+        let urls = await DwebTransports.p_urlsFrom(el.value);
         fetchanddisplay(urls);
     }
 

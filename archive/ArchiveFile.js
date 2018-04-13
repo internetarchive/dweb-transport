@@ -4,7 +4,8 @@ import React from './ReactFake';
 import Util from './Util';
 import throttle from "throttleit";
 import prettierBytes from "prettier-bytes";
-var Transports = require('dweb-transports');  //TODO-SW find all usages
+//const Transports = require('dweb-transports');
+const Transports = require('../js/TransportsProxy');  //Use this version to go through proxy to ServiceWorker
 
 export default class ArchiveFile {
     /*
@@ -29,7 +30,7 @@ export default class ArchiveFile {
         /*
         Return an array of URLs that might be a good place to get this item
          */
-        if (!this.metadata.ipfs && Transports.connectedNames().includes("IPFS")) {   // Connected to IPFS but dont have IPFS URL yet (not included by default because IPFS caching is slow)
+        if (!this.metadata.ipfs && (await Transports.p_connectedNames()).includes("IPFS")) {   // Connected to IPFS but dont have IPFS URL yet (not included by default because IPFS caching is slow)
             this.metadata = await Util.fetch_json(`${Util.gateway.url_metadata}${this.itemid}/${this.metadata.name}`);
         }
         // Includes both ipfs and ipfs via gateway link as the latter can prime the IPFS DHT so the former works for the next user

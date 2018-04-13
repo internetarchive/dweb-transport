@@ -54,7 +54,7 @@
     async function fetchanddisplay(urls) {
         /* Fetch a URL, display the meta data and a box for adding to it*/
         console.log("fetchanddisplay",urls);
-        urls = DwebTransports.urlsFrom(urls);
+        urls = await DwebTransports.p_urlsFrom(urls);
         try {
             //Note cl below is a global so can be accessed for push
             cl = await Dweb.SmartDict.p_fetch(urls, verbose);   // Throws TransportError immediately if url invalid

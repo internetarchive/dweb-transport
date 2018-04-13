@@ -1,4 +1,4 @@
-
+// Keep this light, ideally dont put anything needing a "require" in here
 utils = {}; //utility functions
 
 //Parts of this file (consolearr, and createElement) are also in dweb-transports repo

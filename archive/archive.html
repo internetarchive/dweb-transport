@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Internet Archive - in the browser</title>
+    <base href="https://dweb.me/examples/archive.html"><!-- Allow relative URLs here (in this header), this could also be http://ipfs.io/ipfs/Q11...-->
     <!--TODO-DETAILS-STAGE2 links should refer to content addressable files-->
     <script src="./includes/jquery-1.10.2.min.js" type="text/javascript"></script>
     <script src="./includes/bootstrap.min.js" type="text/javascript"></script>
@@ -31,7 +32,6 @@
     $(function(){ $('.navbar [data-toggle="tooltip"]').tooltip({}); });
 
     async function main() {
-        //TODO-SW disable p_connect - should be using SW
         await DwebTransports.p_connect({statuselement: document.getElementById("statuselement"), transports: searchparams.getAll("transport")});
         if (query) {
             Nav.nav_search(query)
@@ -54,12 +54,9 @@
     //Nav.nav_home();
     //Nav.nav_details("mbid-b105f712-d75e-4d0a-a9c5-bf1948461e2b") // Image (Red Shift)
     var searchparams = new URL(window.location.href).searchParams;
-    //TODO-SW match paths like search and details
-    i = location.pathname.indexOf("/details/"
+    i = location.pathname.indexOf("/details/");
     var item = (i > -1) ? location.pathname.slice(i+9) : searchparams.get("item");
-    //TODO-SW handle searches - need to check it makes it through the redirections
-    i = location.pathname.indexOf("/search.php?query="
-    var query = (i > -1) ? location.pathname.slice(i+18) : searchparams.get("query");
+    var query =  searchparams.get("query");
     var verbose = searchparams.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)
     main();
 </script>

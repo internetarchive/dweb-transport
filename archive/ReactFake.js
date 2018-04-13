@@ -12,8 +12,10 @@ import from2 from "from2";
 import prettierBytes from "prettier-bytes";
 const Url = require('url');
 import ArchiveFile from "./ArchiveFile";
-const Transports = require('dweb-transports');  //TODO-SW find all usages
-const Domain = require('../js/Domain');
+// Non service worker way
+//const Transports = require('dweb-transports');
+//const Domain = require('../js/Domain'); //Required to make sure can resolve names
+const Transports = require('../js/TransportsProxy');  //Use this version to go through proxy to ServiceWorker
 
 function deletechildren(el, keeptemplate) { //Note same function in htmlutils
     /*
@@ -90,7 +92,8 @@ export default class React  {
         if (verbose) console.log(`Loading Image ${urls}`);
         urls = await this.p_resolveUrls(urls, rel); // Handles a range of urls include ArchiveFile
         urls = await Transports.p_resolveNames(urls); // Resolves names as validFor doesnt currently handle names
-        const validCreateReadStream = Transports.validFor(urls, "createReadStream").length;
+        //TODO-SW reenable next line (instead of undefined) when fix p_f_createReadStream
+        const validCreateReadStream = undefined // Transports.validFor(urls, "createReadStream").length;
         // Three options - depending on whether can do a stream well (WEBSOCKET) or not (HTTP, IPFS); or local (File:)
         if (urls[0].startsWith("file:")) {
             // This should only happen if the original script was loaded from local disk
@@ -101,11 +104,10 @@ export default class React  {
         } else if (validCreateReadStream) {
             const file = {
                 name: name,
-                createReadStream: await Transports.p_f_createReadStream(urls, verbose)
+                createReadStream: await Transports.p_f_createReadStream(urls, verbose) //TODO-SW support p_f_createReadStream
                 // Return a function that returns a readable stream that provides the bytes between offsets "start" and "end" inclusive.
                 // This function works just like fs.createReadStream(opts) from the node.js "fs" module.
                 // f_createReadStream can initiate the stream before returning the function.
-                //OLD WAY: function (opts) { return Transports.createReadStream(urls, opts, verbose); }
             };
 
             RenderMedia.append(file, jsx, cb);  // Render into supplied element - have to use append, as render doesnt work, the cb will set attributes and/or add children.
@@ -144,7 +146,8 @@ export default class React  {
             //urls = [ 'ipfs:/ipfs/QmRfcgjWEWdzKBnnSYwmV7Kt5wVVuWZvLm96o4dj7myWuy']  - TODO delete this line once Kyle fixes files.cat for urlstored files - this replaces all with a test video
             urls = await this.p_resolveUrls(urls, rel); // Allow relative urls
             urls = await Transports.p_resolveNames(urls); // Allow names among urls
-            const validCreateReadStream = Transports.validFor(urls, "createReadStream").length;
+            //TODO-SW reenable when p_f_createReadStream works.
+            const validCreateReadStream = undefined; //TODO-SW = Transports.validFor(urls, "createReadStream").length;
             if (validCreateReadStream) {
                 const file = {
                     name: name,
@@ -152,7 +155,6 @@ export default class React  {
                         // Return a function that returns a readable stream that provides the bytes between offsets "start" and "end" inclusive.
                         // This function works just like fs.createReadStream(opts) from the node.js "fs" module.
                         // f_createReadStream can initiate the stream before returning the function.
-                        //OLD WAY: function (opts) { return Transports.createReadStream(urls, opts, verbose); }
                 };
 
                 RenderMedia.render(file, jsx, cb);  // Render into supplied element
@@ -187,7 +189,7 @@ export default class React  {
                 // Next choice is to pass a HTTP url direct to <VIDEO> as it knows how to stream it.
                 // TODO clean this nasty kludge up,
                 // Find a HTTP transport if connected, then ask it for the URL (as will probably be contenthash) note it leaves non contenthash urls untouched
-                const url = Transports.http()._url(urls.find(u => (u.startsWith("contenthash") || u.startsWith("http") )), "content/rawfetch");
+                const url = await Transports.p_httpfetchurls(urls);
                 if (url) {
                     jsx.src = url;
                 } else {
@@ -235,7 +237,7 @@ export default class React  {
         /* First we handle cases where we dont actually build the tag requested */
 
         const kids = Array.prototype.slice.call(arguments).slice(2);
-        const rel = [ window.location.href ];
+        const rel = [ document.baseURI ]; // use baseURI as will be location.href if not explicitly set; [ window.location.href ];
         
         function cb(err, element) {
             if (err) {

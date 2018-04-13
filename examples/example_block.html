@@ -22,15 +22,15 @@
                 let content = tinyMCE.get('mytextarea').getContent();
                 // alert(content);
                 let el = document.getElementById("retrievalarea");
-                let urls = DwebTransports.p_rawstore(content, {verbose})
+                DwebTransports.p_rawstore(content, {verbose})
                     .then((urls) => el.value = urls)
                     .catch((err) => {console.error("saveoncallback", err); alert(err)});
             }
         });
 
-        function fetchit() {
+        async function fetchit() {
             let el = document.getElementById("retrievalarea");
-            let urls = DwebTransports.urlsFrom(el.value);
+            let urls = await DwebTransports.p_urlsFrom(el.value);
             fetchanddisplay(urls); //asynchronous
         }
 

@@ -3,7 +3,6 @@
 'use strict'
 
 const DwebTransports = require('dweb-transports'); // Handles multiple transports
-//TODO-SW put Domain back in, then figure out why rawfetch fails (see sw_client XXX1)
 const Domain = require('./Domain'); // Must be after DwebTransports, plugs into DwebTransports to resolve names
 const Leaf = Domain.clsLeaf;
 
@@ -15,7 +14,8 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
     console.log('service-worker activating');
-    event.waitUntil(DwebTransports.p_connect()); //{transports: searchparams.getAll("transport")}; statuselement: document.getElementById("statuselement")
+    //TODO-SW remove "HTTP" restriction
+    event.waitUntil(DwebTransports.p_connect({transports: ["HTTP"]})); //{transports: searchparams.getAll("transport")}; statuselement: document.getElementById("statuselement")
     /*
     ipfsstart();  // Ignore promise
     */
@@ -34,39 +34,28 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-    // self.location.origin is e.g. "localhost:8080" and URL should always match this or Service Worker wont catch it
+    // self.location.origin is e.g. "http://localhost:8080" and URL should always match this or Service Worker wont catch it
     //Called each time client tries to load a URL in the domain
     let url = new URL(event.request.url);
     let verbose = url.searchParams.get("verbose") || false;
     console.log("Service Worker called with url=",url.href);
     if (url.pathname.startsWith('/ping')) {                 // Just for testing
         event.respondWith(p_ping(`Ping: ${url.href}`));
-    } else if (url.pathname.startsWith('/test')) {          // Feel free to change this
-        event.respondWith(p_redirect("./temp.html"));
+    //} else if (url.pathname.startsWith('/test')) {          // Feel free to change this
+    //    event.respondWith(p_redirect("./temp.html"));
     } else if (url.hostname.startsWith("dweb.") && (url.hostname !== "dweb.me")) {          // https://dweb.archive.org/details/foo -> dweb.archive.org/arc/archive.org/details/foo
         url.pathname = `/arc/${url.hostname.substring(5)}${url.pathname}`
         event.respondWith(p_redirect(url.href));
     } else if ( url.pathname.startsWith("/archive.org")) {  // https://localhost:4244/archive.org/details/foo -> /arc/archive.org/details/foo
         url.pathname = `/arc${url.pathname}`
         event.respondWith(p_redirect(url.href));
-    //TODO-SW this group just here till "BASE" in version on gateway
-    } else if (url.pathname.startsWith("/arc/archive.org/details/includes/")) {
-        event.respondWith(p_redirect(`https://dweb.me/examples/includes/${url.pathname.slice(34)}`));
-    } else if (url.pathname === "/arc/archive.org/details/htmlutils.js") {
-        event.respondWith(p_redirect(`https://dweb.me/examples/htmlutils.js`));
-    } else if (url.pathname === "/arc/archive.org/details/loginutils.js") {
-        event.respondWith(p_redirect(`https://dweb.me/examples/loginutils.js`));
-    } else if (url.pathname === "/arc/archive.org/details/example_styles.css") {
-        event.respondWith(p_redirect(`https://dweb.me/examples/example_styles.css`));
-    } else if (url.pathname === "/arc/archive.org/details/archive_webpacked.js") {
-        event.respondWith(p_redirect(`https://dweb.me/examples/archive_webpacked.js`));
-    //TODO-SW end of material to remove once BASE established
+    } else if ((self.location.origin === "http://localhost:8080") && (url.hostname === "dweb.me") && url.pathname.startsWith("/examples/")) {   // dweb.me/examples/foo -> localhost:8080/foo //TODO-SW check when know where http-server running
+        event.respondWith(p_redirect(`${self.location.origin}/${url.pathname.slice(10)}`));
     } else if ( url.pathname.startsWith("/arc/")) {         // https://localhost:4244/arc/archive.org/details/foo -> archive.html (from resolution)
         event.respondWith(p_responseFromName(url.pathname, url.search.slice(1), {verbose}));   // Skip initial "?" in search
     //TODO-SW implement ipfs catch (and magnet)
-    //TODO-SW makesure archive.html doesnt start p_connect, and passes requests to SW
-    //TODO-SW see how handling /metadata
     //TODO-SW build bootstrap into things like archive.html
+    //TODO-SW make sure can bootstrap off of basic disk
     } else if ((url.pathname.startsWith('/ipfs')) && (url.hostname !== "ipfs.io")) {
         //TODO-SW move https://ipfs.io check into TransportsIPFS so use one URL dweb:/ipfs of ipfs:/ipfs and tries IPFS & http://ipfs.io
         event.respondWith(p_respondFromDwebUrl(`ipfs:${url.pathname}`));
@@ -82,8 +71,7 @@ async function p_ping(url, text) {
     return new Response(`${text || "Ping response to:"} ${url}`, headers)
 }
 async function p_redirect(newurl) {
-    //TODO-SW maybe use the redirect status that doesnt change the URL
-    //TODO-SW make sure search queries make it htrough the redirections
+    //TODO-SW maybe use the redirect status that doesnt change the URL in some cases
     console.log("Redirecting to", newurl)
     return new Response(undefined,  {status: 307, statusText: 'OK', headers: {"Location": newurl}})
 }
@@ -102,8 +90,14 @@ async function p_responseFromName(name, search_supplied, {verbose=false}={}) {
         const res = await Domain.p_rootResolve(name, {verbose});
         const resolution = res[0];
         const remainder = res[1];
-        if (remainder.length) {
+        if (remainder && remainder.length) {
             // TODO make leaf clear about remainder - can specify to ignore it, or its a redirect (which would only work with one URL returned)
+        }
+        if (self.location.origin === "http://localhost:8080") {
+            console.log(`XXXSW @100 rewriting ${resolution.urls} to localhost url`);
+            //TODO-SW these are just while debugging, can delete when archive.html updated on dweb.me
+            resolution.urls = resolution.urls.map((u) => u.replace('https://dweb.me/examples/archive.html','http://localhost:8080/archive.html'))
+            console.log(`XXXSW @130 res= ${resolution.urls}`);
         }
         let data = await DwebTransports.p_rawfetch(resolution.urls, {verbose});
         return new Response(data, {status: 200, statusText: 'OK', headers: {"Content-type": resolution.mimetype}});
@@ -116,7 +110,7 @@ async function p_responseFromName(name, search_supplied, {verbose=false}={}) {
 
 self.addEventListener('message', (event) => {
     /* This ia proxy for Transports
-    event.command = p_rawfetch|.... //TODO-SW extend to cover all commands used
+    event.command = p_rawfetch|....
      */
     console.log("SW handling event", event);
     let res;
@@ -124,7 +118,7 @@ self.addEventListener('message', (event) => {
         event.ports[0].postMessage({error: `No such command on DwebTransports: ${event.data.command}`});
     }
     DwebTransports[event.data.command](...event.data.args)
-    .then((res) => { console.log("XXX@123 res=", res); return res; }) //TODO-SW remove debugging
+    //.then((res) => { console.log("XXX@123 res=", res); return res; }) //  uncomment for debugging
         .then((res) => event.ports[0].postMessage(res))
         .catch((err) => event.ports[0].postMessage({error: err.message}));
     return false;
