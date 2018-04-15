@@ -6,7 +6,8 @@ where much of this code came from
 
 Note expect to see this loaded with const DwebTransport = require(TransportsProxy) to reuse code that calls DwebTransport
  */
-const errors = require("../js/Errors");
+const errors = require("./Errors");
+const utils = require("./utils");
 //TODO-SW should have one-line edit of this to give direct to Transports version so can always "require TransportsProxy
 class TransportsProxy {
     constructor(options, verbose) {
@@ -14,19 +15,15 @@ class TransportsProxy {
     }
 
     static async p_registerServiceWorker() {
+        console.log("Registering Service Worker");
         if ('serviceWorker' in navigator) {
 
             await navigator.serviceWorker.register(window.location.origin+'/serviceworker_bundle.js');
             console.log('-> Registered the service worker successfully');
-            navigator.serviceWorker.addEventListener('message', function(event) {
-                // Set up a listener for messages posted from the service worker.
-                // The service worker is set to post a message to all its clients once it's run its activation
-                // handler and taken control of the page, so you should see this message event fire once.
-                console.log("Client received SW message:",event.data); // Just a placeholder for async messages back
-            });
         } else {
             console.error("Unable to register service worker as not in 'navigator'");
         }
+        this.refreshstatuses(await this.p_statuses());
     }
 
     static _p_proxy(command, args) {
@@ -56,6 +53,9 @@ class TransportsProxy {
         });
     }
 
+    static async p_statuses() {
+        return await this._p_proxy("p_statuses", []);
+    }
     static async p_connectedNames() {
         return await this._p_proxy("p_connectedNames", []);
     }
@@ -111,10 +111,42 @@ class TransportsProxy {
     static async p_newlisturls(cl, opts)  // TODO-SW -- will need to extract info from cl
     */
 
+    static async refreshstatuses(statuses) {
+        /* Refresh display of statuses:
+        statuses    [ {name, status}* ]
+         */
+        statuses.map(s => this.refreshstatus(s.name, s.status));
+    }
+    static async refreshstatus(name, status) {
+        let statuselement = TransportsProxy.options.statuselement; // May be undefined
+        if (statuselement) {
+            let el = Array.prototype.slice.call(statuselement.getElementsByTagName("LI")).find((el) => el.name === name);
+            if (!el) {
+                el = utils.createElement("LI",
+                    {onclick: "this.source.togglePaused(DwebTransports.refreshstatus);", name}, //TODO-SW figure out how t osend this back
+                    name);
+                statuselement.appendChild(el);
+            }
+            let statusclasses = ["transportstatus0","transportstatus1","transportstatus2","transportstatus3","transportstatus4"];
+            el.classList.remove(...statusclasses);
+            el.classList.add(statusclasses[status]);
+        }
+
+    }
+
     static async p_connect(options, verbose) {
         //options = { defaulttransports: ["IPFS"], statuselement: el, http: {}, ipfs: {} }
-        TransportsProxy.p_registerServiceWorker(); //TODO-SW move to explicitly connect, currently connects automatically on activate
-        //TODO-SW get status reports as async message to all controlled pages and forward to statuselement
+        // Chain is typically: archive.html.main > TP.p_connect > TP.p_registerServiceWorker > SW.activate ...
+        this.options = options; // Save for later - esp statuselement
+        this.p_registerServiceWorker();
+        navigator.serviceWorker.addEventListener('message', function(event) {
+            if (event.data.command === "status") {
+                TransportsProxy.refreshstatus(event.data.name, event.data.status);
+            } else {
+                console.log("Client received uninterpretable SW message",event.data);
+            }
+
+        });
     }
 }
 exports = module.exports = TransportsProxy;

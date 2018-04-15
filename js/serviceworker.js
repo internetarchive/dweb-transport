@@ -12,16 +12,18 @@ self.addEventListener('install', (event) => {
     console.log('service-worker clients.skipWaiting completed');
 })
 
+async function p_refreshstatus(t) {
+    let clients = await self.clients.matchAll();
+    return await Promise.all(clients.map((client) => client.postMessage({command: "status", name: t.name, status: t.status})));
+}
+
 self.addEventListener('activate', (event) => {
     console.log('service-worker activating');
-    //TODO-SW remove "HTTP" restriction
-    event.waitUntil(DwebTransports.p_connect({transports: ["HTTP"]})); //{transports: searchparams.getAll("transport")}; statuselement: document.getElementById("statuselement")
-    /*
-    ipfsstart();  // Ignore promise
-    */
-    console.log('service-worker p_connect complete');
     event.waitUntil(self.clients.claim())
     console.log('service-worker clients.claim completed');
+    //TODO-SW remove "HTTP" restriction
+    event.waitUntil(DwebTransports.p_connect({transports: ["HTTP"], statuscb: p_refreshstatus})); //{transports: searchparams.getAll("transport")}; statuselement: document.getElementById("statuselement")
+    console.log('service-worker p_connect complete');
     // After the activation and claiming is complete, send a message to each of the controlled
     // pages letting it know that it's active.
     // This will trigger navigator.serviceWorker.onmessage in each client.
