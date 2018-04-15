@@ -71,7 +71,15 @@ export default class React  {
         }
     }
 
-    static async p_loadImg(jsx, name, urls, cb, rel) {
+    static _loadImgSrc(el, url, cb) {
+        // This should only happen if the original script was loaded from local disk
+        let elImg = document.createElement("img");
+        elImg.setAttribute("src", url);
+        cb(undefined, elImg);  // Set attributes (shouldnt have kids)
+        el.appendChild(elImg);
+    }
+
+    static async p_loadImg(el, name, urls, cb, rel) {
         /*
         This is the asyncronous part of loadImg, runs in the background to update the image.
         Previous version got a static (non stream) content and puts in an existing IMG tag but this fails in Firefox
@@ -86,31 +94,29 @@ export default class React  {
         // This next code is bizarre combination needed to open a blob from within an HTML window.
         let objectURL = URL.createObjectURL(blob);
         if (verbose) console.log("Blob URL=",objectURL);
-        //jsx.src = `http://archive.org/download/${this.itemid}/${this.metadata.name}`
-        jsx.src = objectURL;
+        //el.src = `http://archive.org/download/${this.itemid}/${this.metadata.name}`
+        el.src = objectURL;
         */
         if (verbose) console.log(`Loading Image ${urls}`);
         urls = await this.p_resolveUrls(urls, rel); // Handles a range of urls include ArchiveFile
         urls = await Transports.p_resolveNames(urls); // Resolves names as validFor doesnt currently handle names
         //TODO-SW reenable next line (instead of undefined) when fix p_f_createReadStream
-        const validCreateReadStream = undefined // Transports.validFor(urls, "createReadStream").length;
         // Three options - depending on whether can do a stream well (WEBSOCKET) or not (HTTP, IPFS); or local (File:)
-        if (urls[0].startsWith("file:")) {
-            // This should only happen if the original script was loaded from local disk
-            let el = document.createElement("img");
-            el.setAttribute("src", urls[0]);
-            cb(undefined, el);  // Set attributes (shouldnt have kids)
-            jsx.appendChild(el);
-        } else if (validCreateReadStream) {
+        let fileurl = urls.find(u => u.startsWith("file"))
+        let magneturl = urls.find(u => u.includes('magnet:'));
+        const streamUrls = await DwebTransports.p_urlsValidFor(urls, "createReadStream");
+        if (fileurl) {
+            this._loadImgSrc(el, fileurl, cb);
+        } else if ((Transports.type === "ServiceWorker") && magneturl) {
+            this._loadImgSrc(el, magneturl.replace('magnet:',`${window.origin}/magnet/`), cb);
+        } else if (streamUrls.length) {
             const file = {
                 name: name,
-                createReadStream: await Transports.p_f_createReadStream(urls, verbose) //TODO-SW support p_f_createReadStream
-                // Return a function that returns a readable stream that provides the bytes between offsets "start" and "end" inclusive.
+                createReadStream: await Transports.p_f_createReadStream(streamUrls, {verbose})
+                // Initiate a stream, & return a f({start, end}) => readstream
                 // This function works just like fs.createReadStream(opts) from the node.js "fs" module.
-                // f_createReadStream can initiate the stream before returning the function.
             };
-
-            RenderMedia.append(file, jsx, cb);  // Render into supplied element - have to use append, as render doesnt work, the cb will set attributes and/or add children.
+            RenderMedia.append(file, el, cb);  // Render into supplied element - have to use append, as render doesnt work, the cb will set attributes and/or add children.
         } else {
             // Otherwise fetch the file, and pass via rendermedia and from2
             //TODO-MULTI-GATEwAY need to set relay: true once IPFS different CIDs (hashes) from browser/server adding
@@ -123,7 +129,7 @@ export default class React  {
                     return from2([buff.slice(opts.start || 0, opts.end || (buff.length - 1))])
                 }
             };
-            RenderMedia.append(file, jsx, cb);  // Render into supplied element - have to use append, as render doesnt work, the cb will set attributes and/or add children.
+            RenderMedia.append(file, el, cb);  // Render into supplied element - have to use append, as render doesnt work, the cb will set attributes and/or add children.
         }
     }
 
@@ -137,7 +143,59 @@ export default class React  {
         return element;
     }
 
-    static async p_loadStream(jsx, name, urls, cb, rel) {
+    static async _p_loadStreamRenderMedia(el, name, urls, cb, rel) {
+        const file = {
+            name: name,
+            createReadStream: await Transports.p_f_createReadStream(urls, {verbose})
+            // Return a function that returns a readable stream that provides the bytes between offsets "start" and "end" inclusive.
+            // This function works just like fs.createReadStream(opts) from the node.js "fs" module.
+            // f_createReadStream can initiate the stream before returning the function.
+        };
+
+        RenderMedia.render(file, el, cb);  // Render into supplied element, will set window.WEBTORRENT_TORRENT if uses WebTorrent
+
+        if (window.WEBTORRENT_TORRENT) {
+            const torrent = window.WEBTORRENT_TORRENT;
+
+            const updateSpeed = () => {
+                if (window.WEBTORRENT_TORRENT === torrent) {    // Check still displaying ours
+                    const webtorrentStats = document.querySelector('#webtorrentStats'); // Not moved into updateSpeed as not in document when this is run first time
+                    if (webtorrentStats) {
+                        const els = (
+                            <span>
+                                <b>Peers:</b> {torrent.numPeers}{' '}
+                                <b>Progress:</b> {(100 * torrent.progress).toFixed(1)}%{' '}
+                                <b>Download speed:</b> {prettierBytes(torrent.downloadSpeed)}/s{' '}
+                                <b>Upload speed:</b> {prettierBytes(torrent.uploadSpeed)}/s
+                            </span>
+                        )
+                        deletechildren(webtorrentStats);
+                        webtorrentStats.appendChild(els);
+                    }
+                }
+            };
+
+            torrent.on('download', throttle(updateSpeed, 250));
+            torrent.on('upload', throttle(updateSpeed, 250));
+            setInterval(updateSpeed, 1000);
+            updateSpeed(); //Do it once
+        }
+    }
+    static async _p_loadStreamFetchAndBuffer(el, name, urls, cb, rel) {
+
+        // Worst choice - fetch the file, and pass via rendermedia and from2
+        const buff = await  Transports.p_rawfetch(urls, {verbose});  //Typically will be a Uint8Array, TODO-TIMEOUT make timeoutMS dependent on file size
+        const file = {
+            name: name,
+            createReadStream: function (opts) {
+                if (!opts) opts = {};
+                return from2([buff.slice(opts.start || 0, opts.end || (buff.length - 1))])
+            }
+        };
+        RenderMedia.render(file, el, cb);  // Render into supplied element
+    }
+
+    static async p_loadStream(el, name, urls, cb, rel) {
         //More complex strategy. ....
         //If the Transports supports urls/createReadStream (webtorrent only at this point) then load it.
         //If its a HTTP URL use that
@@ -147,62 +205,28 @@ export default class React  {
             urls = await this.p_resolveUrls(urls, rel); // Allow relative urls
             urls = await Transports.p_resolveNames(urls); // Allow names among urls
             //TODO-SW reenable when p_f_createReadStream works.
-            const validCreateReadStream = undefined; //TODO-SW = Transports.validFor(urls, "createReadStream").length;
-            if (validCreateReadStream) {
-                const file = {
-                    name: name,
-                    createReadStream: await Transports.p_f_createReadStream(urls, verbose)
-                        // Return a function that returns a readable stream that provides the bytes between offsets "start" and "end" inclusive.
-                        // This function works just like fs.createReadStream(opts) from the node.js "fs" module.
-                        // f_createReadStream can initiate the stream before returning the function.
-                };
-
-                RenderMedia.render(file, jsx, cb);  // Render into supplied element
-
-                if (window.WEBTORRENT_TORRENT) {
-                    const torrent = window.WEBTORRENT_TORRENT;
-
-                    const updateSpeed = () => {
-                        if (window.WEBTORRENT_TORRENT === torrent) {    // Check still displaying ours
-                            const webtorrentStats = document.querySelector('#webtorrentStats'); // Not moved into updateSpeed as not in document when this is run first time
-                            const els = (
-                                <span>
-                                <b>Peers:</b> {torrent.numPeers}{' '}
-                            <b>Progress:</b> {(100 * torrent.progress).toFixed(1)}%{' '}
-                            <b>Download speed:</b> {prettierBytes(torrent.downloadSpeed)}/s{' '}
-                        <b>Upload speed:</b> {prettierBytes(torrent.uploadSpeed)}/s
-                            </span>
-                        )
-                            if (webtorrentStats) {
-                                deletechildren(webtorrentStats);
-                                webtorrentStats.appendChild(els);
-                            }
-                        }
-                    };
-
-                    torrent.on('download', throttle(updateSpeed, 250));
-                    torrent.on('upload', throttle(updateSpeed, 250));
-                    setInterval(updateSpeed, 1000);
-                    updateSpeed(); //Do it once
-                }
+            // Strategy here ...
+            // If serviceworker && webtorrent => video src=
+            // If can createReadStream (IPFS when fixed; webtorrent) => rendermedia
+            // If http => video src
+            // Default fetch as bytes and
+            let magneturl = urls.find(u => u.includes('magnet:'));
+            if ((Transports.type === "ServiceWorker")  && magneturl) {
+                el.src = magneturl.replace('magnet:',`${window.origin}/magnet/`);
             } else {
-                // Next choice is to pass a HTTP url direct to <VIDEO> as it knows how to stream it.
-                // TODO clean this nasty kludge up,
-                // Find a HTTP transport if connected, then ask it for the URL (as will probably be contenthash) note it leaves non contenthash urls untouched
-                const url = await Transports.p_httpfetchurls(urls);
-                if (url) {
-                    jsx.src = url;
+                const streamUrls = (await DwebTransports.p_urlsValidFor(urls, "createReadStream"));
+                if (streamUrls.length) {
+                    await this._p_loadStreamRenderMedia(el, name, streamUrls, cb, rel)
                 } else {
-                    // Worst choice - fetch the file, and pass via rendermedia and from2
-                    const buff = await  Transports.p_rawfetch(urls, {verbose});  //Typically will be a Uint8Array, TODO-TIMEOUT make timeoutMS dependent on file size
-                    const file = {
-                        name: name,
-                        createReadStream: function (opts) {
-                            if (!opts) opts = {};
-                            return from2([buff.slice(opts.start || 0, opts.end || (buff.length - 1))])
-                        }
-                    };
-                    RenderMedia.render(file, jsx, cb);  // Render into supplied element
+                    // Next choice is to pass a HTTP url direct to <VIDEO> as it knows how to stream it.
+                    // TODO clean this nasty kludge up,
+                    // Find a HTTP transport if connected, then ask it for the URL (as will probably be contenthash) note it leaves non contenthash urls untouched
+                    const url = await Transports.p_httpfetchurls(urls);
+                    if (url) {
+                        el.src = url;
+                    } else {
+                        await this._p_loadStreamFetchAndBuffer(el, name, urls, cb, rel);
+                    }
                 }
             }
         } catch(err) {
@@ -211,12 +235,12 @@ export default class React  {
         }
 
     }
-    static loadStream(jsx, name, urls, cb, rel) {
+    static loadStream(el, name, urls, cb, rel) {
         //asynchronously loads file from one of metadata, turns into blob, and stuffs into element
         // usage like <VIDEO src=<ArchiveFile instance>  >
         // noinspection JSIgnoredPromiseFromCall
-        this.p_loadStream(jsx, name, urls, cb, rel); /* Asynchronously load image, intentionally not waiting for it to complete*/
-        return jsx;
+        this.p_loadStream(el, name, urls, cb, rel); /* Asynchronously load image, intentionally not waiting for it to complete*/
+        return el;
     }
 
 

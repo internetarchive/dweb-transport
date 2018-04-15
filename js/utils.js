@@ -156,4 +156,22 @@ utils.createElement = function(tag, attrs, children) {        // Note arguments 
     return element;
 }
 
+
+utils.optsFromRange = function(str) {
+    // Loosely based on npm range-parser , which requires the file size
+    let index = str.indexOf('=');
+    if (index === -1) {
+        return {}
+    }
+    // split the range string
+    let arr = str.slice(index + 1).split(',');
+    // check ranges type
+    if (str.slice(0, index) !== "bytes") throw new Error("Only byte ranges supported");
+    // parse only first range (range-parser loops over all of them)
+    let range = arr[0].split('-');
+    let start = parseInt(range[0], 10) || 0;
+    let end = parseInt(range[1], 10) || undefined;
+    return {start, end};
+}
+
 exports = module.exports = utils;

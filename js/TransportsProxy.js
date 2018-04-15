@@ -8,6 +8,8 @@ Note expect to see this loaded with const DwebTransport = require(TransportsProx
  */
 const errors = require("./Errors");
 const utils = require("./utils");
+const stream = require('readable-stream');
+
 //TODO-SW should have one-line edit of this to give direct to Transports version so can always "require TransportsProxy
 class TransportsProxy {
     constructor(options, verbose) {
@@ -104,10 +106,11 @@ class TransportsProxy {
     static async p_urlsFrom(url) {
         return await this._p_proxy("p_urlsFrom", [url]);
     }
-
+    static async p_urlsValidFor(urls, func, options) {
+        return await this._p_proxy("p_urlsValidFor", [urls, func, options]);
+    }
     /*
     static listmonitor(urls, cb) // TODO-SW -- cb isnt going to work, or maybe it can via message passing
-    static async p_f_createReadStream(urls, verbose, options) // TODO-SW -- will need to figure out where to split function
     static async p_newlisturls(cl, opts)  // TODO-SW -- will need to extract info from cl
     */
 
@@ -120,10 +123,10 @@ class TransportsProxy {
     static async refreshstatus(name, status) {
         let statuselement = TransportsProxy.options.statuselement; // May be undefined
         if (statuselement) {
-            let el = Array.prototype.slice.call(statuselement.getElementsByTagName("LI")).find((el) => el.name === name);
+            let el = Array.prototype.slice.call(statuselement.getElementsByTagName("LI")).find((el) => el.getAttribute("name") === name);
             if (!el) {
                 el = utils.createElement("LI",
-                    {onclick: "this.source.togglePaused(DwebTransports.refreshstatus);", name}, //TODO-SW figure out how t osend this back
+                    {onclick: "this.source.togglePaused(DwebTransports.refreshstatus);", name}, //TODO-SW figure out how to send this back
                     name);
                 statuselement.appendChild(el);
             }
@@ -148,6 +151,47 @@ class TransportsProxy {
 
         });
     }
+
+    static async p_f_createReadStream(urls, options={}) {     // TODO need to tell proxy to return a url
+        let wanturl = options.wanturl; // Save for interpretation below
+        options.wanturl = true; // Always set wanturl for call
+        let verbose = options["verbose"];
+        let url = await this._p_proxy("p_f_createReadStream", [urls, options]); // Note will be a URL structure
+        if (wanturl) {
+            return url;
+        } else {
+            let self = this;
+            console.log("XXX@TP.164 url=",url)
+            return function(opts) { return self.createReadStream(url, opts, verbose); };
+        }
+    }
+
+    static createReadStream(httpurl, opts={}, verbose) {
+        /*
+        This is hard! Have to return a stream immediately, but all possible ways to get it are async.
+         */
+        console.log("XXX@TPcrs httpurl=",httpurl, opts)
+        const through = new stream.PassThrough();
+        let headers = new Headers();
+        if (opts.start || opts.end) headers.append("range", `bytes=${opts.start || 0}-${opts.end || ""}`);
+        let init = {    //https://developer.mozilla.org/en-US/docs/Web/API/WindowOrWorkerGlobalScope/fetch
+            method: 'GET',
+            headers: headers,
+            mode: 'cors',
+            cache: 'default',
+            redirect: 'follow',  // Chrome defaults to manual
+            keepalive: true    // Keep alive - mostly we'll be going back to same places a lot
+        };
+        httpurl = (typeof(httpurl) === "string" ? httpurl : httpurl.href).replace('magnet:',`${window.origin}/magnet/`) // Relative to root of this window
+        fetch(new Request(httpurl, init))
+            .then((resp) => {
+                console.log(resp);
+                resp.body.pipeThrough(through);  // This might not be correct
+                //resp.socket.pipe(through)
+            });
+        return through;
+    }
 }
+TransportsProxy.type = "ServiceWorker";
 exports = module.exports = TransportsProxy;
 

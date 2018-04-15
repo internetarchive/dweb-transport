@@ -209,7 +209,7 @@ class KeyValueTable extends PublicPrivate {
             console.assert(publicobj._map["address"] === "Nowhere"); // Shouldnt be set yet
             await masterobj.p_set("address","Everywhere", verbose);
             await delay(500);
-            if (Transports.validFor(masterobj.tablepublicurls, "monitor").length) {
+            if (await Transports.p_urlsValidFor(masterobj.tablepublicurls, "monitor").length) {
                 console.assert(publicobj._map["address"] === "Everywhere"); // Should be set after allow time for monitor event
             } else {
                 console.log('Loaded transports dont support "monitor"');
