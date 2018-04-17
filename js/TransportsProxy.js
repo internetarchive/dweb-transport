@@ -4,7 +4,7 @@ Part of the intention is to reduce the amount of code loaded for each page, and 
 for comprehensible service worker messaging example See https://github.com/GoogleChrome/samples/blob/gh-pages/service-worker/post-message/service-worker.js
 where much of this code came from
 
-Note expect to see this loaded with const DwebTransport = require(TransportsProxy) to reuse code that calls DwebTransport
+Note expect to see this loaded with const DwebTransport = require(Transports) to reuse code that calls DwebTransport
  */
 const errors = require("./Errors");
 const utils = require("./utils");
@@ -169,6 +169,10 @@ class TransportsProxy {
     static createReadStream(httpurl, opts={}, verbose) {
         /*
         This is hard! Have to return a stream immediately, but all possible ways to get it are async.
+
+        Doesnt work on WebTorrent as is, because it returns a Browser ReadableStream, and rendermedia wants a node ReadStream
+        doesnt matter for now since with Service Worker, best to go direct to <video src = '/magnet/...'>
+        Revisit this for IPFS streams when they work.
          */
         console.log("XXX@TPcrs httpurl=",httpurl, opts)
         const through = new stream.PassThrough();
@@ -194,4 +198,3 @@ class TransportsProxy {
 }
 TransportsProxy.type = "ServiceWorker";
 exports = module.exports = TransportsProxy;
-

@@ -3,8 +3,7 @@ import Util from "./Util";
 
 require('babel-core/register')({ presets: ['env', 'react']}); // ES6 JS below!
 //const Transports = require('dweb-transports');
-//const Domain = require('../js/Domain');     // So can resolve names like dweb:/arc (on ServiceWorker, it includes Domain)
-const Transports = require('../js/TransportsProxy');  //Use this version to go through proxy to ServiceWorker
+const Transports = require('../js/Transports');  //Use this version to go through proxy to ServiceWorker
 const utils = require('../js/utils');
 //TODO-NAMING url could be a name
 

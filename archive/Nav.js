@@ -15,8 +15,7 @@ import Image from './Image'
 import Audio from './Audio'
 import Video from './Video'
 import DetailsError from './DetailsError'
-//const Transports = require('dweb-transports');
-const Transports = require('../js/TransportsProxy');  //Use this version to go through proxy to ServiceWorker
+const Transports = require('../js/Transports');  //Use this version to go through proxy to ServiceWorker
 
 
 export default class Nav {

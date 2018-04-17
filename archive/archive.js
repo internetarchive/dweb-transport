@@ -4,7 +4,7 @@
 var Nav = require('./Nav').default;
 window.Nav = Nav; // So HTML can find it
 //var Dweb = require('../js/Dweb').default;   //It doesnt look like this is used even in non-service workers
-var DwebTransports = require('../js/TransportsProxy');
+var DwebTransports = require('../js/Transports');
 window.DwebTransports = DwebTransports; // So HTML can find it
 //Above works
 //window.Nav = Nav;
