@@ -4,13 +4,12 @@ Part of the intention is to reduce the amount of code loaded for each page, and 
 for comprehensible service worker messaging example See https://github.com/GoogleChrome/samples/blob/gh-pages/service-worker/post-message/service-worker.js
 where much of this code came from
 
-Note expect to see this loaded with const DwebTransport = require(Transports) to reuse code that calls DwebTransport
+Best way to include this is usually to include Transports.js and then edit that in one place to switch between ServiceWorker/TransportProxy and direct-Transports
  */
 const errors = require("./Errors");
 const utils = require("./utils");
 const stream = require('readable-stream');
 
-//TODO-SW should have one-line edit of this to give direct to Transports version so can always "require TransportsProxy
 class TransportsProxy {
     constructor(options, verbose) {
         if (verbose) console.log("Transports(%o)", options);
@@ -126,7 +125,7 @@ class TransportsProxy {
             let el = Array.prototype.slice.call(statuselement.getElementsByTagName("LI")).find((el) => el.getAttribute("name") === name);
             if (!el) {
                 el = utils.createElement("LI",
-                    {onclick: "this.source.togglePaused(DwebTransports.refreshstatus);", name}, //TODO-SW figure out how to send this back
+                    {onclick: "this.source.togglePaused(DwebTransports.refreshstatus);", name}, //TODO-SW add toggle to UI and message>SW>Transports
                     name);
                 statuselement.appendChild(el);
             }

@@ -24,7 +24,7 @@ self.addEventListener('activate', (event) => {
     console.log('service-worker activating');
     event.waitUntil(self.clients.claim());
     console.log('service-worker clients.claim completed');
-    //TODO-SW remove "HTTP" restriction
+    //TODO-SW remove "HTTP" restriction and test with IPFS
     console.log("Connecting to decentralized transports");
     event.waitUntil(DwebTransports.p_connect({transports: ["HTTP","WEBTORRENT"], statuscb: p_refreshstatus})); //{transports: searchparams.getAll("transport")}; statuselement: document.getElementById("statuselement")
     //event.waitUntil(DwebTransports.p_connect({statuscb: p_refreshstatus})); //{transports: searchparams.getAll("transport")}; statuselement: document.getElementById("statuselement")
@@ -62,7 +62,7 @@ self.addEventListener('fetch', (event) => {
     } else if (url.pathname.startsWith('/magnet/') || (url.protocol === "magnet:")) {
         event.respondWith(p_respondWebTorrent(`magnet:${url.pathname.replace('/magnet/', '')}${url.search}`, range, verbose));
     } else if ((url.pathname.startsWith('/ipfs')) && (url.hostname !== "ipfs.io")) {
-        //TODO-SW implement ipfs catch (and magnet)
+        //TODO-SW implement ipfs catch
         //TODO-SW move https://ipfs.io check into TransportsIPFS so use one URL dweb:/ipfs of ipfs:/ipfs and tries IPFS & http://ipfs.io
         event.respondWith(p_respondFromDwebUrl(`ipfs:${url.pathname}`));
     }

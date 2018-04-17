@@ -97,7 +97,6 @@ export default class React  {
         if (verbose) console.log(`Loading Image ${urls}`);
         urls = await this.p_resolveUrls(urls, rel); // Handles a range of urls include ArchiveFile
         urls = await Transports.p_resolveNames(urls); // Resolves names as validFor doesnt currently handle names
-        //TODO-SW reenable next line (instead of undefined) when fix p_f_createReadStream
         // Three options - depending on whether can do a stream well (WEBSOCKET) or not (HTTP, IPFS); or local (File:)
         let fileurl = urls.find(u => u.startsWith("file"))
         let magneturl = urls.find(u => u.includes('magnet:'));
@@ -151,7 +150,7 @@ export default class React  {
 
         RenderMedia.render(file, el, cb);  // Render into supplied element, will set window.WEBTORRENT_TORRENT if uses WebTorrent
 
-        if (window.WEBTORRENT_TORRENT) {
+        if (window.WEBTORRENT_TORRENT) {    //TODO-SW need to get status back from WebTorrent
             const torrent = window.WEBTORRENT_TORRENT;
 
             const updateSpeed = () => {
@@ -201,7 +200,6 @@ export default class React  {
             //urls = [ 'ipfs:/ipfs/QmRfcgjWEWdzKBnnSYwmV7Kt5wVVuWZvLm96o4dj7myWuy']  - TODO delete this line once Kyle fixes files.cat for urlstored files - this replaces all with a test video
             urls = await this.p_resolveUrls(urls, rel); // Allow relative urls
             urls = await Transports.p_resolveNames(urls); // Allow names among urls
-            //TODO-SW reenable when p_f_createReadStream works.
             // Strategy here ...
             // If serviceworker && webtorrent => video src=
             // If can createReadStream (IPFS when fixed; webtorrent) => rendermedia
