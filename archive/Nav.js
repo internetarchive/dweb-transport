@@ -140,8 +140,9 @@ export default class Nav {
         if (wanthistory) {
             let historystate = {query: q}; //TODO-HISTORY may want  to store verbose, transports etc here
             let cnp = await Transports.p_connectedNamesParm();
+            // See notes on async_factory about history.pushState //TODO-SW copy history.pushState from factory below
             history.pushState(historystate, `Internet Archive search ${q}`,
-                `${window.origin}/arc/archive.org/details?query=${q}&${verbose ? "verbose=true&" : ""}${cnp}`);
+                `${window.location.origin}/arc/archive.org/details?query=${q}&${verbose ? "verbose=true&" : ""}${cnp}`);
         }
         let destn = document.getElementById('main'); // Blank window (except Nav) as loading
         Nav.clear(destn);
@@ -159,8 +160,15 @@ static async factory(itemid, res, wanthistory=true) {
         if (wanthistory) {
             let historystate = {itemid}; //TODO-HISTORY may want  to store verbose, transports etc here
             let cnp = await Transports.p_connectedNamesParm();
-            history.pushState(historystate, `Internet Archive item ${itemid ? itemid : ""}`,
-                `${window.origin}/arc/archive.org/details${itemid ? "/"+itemid :""}?${verbose ? "verbose=true&" : ""}${cnp}`);
+            // History is tricky .... take care of: SW (with Base set) \ !SW; file | http; cases
+            // when loaded from file, non SW window.location.origin = document.location.origin = "file://" and document.baseURI is unset
+            let historyloc;
+            if (window.location.origin === "file://") {
+                historyloc = `${window.location.origin}${window.location.pathname}?${itemid ? "item=" + itemid + "&" : ""}${verbose ? "verbose=true&" : ""}${cnp}`
+            } else { //Might not work on http, this is intended for SW
+                historyloc = `${window.location.origin}/arc/archive.org/details${itemid ? "/"+itemid :""}?${verbose ? "verbose=true&" : ""}${cnp}`
+            }
+            history.pushState(historystate, `Internet Archive item ${itemid ? itemid : ""}`, historyloc);
         }
         if (!itemid) {
             (await new Home(itemid, undefined).fetch()).render(res);
