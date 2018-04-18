@@ -141,8 +141,13 @@ export default class Nav {
             let historystate = {query: q}; //TODO-HISTORY may want  to store verbose, transports etc here
             let cnp = await Transports.p_connectedNamesParm();
             // See notes on async_factory about history.pushState //TODO-SW copy history.pushState from factory below
-            history.pushState(historystate, `Internet Archive search ${q}`,
-                `${window.location.origin}/arc/archive.org/details?query=${q}&${verbose ? "verbose=true&" : ""}${cnp}`);
+            let historyloc;
+            if (window.location.origin === "file://") {
+                historyloc = `${window.location.origin}${window.location.pathname}?query=${q}&${verbose ? "verbose=true&" : ""}${cnp}`
+            } else { //Might not work on http, this is intended for SW
+                historyloc = `${window.location.origin}/arc/archive.org/details?query=${q}&${verbose ? "verbose=true&" : ""}${cnp}`
+            }
+            history.pushState(historystate, `Internet Archive search ${q}`, historyloc);
         }
         let destn = document.getElementById('main'); // Blank window (except Nav) as loading
         Nav.clear(destn);
