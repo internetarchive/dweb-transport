@@ -26,8 +26,8 @@ self.addEventListener('activate', (event) => {
     console.log('service-worker clients.claim completed');
     //TODO-SW remove "HTTP" restriction and test with IPFS
     console.log("Connecting to decentralized transports");
-    event.waitUntil(DwebTransports.p_connect({transports: ["HTTP","WEBTORRENT"], statuscb: p_refreshstatus})); //{transports: searchparams.getAll("transport")}; statuselement: document.getElementById("statuselement")
-    //event.waitUntil(DwebTransports.p_connect({statuscb: p_refreshstatus})); //{transports: searchparams.getAll("transport")}; statuselement: document.getElementById("statuselement")
+    //event.waitUntil(DwebTransports.p_connect({transports: ["HTTP","WEBTORRENT"], statuscb: p_refreshstatus})); //{transports: searchparams.getAll("transport")}; statuselement: document.getElementById("statuselement")
+    event.waitUntil(DwebTransports.p_connect({statuscb: p_refreshstatus})); //{transports: searchparams.getAll("transport")}; statuselement: document.getElementById("statuselement")
     console.log('service-worker p_connect complete');
 });
 

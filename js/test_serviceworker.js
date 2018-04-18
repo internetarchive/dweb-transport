@@ -18,8 +18,9 @@ if (searchparams.get("addr")) {
 log("Loading Service Worker and connecting to transports...");
 //TODO-SW this loops if not provided an addr, in that case should have a form to fill in
 TransportsProxy.p_registerServiceWorker()
+.then((data) => console.log("Service Worker registration complete"))
 //.then(() =>  TransportsProxy.p_rawfetch(["http://gateway.dweb.me/info"], {verbose} ))
-.then((data) => console.log("Result of test to gateway.dweb.me= ", data))
+//.then((data) => console.log("Result of test to gateway.dweb.me= ", data))
 .catch((err) => log(`Test to gateway.dweb.me failed: ${err}`))
 log(`Redirecting through service worker to:${url}`);
 window.open(url,"_self");
