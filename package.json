@@ -9,10 +9,10 @@
   "dependencies": {
     "crypto": "latest",
     "custom-event": "latest",
-    "dweb-transports": "git+https://git@github.com/mitra42/dweb-transports.git",
+    "dweb-transports": "git+https://git@github.com/internetarchive/dweb-transports.git",
     "es2015": "latest",
     "from2": "latest",
-    "jsdom": "latest",
+    "jsdom": "^11.8.0",
     "level": "latest",
     "leveldown": "latest",
     "levelup": "latest",
