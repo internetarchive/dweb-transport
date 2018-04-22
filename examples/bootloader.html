@@ -38,11 +38,11 @@
         document.write('<div id="statuselement"></div>');
         await DwebTransports.p_connect({statuselement: document.getElementById("statuselement"), transports: searchparams.getAll("transport")});
         try {
-            const res = await Dweb.Domain.p_rootResolve(name, {verbose});
+            const res = await DwebObjects.Domain.p_rootResolve(name, {verbose});
             const resolution = res[0];
             const remainder = res[1];
             const opentarget="_self";
-            if ((resolution instanceof Dweb.Leaf) && ["text/html"].includes(resolution.mimetype)) {
+            if ((resolution instanceof DwebObjects.Leaf) && ["text/html"].includes(resolution.mimetype)) {
                 //Its an HTML file, open it 
                 if (resolution.metadata.htmlusesrelativeurls) {
                     let tempurls = resolution.urls;
@@ -62,7 +62,7 @@
                 } else {
                     //TODO-BOOTSTRAP Not clear if parms make sense to a blob, if so can copy from above
                     // Not setting timeoutMS as could be a slow load of a big file TODO-TIMEOUT make dependent on size
-                    Dweb.utils.display_blob(await DwebTransports.p_rawfetch(resolution.urls, {verbose}), {type: resolution.mimetype, target: opentarget});
+                    DwebObjects.utils.display_blob(await DwebTransports.p_rawfetch(resolution.urls, {verbose}), {type: resolution.mimetype, target: opentarget});
                 }
             }
         } catch(err) {

@@ -82,7 +82,7 @@
                 let data = await DwebTransports.p_rawfetch([`ipfs:/ipfs/${multihash}`], {verbose}); //TODO-TIMEOUT make dependent on file size
                 if (verbose) console.log("display_ipfs retrieved", data.constructor.name, blk.size());
                 if (verbose && data.length < 1000) console.log("Buffer=", data.toString());
-                Dweb.utils.display_blob(data, {type: 'application/pdf'}); //TODO allow for multiple types
+                DwebObjects.utils.display_blob(data, {type: 'application/pdf'}); //TODO allow for multiple types
             } catch(err) {
                     console.log("display_ipfs cant retrieve",err)
             }

@@ -22,7 +22,7 @@ async function p_resolveobj(url) {
         if (typeof url === 'string')
             url = [ url ];
         if (Array.isArray(url))
-            url = await Dweb.SmartDict.p_fetch(url, verbose);
+            url = await DwebObjects.SmartDict.p_fetch(url, verbose);
         return url;
     } catch(err) {
         console.log("p_resolveobj: Cannot resolve",url);

@@ -12,7 +12,7 @@ import from2 from "from2";
 import prettierBytes from "prettier-bytes";
 const Url = require('url');
 import ArchiveFile from "./ArchiveFile";
-const Transports = require('../js/Transports');  //Use this version to go through proxy to ServiceWorker
+const Transports = require('../../../dweb-serviceworker/Transports');  //Use this version to go through proxy to ServiceWorker
 
 function deletechildren(el, keeptemplate) { //Note same function in htmlutils
     /*

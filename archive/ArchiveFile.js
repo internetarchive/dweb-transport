@@ -5,7 +5,7 @@ import Util from './Util';
 import throttle from "throttleit";
 import prettierBytes from "prettier-bytes";
 //const Transports = require('dweb-transports');
-const Transports = require('../js/Transports');  //Use this version to go through proxy to ServiceWorker
+const Transports = require('../../../dweb-serviceworker/Transports');  //Use this version to go through proxy to ServiceWorker
 
 export default class ArchiveFile {
     /*

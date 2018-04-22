@@ -12,7 +12,7 @@
     function sendit() {     // Send form data to Dweb, and display the url
         if (verbose) console.log("sendit ---");
         let dict = form2dict("myform");
-        let sd = new Dweb.SmartDict(dict, verbose );
+        let sd = new DwebObjects.SmartDict(dict, verbose );
         if (verbose) console.log("SD=",sd);
         // Now display link
         sd.p_store(verbose) // Store the edited dictionary
@@ -30,7 +30,7 @@
         if (verbose) console.log("Fetching urls=", urls);
         let destn = document.getElementById("retrievaldestn");
         destn.innerHTML = ""; // Clear it first
-        let sd = await Dweb.SmartDict.p_fetch(urls, verbose);
+        let sd = await DwebObjects.SmartDict.p_fetch(urls, verbose);
         if (verbose) console.log("Fetched=",sd);
         destn.innerHTML = "My name is: "+sd.name;
         destn.style.color = sd.favcolor;

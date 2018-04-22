@@ -3,8 +3,7 @@ import Util from "./Util";
 
 require('babel-core/register')({ presets: ['env', 'react']}); // ES6 JS below!
 //const Transports = require('dweb-transports');
-const Transports = require('../js/Transports');  //Use this version to go through proxy to ServiceWorker
-const utils = require('../js/utils');
+const Transports = require('../../../dweb-serviceworker/Transports');  //Use this version to go through proxy to ServiceWorker
 //TODO-NAMING url could be a name
 
 export default class ArchiveItem {
@@ -64,7 +63,7 @@ export default class ArchiveItem {
             // Fetch via Domain record - the dweb:/arc/archive.org/metadata resolves into a table that is dynamic on gateway.dweb.me
             const name = `dweb:/arc/archive.org/metadata/${this.itemid}`;
             let m = await Transports.p_rawfetch([name], {verbose, timeoutMS: 5000}); // Using Transports as its multiurl and might not be HTTP urls
-            m = utils.objectfrom(m);
+            m = (typeof m === "string" || m instanceof Buffer) ? JSON.parse(m) : m;
             console.assert(m.metadata.identifier === this.itemid);
             this.item = m;
             this._listLoad();   // Load _list with ArchiveFile

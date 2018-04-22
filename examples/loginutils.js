@@ -26,7 +26,7 @@ const icon_images = {   //!SEE-OTHER-KC-CLASSES
 
 function logout_click() {
     /* Logout button clicked  - logged out*/
-    Dweb.KeyChain.logout();         // Empty keychains
+    DwebObjects.KeyChain.logout();         // Empty keychains
     deletechildren("keychains_ul");    // Delete any visible children
     hide('logout');                 // Nothing remains to logout so hide button
 }
@@ -40,7 +40,7 @@ async function p_login(dict) {
     if (typeof(dict) === "string") dict = form2dict(dict);
     try {
         let passphrase = dict.name + "/" + dict.passphrase;
-        let kc = await Dweb.KeyChain.p_new({name: dict.name}, {passphrase: passphrase}, verbose);
+        let kc = await DwebObjects.KeyChain.p_new({name: dict.name}, {passphrase: passphrase}, verbose);
         addtemplatedchild("keychains_ul", {}, kc);      // returns el, but unused
         show('logout');                             // And show the logout button
     } catch(err) {
@@ -81,7 +81,7 @@ function keychain_click(el) {
     kc.addEventListener("insert", (event) => {                  // Setup a listener that will trigger when anything added to the list and update HTML
         if (verbose) console.log("keychain.eventlistener",event);
         let sig = event.detail;
-        if (Dweb.utils.intersects(kc._publicurls, el_keychain_header.source._publicurls))   // Check its still this KeyChain being displayed in keylist
+        if (DwebObjects.utils.intersects(kc._publicurls, el_keychain_header.source._publicurls))   // Check its still this KeyChain being displayed in keylist
             sig.p_fetchdata({verbose})                            // Get the data from a sig, its not done automatically as in other cases could be large
                 .then((obj) => _showkeyorlock("keychain_ul", obj))             // Show on the list
     });
@@ -92,13 +92,13 @@ async function kcitem_click(el) { //!SEE-OTHER-KC-CLASSES
     // Clicked on a key or a lock, determine which and forward
     el = elementFrom(el);
     let obj = el.source;
-    if (obj instanceof Dweb.AccessControlList)
+    if (obj instanceof DwebObjects.AccessControlList)
         await p_lock_click(el);
-    else if (obj instanceof Dweb.KeyPair)
+    else if (obj instanceof DwebObjects.KeyPair)
         key_click(el);
-    else if (obj instanceof Dweb.VersionList)
+    else if (obj instanceof DwebObjects.VersionList)
         await p_versionlist_click(el);
-    else if ((obj instanceof Dweb.SmartDict) && obj.token)  // Its a token - like a key
+    else if ((obj instanceof DwebObjects.SmartDict) && obj.token)  // Its a token - like a key
         token_click(el);
      else
         throw new errors.ToBeImplementedError(`kcitem_click doesnt support ${obj.constructor.name}`)
@@ -131,7 +131,7 @@ async function keynew_click() {
     hide('keynew_form');
     let dict = form2dict("keynew_form"); //name
     let keychain = document.getElementById('keychain_header').source;   // Keychain of parent of this dialog
-    let key = new Dweb.KeyPair({name: dict.name, key: {keygen: true}, _acl: keychain}, verbose ); // Doesnt store
+    let key = new DwebObjects.KeyPair({name: dict.name, key: {keygen: true}, _acl: keychain}, verbose ); // Doesnt store
     _showkeyorlock("keychain_ul", key);   // Put in UI, as listmonitor response will be deduplicated.
     await keychain.p_push(key, verbose);    // Will store on the way
     if (verbose) console.groupEnd("keynew_click ---");
@@ -142,7 +142,7 @@ async function locknew_click() {
     hide('locknew_form');
     let dict = form2dict("locknew_form"); //name
     let keychain = document.getElementById('keychain_header').source;  // The KeyChain being added to.
-    let res = await Dweb.AccessControlList.p_new({name: dict.name, _acl: keychain}, true, {keygen: true}, verbose, null, keychain )    //(data, master, key, verbose, options, kc)
+    let res = await DwebObjects.AccessControlList.p_new({name: dict.name, _acl: keychain}, true, {keygen: true}, verbose, null, keychain )    //(data, master, key, verbose, options, kc)
         .then((acl) => _showkeyorlock("keychain_ul", acl)); // Put in UI, as listmonitor return rejected as duplicate
     if (verbose) console.groupEnd("locknew_click ---");
     return res;
@@ -152,7 +152,7 @@ async function p_lock_click(el) {
     if (verbose) console.group("p_lock_click ---");
     let acl = el.source;                                    // The ACL clicked on
     show('lock_div');                                     // Show the HTML with a list of tokens in ACL
-    let el_lockheader = replacetexts("lock_header", acl);     // Set name fields etc in keylistdiv, sets source
+    let el_lockheader = replacetexts("lock_header", acl);     // Set name fields etc in keylistdiv, sets source //TODO-HTMLUTILS replacetexts -> createElement
     deletechildren("lock_ul");                               // Remove any existing HTML children
     try {
         let toks = await acl.p_tokens();                                       // Retrieve the keys for the keylist
@@ -160,7 +160,7 @@ async function p_lock_click(el) {
         acl.addEventListener("insert", (event) => {                  // Setup a listener that will trigger when anything added to the list and update HTML
             if (verbose) console.log("lock.eventlistener",event);
             let sig = event.detail;
-            if (Dweb.utils.intersects(acl._publicurls, el_lockheader.source._publicurls))  // Check its still this ACL being displayed in keylist
+            if (DwebObjects.utils.intersects(acl._publicurls, el_lockheader.source._publicurls))  // Check its still this ACL being displayed in keylist
                 sig.p_fetchdata({verbose})                    // Get the data from a sig, its not done automatically as in other cases could be large
                     .then((tok) => _showkeyorlock("lock_ul", tok))           // Show on the list
         });

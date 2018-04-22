@@ -18,7 +18,7 @@
             // Get the data from the form
             let dict = form2dict("newform");
             <!--CommonList(data, master, key, verbose, options)-->
-            let obj = await Dweb.CommonList.p_new(dict, true, {keygen: true}, verbose, {_allowunsafestore: true});
+            let obj = await DwebObjects.CommonList.p_new(dict, true, {keygen: true}, verbose, {_allowunsafestore: true});
             // _allowunsafestore is set to true since AccessControlList not set yet, so storing unencrypted.
             console.log("Created=", obj);
             await obj.p_store(verbose);
@@ -34,7 +34,7 @@
             // Get the data from the form
             let dict = form2dict("entryform");
             // Create a new object and add to the list
-            let obj = new Dweb.SmartDict(dict, verbose );
+            let obj = new DwebObjects.SmartDict(dict, verbose );
             await cl.p_push(obj, verbose);
             console.log("Added:",obj);                             // Show on the Javascript console
             addtemplatedchild("listresults", {}, obj);                  // Display locally as listmonitor will not pick up local entries
@@ -57,7 +57,7 @@
         urls = await DwebTransports.p_urlsFrom(urls);
         try {
             //Note cl below is a global so can be accessed for push
-            cl = await Dweb.SmartDict.p_fetch(urls, verbose);   // Throws TransportError immediately if url invalid
+            cl = await DwebObjects.SmartDict.p_fetch(urls, verbose);   // Throws TransportError immediately if url invalid
             console.log("Fetched=", cl);
             // Only display the input prompt if its a master list.
             if (cl._master) { show("entryrow"); } else { hide("entryrow"); }

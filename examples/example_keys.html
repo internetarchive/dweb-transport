@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!--TODO-REPO make all examples work with new libraries and test with SW -->
     <meta charset="UTF-8">
     <title>Dweb example - Keys, Locks and Authentication</title>
     <link rel='stylesheet' href='example_styles.css'>
@@ -20,7 +21,7 @@
                 await DwebTransports.p_connect({statuselement: document.getElementById("statuselement"), transports: searchparams.getAll("transport")});
                 // Any code you want to run once online goes here.
                 var url = searchparams.get("url"); // Unused in this example
-                Dweb.KeyChain.eventHandler.addEventListener((event) => {   //TODO-EVENT move to new mechanism in PublicPrivate
+                DwebObjects.KeyChain.eventHandler.addEventListener((event) => {   //TODO-EVENT move to new mechanism in PublicPrivate
                     console.log("event",event);
                     if (event.type === "login") { onlogin(event.values); }
                 });
@@ -123,7 +124,7 @@
     <li><strong>KeyChain:</strong> A collection of Keys, Locks, and Master items.</li>
     <li><strong>Locked Items:</strong> something secured with a Lock.</li>
     <li><strong>Master Items:</strong> are thing that you control access to, this means owning the private key that they are locked with.</li>
-    <li><strong>Dweb.keychains:</strong> is the list of KeyChains currently logged into.</li>
+    <li><strong>DwebObjects.keychains:</strong> is the list of KeyChains currently logged into.</li>
     <li><strong>Login Key:</strong> The private key pair generated for each user, the private part is really private - never stored online.</li>
     </ul>
 </p>

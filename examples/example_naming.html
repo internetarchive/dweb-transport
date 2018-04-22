@@ -117,7 +117,7 @@
         }
         function addsubdomain(el, name, dom) {
             // el should be a ul to add newly created nodes to
-            let el_name = createElement("span", {class: `naming_name ${(dom instanceof Dweb.Domain && dom.privateFromKeyChain()) ? "fa-unlock" : ""}`}, " ", name);
+            let el_name = createElement("span", {class: `naming_name ${(dom instanceof DwebObjects.Domain && dom.privateFromKeyChain()) ? "fa-unlock" : ""}`}, " ", name);
             let el_ul = createElement("ul", {});
             fa_icon = {"domain": "fa-folder", "leaf": "fa-leaf"}[dom.table] || "fa-question";
             expandable = ["domain"].includes(dom.table);
@@ -152,7 +152,7 @@
                     console.log("XXX@152",x.source);
                     src = x.source;
                     span = x.firstChild;    // Will be a span, but dont really care, this is where we add the class cos cant overload LI
-                    if (src instanceof Dweb.Domain && src.privateFromKeyChain()) {
+                    if (src instanceof DwebObjects.Domain && src.privateFromKeyChain()) {
                         span.classList.add('fa-unlock');
                     } else {
                         span.classList.remove('fa-unlock');
@@ -168,16 +168,16 @@
                 await DwebTransports.p_connect({statuselement: document.getElementById("statuselement"), transports: searchparams.getAll("transport")});
                 // Any code you want to run once online goes here.
                 var url = searchparams.get("url"); // Unused in this example
-                Dweb.KeyChain.eventHandler.addEventListener((event) => {   //TODO-EVENT move to new mechanism in PublicPrivate
+                DwebObjects.KeyChain.eventHandler.addEventListener((event) => {   //TODO-EVENT move to new mechanism in PublicPrivate
                     console.log("event",event);
                     if (event.type === "login") {
                         // noinspection JSIgnoredPromiseFromCall
                         onlogin(event.values); }
                 });
-                await Dweb.Domain.p_rootSet({verbose});
+                await DwebObjects.Domain.p_rootSet({verbose});
                 console.log("==Login should have finished-== output after here implies async issue ===");
                 let el_root_ul = document.getElementById("treeroot_ul");
-                addsubdomain(el_root_ul, "/", Dweb.Domain.root);
+                addsubdomain(el_root_ul, "/", DwebObjects.Domain.root);
             } catch(err) { // Catch any uncaught errors here, log and alert.
                 console.log("App Error:", err);
                 throw(err);

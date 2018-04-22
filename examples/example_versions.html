@@ -33,7 +33,7 @@
             }
         }
         function newversion() {  // Create a new blank version - this is where to configure what each one looks like - by setting fields etc.
-            return new Dweb.SmartDict({textarea: ""})
+            return new DwebObjects.SmartDict({textarea: ""})
         }
         async function newversionlist(el) {
             // Create a new versionlist.
@@ -42,7 +42,7 @@
                 let dict = form2dict(el);                               // Get the data from the form
                 dict.contentacl = await DwebTransports.p_urlsFrom(dict.contentacl);            // May be in variety of forms but especially JSON version of array of urls
                 // VersionList(data, master, keypair, keygen, mnemonic, verbose, options)
-                let obj = await Dweb.VersionList.p_new(dict, true, {keygen: true}, newversion(), verbose);
+                let obj = await DwebObjects.VersionList.p_new(dict, true, {keygen: true}, newversion(), verbose);
                 await p_vl_target_display(el, obj)                      // Display in the HTML target defined below
             } catch(err) {
                 console.log("ERROR in newversionlist:",err); alert(err.message);
@@ -87,8 +87,8 @@
         function onlogin(kc) {
             try {
                 // Populate drop-downs
-                replacetexts("vls_list", Dweb.KeyChain.mykeys(Dweb.VersionList));
-                replacetexts("lock_list", Dweb.KeyChain.mykeys(Dweb.AccessControlList));
+                replacetexts("vls_list", DwebObjects.KeyChain.mykeys(DwebObjects.VersionList));
+                replacetexts("lock_list", DwebObjects.KeyChain.mykeys(DwebObjects.AccessControlList));
                 //TODO add event listners here for VersionList and ACL
                 let el = elementFrom("vl_target");
                 if (url && !el.source) {   // Were asked to load a VL (indicated by global url being set) but had to wait for login.
@@ -109,7 +109,7 @@
                 // Any code you want to run once online goes here.
                 starteditor();
                 //Setup a callback so once logged in it will populate drop-downs
-                Dweb.KeyChain.eventHandler.addEventListener((event) => {    //TODO-EVENT move to new mechanism in PublicPrivate
+                DwebObjects.KeyChain.eventHandler.addEventListener((event) => {    //TODO-EVENT move to new mechanism in PublicPrivate
                     console.log("event",event);
                     if (event.type === "login") { onlogin(event.values); }
                 });

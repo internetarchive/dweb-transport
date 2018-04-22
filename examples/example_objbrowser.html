@@ -17,13 +17,13 @@
 
     async function fetchanddisplay(urls) {
         if (verbose) console.log("Fetching urls=", urls);
-        let sd = await Dweb.SmartDict.p_fetch(urls, verbose);
+        let sd = await DwebObjects.SmartDict.p_fetch(urls, verbose);
         if (verbose) console.log("Fetched=",sd);
         deletechildren("ObjBrowserDiv");
         await sd.p_objbrowser("ObjBrowserDiv");
     }
     function quick_keychains() {
-        (new Dweb.SmartDict()).objbrowser_arrayobj(elementFrom("ObjBrowserDiv"), "keychains", Dweb.KeyChain.keychains, {links: true});
+        (new DwebObjects.SmartDict()).objbrowser_arrayobj(elementFrom("ObjBrowserDiv"), "keychains", DwebObjects.KeyChain.keychains, {links: true});
     }
 
     async function main() {
