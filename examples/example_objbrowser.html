@@ -48,16 +48,16 @@
     <div id="statuselement"></div>
     <ul id="keychains_ul"><li class='template vertical_li' onclick='keychain_click(this);'><span name='name'></span></li></ul>
     <form><input id="logout" class="button" type="button" onclick="logout_click();" style="display:none;" value="Logout"/></form><!--logout all keychains-->
-    <img src="noun_186903_cc.png" alt="keychain" class="iconopener" onclick="show('loginform','');"/>
+    <img src="images/noun_186903_cc.png" alt="keychain" class="iconopener" onclick="show('loginform','');"/>
     <form class="dialogform" id="loginform" onsubmit="loginformsubmit(); return false;" style="display:none;">
-        <img class="keylist_icon" src="noun_83161_cc.svg" alt="Close" onclick="hide('loginform');"/>
+        <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('loginform');"/>
         <input class="propval" type="text" name="name" size="20" placeholder="Your id"/>
         <input class="propval" type="text" name="passphrase" size="70" placeholder="Passphrase"/>
         <input class="button" type="submit" value="Login"/>
         <input class="button" type="button" onclick="show('registrationform');" value="Register"/>
     </form>
     <form class="dialogform" id="registrationform" name="registrationform" onsubmit="registrationsubmit(); return false;" style="display:none;">
-        <img class="keylist_icon" src="noun_83161_cc.svg" alt="Close" onclick="hide('registrationform');"/>
+        <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('registrationform');"/>
         <input class="propval" type="text" name="name" size="50" placeholder="Your id - it doesnt have to be unique"/>
         <input class="propval" type="text" name="passphrase" size="70" placeholder="Type a complex phrase, easy for you to remember, hard for others to guess, mixed case, numbers, punctuation are all good"/>
         <input class="button" type="submit" value="Register"/>
@@ -66,11 +66,11 @@
     <div id="keychain" class="displayedblock" style="display:none;">
         <div class="displayedblockheader" id="keychain_header">
             <form class="dialogform">
-                <img class="keylist_icon" src="noun_83161_cc.svg" alt="Close" onclick="hide('keychain');" style="float:right;"/>
+                <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('keychain');" style="float:right;"/>
                 <span name="name" style="display: inline-block;"></span>
                 <!--If change icons, see icon_images above-->
-                <span style="display: inline-block;"><img class="keylist_icon" src="noun_1146472_cc.png" alt="Key"/><input class="button" type="button" onclick="show('keynew_form');" value="new key"/></span>
-                <span style="display: inline-block;"><img class="keylist_icon" src="noun_1093404_cc.png" alt="Lock"/><input class="button" type="button" onclick="show('locknew_form');" value="new lock"/></span>
+                <span style="display: inline-block;"><img class="keylist_icon" src="images/noun_1146472_cc.png" alt="Key"/><input class="button" type="button" onclick="show('keynew_form');" value="new key"/></span>
+                <span style="display: inline-block;"><img class="keylist_icon" src="images/noun_1093404_cc.png" alt="Lock"/><input class="button" type="button" onclick="show('locknew_form');" value="new lock"/></span>
             </form>
         </div>
         <!-- List of all keys in keychain-->
@@ -88,10 +88,10 @@
     </form>
     <div id="lock_div" class="displayedblock" style="display:none">
         <div class="displayedblockheader" id="lock_header"><!--note source will be set on lock_header-->
-            Lock: <img class="keylist_icon" src="noun_1176543_cc.png" onclick='locklink_click("lock_header");' alt="link"/><span name="name"></span>
+            Lock: <img class="keylist_icon" src="images/noun_1176543_cc.png" onclick='locklink_click("lock_header");' alt="link"/><span name="name"></span>
             <form class="dialogform" style="display:inline-block;">
-                <img class="keylist_icon" src="noun_708669_cc.png" alt="Key"/><input class="button" type="button" onclick="show('tokennew_form');" value="new token"/>
-                <img class="keylist_icon" src="noun_83161_cc.svg" alt="Close" onclick="hide('lock_div');"/>
+                <img class="keylist_icon" src="images/noun_708669_cc.png" alt="Key"/><input class="button" type="button" onclick="show('tokennew_form');" value="new token"/>
+                <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('lock_div');"/>
             </form>
         </div>
         <!-- List of all tokens in AccessControlList-->
@@ -105,7 +105,7 @@
     <!--Dialogue to enter a new key for an ACL -->
     <form id='tokennew_form' name="tokennew_form" onsubmit="tokennew_click(); return false;" style="display:none;">
         <input class="propval" type="text" name="name" size="20" placeholder="Name of key" style="align:right;" />
-        <img class="keylist_icon" src="noun_83161_cc.svg" alt="Close" onclick="hide('tokennew_form');"/>
+        <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('tokennew_form');"/>
         <input class="propval" type="text" name="urls" size="50" placeholder="URLs of key"/><br/>
         <input class="button" type="submit" value="Add" style="align:right;"/>
     </form>
