@@ -5,65 +5,65 @@
     <!--Note there are copies of this in dweb-transports repo and dweb-transport repo-->
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>DWEB Transports example page</title>
-    <script type="text/javascript" src="./dweb_transports_bundle.js"></script>
+    <script type="text/javascript" src="./dist/dweb-transports-bundle.js"></script>
     <script type="text/javascript" src='https://cloud.tinymce.com/stable/tinymce.min.js'></script><!-- TinyMCE -->
     <script type="text/javascript">
 
-        tinymce.init({
-            selector: '#mytextarea',
-            menubar: "true",
-            plugins: [ "save",
-                'advlist autolink lists link image charmap print preview anchor',
-                'searchreplace visualblocks code fullscreen',
-                'insertdatetime media table contextmenu paste code' ],
-            toolbar: 'save | undo redo | insert | styleselect | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image',
-            save_onsavecallback: function() {
-                let verbose = true; // See commentary in console.log
-                let content = tinyMCE.get('mytextarea').getContent();
-                // alert(content);
-                let el = document.getElementById("retrievalarea");
-                DwebTransports.p_rawstore(content, {verbose})
-                    .then((urls) => el.value = urls)
-                    .catch((err) => {console.error("saveoncallback", err); alert(err)});
-            }
-        });
-
-        async function fetchit() {
+    tinymce.init({
+        selector: '#mytextarea',
+        menubar: "true",
+        plugins: [ "save",
+            'advlist autolink lists link image charmap print preview anchor',
+            'searchreplace visualblocks code fullscreen',
+            'insertdatetime media table contextmenu paste code' ],
+        toolbar: 'save | undo redo | insert | styleselect | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image',
+        save_onsavecallback: function() {
+            let verbose = true; // See commentary in console.log
+            let content = tinyMCE.get('mytextarea').getContent();
+            // alert(content);
             let el = document.getElementById("retrievalarea");
-            let urls = await DwebTransports.p_urlsFrom(el.value);
-            fetchanddisplay(urls); //asynchronous
+            let urls = DwebTransports.p_rawstore(content, {verbose})
+                .then((urls) => el.value = urls)
+                .catch((err) => {console.error("saveoncallback", err); alert(err)});
         }
+    });
 
-        async function fetchanddisplay(urls) {
-            try {
-                console.log("Fetching urls=", urls);
-                let destn = document.getElementById("retrievaldestn");
-                destn.innerHTML = ""; // Clear it first
+    async function fetchit() {
+        let el = document.getElementById("retrievalarea");
+        let urls = await DwebTransports.p_urlsFrom(el.value);
+        fetchanddisplay(urls); //asynchronous
+    }
 
-                let data = await DwebTransports.p_rawfetch(urls, {verbose});
-                console.log("Retrieved data length", data.length);
-                destn.innerHTML = data;
-            } catch(err) {
-                console.log("fetchanddisplay: Error",err.message);
-                alert(err.message);
-                throw err;
-            }
+    async function fetchanddisplay(urls) {
+        try {
+            console.log("Fetching urls=", urls);
+            let destn = document.getElementById("retrievaldestn");
+            destn.innerHTML = ""; // Clear it first
+
+            let data = await DwebTransports.p_rawfetch(urls, {verbose});
+            console.log("Retrieved data length", data.length);
+            destn.innerHTML = data;
+        } catch(err) {
+            console.log("fetchanddisplay: Error",err.message);
+            alert(err.message);
+            throw err;
         }
-        async function main(url) {
-            try {
-                // and if not found will use the defaulttransports specified here.
-                await DwebTransports.p_connect({
-                    statuselement: document.getElementById("statuselement"),    // Where to build status indicator
-                    defaulttransports: ["HTTP","IPFS"],                         // Default transports if not specified
-                    transports: searchparams.getAll("transport")    // Allow override default from URL parameters
-                }, verbose);
-                // Any code you want to run after connected to transports goes here.
-                if (url) fetchanddisplay(url);
-            } catch(err) {
-                console.log("App Error:", err);
-                alert(err.message);
-            }
+    }
+    async function main(url) {
+        try {
+            // and if not found will use the defaulttransports specified here.
+            await DwebTransports.p_connect({
+                statuselement: document.getElementById("statuselement"),    // Where to build status indicator
+                defaulttransports: ["HTTP","IPFS"],                         // Default transports if not specified
+                transports: searchparams.getAll("transport")    // Allow override default from URL parameters
+            }, verbose);
+            // Any code you want to run after connected to transports goes here.
+            if (url) fetchanddisplay(url);
+        } catch(err) {
+            console.log("App Error:", err);
+            alert(err.message);
         }
+    }
 
 
     </script>
