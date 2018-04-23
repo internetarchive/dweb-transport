@@ -53,7 +53,7 @@
     "watch": "watchify js/Dweb_alltransports.js -o examples/dweb_bundled.js --verbose",
     "test": "cd js; node ./test.js",
     "bundletest": "cd js; browserify ./test_ipfs.js > ../examples/test_ipfs_bundled.js",
-    "help": "echo 'test (prob not working)'; echo 'bundle (packs into ../examples)'; echo 'watch: continually bundles whenever files change'; echo 'bundletest: (pack for test.html)'",
-    "copyotherrepos": "cp ../dweb-transports/dist/dweb-transports-bundle.js ../dweb-objects/dist/dweb-objects-bundle.js ../dweb-serviceworker/dist/{serviceworker,dweb-serviceworker-boot}-bundle.js ./examples"
+    "help": "echo 'copyotherrepos: copies bundles from other places'",
+    "copyotherrepos": "cp ../dweb-transports/dist/dweb-transports-bundle.js ../dweb-objects/dist/dweb-objects-bundle.js ../dweb-serviceworker/dist/{dweb-serviceworker,dweb-serviceworker-proxy,dweb-serviceworker-boot}-bundle.js ./examples"
   }
 }
