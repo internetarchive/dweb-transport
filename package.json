@@ -53,7 +53,8 @@
     "test": "cd js; node ./test.js",
     "bundletest": "cd js; browserify ./test_ipfs.js > ../examples/test_ipfs_bundled.js",
     "help": "echo 'copyotherrepos: copies bundles from other places'",
-    "copyotherrepos": "cp ../dweb-transports/dist/dweb-transports-bundle.js ../dweb-objects/dist/dweb-objects-bundle.js ../dweb-serviceworker/dist/{dweb-serviceworker,dweb-serviceworker-proxy,dweb-serviceworker-boot}-bundle.js ./examples",
-    "build": "npm script copyotherrepos"
+    "copyotherrepos": "cp ../dweb-transports/dist/dweb-transports-bundle.js ../dweb-objects/dist/dweb-objects-bundle.js ../dweb-serviceworker/dist/*-bundle.js  ./examples",
+    "copyarchive": "cp -r ../dweb-archive/dist/* ./examples"
+    "build": "npm run copyotherrepos; npm run copyarchive"
   }
 }
