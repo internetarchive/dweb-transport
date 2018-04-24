@@ -42,6 +42,7 @@
     "babelify": "^8.0.0",
     "browserify": "^14.5.0",
     "chai": "^4.1.2",
+    "copy-webpack-plugin": "^4.5.1",
     "watchify": "^3.11.0"
   },
   "repository": {
@@ -49,11 +50,10 @@
     "url": "git://github.com/internetarchive/dweb-transport.git"
   },
   "scripts": {
-    "bundle": "cd js; browserify ./Dweb_alltransports.js > ../examples/dweb_bundled.js",
-    "watch": "watchify js/Dweb_alltransports.js -o examples/dweb_bundled.js --verbose",
     "test": "cd js; node ./test.js",
     "bundletest": "cd js; browserify ./test_ipfs.js > ../examples/test_ipfs_bundled.js",
     "help": "echo 'copyotherrepos: copies bundles from other places'",
-    "copyotherrepos": "cp ../dweb-transports/dist/dweb-transports-bundle.js ../dweb-objects/dist/dweb-objects-bundle.js ../dweb-serviceworker/dist/{dweb-serviceworker,dweb-serviceworker-proxy,dweb-serviceworker-boot}-bundle.js ./examples"
+    "copyotherrepos": "cp ../dweb-transports/dist/dweb-transports-bundle.js ../dweb-objects/dist/dweb-objects-bundle.js ../dweb-serviceworker/dist/{dweb-serviceworker,dweb-serviceworker-proxy,dweb-serviceworker-boot}-bundle.js ./examples",
+    "build": "npm script copyotherrepos"
   }
 }
