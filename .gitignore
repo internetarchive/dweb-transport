@@ -13,3 +13,12 @@ sw_client_bundle.js
 sw_server_bundle.js
 test_serviceworker_bundle.js
 *-bundle.js
+examples/includes
+examples/images/cc
+WaybackLogoSmall.png
+loading.gif
+gift.png
+examples/fonts
+archive.html
+archive_bundle.js
+bootloader.html
