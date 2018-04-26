@@ -1,7 +1,6 @@
 /*
     This file is a set of utility functions used in the manipulation of HTML pages
     There is nothing specific to Dweb at all here, feel free to copy and modify.
-    TODO-REPO find what from here, if anything, used in archive and remove rest
  */
 
 

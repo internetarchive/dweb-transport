@@ -91,7 +91,7 @@
         let publicurl = new URL(window.location.href);
         let privateurl = new URL(window.location.href);
         publicurl.search=(obj._publicurls.length ? "url="+obj._publicurls[0] : "");
-        privateurl.search=(obj._master ? "url="+obj._urls[0] : "");    //TODO-MULTI check it shows up, maybe should be "urls.length
+        privateurl.search=(obj._master ? "url="+obj._urls[0] : "");
         replacetexts(el, obj, {
             _publicurlsstr: JSON.stringify(obj._publicurls),
             _privateurlsstr: (obj._master ? JSON.stringify(obj._urls) : ""),
