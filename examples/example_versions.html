@@ -109,7 +109,7 @@
             try {
                 await DwebTransports.p_connect({statuselement: document.getElementById("statuselement"), transports: searchparams.getAll("transport")});
                 // Any code you want to run once online goes here.
-                starteditor();
+                starteditor({savecb: p_updatecontent});
                 //Setup a callback so once logged in it will populate drop-downs
                 DwebObjects.KeyChain.eventHandler.addEventListener((event) => {    //TODO-EVENT move to new mechanism in PublicPrivate
                     console.log("event",event);

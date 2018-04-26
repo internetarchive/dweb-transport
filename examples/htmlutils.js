@@ -230,9 +230,17 @@ function seteditor(content) {
     tinyMCE.activeEditor.setDirty(true);        // Allow saving this restored text
 }
 
-function starteditor() {
-    //TODO maybe add some options that can override fields if needed (e.g. with a Object.assign
-    tinymce.init({
+function starteditor(opts={}) {
+    /*
+    Start TinyMCE editor
+    opts = {
+        savecb(content) => void: Callback on saving
+        ... other tiny initialization options to override defaults
+        }
+     */
+    savecb = opts.savecb;
+    delete opts.savecb;
+    tinydefaults = {
         selector: '#mytextarea',
         menubar: "true",
         plugins: [ "save",
@@ -240,6 +248,7 @@ function starteditor() {
             'searchreplace visualblocks code fullscreen',
             'insertdatetime media table contextmenu paste code' ],
         toolbar: 'save | undo redo | insert | styleselect | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image',
-        save_onsavecallback: () => p_updatecontent(tinyMCE.get('mytextarea').getContent())  // This function must be provided
-    });
+        save_onsavecallback: () => savecb(tinyMCE.get('mytextarea').getContent())  // This function must be provided
+    };
+    tinymce.init(Object.assign(tinydefaults, opts));
 }
