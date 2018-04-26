@@ -69,7 +69,7 @@ async function loginformsubmit() {
 
 function _showkeyorlock(el, obj) {
     // Utility function to add new or existing element to Key List
-    addtemplatedchild(el, {}, obj, {objsym: icon_images[obj.table === "sd" && obj.token ? "tok" : obj.table ] });
+    addtemplatedchild(el, {}, obj, {objsym: "images/"+icon_images[obj.table === "sd" && obj.token ? "tok" : obj.table ] });
 }
 
 function keychain_click(el) {
@@ -152,7 +152,26 @@ async function p_lock_click(el) {
     if (verbose) console.group("p_lock_click ---");
     let acl = el.source;                                    // The ACL clicked on
     show('lock_div');                                     // Show the HTML with a list of tokens in ACL
-    let el_lockheader = replacetexts("lock_header", acl);     // Set name fields etc in keylistdiv, sets source //TODO-HTMLUTILS replacetexts -> createElement
+    let el_lockheader = document.getElementById("lock_header");
+    //TODO-REPLACETEXTS first attempt to fix it ...
+    updateElement(el_lockheader, {source: acl},
+        "Lock:",
+        createElement("img", {class: "keylist_icon", src: "images/noun_1176543_cc.png", onclick: 'locklink_click("lock_header");', alt: "link"}),
+        acl.name,
+        createElement("form", {class: "dialogform", style: "display:inline-block;"},
+            createElement("img", {class: "keylist_icon", src: "images/noun_708669_cc.png", alt: "Key"}),
+            createElement("input", {class: "button", type: "button", onclick: "show('tokennew_form');", value: "new token"}),
+            createElement("img", {class: "keylist_icon", src: "images/noun_83161_cc.svg", alt: "Close", onclick: "hide('lock_div');"})
+        )
+    );
+    /* TODO-REPLACETEXTS check above matches this, then remove this
+    Lock: <img class="keylist_icon" src="images/noun_1176543_cc.png" onclick='locklink_click("lock_header");' alt="link"/><span name="name"></span>
+        <form class="dialogform" style="display:inline-block;">
+        <img class="keylist_icon" src="images/noun_708669_cc.png" alt="Key"/><input class="button" type="button" onclick="show('tokennew_form');" value="new token"/>
+        <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('lock_div');"/>
+        </form>
+        */
+
     deletechildren("lock_ul");                               // Remove any existing HTML children
     try {
         let toks = await acl.p_tokens();                                       // Retrieve the keys for the keylist

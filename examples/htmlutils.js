@@ -253,6 +253,16 @@ function starteditor(opts={}) {
     tinymce.init(Object.assign(tinydefaults, opts));
 }
 
+function updateElement(el, attrs, children) {
+    /*
+    el:         Element to be updated
+    attrs:      To set on el
+    children:   To replace existing children (a series of arguments, which can be arrays)
+     */
+    deletechildren(el);
+    const kids = Array.prototype.slice.call(arguments).slice(2);
+    return buildoutElement(el, el.tagName, attrs, kids);
+}
 
 // This comes from archive/ReactFake.js
 function createElement(tag, attrs, children) {        // Note arguments is set to tag, attrs, child1, child2 etc

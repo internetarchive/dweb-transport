@@ -81,13 +81,7 @@
         <input class="button" type="submit" value="Generate"/>
     </form>
     <div id="lock_div" class="displayedblock" style="display:none">
-        <div class="displayedblockheader" id="lock_header"><!--note source will be set on lock_header-->
-            Lock: <img class="keylist_icon" src="images/noun_1176543_cc.png" onclick='locklink_click("lock_header");' alt="link"/><span name="name"></span>
-            <form class="dialogform" style="display:inline-block;">
-                <img class="keylist_icon" src="images/noun_708669_cc.png" alt="Key"/><input class="button" type="button" onclick="show('tokennew_form');" value="new token"/>
-                <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('lock_div');"/>
-            </form>
-        </div>
+        <div class="displayedblockheader" id="lock_header"></div><!--note source will be set on lock_header and internals built out by p_lock_click-->
         <!-- List of all tokens in AccessControlList-->
         <ul id="lock_ul" class="inline_ul">
             <li class="inline_li template" onclick="kcitem_click(this)">
