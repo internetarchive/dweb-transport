@@ -21,7 +21,7 @@
             //TODO-NAMING adjust permissions, locks etc
             walktree("treeroot_ul");
         }
-        async function domain_open(el_li, el_ul, dom) {
+        async function p_domain_open(el_li, el_ul, dom) {
             // el is the li, want the ui inside it
             if (el_li.classList.contains("collapsed")) {
                 let kids = await dom.p_getall(verbose);
@@ -44,16 +44,51 @@
         async function domain_close() {
             alert("domain_close")
         }
-        async function show_details(el_details, dom) {
+        function _createElementNameAndValue(name, value) {
+            return createElement("li", {},
+                createElement("span", {class: "propname"}, name),
+                createElement("span", {class: "propval"}, value)
+            );
+        }
+        async function p_show_details(el_details, dom) {
             deletechildren(el_details, true);
-            addtemplatedchild(el_details, {templatename: dom.table}, dom, {metadatajson: JSON.stringify(dom.metadata)});
+                if (dom.table === "leaf" || dom.table === "domain") {
+                    updateElement(el_details, {},
+                        createElement("ul", {source: dom},
+                            _createElementNameAndValue("Name", dom.name),
+                            _createElementNameAndValue("Expires", dom.expires),
+                            dom.keys ? createElement("li", {},
+                                createElement("span", {class: "propname"}, "Keys"),
+                                createElement("ul", {class: "proplist"}, dom.keys.map((key) =>
+                                    createElement("li", {}, key)))) : undefined,
+                            dom.signatures ? createElement("li", {},
+                                createElement("span", {class: "propname"}, "Signatures"),
+                                createElement("ul", {class: "proplist"}, dom.signatures.map((sig) =>
+                                    createElement("li", {},
+                                        sig.date,
+                                        createElement("br"),
+                                        sig.signedby,
+                                        createElement("br"),
+                                        sig.signature
+                                    )))) : undefined ,
+                            dom.urls ? createElement("li", {},
+                                createElement("span", {class: "propname"}, "URLs"),
+                                createElement("ul", {class: "proplist"}, dom.urls.map((url) =>
+                                    createElement("a", {href: url}, url)))) : undefined,
+                            dom.tables ? createElement("li", {},
+                                createElement("span", {class: "propname"}, "Tables"),
+                                createElement("ul", {class: "proplist"}, dom.tables.map((key) =>
+                                    createElement("li", {}, key)))) : undefined,
+                            _createElementNameAndValue("Mimetype", dom.mimetype),
+                            _createElementNameAndValue("Metadata", JSON.stringify(dom.metadata))))
+                } else throw new Error("Cant show details for table="+dom.table);
         }
         function addsubdomain(el, name, dom) {
             // el should be a ul to add newly created nodes to
-            let el_name = createElement("span", {class: `naming_name ${(dom instanceof DwebObjects.Domain && dom.privateFromKeyChain()) ? "fa-unlock" : ""}`}, " ", name);
-            let el_ul = createElement("ul", {});
-            fa_icon = {"domain": "fa-folder", "leaf": "fa-leaf"}[dom.table] || "fa-question";
-            expandable = ["domain"].includes(dom.table);
+            const el_name = createElement("span", {class: `naming_name ${(dom instanceof DwebObjects.Domain && dom.privateFromKeyChain()) ? "fa-unlock" : ""}`}, " ", name);
+            const el_ul = createElement("ul", {});
+            const fa_icon = {"domain": "fa-folder", "leaf": "fa-leaf"}[dom.table] || "fa-question";
+            const expandable = ["domain"].includes(dom.table);
             //TODO-NAMING need to add UI for unlockable
             let el_li = createElement("li", {class: `${ expandable ? "collapsed " : " "}fa ${fa_icon}`, source: dom },
                 //createElement("img", {class: "tree_icon ", src: `images/tree_${dom.table}`} )
@@ -62,7 +97,8 @@
                 // Either of these seem to be sufficient but see both in some online examples
                 if (evt.stopPropagation)    evt.stopPropagation();
                 if (evt.cancelBubble!=null) evt.cancelBubble = true;
-                show_details("naming_details", dom);
+                // noinspection JSIgnoredPromiseFromCall
+                p_show_details("naming_details", dom);
             };
             el_li.onclick = function(evt) {
                 // Either of these seem to be sufficient but see both in some online examples
@@ -70,21 +106,22 @@
                 if (evt.stopPropagation)    evt.stopPropagation();
                 if (evt.cancelBubble!=null) evt.cancelBubble = true;
                 let dom = this.source;
-                domain_open(el_li, el_ul, dom);
+                // noinspection JSIgnoredPromiseFromCall
+                p_domain_open(el_li, el_ul, dom);
 
             };
             el.appendChild(el_li);
         }
         function walktree(el) {
             el = elementFrom(el);
-            if (el.tagName != "UL") {
+            if (el.tagName !== "UL") {
                 el = el.getElementsByTagName("UL")[0];  // Should be first ul inside, which is one we recurse
             }
-            for (x of el.childNodes) {
+            for (let x of el.childNodes) {
                 if (x.tagName === "LI") {
                     console.log("XXX@152",x.source);
-                    src = x.source;
-                    span = x.firstChild;    // Will be a span, but dont really care, this is where we add the class cos cant overload LI
+                    const src = x.source;
+                    const span = x.firstChild;    // Will be a span, but dont really care, this is where we add the class cos cant overload LI
                     if (src instanceof DwebObjects.Domain && src.privateFromKeyChain()) {
                         span.classList.add('fa-unlock');
                     } else {
@@ -98,6 +135,7 @@
             //This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
             // These next two lines reqd at this level to get the global scope
             try {
+                buildoutlogin("loginelement"); // Build standard login
                 await DwebTransports.p_connect({statuselement: document.getElementById("statuselement"), transports: searchparams.getAll("transport")});
                 // Any code you want to run once online goes here.
                 var url = searchparams.get("url"); // Unused in this example
@@ -113,8 +151,8 @@
                 addsubdomain(el_root_ul, "/", DwebObjects.Domain.root);
             } catch(err) { // Catch any uncaught errors here, log and alert.
                 console.log("App Error:", err);
-                throw(err);
                 alert(err.message);
+                throw(err);
             }
        }
 
@@ -140,94 +178,14 @@
 
 <div class="naming_outer">
     <div class="naming_tree"><!--Tree-->
-        <ul id="treeroot_ul">
-        </ul>
+        <ul id="treeroot_ul"></ul>
     </div>
-    <div class="naming_details" id="naming_details"><!--Details-->
-        <ul class="template domain fas">
-                <li><span class="propname">Name</span><span name="name" class="propval"></span></li>
-                <li><span class="propname">Expires</span><span name="expires" class="propval"></span></li>
-                <li><span class="propname">Keys</span><ul name="keys" class="proplist"><li class="template"><span name="_"></span></li></ul></li>
-                <li><span class="propname">Signatures</span><ul name="signatures" class="proplist">
-                    <li class="template"><span name="date"></span><br/><span name="signedby"></span><br/><span name="signature"></span></li></ul>
-                <li><span class="propname">Tables</span><ul name="tablepublicurls" class="proplist"><li class="template"><span name="_"></span></li></ul></li>
-                <!--<li><span class="propname">ACL</span><ul name="_acl" class="propval"></span></li> _acl isnt in public version-->
-        </ul>
-        <ul class="template leaf">
-            <li><span class="propname">Name</span><span name="name" class="propval"></span></li>
-            <li><span class="propname">Expires</span><span name="expires" class="propval"></span></li>
-            <li><span class="propname">Signatures</span><ul name="signatures" class="proplist">
-                <li class="template"><span name="date"></span><br/><span name="signedby"></span><br/><span name="signature"></span></li></ul>
-            <li><span class="propname">URLs</span><ul name="urls" class="proplist"><li class="template"><a href="_"><span name="_"></span></a></li></ul></li>
-            <li><span class="propname">Mimetype</span>:&nbsp;<span name="mimetype" class="propval"></span></li>
-            <li><span class="propname">Metadata</span>:&nbsp;<span name="metadatajson" class="propval"></span></li>
-        </ul>
-    </div>
+    <div class="naming_details" id="naming_details"></div><!--Details-->
 </div>
 
 
 <!--Login and network status box - this is standard for any app requiring logging in -- if edit, change on at least example_keys, example_versions -->
-<div class="floatright" style="position:relative;">
-    <div id="statuselement"></div>
-    <ul id="keychains_ul"><li class='template vertical_li' onclick='keychain_click(this);'><span name='name'></span></li></ul>
-    <form><input id="logout" class="button" type="button" onclick="logout_click();" style="display:none;" value="Logout"/></form><!--logout all keychains-->
-    <img src="images/noun_186903_cc.png" alt="keychain" class="iconopener" onclick="show('loginform','');"/>
-    <form class="dialogform" id="loginform" onsubmit="loginformsubmit(); return false;" style="display:none;">
-        <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('loginform');"/>
-        <input class="propval" type="text" name="name" size="20" placeholder="Your id"/>
-        <input class="propval" type="text" name="passphrase" size="70" placeholder="Passphrase"/>
-        <input class="button" type="submit" value="Login"/>
-        <input class="button" type="button" onclick="show('registrationform');" value="Register"/>
-    </form>
-    <form class="dialogform" id="registrationform" name="registrationform" onsubmit="registrationsubmit(); return false;" style="display:none;">
-        <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('registrationform');"/>
-        <input class="propval" type="text" name="name" size="50" placeholder="Your id - it doesnt have to be unique"/>
-        <input class="propval" type="text" name="passphrase" size="70" placeholder="Type a complex phrase, easy for you to remember, hard for others to guess, mixed case, numbers, punctuation are all good"/>
-        <input class="button" type="submit" value="Register"/>
-    </form>
-    <!-- KeyChain -->
-    <div id="keychain" class="displayedblock" style="display:none;">
-        <div class="displayedblockheader" id="keychain_header">
-            <form class="dialogform">
-                <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('keychain');" style="float:right;"/>
-                <span name="name" style="display: inline-block;"></span>
-                <!--If change icons, see icon_images above-->
-                <span style="display: inline-block;"><img class="keylist_icon" src="images/noun_1146472_cc.png" alt="Key"/><input class="button" type="button" onclick="show('keynew_form');" value="new key"/></span>
-                <span style="display: inline-block;"><img class="keylist_icon" src="images/noun_1093404_cc.png" alt="Lock"/><input class="button" type="button" onclick="show('locknew_form');" value="new lock"/></span>
-            </form>
-        </div>
-        <!-- List of all keys in keychain-->
-        <ul id="keychain_ul" class="inline_ul">
-            <li class="inline_li template" onclick="kcitem_click(this);"><img class="keylist_icon" name="objsym"/><span class="keylist_name" name="name"></span></li>';
-        </ul>
-    </div>
-    <form id="keynew_form" name="keynew_form" onsubmit="keynew_click(); return false;" style="display:none">
-        <input class="propval" type="text" name="name" size="50" placeholder="Name of the key"/>
-        <input class="button" type="submit" value="Generate"/>
-    </form>
-    <form id="locknew_form" name="locknew_form" onsubmit="locknew_click(); return false;" style="display:none">
-        <input class="propval" type="text" name="name" size="50" placeholder="Name of the Lock"/>
-        <input class="button" type="submit" value="Generate"/>
-    </form>
-    <div id="lock_div" class="displayedblock" style="display:none">
-        <div class="displayedblockheader" id="lock_header"></div><!--note source will be set on lock_header and internals built out by p_lock_click-->
-        <!-- List of all tokens in AccessControlList-->
-        <ul id="lock_ul" class="inline_ul">
-            <li class="inline_li template" onclick="kcitem_click(this)">
-                <img class="keylist_icon" name="objsym" alt="key"/>
-                <span class="keylist_name" name="name"></span>
-            </li>
-        </ul>
-    </div>
-    <!--Dialogue to enter a new key for an ACL -->
-    <form id='tokennew_form' name="tokennew_form" onsubmit="tokennew_click(); return false;" style="display:none;">
-        <input class="propval" type="text" name="name" size="20" placeholder="Name of key" style="align:right;" />
-        <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('tokennew_form');"/>
-        <input class="propval" type="text" name="urls" size="50" placeholder="URLs of key"/><br/>
-        <input class="button" type="submit" value="Add" style="align:right;"/>
-    </form>
-</div><!--End of standard network status and login panel-->
-
+<div id="loginelement" class="floatright" style="position:relative;"></div><!--Standard Network status and login panel-->
 
 <h1>Dweb - Naming - Documentation</h1>
 <p>This page is an example UI for display and registering names.</p>
@@ -268,7 +226,6 @@
                 <li class="fas fa-square">Stored meta (with priv key) In Keychain of Test user</li>
                 <li class="fas fa-square">Keys for test domain are random</li>
                 <li class="fas fa-square">UI to show unlock in list when we have the key keychain>domains>pubkeys>checkInUI</li>
-            </ul></li>
         </ul></li>
         <li class="fas fa-tasks">New Leaf<ul>
             <li class="fas fa-square">UI enables "New Leaf" based on keys</li>
@@ -305,6 +262,7 @@
     // These have to be at global level so they can be found anywhere.
     var searchparams = new URL(window.location.href).searchParams;
     var verbose = searchparams.get("verbose") || false;  // Anything specified for verbose is true (could truthify buy no need)
+    // noinspection JSIgnoredPromiseFromCall
     main();
 </script>
 </body>

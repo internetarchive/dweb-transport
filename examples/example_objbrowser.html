@@ -31,6 +31,7 @@
     async function main() {
         //This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
         try {
+            buildoutlogin("loginelement"); // Build standard login
             await DwebTransports.p_connect({statuselement: document.getElementById("statuselement"), transports: searchparams.getAll("transport")});
             // Any code you want to run once online goes here.
             if (url) fetchanddisplay(url);
@@ -45,67 +46,7 @@
     </script>
 </head>
 <body class="examples">
-<!--Login and network status box - this is standard for any app requiring logging in -- if edit, change on at least example_keys, example_versions -->
-<div class="floatright" style="position:relative;">
-    <div id="statuselement"></div>
-    <ul id="keychains_ul"><li class='template vertical_li' onclick='keychain_click(this);'><span name='name'></span></li></ul>
-    <form><input id="logout" class="button" type="button" onclick="logout_click();" style="display:none;" value="Logout"/></form><!--logout all keychains-->
-    <img src="images/noun_186903_cc.png" alt="keychain" class="iconopener" onclick="show('loginform','');"/>
-    <form class="dialogform" id="loginform" onsubmit="loginformsubmit(); return false;" style="display:none;">
-        <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('loginform');"/>
-        <input class="propval" type="text" name="name" size="20" placeholder="Your id"/>
-        <input class="propval" type="text" name="passphrase" size="70" placeholder="Passphrase"/>
-        <input class="button" type="submit" value="Login"/>
-        <input class="button" type="button" onclick="show('registrationform');" value="Register"/>
-    </form>
-    <form class="dialogform" id="registrationform" name="registrationform" onsubmit="registrationsubmit(); return false;" style="display:none;">
-        <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('registrationform');"/>
-        <input class="propval" type="text" name="name" size="50" placeholder="Your id - it doesnt have to be unique"/>
-        <input class="propval" type="text" name="passphrase" size="70" placeholder="Type a complex phrase, easy for you to remember, hard for others to guess, mixed case, numbers, punctuation are all good"/>
-        <input class="button" type="submit" value="Register"/>
-    </form>
-    <!-- KeyChain -->
-    <div id="keychain" class="displayedblock" style="display:none;">
-        <div class="displayedblockheader" id="keychain_header">
-            <form class="dialogform">
-                <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('keychain');" style="float:right;"/>
-                <span name="name" style="display: inline-block;"></span>
-                <!--If change icons, see icon_images above-->
-                <span style="display: inline-block;"><img class="keylist_icon" src="images/noun_1146472_cc.png" alt="Key"/><input class="button" type="button" onclick="show('keynew_form');" value="new key"/></span>
-                <span style="display: inline-block;"><img class="keylist_icon" src="images/noun_1093404_cc.png" alt="Lock"/><input class="button" type="button" onclick="show('locknew_form');" value="new lock"/></span>
-            </form>
-        </div>
-        <!-- List of all keys in keychain-->
-        <ul id="keychain_ul" class="inline_ul">
-            <li class="inline_li template" onclick="kcitem_click(this);"><img class="keylist_icon" name="objsym"/><span class="keylist_name" name="name"></span></li>';
-        </ul>
-    </div>
-    <form id="keynew_form" name="keynew_form" onsubmit="keynew_click(); return false;" style="display:none">
-        <input class="propval" type="text" name="name" size="50" placeholder="Name of the key"/>
-        <input class="button" type="submit" value="Generate"/>
-    </form>
-    <form id="locknew_form" name="locknew_form" onsubmit="locknew_click(); return false;" style="display:none">
-        <input class="propval" type="text" name="name" size="50" placeholder="Name of the Lock"/>
-        <input class="button" type="submit" value="Generate"/>
-    </form>
-    <div id="lock_div" class="displayedblock" style="display:none">
-        <div class="displayedblockheader" id="lock_header"></div><!--note source will be set on lock_header and internals built out by p_lock_click-->
-        <!-- List of all tokens in AccessControlList-->
-        <ul id="lock_ul" class="inline_ul">
-            <li class="inline_li template" onclick="kcitem_click(this)">
-                <img class="keylist_icon" name="objsym" alt="key"/>
-                <span class="keylist_name" name="name"></span>
-            </li>
-        </ul>
-    </div>
-    <!--Dialogue to enter a new key for an ACL -->
-    <form id='tokennew_form' name="tokennew_form" onsubmit="tokennew_click(); return false;" style="display:none;">
-        <input class="propval" type="text" name="name" size="20" placeholder="Name of key" style="align:right;" />
-        <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('tokennew_form');"/>
-        <input class="propval" type="text" name="urls" size="50" placeholder="URLs of key"/><br/>
-        <input class="button" type="submit" value="Add" style="align:right;"/>
-    </form>
-</div><!--End of standard network status and login panel-->
+<div id="loginelement" class="floatright" style="position:relative;"></div><!--Standard Network status and login panel-->
 
 <h1>Dweb - Object Browser Example</h1>
 <h4>Paste any URL in the box and "Fetch" and it will be fetched and its structure displayed</h4>

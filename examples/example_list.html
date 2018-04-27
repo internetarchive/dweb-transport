@@ -39,7 +39,7 @@
             let obj = new DwebObjects.SmartDict(dict, verbose );
             await cl.p_push(obj, verbose);
             console.log("Added:",obj);                             // Show on the Javascript console
-            addtemplatedchild("listresults", {}, obj);                  // Display locally as listmonitor will not pick up local entries
+            addlistresult("addlistresults", obj);                  // Display locally as listmonitor will not pick up local entries
         } catch(err){ console.log("ERROR:",err); alert(err.message); }
         return false; // Stop form submission and page reloading reloading
     }
@@ -70,19 +70,23 @@
             let objs = await cl.p_list_then_elements({verbose});   //This adds the listmonitor as a side effect, so updated as changes
             console.log("objs=",JSON.stringify(objs));
             //Add the elements to the list
-            objs.map((obj) => addtemplatedchild("listresults", {}, obj));
+            objs.map((obj) => addlistresult("listresults", obj));
             // Setup a EventListener so anything new added to the list us added to the display
             cl.addEventListener("insert", (event) => {
                 if (verbose) console.log("fetchanddisplay",event);
                 let sig = event.detail;
                 sig.p_fetchdata({verbose})
-                    .then((obj) => addtemplatedchild("listresults", {}, obj))
+                    .then((obj) => addlistresult("listresults", obj))
                 });
             // Redisplay it in the object browser for debugging
         } catch(err) {
             console.log("ERROR:", err);
             alert(err.message); // bad url generates TransportError
         }
+    }
+    function addlistresult(el, obj) {
+        elementFrom(el).appendChild(
+            createElement("span", {class: "said", source: obj}, say));
     }
     function displayobj(el, obj) {
         /* Display an obj, under an element in appropriately named fields */
@@ -92,12 +96,21 @@
         let privateurl = new URL(window.location.href);
         publicurl.search=(obj._publicurls.length ? "url="+obj._publicurls[0] : "");
         privateurl.search=(obj._master ? "url="+obj._urls[0] : "");
-        replacetexts(el, obj, {
-            _publicurlsstr: JSON.stringify(obj._publicurls),
-            _privateurlsstr: (obj._master ? JSON.stringify(obj._urls) : ""),
-            privatelink: privateurl.href,
-            publiclink: publicurl.href,
-        });
+        updateElement("retrievaldestn", {source: obj},
+            createElement("li", {class: "prop"},
+                createElement("span", {class: "propname"}, "Name:"),
+                createElement("span", {class: "propval"}, obj.name) ),
+            createElement("li", {class: "prop"},
+                createElement("span", {class: "propname"}, "Private url:"),
+                createElement("span", {class: "propval"}, (obj._master ? JSON.stringify(obj._urls) : "")),
+                createElement("a", {href: privateurl.href},
+                    createElement("img", {alt: "link", src: "images/link.png"}))),
+            createElement("li", {class: "prop"},
+                createElement("span", {class: "propname"}, "Public url:"),
+                createElement("span", {class: "propval"},  JSON.stringify(obj._publicurls)),
+                createElement("a", {href: publicurl.href},
+                    createElement("img", {alt: "link", src: "images/link.png"}))),
+        );
     }
 
     async function main() {
@@ -155,14 +168,10 @@
 
 
 <!-- Object will be displayed here in fields with names that match-->
-<ul class="props" id="retrievaldestn">
-    <li class="prop"><span class="propname">Name:</span><span class="propval" name="name"></span></li>
-    <li class="prop"><span class="propname">Private url:</span><span class="propval" name="_privateurlsstr"></span><a href="privatelink"> <img alt="link" src="images/link.png"/></a></li>
-    <li class="prop"><span class="propname">Public url:</span><span class="propval" name="_publicurlsstr"></span><a href="publiclink"> <img alt="link" src="images/link.png"/></a></li>
-</ul>
+<ul class="props" id="retrievaldestn"></ul>
 
 <table class="displayedblock">
-    <tr><td colspan="2" id="listresults" style="min-height:200px; border: 1px black solid; background-color:#f0f0f0;"><span class='template said' name='say'></span></td></tr>
+    <tr><td colspan="2" id="listresults" style="min-height:200px; border: 1px black solid; background-color:#f0f0f0;"></td></tr>
     <tr id="entryrow">
         <td style="width:3em;"><b>&gt;</b></td>
         <td>
