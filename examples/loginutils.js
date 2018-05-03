@@ -184,7 +184,6 @@ async function p_lock_click(el) {
     let acl = el.source;                                    // The ACL clicked on
     show('lock_div');                                     // Show the HTML with a list of tokens in ACL
     let el_lockheader = document.getElementById("lock_header");
-    //TODO-REPLACETEXTS first attempt to fix it ...
     updateElement(el_lockheader, {source: acl},
         "Lock:",
         createElement("img", {class: "keylist_icon", src: "images/noun_1176543_cc.png", onclick: 'locklink_click("lock_header");', alt: "link"}),
