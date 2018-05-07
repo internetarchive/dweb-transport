@@ -95,11 +95,17 @@ function seteditor(content) {
     tinyMCE.activeEditor.setDirty(true);        // Allow saving this restored text
 }
 
-function starteditor() {
-    //TODO maybe add some options that can override fields if needed (e.g. with a Object.assign
-    tinymce.init({
+function starteditor(opts={}) {
+    /*
+    Start TinyMCE editor
+    opts = {
+        savecb(content) => void: Callback on saving
+        ... other tiny initialization options to override defaults
+        }
+     */
     	savecb = opts.savecb;
     	delete opts.savecb;
+    tinydefaults = {
         selector: '#mytextarea',
         menubar: "true",
         plugins: [ "save",
