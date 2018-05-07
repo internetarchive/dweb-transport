@@ -23,12 +23,11 @@
                     vl._working = newversion();             // Locally defined as to what new version is.
                 }
                 seteditor(vl._working.textarea);            // Load the editor with the content (existing or blank)
-                replacetexts("vl_target", vl, {             // Load the header of the editor, especially the lock symbols
-                    readlockimg: icon_images[vl._working._acl ? "locked" : "unlocked"],
-                    writelockimg: icon_images[vl._acl ? "locked" : "unlocked"],
-                    readlockname: vl._working._acl ? vl._working._acl.name : "",
-                    writelockname: vl._acl ? vl._acl.name : ""
-                });
+                document.getElementById("readlockimg").setAttribute("src","images/"+icon_images[vl._working._acl ? "locked" : "unlocked"]);
+                document.getElementById("writelockimg").setAttribute("src","images/"+icon_images[vl._acl ? "locked" : "unlocked"]);
+                document.getElementById("vl_target")["source"] = vl;
+                updateElement("readlockname", {}, vl._working._acl ? vl._working._acl.name : "");
+                updateElement("writelockname", {}, vl._acl ? vl._acl.name : "");
             } catch(err) {
                 console.log("p_vl_target_display: cannot display %o in element %o", vl, el, err.message);
                 throw err;
@@ -62,7 +61,8 @@
             working.textarea = content;
             working.dirty();                // Make sure saved
             let sig = await vl.p_saveversion(verbose);
-            addtemplatedchild("vl_list", {}, sig);
+            document.getElementById("vl_list").appendChild(
+                createElement("li", {onclick: "clickrestore(this);", source: sig}, sig.date));
             console.groupEnd("p_updatecontent ---");
         }
 
@@ -70,7 +70,7 @@
             console.group("clickrestore ---");
             let vl = document.getElementById("vl_target").source;
             await vl.p_restoreversion(el.source, verbose);          // Reset to the specific version
-            replacetexts("workingform", vl._working);               // Display texts from the new version
+            updateElement("mytextarea", vl._working.mytextarea)
             seteditor(vl._working.textarea);                        // And show in the editor
             console.groupEnd("clickrestore ---");
         }
@@ -89,8 +89,14 @@
         function onlogin(kc) {
             try {
                 // Populate drop-downs
-                replacetexts("vls_list", DwebObjects.KeyChain.mykeys(DwebObjects.VersionList));
-                replacetexts("lock_list", DwebObjects.KeyChain.mykeys(DwebObjects.AccessControlList));
+                updateElement("vls_list",{},
+                    DwebObjects.KeyChain.mykeys(DwebObjects.VersionList).map( (vl) =>
+                        createElement("option", {source: vl, value: JSON.stringify(vl._urls)}, vl.name)
+                )   );
+                updateElement("lock_list",{},
+                    DwebObjects.KeyChain.mykeys(DwebObjects.AccessControlList).map( (acl) =>
+                        createElement("option", {source: acl, value: JSON.stringify(acl._urls)}, acl.name)
+                    )   );
                 //TODO add event listners here for VersionList and ACL
                 let el = elementFrom("vl_target");
                 if (url && !el.source) {   // Were asked to load a VL (indicated by global url being set) but had to wait for login.
@@ -107,6 +113,7 @@
             //This is the "main()", starts a transport, checks its status, and if appropriate to app opens a URL passed
             // These next two lines reqd at this level to get the global scope
             try {
+                buildoutlogin("loginelement"); // Build standard login
                 await DwebTransports.p_connect({statuselement: document.getElementById("statuselement"), transports: searchparams.getAll("transport")});
                 // Any code you want to run once online goes here.
                 starteditor({savecb: p_updatecontent});
@@ -129,72 +136,7 @@
 </head>
 <body class="examples">
 <!--Login and network status box - this is standard for any app requiring logging in -- if edit, change on at least example_keys, example_versions -->
-<div class="floatright" style="position:relative;">
-    <div id="statuselement"></div>
-    <ul id="keychains_ul"><li class='template vertical_li' onclick='keychain_click(this);'><span name='name'></span></li></ul>
-    <form><input id="logout" class="button" type="button" onclick="logout_click();" style="display:none;" value="Logout"/></form><!--logout all keychains-->
-    <img src="images/noun_186903_cc.png" alt="keychain" class="iconopener" onclick="show('loginform','');"/>
-    <form class="dialogform" id="loginform" onsubmit="loginformsubmit(); return false;" style="display:none;">
-        <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('loginform');"/>
-        <input class="propval" type="text" name="name" size="20" placeholder="Your id"/>
-        <input class="propval" type="text" name="passphrase" size="70" placeholder="Passphrase"/>
-        <input class="button" type="submit" value="Login"/>
-        <input class="button" type="button" onclick="show('registrationform');" value="Register"/>
-    </form>
-    <form class="dialogform" id="registrationform" name="registrationform" onsubmit="registrationsubmit(); return false;" style="display:none;">
-        <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('registrationform');"/>
-        <input class="propval" type="text" name="name" size="50" placeholder="Your id - it doesnt have to be unique"/>
-        <input class="propval" type="text" name="passphrase" size="70" placeholder="Type a complex phrase, easy for you to remember, hard for others to guess, mixed case, numbers, punctuation are all good"/>
-        <input class="button" type="submit" value="Register"/>
-    </form>
-    <!-- KeyChain -->
-    <div id="keychain" class="displayedblock" style="display:none;">
-        <div class="displayedblockheader" id="keychain_header">
-            <form class="dialogform">
-                <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('keychain');" style="float:right;"/>
-                <span name="name" style="display: inline-block;"></span>
-                <!--If change icons, see icon_images above-->
-                <span style="display: inline-block;"><img class="keylist_icon" src="images/noun_1146472_cc.png" alt="Key"/><input class="button" type="button" onclick="show('keynew_form');" value="new key"/></span>
-                <span style="display: inline-block;"><img class="keylist_icon" src="images/noun_1093404_cc.png" alt="Lock"/><input class="button" type="button" onclick="show('locknew_form');" value="new lock"/></span>
-            </form>
-        </div>
-        <!-- List of all keys in keychain-->
-        <ul id="keychain_ul" class="inline_ul">
-            <li class="inline_li template" onclick="kcitem_click(this);"><img class="keylist_icon" name="objsym"/><span class="keylist_name" name="name"></span></li>';
-        </ul>
-    </div>
-    <form id="keynew_form" name="keynew_form" onsubmit="keynew_click(); return false;" style="display:none">
-        <input class="propval" type="text" name="name" size="50" placeholder="Name of the key"/>
-        <input class="button" type="submit" value="Generate"/>
-    </form>
-    <form id="locknew_form" name="locknew_form" onsubmit="locknew_click(); return false;" style="display:none">
-        <input class="propval" type="text" name="name" size="50" placeholder="Name of the Lock"/>
-        <input class="button" type="submit" value="Generate"/>
-    </form>
-    <div id="lock_div" class="displayedblock" style="display:none">
-        <div class="displayedblockheader" id="lock_header"><!--note source will be set on lock_header-->
-            Lock: <img class="keylist_icon" src="images/noun_1176543_cc.png" onclick='locklink_click("lock_header");' alt="link"/><span name="name"></span>
-            <form class="dialogform" style="display:inline-block;">
-                <img class="keylist_icon" src="images/noun_708669_cc.png" alt="Key"/><input class="button" type="button" onclick="show('tokennew_form');" value="new token"/>
-                <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('lock_div');"/>
-            </form>
-        </div>
-        <!-- List of all tokens in AccessControlList-->
-        <ul id="lock_ul" class="inline_ul">
-            <li class="inline_li template" onclick="kcitem_click(this)">
-                <img class="keylist_icon" name="objsym" alt="key"/>
-                <span class="keylist_name" name="name"></span>
-            </li>
-        </ul>
-    </div>
-    <!--Dialogue to enter a new key for an ACL -->
-    <form id='tokennew_form' name="tokennew_form" onsubmit="tokennew_click(); return false;" style="display:none;">
-        <input class="propval" type="text" name="name" size="20" placeholder="Name of key" style="align:right;" />
-        <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('tokennew_form');"/>
-        <input class="propval" type="text" name="urls" size="50" placeholder="URLs of key"/><br/>
-        <input class="button" type="submit" value="Add" style="align:right;"/>
-    </form>
-</div><!--End of standard network status and login panel-->
+<div id="loginelement" class="floatright" style="position:relative;"></div><!--Standard Network status and login panel-->
 
 
 <h1>Dweb - Version lists example</h1>
@@ -214,25 +156,21 @@
 <div style="display:table">
 <form  style="display:table-cell;padding-right:50px;">
     <h4>Open&nbsp;existing, </h4>
-    <select id="vls_list" onChange="vl_select(this);">
-        <option class="template" value="_urls" name="name"></option>
-    </select>
+    <select id="vls_list" onChange="vl_select(this);"></select>
 </form>
 <form method="post" style="display:table-cell;" id="newform" onsubmit="newversionlist(this); return false;">
     <h4>or create new list.</h4>
     <input class="propval" type="text" name="name" placeholder="Name of new version list" size="70" value=""/>
     <br/><img class="keylist_icon" src="images/noun_1093404_cc_unlocked.png" alt="lock">
-    <select id="lock_list" name="contentacl">
-        <option class="template" value="_urls" name="name"></option>
-    </select>
+    <select id="lock_list" name="contentacl"></select>
     <input class="button" type="submit" value="Create"/>
 </form>
 </div>
 <!-- Meta info about the list -->
 <div id="vl_target" class="displayedblock"> <!-- Note "vl_target" will make sure loginutils loads it by default-->
     <span style="float:right;display:table;margin-top:3px;margin-right:10px">
-        <span style="display:table-row;"><span style="display:table-cell;">Read:</span><img style="display:table-cell;" name="readlockimg" class="keylist_icon" src="images/noun_1093404_cc_unlocked.png" alt="unlocked"><span style="display:table-cell;" name="readlockname"></span></span>
-        <span style="display:table-row;"><span style="display:table-cell;">Write:</span><img style="display:table-cell;" name="writelockimg" class="keylist_icon" src="images/noun_1093404_cc_unlocked.png" alt="unlocked"><span style="display:table-cell;" name="writelockname"></span></span>
+        <span style="display:table-row;"><span style="display:table-cell;">Read:</span><img style="display:table-cell;" id="readlockimg" class="keylist_icon" src="images/noun_1093404_cc_unlocked.png" alt="unlocked"><span style="display:table-cell;" id="readlockname"></span></span>
+        <span style="display:table-row;"><span style="display:table-cell;">Write:</span><img style="display:table-cell;" id="writelockimg" class="keylist_icon" src="images/noun_1093404_cc_unlocked.png" alt="unlocked"><span style="display:table-cell;" id="writelockname"></span></span>
     </span>
 
     <h4 name="name"></h4>
@@ -240,9 +178,7 @@
     <form method="post" id="workingform" name="_working">
         <textarea id="mytextarea" name="textarea" width="60%">Testing</textarea>
     </form>
-    <ul id="vl_list" name="_list">
-        <li  onclick="clickrestore(this);" class="template" ><span name="date"></span></li><!-- alternative name="data_textarea"-->
-    </ul>
+    <ul id="vl_list" name="_list"></ul>
 </div>
 
 <!--
@@ -250,7 +186,6 @@ TODO click lock to select a lock to lock it with
 TODO  click locked key to edit that lock ?
 TODO Favorites
 TODO Listmonitor on versions, and on locks, and existing lists
-TODO allow turning off HTTP or IPFS
 -->
 <h2>Explanation</h2>
 <p>

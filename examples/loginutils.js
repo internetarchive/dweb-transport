@@ -41,7 +41,9 @@ async function p_login(dict) {
     try {
         let passphrase = dict.name + "/" + dict.passphrase;
         let kc = await DwebObjects.KeyChain.p_new({name: dict.name}, {passphrase: passphrase}, verbose);
-        addtemplatedchild("keychains_ul", {}, kc);      // returns el, but unused
+        document.getElementById("keychains_ul").appendChild(
+            createElement("li", {class: 'vertical_li', onclick: 'keychain_click(this);', source: kc}, kc.name)
+        );
         show('logout');                             // And show the logout button
     } catch(err) {
         console.log("Unable to _login",err);
@@ -69,14 +71,43 @@ async function loginformsubmit() {
 
 function _showkeyorlock(el, obj) {
     // Utility function to add new or existing element to Key List
-    addtemplatedchild(el, {}, obj, {objsym: icon_images[obj.table === "sd" && obj.token ? "tok" : obj.table ] });
+    elementFrom(el).appendChild(
+        createElement("li", {class: "inline_li", onclick: "kcitem_click(this);", source: obj},
+            createElement("img", {class: "keylist_icon", src: "images/"+icon_images[obj.table === "sd" && obj.token ? "tok" : obj.table ]}),
+            createElement("span", {class: "keylist_name"}, obj.name))
+    )
 }
 
 function keychain_click(el) {
     /* Click on a KeyChain i.e. on a login - display list of Keys and Locks for that login */
     let kc = el.source;                                         // Find KeyChain clicked on
     show('keychain');                                               // Show the div 'keys' for showing keylist
-    let el_keychain_header = replacetexts("keychain_header", kc);  // Set name fields etc in keylistdiv, sets source - dont set in keychain as will get list wrong
+    /*
+        <div class="displayedblockheader" id="keychain_header">
+        <form class="dialogform">
+            <img class="keylist_icon" src="images/noun_83161_cc.svg" alt="Close" onclick="hide('keychain');" style="float:right;"/>
+            <span name="name" style="display: inline-block;"></span>
+            <!--If change icons, see icon_images above-->
+            <span style="display: inline-block;"><img class="keylist_icon" src="images/noun_1146472_cc.png" alt="Key"/><input class="button" type="button" onclick="show('keynew_form');" value="new key"/></span>
+            <span style="display: inline-block;"><img class="keylist_icon" src="images/noun_1093404_cc.png" alt="Lock"/><input class="button" type="button" onclick="show('locknew_form');" value="new lock"/></span>
+        </form>
+    </div>
+     */
+    let el_keychain_header = document.getElementById("keychain_header");
+    <!--If change icons, see icon_images above-->
+    updateElement(el_keychain_header, {source: kc},
+        createElement("form", {class: "dialogform"},
+            createElement("img", {class: "keylist_icon", src: "images/noun_83161_cc.svg", alt: "Close", onclick: "hide('keychain');", style: "float:right;"}),
+            createElement("span", {style: "display: inline-block;" }, kc.name),
+            createElement('span', {style: "display: inline-block;"},
+                createElement('img', {class: "keylist_icon", src: "images/noun_1146472_cc.png", alt: "Key"}),
+                createElement('input', {class: "button", type: "button", onclick: "show('keynew_form');", value: "new key"})
+            ),
+            createElement('span', {style: "display: inline-block;"},
+                createElement('img', {class: "keylist_icon", src: "images/noun_1093404_cc.png", alt: "Lock"}),
+                createElement('input', {class: "button", type: "button", onclick: "show('locknew_form');", value: "new lock"})
+            )
+        ));
     deletechildren("keychain_ul");                               // Delete any locks or eys currently displayed
     kc.addEventListener("insert", (event) => {                  // Setup a listener that will trigger when anything added to the list and update HTML
         if (verbose) console.log("keychain.eventlistener",event);
@@ -152,7 +183,17 @@ async function p_lock_click(el) {
     if (verbose) console.group("p_lock_click ---");
     let acl = el.source;                                    // The ACL clicked on
     show('lock_div');                                     // Show the HTML with a list of tokens in ACL
-    let el_lockheader = replacetexts("lock_header", acl);     // Set name fields etc in keylistdiv, sets source //TODO-HTMLUTILS replacetexts -> createElement
+    let el_lockheader = document.getElementById("lock_header");
+    updateElement(el_lockheader, {source: acl},
+        "Lock:",
+        createElement("img", {class: "keylist_icon", src: "images/noun_1176543_cc.png", onclick: 'locklink_click("lock_header");', alt: "link"}),
+        acl.name,
+        createElement("form", {class: "dialogform", style: "display:inline-block;"},
+            createElement("img", {class: "keylist_icon", src: "images/noun_708669_cc.png", alt: "Key"}),
+            createElement("input", {class: "button", type: "button", onclick: "show('tokennew_form');", value: "new token"}),
+            createElement("img", {class: "keylist_icon", src: "images/noun_83161_cc.svg", alt: "Close", onclick: "hide('lock_div');"})
+        )
+    );
     deletechildren("lock_ul");                               // Remove any existing HTML children
     try {
         let toks = await acl.p_tokens();                                       // Retrieve the keys for the keylist
@@ -182,4 +223,40 @@ async function tokennew_click() { //Called by "Add" button on new token dialog
     if (verbose) console.groupEnd("tokennew_click ---");
 }
 
-
+function buildoutlogin(el) {
+    updateElement(el, {},  // Typically <div class="floatright", style="position:relative;"></div>
+            createElement('div', { id: 'statuselement' }),
+            createElement('ul', { id: 'keychains_ul' }),
+            createElement('form',        null,
+                createElement('input', { id: 'logout', 'class': 'button', type: 'button', onclick: 'logout_click();', style: 'display:none;', value: 'Logout' })    ),
+            createElement('img', { src: 'images/noun_186903_cc.png', alt: 'keychain', 'class': 'iconopener', onclick: 'show("loginform","");' }),
+            createElement('form',        { 'class': 'dialogform', id: 'loginform', onsubmit: 'loginformsubmit(); return false;', style: 'display:none;' },
+                createElement('img', { 'class': 'keylist_icon', src: 'images/noun_83161_cc.svg', alt: 'Close', onclick: 'hide("loginform");' }),
+                createElement('input', { 'class': 'propval', type: 'text', name: 'name', size: '20', placeholder: 'Your id' }),
+                createElement('input', { 'class': 'propval', type: 'text', name: 'passphrase', size: '70', placeholder: 'Passphrase' }),
+                createElement('input', { 'class': 'button', type: 'submit', value: 'Login' }),
+                createElement('input', { 'class': 'button', type: 'button', onclick: 'show("registrationform");', value: 'Register' })    ),
+            createElement('form',        { 'class': 'dialogform', id: 'registrationform', name: 'registrationform', onsubmit: 'registrationsubmit(); return false;', style: 'display:none;' },
+                createElement('img', { 'class': 'keylist_icon', src: 'images/noun_83161_cc.svg', alt: 'Close', onclick: 'hide("registrationform");' }),
+                createElement('input', { 'class': 'propval', type: 'text', name: 'name', size: '50', placeholder: 'Your id - it doesnt have to be unique' }),
+                createElement('input', { 'class': 'propval', type: 'text', name: 'passphrase', size: '70', placeholder: 'Type a complex phrase, easy for you to remember, hard for others to guess, mixed case, numbers, punctuation are all good' }),
+                createElement('input', { 'class': 'button', type: 'submit', value: 'Register' })    ),
+            createElement('div',        { id: 'keychain', 'class': 'displayedblock', style: 'display:none;' },
+                createElement('div', { 'class': 'displayedblockheader', id: 'keychain_header' }),
+                createElement('ul', { id: 'keychain_ul', 'class': 'inline_ul' })    ),
+            createElement('form',        { id: 'keynew_form', name: 'keynew_form', onsubmit: 'keynew_click(); return false;', style: 'display:none' },
+                createElement('input', { 'class': 'propval', type: 'text', name: 'name', size: '50', placeholder: 'Name of the key' }),
+                createElement('input', { 'class': 'button', type: 'submit', value: 'Generate' })    ),
+            createElement('form',        { id: 'locknew_form', name: 'locknew_form', onsubmit: 'locknew_click(); return false;', style: 'display:none' },
+                createElement('input', { 'class': 'propval', type: 'text', name: 'name', size: '50', placeholder: 'Name of the Lock' }),
+                createElement('input', { 'class': 'button', type: 'submit', value: 'Generate' })    ),
+            createElement('div',        { id: 'lock_div', 'class': 'displayedblock', style: 'display:none' },
+                createElement('div', { 'class': 'displayedblockheader', id: 'lock_header' }),
+                createElement('ul', { id: 'lock_ul', 'class': 'inline_ul' })    ),
+            createElement('form',        { id: 'tokennew_form', name: 'tokennew_form', onsubmit: 'tokennew_click(); return false;', style: 'display:none;' },
+                createElement('input', { 'class': 'propval', type: 'text', name: 'name', size: '20', placeholder: 'Name of key', style: 'align:right;' }),
+                createElement('img', { 'class': 'keylist_icon', src: 'images/noun_83161_cc.svg', alt: 'Close', onclick: 'hide("tokennew_form");' }),
+                createElement('input', { 'class': 'propval', type: 'text', name: 'urls', size: '50', placeholder: 'URLs of key' }),
+                createElement('br', null),
+                createElement('input', { 'class': 'button', type: 'submit', value: 'Add', style: 'align:right;' })    ));
+}
