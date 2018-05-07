@@ -1,6 +1,7 @@
 /*
     This file is a set of utility functions used in the manipulation of HTML pages
     There is nothing specific to Dweb at all here, feel free to copy and modify.
+    TODO-REPO find what from here, if anything, used in archive and remove rest
  */
 
 
@@ -94,17 +95,11 @@ function seteditor(content) {
     tinyMCE.activeEditor.setDirty(true);        // Allow saving this restored text
 }
 
-function starteditor(opts={}) {
-    /*
-    Start TinyMCE editor
-    opts = {
-        savecb(content) => void: Callback on saving
-        ... other tiny initialization options to override defaults
-        }
-     */
-    savecb = opts.savecb;
-    delete opts.savecb;
-    tinydefaults = {
+function starteditor() {
+    //TODO maybe add some options that can override fields if needed (e.g. with a Object.assign
+    tinymce.init({
+    	savecb = opts.savecb;
+    	delete opts.savecb;
         selector: '#mytextarea',
         menubar: "true",
         plugins: [ "save",
