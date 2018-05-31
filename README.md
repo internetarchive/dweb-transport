@@ -2,60 +2,49 @@
 
 Welcome to the Internet Archive's Decentralized Wed (Dweb) libraries. 
 
+This is the old Repository, it has some legacy material, examples and partially started projects.
+
+Only the examples are documented below so-far <TODO-DOCS>
+
 ## Running the examples
 The examples can run either from the [dweb.me/examples](https://dweb.me/examples) server, 
 or once the source is checked out, locally from your file system.
 
-By default each of these examples runs both IPFS and HTTP transports, and is smart if it cannot connect to one or the other.
-Links below allow selecting to use ONLY IPFS, or the Archive's contenthash server.
+By default each of these examples runs multiple transports, and is smart if it cannot connect to one or the other.
 
-- Simple text creation and retrieval: example_block.html: [Default](https://dweb.me/examples/example_block.html) [IPFS](https://dweb.me/examples/example_block.html&transport=IPFS)
-    or [HTTP](https://dweb.me/examples/example_block.html?transport=HTTP)
-- Simple dict creation and retrieval: example_smartdict.html: [Default](https://dweb.me/examples/example_smartdict.html) [IPFS](https://dweb.me/examples/example_smartdict.html&transport=IPFS)
-    or [HTTP](https://dweb.me/examples/example_smartdict.html?transport=HTTP); 
-- List creation and retrieval: example_list.html: [Default](https://dweb.me/examples/example_list.html) [IPFS](https://dweb.me/examples/example_list.html&transport=IPFS)
-    or [HTTP](https://dweb.me/examples/example_list.html?transport=HTTP)
-- UI for Academic docs - centralised search; decentralized retrieval: example_academic.html: [Default](https://dweb.me/examples/example_academic.html) [IPFS](https://dweb.me/examples/example_academic.html&transport=IPFS)
-    or [HTTP](https://dweb.me/examples/example_academic.html?transport=HTTP)
-- Authentication: Managing locks and keys example_keys.html: [Default](https://dweb.me/examples/example_keys.html) [IPFS](https://dweb.me/examples/example_keys.html&transport=IPFS)
-    or [HTTP](https://dweb.me/examples/example_keys.html?transport=HTTP); 
-- Versions of a single document: example_versions.html: [Default](https://dweb.me/examples/example_versions.html) [IPFS](https://dweb.me/examples/example_versions.html&transport=IPFS)
-    or [HTTP](https://dweb.me/examples/example_versions.html?transport=HTTP); 
-- [objbrowser.html](https://dweb.me/examples/objbrowser.html);  ((Not currently working))
+- Simple text creation and retrieval: [example_block.html](https://dweb.me/examples/example_block.html)
+- Simple dict creation and retrieval: [example_smartdict.html](https://dweb.me/examples/example_smartdict.html)
+- List creation and retrieval: [example_list.html](https://dweb.me/examples/example_list.html)
+- UI for Academic docs - centralised search; decentralized retrieval: []example_academic.html](https://dweb.me/examples/example_academic.html)
+- Authentication: Managing locks and keys [example_keys.html](https://dweb.me/examples/example_keys.html)
+- Versions of a single document: [example_versions.html](https://dweb.me/examples/example_versions.html)
+- [objbrowser.html](https://dweb.me/examples/objbrowser.html)
 
-**Browser Support**: This should work on Chrome and Firefox (Safari doesn't support many newer features), 
-see below for IPFS bugs, 
+**Browser Support**: This should work on Chrome and Firefox (Safari doesn't support many newer features but appears to work), 
 
-**Transport choice**: As you can see from the URLs above ylj ca  select between IPFS (default) and HTTP as the transport
+**Transport choice**: You can deselect transports by clicking the Green indicator on an example. 
+To prevent it connecting in the firstplace, you can supply paused=HTTP or paused=IPFS or paused=WEBTORRENT or paused=YJS to the url.
 
 **Verbosity**: You can get debugging output by appending verbose=true to the URLs, 
 this shows up in your console and also (for HTTP) in our server logs.
 
 ### BLOCK example
-- In your browser, open examples/example_block.html: 
-[Default](https://dweb.me/examples/example_block.html) [IPFS](https://dweb.me/examples/example_block.html&transport=IPFS)
-or [HTTP](https://dweb.me/examples/example_block.html?transport=HTTP)
+- In your browser, open [examples/example_block.html](https://dweb.me/examples/example_block.html):
 - Type some text into the editor and hit Save  
 - A hash should appear below.  
-- If it doesn't then run with the verbose argument 
-[IPFS](https://dweb.me/examples/example_block.html?verbose=true) 
-or [HTTP](https://dweb.me/examples/example_block.html?transport=HTTP&verbose=true) 
+- If it doesn't then run with the [verbose argument](https://dweb.me/examples/example_block.html?verbose=true)
 and open the browser console (e.g. Firefox/tools/Web Developer/Web Console)  
 - Click "FetchIt" and the data should be returned.
 
 ### SMART DICT example
-- In your browser, open example_smartdict.html
-[Default](https://dweb.me/examples/example_smartdict.html) [IPFS](https://dweb.me/examples/example_smartdict.html&transport=IPFS)
-or [HTTP](https://dweb.me/examples/example_smartdict.html?transport=HTTP);
+- In your browser, open [example_smartdict.html](https://dweb.me/examples/example_smartdict.html)
 - Type some text into the name, and a HTML color nmae into the color (e.g. "red") and hit Save  
 - A hash should appear below.  
 - Click "FetchIt" and the data should be returned and displayed.  
 - Hover over "Object Browser" to see the structure of the object.
 
 ### COMMON LIST example
-- In your browser, open the file:  example_list.html:
-[Default](https://dweb.me/examples/example_list.html) [IPFS](https://dweb.me/examples/example_list.html&transport=IPFS)
-or [HTTP](https://dweb.me/examples/example_list.html?transport=HTTP)
+- In your browser, open the file:  [example_list.html](https://dweb.me/examples/example_list.html):
 - Click New and enter a name for your list  
 - A blank list should appear along with the name and hashes (retrieved from Dweb)  
 - Enter something in the text field and hit Send  
@@ -70,9 +59,7 @@ the user ability to also write to the list.
 This is a work in progress, dependent on the incompleteness of both the Academic Document virtual collection at Archive.org and 
 the bugs/issues in IPFS.
 
-- In your browser, open the file:  example_academic.html:
-[Default](https://dweb.me/examples/example_academic.html) [IPFS](https://dweb.me/examples/example_academic.html&transport=IPFS)
-or [HTTP](https://dweb.me/examples/example_academic.html?transport=HTTP)
+- In your browser, open the file:  [example_academic.html](https://dweb.me/examples/example_academic.html)
 - Enter a search term 
 - A list of papers should be returned, along with their DOI.
 - Choose one that hs a check-mark next to it, we don't have the others at the Archive.
@@ -83,18 +70,12 @@ or [HTTP](https://dweb.me/examples/example_academic.html?transport=HTTP)
 - The last link fetches directly in the browser without coming to the Archive or any other single point of failure.
 
 ### AUTHENTICATION example
-- In your browser, open the file:  examples/example_keys.html:
-[Default](https://dweb.me/examples/example_keys.html) [IPFS](https://dweb.me/examples/example_keys.html&transport=IPFS)
-or [HTTP](https://dweb.me/examples/example_keys.html?transport=HTTP)
+- In your browser, open the file:  [examples/example_keys.html](https://dweb.me/examples/example_keys.html)
 - follow the instructions on the page.
 
 ### VERSIONS exampe
-- In your browser, open the file examples/example_versions.html
-[Default](https://dweb.me/examples/example_versions.html) [IPFS](https://dweb.me/examples/example_versions.html&transport=IPFS)
-or [HTTP](https://dweb.me/examples/example_versions.html?transport=HTTP);
+- In your browser, open the file [examples/example_versions.html](https://dweb.me/examples/example_versions.html)
 - follow the instructions on the page.
-
-Further examples will demonstrate using the lock.
 
 ## Installing a compilable version
 - Checkout the repository
@@ -111,17 +92,9 @@ virtually clean run gives more confidence that the install worked.
 - This should start a IPFS instance, and generate some messages ending in "delaying 10 secs" and "Completed test".
 - It will leave the IPFS instance running and usually will need a Ctrl-C to exit.
 
-## Major Browser Issues
-
-Please not there is an issue with IPFS on some Firefox versions (seen on 54.0.1, not on 49.0.2 for example)
-that is currently leaking Threads and slowing the machine down drastically. This is being explored!  
-Use it on Chrome for now, and expect it to crash every 5 minutes.
-The HTTP versions don't have this problem, but also don't support live notification of changes.
-This is reported on IPFS at [JSIPFS issue#950](https://github.com/ipfs/js-ipfs/issues/950), dweb-transport issue@ and supposedly being fixed 
-
 ## See also:
 
-The documentation for the Internet Archive's Dweb project is currently on Google (yes, we appreciate the irony). 
+Some of the documentation for the Internet Archive's Dweb project is currently on Google (yes, we appreciate the irony). 
 
 [API docs](https://docs.google.com/document/d/1_MttdWglsIOIajqtiSW5AWuf6YObZP8AA2LF9OV4xOM/edit#)  
 [Top level doc on project and links](https://docs.google.com/document/d/1-lI352gV_ma5ObAO02XwwyQHhqbC8GnAaysuxgR2dQo/edit#)
