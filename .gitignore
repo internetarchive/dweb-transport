@@ -25,3 +25,4 @@ bootloader.html
 dweb-archive-styles.css
 archivesw.html
 package-lock.json
+mirror/node_modules

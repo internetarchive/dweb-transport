@@ -1,8 +1,13 @@
 const level = require('level');
-const errors = require("../js/Errors.js"); // ToBeImplementedError
+const errors = require("./Errors.js"); // ToBeImplementedError
 
 
 class HashStore {
+    /*
+    A generic Hash Store built on top of level,
+
+    TODO - this could probably build on top of Redis as well.
+     */
     constructor() {
         throw new errors.IntentionallyUnimplementedError("There is no meaningful constructor for HashStore")
     }
