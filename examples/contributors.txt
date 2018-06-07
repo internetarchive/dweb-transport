@@ -1,7 +1,0 @@
-Graphics:
-    noun_83161_cc.svg   Close by Dmitry Mamaev from the Noun Project
-    noun_186903_cc.png  Keychain icon by Thomas Soto from the Noun Project
-    noun_708669_cc.png  Lock by anbileru adaleru from the Noun Project
-    noun_1093404_cc.png Lock icon Agne from the Noun Project:
-    noun_1146472_cc.png Key by Setyo Ari Wibowo from the Noun Project
-    noun_1176543_cc.png Link by arjuazka from the Noun Project
