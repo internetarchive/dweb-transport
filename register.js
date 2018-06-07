@@ -11,9 +11,9 @@ urls = ["https://dweb.archive.org/examples/"];
 while (args.length) {
     arg = args.shift();
     //if (arg == "-v") { verbose=true; }
-    if (arg.startsWith("/ipfs/")) { urls.push("ipfs:"+arg+"/"); }
+    if (arg.startsWith("ipfs:/ipfs/")) { urls.push(arg+"/"); }
 }
-
+console.log("XXX urls=", urls)
 async function p_main() {
     let patharr = pathname.split('/');
     if (patharr[0] == "") patharr.shift(); // Strip any leading /
