@@ -80,7 +80,7 @@ the bugs/issues in IPFS.
 ## Installing a compilable version
 - Checkout the repository
 - If you haven't already, then install [npm](https://nodejs.org/en/download) and upgrade node to Node 7 or later (for support of async/wait).
-- And on a Mac you'll need Xcode from the App store. 
+- And on a Mac you'll probably need Xcode from the App store. 
 - No idea what you need on Windows (Please update this if you know)
 - Then install the dependencies: ```> npm install --dev```
 - Note that this gets a forked version of libsodium-wrappers from [Mitra's repository][https://github.com/mitra42/libsodium.js], 
@@ -92,11 +92,12 @@ virtually clean run gives more confidence that the install worked.
 - This should start a IPFS instance, and generate some messages ending in "delaying 10 secs" and "Completed test".
 - It will leave the IPFS instance running and usually will need a Ctrl-C to exit.
 
+SORRY - AT THE MOMENT THE INSTRUCTIONS ABOVE WONT WORK, LETS TALK IF YOU WANT TO DO THIS
+
 ## See also:
+< TODO >
 
-Some of the documentation for the Internet Archive's Dweb project is currently on Google (yes, we appreciate the irony). 
-
-[API docs](https://docs.google.com/document/d/1_MttdWglsIOIajqtiSW5AWuf6YObZP8AA2LF9OV4xOM/edit#)  
-[Top level doc on project and links](https://docs.google.com/document/d/1-lI352gV_ma5ObAO02XwwyQHhqbC8GnAaysuxgR2dQo/edit#)
-
+## API
+###htmlutils.js
+###loginutils.js
 

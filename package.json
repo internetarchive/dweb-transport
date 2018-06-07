@@ -7,7 +7,9 @@
   "version": "0.0.1",
   "description": "Javascript library for Internet Archive Decentralized Web project: Transport",
   "dependencies": {
+    "dweb-archive": "git+https://git@github.com/internetarchive/dweb-archive.git",
     "dweb-objects": "git+https://git@github.com/internetarchive/dweb-objects.git",
+    "dweb-serviceworker": "git+https://git@github.com/internetarchive/dweb-serviceworker.git",
     "dweb-transports": "git+https://git@github.com/internetarchive/dweb-transports.git"
   },
   "keywords": [],
@@ -37,6 +39,7 @@
     "help": "echo 'copyotherrepos: copies bundles from other places'",
     "copyotherrepos": "cp ../dweb-transports/dist/dweb-transports-bundle.js ../dweb-objects/dist/dweb-objects-bundle.js ../dweb-serviceworker/dist/*-bundle.js  ./examples",
     "copyarchive": "cp -r ../dweb-archive/dist/* ./examples",
-    "build": "npm run copyotherrepos; npm run copyarchive"
+    "linkotherrepos": "cd examples; for i in ../node_modules/dweb-{transports,objects,serviceworker,archive}/dist/dweb*bundle.js; do ln -s $i .; done",
+    "build": "npm run linkotherrepos; npm run copyarchive"
   }
 }

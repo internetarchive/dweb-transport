@@ -15,13 +15,8 @@ test_serviceworker_bundle.js
 *-bundle.js
 examples/includes
 examples/images/cc
-WaybackLogoSmall.png
-loading.gif
-gift.png
 examples/fonts
-archive.html
 archive_bundle.js
 bootloader.html
-dweb-archive-styles.css
-archivesw.html
 package-lock.json
+mirror/node_modules
