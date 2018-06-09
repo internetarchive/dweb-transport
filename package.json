@@ -35,11 +35,7 @@
   },
   "scripts": {
     "test": "cd js; node ./test.js",
-    "bundletest": "cd js; browserify ./test_ipfs.js > ../examples/test_ipfs_bundled.js",
-    "help": "echo 'copyotherrepos: copies bundles from other places'",
-    "copyotherrepos": "cp ../dweb-transports/dist/dweb-transports-bundle.js ../dweb-objects/dist/dweb-objects-bundle.js ../dweb-serviceworker/dist/*-bundle.js  ./examples",
-    "copyarchive": "cp -r ../dweb-archive/dist/* ./examples",
-    "linkotherrepos": "cd examples; for i in ../node_modules/dweb-{transports,objects,serviceworker,archive}/dist/dweb*bundle.js; do ln -s $i .; done",
-    "build": "npm run linkotherrepos; npm run copyarchive"
+    "help": "echo 'test - but it probably doesnt work'",
+    "build": "echo 'nothing to do for npm run build'"
   }
 }
