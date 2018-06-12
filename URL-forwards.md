@@ -6,12 +6,6 @@ There are a number of places where URLs are forwarded, this is an attempt to gat
 * http://dweb.archive.org proxypass or redirect ? to https://dweb.archive.org
 * https://dweb.archive.org proxypass to http://dweb.me
     
-#### /etc/nginx/sites-enabled/dweb.me
-
-* http://dweb.me/xyz redirect -> https://dweb.me/xyz
-* https://dweb.me/xyz tryfiles -> /examples/bootloader.html
-* https://dweb.me/examples tryfiles -> file
-* TODO want it to handle dweb.me/arc/
 
 #### In dweb-transport/bootloader.html
 * dweb.xxxx.yyy:aaa/bbb?searchstring -> name= arc/xxxx.yyy/aaa/bbb
@@ -19,16 +13,21 @@ There are a number of places where URLs are forwarded, this is an attempt to gat
 * Name lookup -> [ urls ], path
 * Redirect url?path=remainder&searchstring
 
-#### /etc/nginx/sites-enabled/gateway.dweb.me
-* http://gateway.dweb.me/ proxypass localhost:4244 (gateway python)
-* https://gateway.dweb.me/ proxypass localhost:4244 (gateway python)
-* https://gateway.dweb.me/ws proxypass localhost:4002 (websockets for IPFS)
+#### /etc/nginx/sites-enabled/{dweb.me, gateway.dweb.me}   - TODO THIS IS OUT OF DATE see dweb-gateway/nginx/dweb.me
+* http://dweb.me/xyz redirect -> https://dweb.me/xyz
+* https://dweb.me/xyz tryfiles -> /examples/bootloader.html
+* https://dweb.me/examples tryfiles -> file
+* TODO want it to handle dweb.me/arc/
+* http://{gateway.dweb.me,dweb.me}/ proxypass localhost:4244 (gateway python)
+* https://{gateway.dweb.me,dweb.me}/ proxypass localhost:4244 (gateway python)
+* https://{gateway.dweb.me,dweb.me}/ws proxypass localhost:4002 (websockets for IPFS)
 
 
 #### In Naming setup in dweb-objects/domain.js
 * /arc/archive.org/details -> https://dweb.me/examples/archive.html
 * /arc/archive.org/search -> https://dweb.me/examples/archive.html
 * /arc/archive.org/metadata/foo -> https://gateway.dweb.me/metadata/archiveid/foo
+* TODO SHOULD BE /arc/archive.org/metadata/foo -> https://dweb.me/arc/archive.org/metadata/foo
 
 #### In dweb-archive/ReactFake.js
 * Only relative URLs handled currently
@@ -60,6 +59,7 @@ There are a number of places where URLs are forwarded, this is an attempt to gat
 -> bootloader (https:https://dweb.archive.org/metadata/xyz)
 -> name: /arc/archive.org/metadata/xyz
 -> https://gateway.dweb.me/metadata/archiveid/foo
+(should be -> https://dweb.me/arc/archive.org/metadata/foo)
 -> https://localhost:4244/metadata/archiveid/foo (python)
 -> JSON metadata for foo
 
