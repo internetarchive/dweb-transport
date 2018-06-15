@@ -1,6 +1,6 @@
 # dweb-transport
 
-Welcome to the Internet Archive's Decentralized Wed (Dweb) libraries. 
+Welcome to the Internet Archive's Decentralized Web (Dweb) libraries. 
 
 This is the old Repository, it has some legacy material, examples and partially started projects.
 
