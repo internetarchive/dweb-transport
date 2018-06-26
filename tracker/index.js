@@ -1,4 +1,6 @@
-const Server = require('bittorrent-tracker').Server
+const Server = require('bittorrent-tracker').Server;
+
+//TODO-WEBTORRENT - replace logging here to right to somewhere useful (currently goes to console)
 
 const server = new Server({
   udp: true, // enable udp server?
@@ -13,8 +15,10 @@ const server = new Server({
     // It is possible to block by peer id (whitelisting torrent clients) or by secret
     // key (private trackers). Full access to the original HTTP/UDP request parameters
     // are available in `params`.
+    // infohash - TODO - figure out what the format of this is - looks like its hex
 
     if (true /* TODO: ensure that torrent is an Internet Archive torrent */) {
+      //TODO-WEBTORRENT: write a function that checks if the archive has this infohash (
       // If the callback is passed `null`, the torrent will be allowed.
       cb(null)
     } else {
@@ -23,24 +27,24 @@ const server = new Server({
       cb(new Error('disallowed torrent'))
     }
   }
-})
+});
 
 server.on('error', (err) => {
   // fatal server error!
   console.error('ERROR: ' + err.message)
-})
+});
 
 server.on('warning', (err) => {
   // client sent bad data. probably not a problem, just a buggy client.
   console.error('WARNING: ' + err.message)
-})
+});
 
 server.on('listening', () => {
   // fired when all requested servers are listening
-  console.log('listening on http port: ' + server.http.address().port)
-  console.log('listening on udp port: ' + server.udp.address().port)
+  console.log('listening on http port: ' + server.http.address().port);
+  console.log('listening on udp port: ' + server.udp.address().port);
   console.log('listening on ws port: ' + server.ws.address().port)
-})
+});
 
 /**
  * Always return an extra Internet Archive torrent peer.
@@ -48,14 +52,14 @@ server.on('listening', () => {
  * Monkey-patch the "createSwarm" function, so we can get at the swarm object
  * and monkey-patch the "_getPeers" function to always return an extra peer.
  */
-const createSwarmOriginal = server.createSwarm
+const createSwarmOriginal = server.createSwarm;
 server.createSwarm = (infoHash, cb) => {
   createSwarmOriginal.call(server, infoHash, (err, swarm) => {
     if (err) return cb(err)
 
-    const getPeersOriginal = swarm._getPeers
+    const getPeersOriginal = swarm._getPeers;
     swarm._getPeers = (numwant, ownPeerId, isWebRTC) => {
-      const peers = getPeersOriginal.call(swarm, numwant, ownPeerId, isWebRTC)
+      const peers = getPeersOriginal.call(swarm, numwant, ownPeerId, isWebRTC);
       if (!isWebRTC) {
         peers.push({
           type: 'udp',
@@ -66,11 +70,11 @@ server.createSwarm = (infoHash, cb) => {
         })
       }
       return peers
-    }
+    };
 
     cb(null, swarm)
   })
-}
+};
 
 // start tracker server listening! Use 0 to listen on a random free port.
-server.listen(6969)
+server.listen(6969);
