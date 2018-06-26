@@ -1,7 +1,8 @@
 const Tracker = require('bittorrent-tracker')
 
 const opts = {
-  infoHash: new Buffer('01234567890123456789'),
+  //infoHash: new Buffer('01234567890123456789'), // Should be denied
+  infoHash: new Buffer.from('22cf567cbca91d3cc0a338aff766f4ba90da21e9','hex'),   // Should work (its archive item "commute")
   peerId: new Buffer('01234567890123456789'),
   announce: ['http://localhost:6969/announce'],
   port: 9999
