@@ -7,11 +7,19 @@
   "version": "0.0.1",
   "description": "Javascript library for Internet Archive Decentralized Web project: Transport",
   "dependencies": {
+    "bittorrent-tracker": "^9.9.1",
+    "debug": "^3.1.0",
     "dweb-archive": "git+https://git@github.com/internetarchive/dweb-archive.git#require",
     "dweb-objects": "git+https://git@github.com/internetarchive/dweb-objects.git",
     "dweb-serviceworker": "git+https://git@github.com/internetarchive/dweb-serviceworker.git",
     "dweb-transports": "git+https://git@github.com/internetarchive/dweb-transports.git",
-    "gun": "latest"
+    "filesize-parser": "^1.4.2",
+    "gun": "latest",
+    "ip": "^1.1.5",
+    "mkdirp": "^0.5.1",
+    "request": "^2.87.0",
+    "trammel": "^2.0.1",
+    "webtorrent": "^0.101.0"
   },
   "keywords": [],
   "license": "AGPL-3.0",
@@ -28,6 +36,9 @@
     "browserify": "^14.5.0",
     "chai": "^4.1.2",
     "copy-webpack-plugin": "^4.5.2",
+    "parse-torrent": "^6.0.1",
+    "rimraf": "^2.6.2",
+    "tape": "^4.9.1",
     "watchify": "^3.11.0"
   },
   "repository": {
@@ -35,7 +46,7 @@
     "url": "git://github.com/internetarchive/dweb-transport.git"
   },
   "scripts": {
-    "test": "cd js; node ./test.js",
+    "test": "node test/index.js",
     "help": "echo 'test - but it probably doesnt work'",
     "build": "echo 'nothing to do for npm run build'",
     "gun": "cd node_modules/gun; npm start"

@@ -1,0 +1,11 @@
+{
+  "seeders": [
+    {
+      "peerId": "2d5757303039382d494c414465783166346c7351",
+      "torrentPort": 6881
+    }
+  ],
+  "cachePath": "/tmp/archive-torrents",
+  "maxCacheSize": "150M",
+  "cacheCheckIntervalSeconds": 5
+}

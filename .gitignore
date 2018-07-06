@@ -1,5 +1,8 @@
 /node_modules
 
+tracker/node_modules
+seeder/node_modules
+
 .sync
 Icon?
 npm-debug.log
