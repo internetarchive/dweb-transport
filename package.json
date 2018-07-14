@@ -10,7 +10,8 @@
     "dweb-archive": "git+https://git@github.com/internetarchive/dweb-archive.git",
     "dweb-objects": "git+https://git@github.com/internetarchive/dweb-objects.git",
     "dweb-serviceworker": "git+https://git@github.com/internetarchive/dweb-serviceworker.git",
-    "dweb-transports": "git+https://git@github.com/internetarchive/dweb-transports.git"
+    "dweb-transports": "git+https://git@github.com/internetarchive/dweb-transports.git",
+    "gun": "latest"
   },
   "keywords": [],
   "license": "AGPL-3.0",
@@ -36,6 +37,7 @@
   "scripts": {
     "test": "cd js; node ./test.js",
     "help": "echo 'test - but it probably doesnt work'",
-    "build": "echo 'nothing to do for npm run build'"
+    "build": "echo 'nothing to do for npm run build'",
+    "gun": "cd node_modules/gun; npm start"
   }
 }
