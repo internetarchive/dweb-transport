@@ -33,55 +33,71 @@ var server = h.createServer((req, res) => {
     */
 });
 
+
 //TODO-GUN put this into a seperate require
-Gun.on('opt', function (root) {
-    if (root.once) {
-        return
-    }
+function hijack(cb) {
+    /* Intercept outgoing message and replace result with
+        result from cb({soul, key, msg, original})
+     */
 
-    root.on('out', function (msg) {
-        var to = this.to;
-        // PSEUDO CODE!!!!!!! MAY NOT WORK (probably won't);
-        if(msg['@']){
-            if(!msg.put){
-                console.log("XXX@C29: HIJACK!", msg);
-                setTimeout(function(){
-
-                    var tmp = msg['@'];
-                    tmp = root.dup.s[tmp];
-                    console.log("XXX@34 result of root.dup.s[msg['a']]", tmp)
-                    tmp = tmp && tmp.it;
-                    // REFACTOR THIS CODE TO MAKE SURE IT DOESN'T CRASH ON
-                    // NON EXISTENT DATA OR ORIGINAL MESSAGE COULD NOT
-                    // BE FOUND OR OTHER EDGE CASES
-                    var soul = tmp && tmp.get && tmp.get['#'];
-                    var key = tmp && tmp.get && tmp.get['.'];
-                    var state = {};
-                    console.log('XXX@41: soul key', soul, key);
-
-                    msg.put = {};
-                    msg.put[soul] = {_:{'#': soul, '>': state}};
-                    state[key] = Gun.state();
-                    msg.put[soul][key] = 'hello Mitra!';
-                    // NOTE: this doesn't necessarily save it back to
-                    // this peers GUN data.
-
-                    to.next(msg);
-                }, 100);
-                return;
-            }
+    Gun.on('opt', function (root) {
+        console.log("GUN: Hikacking loading trap");
+        if (root.once) {
+            return
         }
-        to.next(msg) // pass to next middleware
+        root.on('out', function (msg) {
+            console.log("GUN: Hikacking starting outgoing message=", msg);
+            let to = this.to;
+            // TODO-GUN - this wont work when running locally in a script ONLY when running in server
+            if(msg['@'] && !msg.put) {
+                console.log("GUN: Hikacking outgoing message", msg);
+                setTimeout(function(){  // TODO-GUN its unclear why this timeout is here, other than for testing
+                    let tmp = root.dup.s[msg['@']];
+                    let original = tmp && tmp.it && tmp.it.get;
+                    console.log("GUN: Hikacking outgoing message original=", original);
+                    if (original) {
+                        let soul = original['#'];
+                        let key = original['.'];
+                        console.log("GUN.hijack: soul=",soul,"key=", key);
+                        let res;
+                        try {
+                            //TODO - this res now has to be async
+                            res = cb({soul, key, msg, original});   // Note response can be undefined if error
+                        } catch(err) {
+                            console.warn("Gun.hijack callback error",err);
+                            res = undefined;
+                        }
+                        msg.put = {
+                        [soul]: {
+                                _: {
+                                    '#': soul,
+                                    '>': {[key]: Gun.state()}
+                                },
+                                [key]: res    // Note undefined should (hopefully) be a valid response
+                        }    };
+                        console.log("GUN.hijack updated msg =", msg);
+                        // NOTE: this doesn't necessarily save it back to
+                        // this peers GUN data, (I (Mitra) thinks that may depend on other processes and order of Gun.on)
+                    }
+                    to.next(msg);
+                }, 100);    //Just for testing and note that its async
+            } else {
+                to.next(msg); // pass to next middleware
+            }
+        });
+        this.to.next(root); // This is next for the Gun.on('opt'), not for the root.on('out')
     });
-    this.to.next(root);
-});
+}
 
+hijack(function({soul=undefined, key=undefined, msg=undefined, original=undefined}={}) {
+    console.log("GUN: hijack testing", soul, key, msg, original);
+    return ("GUN: This is a test result");
+});
 
 var gun = new Gun({
     web: server
 });
 
-
 server.listen(port);
+console.log(usehttps ? "HTTPS" : "HTTP", 'Server started on port ' + port + ' with /gun');
 
-console.log('Server started on port ' + port + ' with /gun');
