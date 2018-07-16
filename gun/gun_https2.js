@@ -1,25 +1,43 @@
-if(typeof window === "undefined"){
-    process.env.GUN_ENV = "false";
-    var Gun = require('gun');
-}
+//var port = process.env.OPENSHIFT_NODEJS_PORT || process.env.VCAP_APP_PORT || process.env.PORT || process.argv[2] || 8080;
 
-/*
-Note:
+const port = 4246;
 
- - doesn't handle getting the soul/UUID from the original request, you'll need this we'll chat about it later.
+const https = require('https');
+const http = require('http');
+const fs = require('fs');
+process.env.GUN_ENV = "false";
+const Gun = require('gun');
+const path = require('path');
 
- - need convert function
+const usehttps = false;
 
- - beware that depedency order can be annoying and stuff.
-*/
-if(typeof window === "undefined"){  // I believe this is the test of browser v node
-  var Gun = require('gun');
-}
+const options =
+    usehttps ?  {
+        key: fs.readFileSync('/etc/letsencrypt/live/dweb.me/privkey.pem'),
+        cert: fs.readFileSync('/etc/letsencrypt/live/dweb.me/fullchain.pem'),
+    }  : {};
+var h = usehttps ? https : http
+//var server = h.createServer(options, (req, res) => {
+var server = h.createServer((req, res) => {
+	if(Gun.serve(req, res)){ return } // filters gun requests!
+    res.writeHead(200);
+    res.end('go away - nothing for browsers here\n');
+
+	/*
+	fs.createReadStream(path.join(__dirname, req.url))
+    .on('error',function(){ // static files!
+        res.writeHead(200, {'Content-Type': 'text/html'});
+        res.end(fs.readFileSync(path.join(__dirname, 'index.html'))); // or default to index
+        })
+    .pipe(res); // stream
+    */
+});
+
 //TODO-GUN put this into a seperate require
 Gun.on('opt', function (root) {
-  if (root.once) {
-    return
-  }
+    if (root.once) {
+        return
+    }
 
     root.on('out', function (msg) {
         var to = this.to;
@@ -58,22 +76,12 @@ Gun.on('opt', function (root) {
     this.to.next(root);
 });
 
-g=new Gun()
-g.get("foo").once(data => console.log('data'));
+
+var gun = new Gun({
+    web: server
+});
 
 
-/*
-{get: {'#': 'soul', '.': 'key'}, '#': 'sldkfjowejf'}
-{'@': 'sldkfjowejf', '#': 'eoijfwijfeoj'}
+server.listen(port);
 
-{_:{'#':'soul', '>':{...}},
-  a: 'hello',
-  key: {'#': 'node'}
-}
-
-gun.get('soul').get('key').once(function(data, key){
-
-})
-*/
-
-
+console.log('Server started on port ' + port + ' with /gun');

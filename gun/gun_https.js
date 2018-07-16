@@ -15,7 +15,7 @@ const options = {
 var server = https.createServer(options, (req, res) => {
 	if(Gun.serve(req, res)){ return } // filters gun requests!
     res.writeHead(200);
-    res.end('hello world\n');
+    res.end('go away - nothing for browsers here\n');
 
 	/*
 	fs.createReadStream(path.join(__dirname, req.url))
