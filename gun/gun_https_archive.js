@@ -25,7 +25,7 @@ const options =
 
 var h = usehttps ? https : http
 //var server = h.createServer(options, (req, res) => {
-function _serve(req, res) = {
+function _serve(req, res) {
 	if(Gun.serve(req, res)){ return } // filters gun requests!
     res.writeHead(200);
     res.end('go away - nothing for browsers here\n');
