@@ -3,7 +3,18 @@ const Server = require('bittorrent-tracker').Server;
 const httptools = require('dweb-transports/httptools');
 
 const config = {
-  validateurl: 'https://archive.org/advancedsearch.php?fl=identifier,btih&output=json&rows=1&q=btih:'
+    validateurl: 'https://archive.org/advancedsearch.php?fl=identifier,btih&output=json&rows=1&q=btih:',
+    opentracker: true,  // Set to false to check BTIH exists before tracking
+    superpeers: [],
+    /*
+    superpeers: [ {
+        type: 'udp',
+        complete: true,
+        peerId:  '2d5757303039382d494c414465783166346c7351', // random peer id must match that in superpeer
+        ip: '12.34.56.78',
+        port: 6881
+    } ]
+    */
 };
 
 //TODO-WEBTORRENT - replace logging here to write to somewhere useful (currently goes to console) OR redirect in calling sript
@@ -23,6 +34,7 @@ const server = new Server({
     // are available in `params`.
     // infohash - TODO - figure out what the format of this is - looks like its hex
     try {
+        if (opentracker) { cb(null); } // If its open its easy
         let onarchive = await httptools.p_GET(config.validateurl + infoHash)
         if (onarchive.response.numFound) { //ensure that torrent is an Internet Archive torrent
             // If the callback is passed `null`, the torrent will be allowed.
@@ -59,7 +71,7 @@ server.on('listening', () => {
 });
 
 /**
- * Always return an extra Internet Archive torrent peer.
+ * Always return an extra Internet Archive torrent peer(s).
  *
  * Monkey-patch the "createSwarm" function, so we can get at the swarm object
  * and monkey-patch the "_getPeers" function to always return an extra peer.
@@ -73,13 +85,7 @@ server.createSwarm = (infoHash, cb) => {
     swarm._getPeers = (numwant, ownPeerId, isWebRTC) => {
       const peers = getPeersOriginal.call(swarm, numwant, ownPeerId, isWebRTC);
       if (!isWebRTC) {
-        peers.push({
-          type: 'udp',
-          complete: true,
-          peerId: '2d5757303039382d494c414465783166346c7351', // random peer id
-          ip: '12.34.56.78',
-          port: 6881
-        })
+        config.superpeers.forEach(p => peers.push(p));
       }
       return peers
     };
