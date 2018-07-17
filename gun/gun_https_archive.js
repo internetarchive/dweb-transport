@@ -15,7 +15,7 @@ const errors = require('dweb-transports/Errors.js');
 //global.DwebTransports = require('dweb-transports/index.js'); //TODO-MIRROR move to repo
 global.verbose = true; // Global needed by ArchiveItem
 
-const usehttps = false;
+const usehttps = true;
 
 const options =
     usehttps ?  {
