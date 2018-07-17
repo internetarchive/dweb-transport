@@ -25,7 +25,7 @@ const options =
 
 var h = usehttps ? https : http
 //var server = h.createServer(options, (req, res) => {
-var server = h.createServer((req, res) => {
+function _serve(req, res) = {
 	if(Gun.serve(req, res)){ return } // filters gun requests!
     res.writeHead(200);
     res.end('go away - nothing for browsers here\n');
@@ -38,7 +38,9 @@ var server = h.createServer((req, res) => {
         })
     .pipe(res); // stream
     */
-});
+}
+var server = usehttps ? h.createServer(options, _serve) : h.createServer(_serve); // HTTPS.createServer has different syntax
+
 
 
 //TODO-GUN put this into a seperate require - not sure "best" Gun-ish way to do this extension
