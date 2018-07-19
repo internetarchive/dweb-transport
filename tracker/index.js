@@ -1,23 +1,13 @@
 const Server = require('bittorrent-tracker').Server;
-
-const httptools = require('dweb-transports/httptools');
-
-const config = {
-    validateurl: 'https://archive.org/advancedsearch.php?fl=identifier,btih&output=json&rows=1&q=btih:',
-    opentracker: true,  // Set to false to check BTIH exists before tracking
-    superpeers: [],
-    /*
-    superpeers: [ {
-        type: 'udp',
-        complete: true,
-        peerId:  '2d5757303039382d494c414465783166346c7351', // random peer id must match that in superpeer
-        ip: '12.34.56.78',
-        port: 6881
-    } ]
-    */
-};
+const httptools = require('dweb-transports/httptools')
+const ip = require('ip')
 
 //TODO-WEBTORRENT - replace logging here to write to somewhere useful (currently goes to console) OR redirect in calling sript
+
+const config = require('../seeder-config.json')
+
+// cache positive responses from validate url
+const filterCache = {}
 
 const server = new Server({
   udp: true, // enable udp server?
@@ -33,12 +23,22 @@ const server = new Server({
     // key (private trackers). Full access to the original HTTP/UDP request parameters
     // are available in `params`.
     // infohash - TODO - figure out what the format of this is - looks like its hex
+
+    // If its open its easy
+    if (config.openTracker) {
+      return cb(null)
+    }
+    // Check if we already determined the torrent is allowed
+    if (filterCache[infoHash]) {
+      return cb(null)
+    }
+
     try {
-        if (opentracker) { cb(null); } // If its open its easy
-        let onarchive = await httptools.p_GET(config.validateurl + infoHash)
+        let onarchive = await httptools.p_GET(config.validateUrl + infoHash)
         if (onarchive.response.numFound) { //ensure that torrent is an Internet Archive torrent
             // If the callback is passed `null`, the torrent will be allowed.
             console.log("Ok for btih", infoHash);
+            filterCache[infoHash] = true
             cb(null)
         } else {
             // If the callback is passed an `Error` object, the torrent will be disallowed
@@ -85,8 +85,32 @@ server.createSwarm = (infoHash, cb) => {
     swarm._getPeers = (numwant, ownPeerId, isWebRTC) => {
       const peers = getPeersOriginal.call(swarm, numwant, ownPeerId, isWebRTC);
       if (!isWebRTC) {
-        config.superpeers.forEach(p => peers.push(p));
+        // make list of peers we already have to avoid duplicates
+        const peerIds = {}
+        peers.forEach((p) => {
+          if (p.type === 'udp')
+            peerIds[p.peerId] = true
+        })
+
+        // add all super peers in our config
+        config.superPeers.forEach((peer) => {
+          // skip dupes
+          if (!peerIds[peer.peerId]) {
+            // put on the front of the list
+            // Modifying this array is ok since getPeersOriginal returns a newly constructed
+            // array on each call
+            peers.unshift({
+              type: 'udp',
+              complete: true,
+              peerId: peer.peerId,
+              ip: peer.ip || ip.address(),
+              port: peer.torrentPort
+            })
+          }
+        })
       }
+
+      peers.splice(numwant) // don't announce more peers than desired
       return peers
     };
 
