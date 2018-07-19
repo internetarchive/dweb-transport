@@ -11,7 +11,6 @@ const rimraf = require('rimraf')
 const filesizeParser = require('filesize-parser')
 const arrayRemove = require('unordered-array-remove')
 
-const common = require('../common')
 const makePassthroughStore = require('./passthrough-chunk-store')
 const config = global.SEEDER_CONFIG || require('../seeder-config')
 
@@ -29,7 +28,7 @@ if (process.argv.length >= 3) {
   configSeederIndex = +process.argv[2]
 }
 
-let seederEntry = config.seeders[configSeederIndex]
+let seederEntry = config.superPeers[configSeederIndex]
 if (!seederEntry.peerId || !seederEntry.torrentPort)
   badConfig('invalid peer id or port')
 
@@ -164,7 +163,7 @@ function handleUnknownTorrent (infoHash, peer, peerId) {
     peer.destroy(err)
   }
 
-  common.getTorrentFile(infoHash, function (err, torrentFile) {
+  getTorrentFile(infoHash, function (err, torrentFile) {
     if (err) return error(err)
     makeStore(infoHash, torrentFile, function (err, storeConstructor) {
       if (err) return error(err)
@@ -215,6 +214,27 @@ function startTorrent (client, infoHash, torrentFile, opts, cb) {
 
   torrent = client.add(torrentFile, opts, function () {
     cb(null, torrent)
+  })
+}
+
+// cache positive responses, indexed by infoHash
+const torrentFileCache = {}
+
+function getTorrentFile (infoHash, cb) {
+  const cacheEntry = torrentFileCache[infoHash]
+  if (cacheEntry) {
+    return cb(null, cacheEntry)
+  }
+
+  var url = 'https://dweb.me/btih/' + infoHash + '?output=torrent'
+  request({
+    url: url,
+    encoding: null
+  }, function (err, response, body) {
+    if (err) return cb(err)
+    if (response.statusCode !== 200) cb(new Error('torrent file not found'))
+    torrentFileCache[infoHash] = body
+    cb(null, body)
   })
 }
 
