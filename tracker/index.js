@@ -6,6 +6,9 @@ const ip = require('ip')
 
 const config = require('../seeder-config.json')
 
+// cache positive responses from validate url
+const filterCache = {}
+
 const server = new Server({
   udp: true, // enable udp server?
   http: true, // enable http server?
@@ -20,12 +23,22 @@ const server = new Server({
     // key (private trackers). Full access to the original HTTP/UDP request parameters
     // are available in `params`.
     // infohash - TODO - figure out what the format of this is - looks like its hex
+
+    // If its open its easy
+    if (config.openTracker) {
+      return cb(null)
+    }
+    // Check if we already determined the torrent is allowed
+    if (filterCache[infoHash]) {
+      return cb(null)
+    }
+
     try {
-        if (config.openTracker) { cb(null); } // If its open its easy
         let onarchive = await httptools.p_GET(config.validateUrl + infoHash)
         if (onarchive.response.numFound) { //ensure that torrent is an Internet Archive torrent
             // If the callback is passed `null`, the torrent will be allowed.
             console.log("Ok for btih", infoHash);
+            filterCache[infoHash] = true
             cb(null)
         } else {
             // If the callback is passed an `Error` object, the torrent will be disallowed
