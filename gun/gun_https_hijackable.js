@@ -11,21 +11,48 @@ const httptools = require('dweb-transports/httptools.js');
 const errors = require('dweb-transports/Errors.js');
 
 //TODO-GUN put this into a seperate require - not sure "best" Gun-ish way to do this extension
-// Call hijack (before 'new Gun()'
-function hijack(cb) {
+
+
+function hijackFactory({soul=undefined, path=undefined, url=undefined, cb=undefined, jsonify=false}={}) {
+    console.log("GUN: Hikacking loading trap");
+    Gun.on('opt',root => {
+        if (!root.once) {
+            _hijackFactory(root, this, {soul, path, url, cb, jsonify});  // This is next for the Gun.on('opt'), not for the root.on('out')
+        } } ); // _hijackFactory is async and calls to.next(root) to chain to next.
+}
+
+
+
+function _hijackFactory(root, self, {soul=undefined, path=undefined, url=undefined, cb=undefined, jsonify=false}={}) {
     /* Intercept outgoing message and replace result with
         result from cb({soul, key, msg, original})
         Note that hijack should be called before the 'new Gun()' call
      */
-    Gun.on('opt', function (root) {
-        console.log("GUN: Hikacking loading trap");
-        if (root.once) {
-            return
+
+    if (typeof soul === "undefined" && typeof path !== "undefined") {
+        root.gun.path(path.split('/')).put({}) // Find the path, create if doesnt exist
+            .get(function(soul){ _hijackFactory(root, self, {soul, url, cb, jsonify});}, true); // Get its soul and recurse (allowing recursion to call to.next
+            //TODO-GUN handle errors if cant make that path.
+        return;
+    }
+    if (url) {
+        let urltoextend = Url.parse(url).href;    // Support url as string or Url structure
+        let soulwanted = soul;
+        cb = function({soul=undefined, key=undefined}={}) { // Doesnt use msg or original parameters to cb
+            if (soul === soulwanted) {
+                return httptools.p_GET(urltoextend + key)
+                    .then(data => jsonify ? JSON.stringify(data) : data)
+                    .catch(err => { if (err instanceof errors.TransportError) { return undefined } else throw err; }) ;
+            }
+            return undefined; // Not hijacking
         }
+    }
+    // By here cb and soul should always be defined
 
-        root.gun <<< TODO-GUN use this
 
-        root.on('out', function (msg) {
+    if (cb) {
+
+        root.on('out', function (msg) {   // Wrap a simple callback function so it captures a soul and returns message
             //console.log("GUN: Hikacking starting outgoing message=", msg);
             let to = this.to;
             // TODO-GUN - this wont work when running locally in node ONLY when running in server
@@ -57,10 +84,10 @@ function hijack(cb) {
                     let res = cb({soul, key, msg, original});  // Sync or Async callback should return promise // Note can resolve to undefined if error
                     if (res instanceof Promise) {
                         res.then(data => { _updateAndForward(data); })
-                        .catch(err => {
-                            console.warn("Gun.hijack promise error", err);
-                            to.next(msg); // Pass it on, hijack failed
-                        });
+                            .catch(err => {
+                                console.warn("Gun.hijack promise error", err);
+                                to.next(msg); // Pass it on, hijack failed
+                            });
                     } else { // either data, or undefined
                         _updateAndForward(res);
                     }
@@ -73,40 +100,12 @@ function hijack(cb) {
                 to.next(msg); // pass to next middleware
             }
         });
-        this.to.next(root); // This is next for the Gun.on('opt'), not for the root.on('out')
-    });
+        console.log("Hijacked",path || "", "at soul", soul, "to", url ? Url.parse(url).href : "a callback");
+    }
+    self.to.next();
 }
 
-function hijackFactory({gun=undefined, soul=undefined, path=undefined, url=undefined, jsonify=false, makepath=false}={}) {
-    if (typeof path !== "undefined") {
-        soul = gun.path(path.split('/'))._.link;
-        if (typeof soul === "undefined" && makepath) {
-            soul = gun.path(path.split('/')).put({}).get(function(soul){XXXX}, true)
-        }
-        if (typeof soul === "undefined") {
-            console.warn("path", path, "cant be found, so not hijacked");
-        }
-    }
-    if (soul && url) {
-        let soulwanted = soul;
-        let urltoextend = Url.parse(url).href;    // Support url as string or Url structure
-        hijack(function({soul=undefined, key=undefined, msg=undefined, original=undefined}={}) {
-            //console.log("GUN: hijack callback", soul, key, msg, original);
-            if (soul === soulwanted) {
-                return httptools.p_GET(urltoextend + key)
-                    .then(data => jsonify ? JSON.stringify(data) : data)
-                    .catch(err => { if (err instanceof errors.TransportError) { return undefined } else throw err; }) ;
-                //return new ArchiveItem({itemid: key}).fetch().then(ai => JSON.stringify(ai.metadata));  // Recurses into looking it up by name
-            }
-            return undefined; // Not hijacking
-        });
-        console.log("Hijacked",path || "", "at soul", soulwanted, "to", urltoextend);
-    }
-    // Can add other hijack patterns here
-
-}
-
-function start({usehttps: true, key: undefined, cert: undefined, dirname: undefined, port: undefined}={}) {
+function start({usehttps=true, key=undefined, cert=undefined, dirname=undefined, port=undefined}={}) {
     /*
     usehttps:   True if should use https, otherwise uses http (sometimes better for testing)
     key:    Path to key certificate
@@ -116,7 +115,7 @@ function start({usehttps: true, key: undefined, cert: undefined, dirname: undefi
     function _serve(req, res) {
         if(Gun.serve(req, res)){ return } // filters gun requests!
         if (dirname) {  // Note this is untested, copied from something I got form @amark
-            fs.createReadStream(path.join(dirname, req.url))    // Note I'm assuming thsi is the Gun "path" model - intent might be the NPM module ?
+            fs.createReadStream(path.join(dirname, req.url))    // Note I'm assuming this is the Gun "path" model - intent might be the NPM module ?
                 .on('error',function(){ // static files!
                     res.writeHead(200, {'Content-Type': 'text/html'});
                     res.end(fs.readFileSync(path.join(__dirname, 'index.html'))); // or default to index
@@ -129,10 +128,11 @@ function start({usehttps: true, key: undefined, cert: undefined, dirname: undefi
         res.end('go away - nothing for browsers here\n');
     }
 
-    var server = usehttps
+    const server = usehttps
         ? https.createServer( {key, cert}, _serve)
         : http.createServer(_serve); // HTTPS.createServer has different syntax
 
+    // noinspection JSUnusedLocalSymbols
     var gun = new Gun({
         web: server
     });
@@ -141,16 +141,3 @@ function start({usehttps: true, key: undefined, cert: undefined, dirname: undefi
 }
 
 exports = module.exports = { start, hijackFactory };
-
-
-#All running on SuperPeer
-gun1 = new Gun()
-path = /arc/archive.org/metadata
-gun1.get(path.split, (soul) => )
-hijack(soul, url)
-gun2 = new Gun(server)
-
-# Reguar peer (in browser) does
-
-g = new Gun()
-g.get('/arc/archive.org/metadata'.split('/')).get('foobar').once()
