@@ -15,7 +15,7 @@ const errors = require('dweb-transports/Errors.js');
 
 function hijackFactory({soul=undefined, path=undefined, url=undefined, cb=undefined, jsonify=false}={}) {
     console.log("GUN: Hikacking loading trap");
-    Gun.on('opt',root => {
+    Gun.on('opt',function(root) {
         if (!root.once) {
             _hijackFactory(root, this, {soul, path, url, cb, jsonify});  // This is next for the Gun.on('opt'), not for the root.on('out')
         } } ); // _hijackFactory is async and calls to.next(root) to chain to next.
@@ -30,6 +30,7 @@ function _hijackFactory(root, self, {soul=undefined, path=undefined, url=undefin
      */
 
     if (typeof soul === "undefined" && typeof path !== "undefined") {
+        console.log("_hijackFactory resolving", path);
         root.gun.path(path.split('/')).put({}) // Find the path, create if doesnt exist
             .get(function(soul){ _hijackFactory(root, self, {soul, url, cb, jsonify});}, true); // Get its soul and recurse (allowing recursion to call to.next
             //TODO-GUN handle errors if cant make that path.
@@ -39,7 +40,9 @@ function _hijackFactory(root, self, {soul=undefined, path=undefined, url=undefin
         let urltoextend = Url.parse(url).href;    // Support url as string or Url structure
         let soulwanted = soul;
         cb = function({soul=undefined, key=undefined}={}) { // Doesnt use msg or original parameters to cb
+            console.log("CB matching",soul,"against",soulwanted);
             if (soul === soulwanted) {
+                console.log("CB matched",soul,"against",soulwanted, "trying", urltoextend + key);
                 return httptools.p_GET(urltoextend + key)
                     .then(data => jsonify ? JSON.stringify(data) : data)
                     .catch(err => { if (err instanceof errors.TransportError) { return undefined } else throw err; }) ;
@@ -53,10 +56,13 @@ function _hijackFactory(root, self, {soul=undefined, path=undefined, url=undefin
     if (cb) {
 
         root.on('out', function (msg) {   // Wrap a simple callback function so it captures a soul and returns message
-            //console.log("GUN: Hikacking starting outgoing message=", msg);
+            console.log("GUN: Hikacking starting outgoing message=", msg);
             let to = this.to;
             // TODO-GUN - this wont work when running locally in node ONLY when running in server
-            if(msg['@'] && !msg.put) {
+            var keys = Object.keys(msg.put||{}), len = keys.length;
+            if(msg['@'] && ((len === 0) || (len === 1 && Gun.obj.empty(msg.put[keys[0]], '_')))){
+            //if(msg['@'] && !msg.put) {
+
                 console.log("GUN: Hikacking outgoing message"); //, msg);
                 let tmp = root.dup.s[msg['@']];
                 let original = tmp && tmp.it && tmp.it.get;
@@ -73,10 +79,10 @@ function _hijackFactory(root, self, {soul=undefined, path=undefined, url=undefin
                                         '#': soul,
                                         '>': {[key]: Gun.state()}
                                     },
-                                    [key]: data      // Note undefined should (hopefully) be a valid response
+                                    [key]: "HELLO WORLD" //was data;       // Note undefined should (hopefully) be a valid response
                                 }
                             };
-                            console.log("GUN.hijack updated msg with data =", data);
+                            console.log("GUN.hijack updated msg with data =", soul, key, data.length);
                         }
                         to.next(msg);           // Pass on to next callback to process
                     }
@@ -102,6 +108,7 @@ function _hijackFactory(root, self, {soul=undefined, path=undefined, url=undefin
         });
         console.log("Hijacked",path || "", "at soul", soul, "to", url ? Url.parse(url).href : "a callback");
     }
+    console.log("Passing to next part of Gun.on('opt')");
     self.to.next();
 }
 
