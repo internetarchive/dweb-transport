@@ -14,6 +14,6 @@ gun = gun_https_hijackable.start( {
             cert:       usehttps ? fs.readFileSync('/etc/letsencrypt/live/dweb.me/fullchain.pem') : undefined,
 });
 
-gun_https_hijackable.hijackFactory( {path: 'arc/archive.org/metadata', url: 'http://dweb.me/arc/archive.org/metadata/', jsonify: true});
+gun_https_hijackable.hijackFactory(gun, {path: 'arc/archive.org/metadata', url: 'http://dweb.me/arc/archive.org/metadata/', jsonify: true});
 //gun_https_hijackable.hijackFactory( gun, {soul: 'jjtc2zr99fqIZp9t0RxE', url: 'http://dweb.me/arc/archive.org/metadata/', jsonify: true});
 

@@ -59,12 +59,11 @@ function _hijackFactory(gun, self, {soul=undefined, path=undefined, url=undefine
             let to = this.to;
             // TODO-GUN - this wont work when running locally in node ONLY when running in server
             var keys = Object.keys(msg.put||{}), len = keys.length;
-            if(msg['@'] && ((len === 0) || (len === 1 && Gun.obj.empty(msg.put[keys[0]], '_')))){
-            //if(msg['@'] && !msg.put) {
-
+            //if(msg['@'] && ((len === 0) || (len === 1 && Gun.obj.empty(msg.put[keys[0]], '_')))){
+            if(msg['@']) {
                 console.log("GUN: Hikacking outgoing message"); //, msg);
                 let tmp = root.dup.s[msg['@']];
-                let original = tmp && tmp.it && tmp.it.get;
+                let original = tmp && tmp.it && tmp.it.get; // Find message this is in reply to
                 console.log("GUN: Hikacking outgoing message original=", original);
                 if (original) {
                     let soul = original['#'];
@@ -77,29 +76,34 @@ function _hijackFactory(gun, self, {soul=undefined, path=undefined, url=undefine
                                         '#': soul,
                                         '>': {[key]: Gun.state()}
                                     },
-                                    [key]: data // Note that undefined should be a valid response here
+                                    [key]: data // Note that undefined should be a valid response here - often test here by replacing `data` with `"Hello World"`
                                 }
                             };
-                            console.log("GUN.hijack updated msg with data =", soul, key, data.length);
+                            console.log("GUN.hijack updated msg with data =", soul, key, data ? data.length : data);
                         to.next(msg);           // Pass on to next callback to process
                     }
-
-                    let res = cb({soul, key, msg, original});  // Sync or Async callback should return promise // Note can resolve to undefined if error
-                    if (res instanceof Promise) {
-                        res.then(data => { _updateAndForward(data); })
-                            .catch(err => {
-                                console.warn("Gun.hijack promise error", err);
-                                to.next(msg); // Pass it on, hijack failed
-                            });
-                    } else { // either data, or undefined
-                        _updateAndForward(res);
+                    if (!(msg.put[soul] && msg.put[soul][key])) {
+                        let res = cb({soul, key, msg, original});  // Sync or Async callback should return promise // Note can resolve to undefined if error
+                        if (res instanceof Promise) {
+                            res.then(data => {
+                                _updateAndForward(data);
+                            })
+                                .catch(err => {
+                                    console.warn("Gun.hijack promise error", err);
+                                    to.next(msg); // Pass it on, hijack failed
+                                });
+                        } else { // either data, or undefined
+                            _updateAndForward(res);
+                        }
+                    } else { // Outgoing message already has an answer to the key
+                        to.next(msg);
                     }
                     // NOTE: this doesn't necessarily save it back to
                     // this peers GUN data, (I (Mitra) thinks that may depend on other processes and order of Gun.on)
-                } else {
+                } else { // Cant find original message, dont hijack, just pass it on
                     to.next(msg);   // No original pass it on
                 }
-            } else {
+            } else { // Wrong kind of message, just pass it on
                 to.next(msg); // pass to next middleware
             }
         }); //hikack
