@@ -5,40 +5,40 @@ const http = require('http');
 const fs = require('fs');
 process.env.GUN_ENV = "false";  // See other WORKAROUND-GUN-ENV hack around current default of true generating lots of errors
 const Url = require('url');
+require ('./hijack.js'); // Its possible this has to be before require gun
 const Gun = require('gun');
-const path = require('gun/lib/path.js');
+require('gun/lib/path.js'); // extend gun with gun.path
 const httptools = require('dweb-transports/httptools.js');
 const errors = require('dweb-transports/Errors.js');
 
 //TODO-GUN put this into a seperate require - not sure "best" Gun-ish way to do this extension
 
 
-function hijackFactory({soul=undefined, path=undefined, url=undefined, cb=undefined, jsonify=false}={}) {
+function hijackFactory(gun, {soul=undefined, path=undefined, url=undefined, cb=undefined, jsonify=false}={}) {
     console.log("GUN: Hikacking loading trap");
-    Gun.on('opt',function(root) {
-        if (!root.once) {
-            _hijackFactory(root, this, {soul, path, url, cb, jsonify});  // This is next for the Gun.on('opt'), not for the root.on('out')
-        } } ); // _hijackFactory is async and calls to.next(root) to chain to next.
+    _hijackFactory(gun, this, {soul, path, url, cb, jsonify});  // This is next for the Gun.on('opt'), not for the root.on('out')
 }
 
 
 
-function _hijackFactory(root, self, {soul=undefined, path=undefined, url=undefined, cb=undefined, jsonify=false}={}) {
+function _hijackFactory(gun, self, {soul=undefined, path=undefined, url=undefined, cb=undefined, jsonify=false}={}) {
     /* Intercept outgoing message and replace result with
         result from cb({soul, key, msg, original})
         Note that hijack should be called before the 'new Gun()' call
      */
-
+    let root = gun._;
+    let soulwanted = soul;
     if (typeof soul === "undefined" && typeof path !== "undefined") {
         console.log("_hijackFactory resolving", path);
+        // if any browser makes a request between HERE
         root.gun.path(path.split('/')).put({}) // Find the path, create if doesnt exist
-            .get(function(soul){ _hijackFactory(root, self, {soul, url, cb, jsonify});}, true); // Get its soul and recurse (allowing recursion to call to.next
+            .get(function(soulwanted){ _hijackFactory(gun, self, {soul: soulwanted, url, cb, jsonify});}, true); // Get its soul and recurse (allowing recursion to call to.next
             //TODO-GUN handle errors if cant make that path.
         return;
     }
+    // and NOW... the hijacker won't be mounted yet.
     if (url) {
         let urltoextend = Url.parse(url).href;    // Support url as string or Url structure
-        let soulwanted = soul;
         cb = function({soul=undefined, key=undefined}={}) { // Doesnt use msg or original parameters to cb
             console.log("CB matching",soul,"against",soulwanted);
             if (soul === soulwanted) {
@@ -50,12 +50,11 @@ function _hijackFactory(root, self, {soul=undefined, path=undefined, url=undefin
             return undefined; // Not hijacking
         }
     }
-    // By here cb and soul should always be defined
+    // By here cb and soulwanted should always be defined
 
 
     if (cb) {
-
-        root.on('out', function (msg) {   // Wrap a simple callback function so it captures a soul and returns message
+        gun.hijack(function (msg) {   // Wrap a simple callback function so it captures a soul and returns message
             console.log("GUN: Hikacking starting outgoing message=", msg);
             let to = this.to;
             // TODO-GUN - this wont work when running locally in node ONLY when running in server
@@ -72,18 +71,16 @@ function _hijackFactory(root, self, {soul=undefined, path=undefined, url=undefin
                     let key = original['.'];
                     console.log("GUN.hijack: soul=",soul,"key=", key);
                     function _updateAndForward(data) {
-                        if (typeof data !== "undefined") {
                             msg.put = {
                                 [soul]: {
                                     _: {
                                         '#': soul,
                                         '>': {[key]: Gun.state()}
                                     },
-                                    [key]: "HELLO WORLD" //was data;       // Note undefined should (hopefully) be a valid response
+                                    [key]: data // Note that undefined should be a valid response here
                                 }
                             };
                             console.log("GUN.hijack updated msg with data =", soul, key, data.length);
-                        }
                         to.next(msg);           // Pass on to next callback to process
                     }
 
@@ -105,11 +102,9 @@ function _hijackFactory(root, self, {soul=undefined, path=undefined, url=undefin
             } else {
                 to.next(msg); // pass to next middleware
             }
-        });
+        }); //hikack
         console.log("Hijacked",path || "", "at soul", soul, "to", url ? Url.parse(url).href : "a callback");
     }
-    console.log("Passing to next part of Gun.on('opt')");
-    self.to.next();
 }
 
 function start({usehttps=true, key=undefined, cert=undefined, dirname=undefined, port=undefined}={}) {
@@ -141,10 +136,10 @@ function start({usehttps=true, key=undefined, cert=undefined, dirname=undefined,
 
     // noinspection JSUnusedLocalSymbols
     var gun = new Gun({
-        web: server
+        web: server.listen(port)
     });
-    server.listen(port);
     console.log(usehttps ? "HTTPS" : "HTTP", 'Server started on port ' + port + ' with /gun');
+    return gun;
 }
 
 exports = module.exports = { start, hijackFactory };
