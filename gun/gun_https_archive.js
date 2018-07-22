@@ -1,10 +1,11 @@
 //var port = process.env.OPENSHIFT_NODEJS_PORT || process.env.VCAP_APP_PORT || process.env.PORT || process.argv[2] || 8080;
 const fs = require('fs');
+const os = require('os');
 const gun_https_hijackable = require('./gun_https_hijackable.js')
 //global.verbose = true; // Include this if ever expand to use ArchiveItem
 
 // Create tempory gun, because have to call hijack (before 'new Gun()' for the server.
-usehttps = true;
+usehttps = ['wwwb-dev0.fnf.archive.org'].includes(os.hostname()); // Are we running on a site with the key below
 
 
 gun = gun_https_hijackable.start( {

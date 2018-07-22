@@ -14,7 +14,7 @@
     "dweb-serviceworker": "git+https://git@github.com/internetarchive/dweb-serviceworker.git",
     "dweb-transports": "git+https://git@github.com/internetarchive/dweb-transports.git",
     "filesize-parser": "^1.4.2",
-    "gun": "latest",
+    "gun": "^0.9.9997",
     "ip": "^1.1.5",
     "mkdirp": "^0.5.1",
     "request": "^2.87.0",

@@ -25,3 +25,4 @@ package-lock.json
 mirror/node_modules
 /gun/data.json
 /data.json
+gun/radata
