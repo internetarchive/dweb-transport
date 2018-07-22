@@ -4,7 +4,7 @@ const gun_https_hijackable = require('./gun_https_hijackable.js')
 //global.verbose = true; // Include this if ever expand to use ArchiveItem
 
 // Create tempory gun, because have to call hijack (before 'new Gun()' for the server.
-usehttps = false;
+usehttps = true;
 
 
 gun = gun_https_hijackable.start( {

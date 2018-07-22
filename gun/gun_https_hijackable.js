@@ -70,6 +70,7 @@ function _hijackFactory(gun, self, {soul=undefined, path=undefined, url=undefine
                     let key = original['.'];
                     console.log("GUN.hijack: soul=",soul,"key=", key);
                     function _updateAndForward(data) {
+                        if (typeof data !== "undefined") {
                             msg.put = {
                                 [soul]: {
                                     _: {
@@ -80,9 +81,10 @@ function _hijackFactory(gun, self, {soul=undefined, path=undefined, url=undefine
                                 }
                             };
                             console.log("GUN.hijack updated msg with data =", soul, key, data ? data.length : data);
+                        }
                         to.next(msg);           // Pass on to next callback to process
                     }
-                    if (!(msg.put[soul] && msg.put[soul][key])) {
+                    if (!(msg.put && msg.put[soul] && msg.put[soul][key])) {
                         let res = cb({soul, key, msg, original});  // Sync or Async callback should return promise // Note can resolve to undefined if error
                         if (res instanceof Promise) {
                             res.then(data => {
