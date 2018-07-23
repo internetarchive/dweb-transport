@@ -4,7 +4,7 @@
   },
   "homepage": "https://github.com/internetarchive/dweb-transport#readme",
   "name": "dweb-transport",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Javascript library for Internet Archive Decentralized Web project: Transport",
   "dependencies": {
     "bittorrent-tracker": "^9.9.1",
