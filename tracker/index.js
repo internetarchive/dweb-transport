@@ -1,10 +1,17 @@
 const Server = require('bittorrent-tracker').Server;
 const httptools = require('dweb-transports/httptools')
-const ip = require('ip')
+const ipAddress = require('ip').address()
 
 //TODO-WEBTORRENT - replace logging here to write to somewhere useful (currently goes to console) OR redirect in calling sript
 
 const config = require('../seeder-config.json')
+
+const peersByIp = {}
+config.superPeers.forEach((peer) => {
+  if (!peer.ip)
+    peer.ip = ipAddress
+  peersByIp[peer.ip] = peer
+})
 
 // cache positive responses from validate url
 const filterCache = {}
@@ -84,31 +91,40 @@ server.createSwarm = (infoHash, cb) => {
     const getPeersOriginal = swarm._getPeers;
     swarm._getPeers = (numwant, ownPeerId, isWebRTC) => {
       const peers = getPeersOriginal.call(swarm, numwant, ownPeerId, isWebRTC);
-      if (!isWebRTC) {
-        // make list of peers we already have to avoid duplicates
-        const peerIds = {}
-        peers.forEach((p) => {
-          if (p.type === 'udp')
-            peerIds[p.peerId] = true
-        })
 
-        // add all super peers in our config
-        config.superPeers.forEach((peer) => {
-          // skip dupes
-          if (!peerIds[peer.peerId]) {
-            // put on the front of the list
-            // Modifying this array is ok since getPeersOriginal returns a newly constructed
-            // array on each call
+      // make list of peers we already have to avoid duplicates
+      const peerIds = {}
+      peers.forEach((p) => {
+        peerIds[p.peerId] = true
+      })
+
+      // add all super peers in our config
+      config.superPeers.forEach((peer) => {
+        // skip dupes
+        if (!peerIds[peer.peerId]) {
+          // put on the front of the list
+          // Modifying this array is ok since getPeersOriginal returns a newly constructed
+          // array on each call
+          if (!isWebRTC) {
             peers.unshift({
               type: 'udp',
               complete: true,
               peerId: peer.peerId,
-              ip: peer.ip || ip.address(),
+              ip: peer.ip,
               port: peer.torrentPort
             })
+          } else if (peer.socket) {
+            peers.unshift({
+              type: 'ws',
+              complete: true,
+              peerId: peer.peerId,
+              ip: peer.ip,
+              port: peer.torrentPort,
+              socket: peer.socket
+            })
           }
-        })
-      }
+        }
+      })
 
       peers.splice(numwant) // don't announce more peers than desired
       return peers
@@ -117,6 +133,33 @@ server.createSwarm = (infoHash, cb) => {
     cb(null, swarm)
   })
 };
+
+
+
+// find connections from seeders
+const onWebSocketConnectionOriginal = server.onWebSocketConnection
+server.onWebSocketConnection = (socket, opts) => {
+  const ip = socket.upgradeReq.headers['x-forwarded-for'] || socket.upgradeReq.connection.remoteAddress
+
+  const superPeer = peersByIp[ip]
+  if (superPeer) {
+    superPeer.socket = socket
+  }
+
+  function remove () {
+    if (socket === peersByIp[ip].socket) {
+      peersByIp[ip].socket = null
+    }
+
+    socket.removeEventListener('error', remove)
+    socket.removeEventListener('close', remove)
+  }
+
+  socket.on('error', remove)
+  socket.on('close', remove)
+
+  onWebSocketConnectionOriginal.call(server, socket, opts)
+}
 
 // start tracker server listening! Use 0 to listen on a random free port.
 server.listen(6969);

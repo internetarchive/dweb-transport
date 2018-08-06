@@ -19,7 +19,8 @@
     "mkdirp": "^0.5.1",
     "request": "^2.87.0",
     "trammel": "^2.0.1",
-    "webtorrent": "^0.101.0"
+    "webtorrent": "^0.101.0",
+    "wrtc": "^0.1.6"
   },
   "keywords": [],
   "license": "AGPL-3.0",
@@ -36,6 +37,7 @@
     "browserify": "^14.5.0",
     "chai": "^4.1.2",
     "copy-webpack-plugin": "^4.5.2",
+    "electron-webrtc": "^0.3.0",
     "parse-torrent": "^6.0.1",
     "rimraf": "^2.6.2",
     "tape": "^4.9.1",
