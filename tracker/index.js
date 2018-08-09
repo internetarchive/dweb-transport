@@ -1,6 +1,6 @@
 const Server = require('bittorrent-tracker').Server;
 const httptools = require('dweb-transports/httptools')
-const ipAddress = require('ip').address()
+const debug = require('debug')('tracker')
 
 //TODO-WEBTORRENT - replace logging here to write to somewhere useful (currently goes to console) OR redirect in calling sript
 
@@ -9,9 +9,11 @@ const config = require('../seeder-config.json')
 const peersByIp = {}
 config.superPeers.forEach((peer) => {
   if (!peer.ip)
-    peer.ip = ipAddress
+    peer.ip = '127.0.0.1'
   peersByIp[peer.ip] = peer
 })
+
+debug('peersByIp', peersByIp)
 
 // cache positive responses from validate url
 const filterCache = {}
@@ -106,6 +108,7 @@ server.createSwarm = (infoHash, cb) => {
           // Modifying this array is ok since getPeersOriginal returns a newly constructed
           // array on each call
           if (!isWebRTC) {
+            debug('giving out tcp seeder')
             peers.unshift({
               type: 'udp',
               complete: true,
@@ -114,6 +117,7 @@ server.createSwarm = (infoHash, cb) => {
               port: peer.torrentPort
             })
           } else if (peer.socket) {
+            debug('giving out webrtc seeder')
             peers.unshift({
               type: 'ws',
               complete: true,
@@ -139,11 +143,16 @@ server.createSwarm = (infoHash, cb) => {
 // find connections from seeders
 const onWebSocketConnectionOriginal = server.onWebSocketConnection
 server.onWebSocketConnection = (socket, opts) => {
-  const ip = socket.upgradeReq.headers['x-forwarded-for'] || socket.upgradeReq.connection.remoteAddress
+  const ip = socket.upgradeReq.headers['x-forwarded-for'] || socket.upgradeReq.connection.remoteAddress.replace(/^::ffff:/, '')
+  debug('got websocket tracker connection', ip)
 
   const superPeer = peersByIp[ip]
   if (superPeer) {
+    debug('found seeder')
     superPeer.socket = socket
+
+    socket.on('error', remove)
+    socket.on('close', remove)
   }
 
   function remove () {
@@ -154,9 +163,6 @@ server.onWebSocketConnection = (socket, opts) => {
     socket.removeEventListener('error', remove)
     socket.removeEventListener('close', remove)
   }
-
-  socket.on('error', remove)
-  socket.on('close', remove)
 
   onWebSocketConnectionOriginal.call(server, socket, opts)
 }

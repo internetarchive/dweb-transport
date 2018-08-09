@@ -21,7 +21,7 @@ const parseTorrent = require('parse-torrent')
 const fs = require('fs')
 const path = require('path')
 
-test.skip('download torrent through seeder', t => {
+test('download torrent through seeder', t => {
   t.plan(1)
   const torrentFile = parseTorrent(fs.readFileSync(path.join(__dirname, 'commute.torrent')))
   // remove all other trackers and web seeds
@@ -43,7 +43,7 @@ test.skip('download torrent through seeder', t => {
   })
 })
 
-test.skip('download a second torrent which should evict the first from the cache', t => {
+test('download a second torrent which should evict the first from the cache', t => {
   t.plan(2)
   const torrentFile = parseTorrent(fs.readFileSync(path.join(__dirname, 'daffy.torrent')))
   // remove all other trackers and web seeds
@@ -61,7 +61,7 @@ test.skip('download a second torrent which should evict the first from the cache
       try {
         // try to access previous torrent directory
         fs.accessSync('/tmp/archive-torrents/22cf567cbca91d3cc0a338aff766f4ba90da21e9')
-        t.fail('pervious torrent still there')
+        t.fail('previous torrent still there')
       } catch (e) {
         t.pass('properly evicted')
       }

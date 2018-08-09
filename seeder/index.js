@@ -61,9 +61,9 @@ function deleteOldest (size) {
 
   debug('doing eviction; torrent list:', lruFetcherTorrents.map(t => t.infoHash))
   const oldest = lruFetcherTorrents.shift()
-  oldest.destroy(function (err) {
+  seeder.remove(oldest.infoHash, function (err) { // this also destroys the fetcher
     if (err) return cacheManagementError(err)
-    debug('destroyed torrent object')
+    debug('destroyed torrent objects')
     trammel(oldest.path, {
       type: 'raw'
     }, function (err, torrentSize) {
@@ -96,7 +96,7 @@ if (MAX_CACHE)
 const socketPool = WebSocketTracker._socketPool
 let trackerSocket
 function createWSTrackerConnection () {
-  const url = config.trackerUrl
+  const url = config.wsTrackerUrl
   if (socketPool[url])
     return
 
@@ -131,10 +131,10 @@ function createWSTrackerConnection () {
     }
 
     const infoHash = Buffer.from(data.info_hash, 'binary').toString('hex')
-    if (data.action === 'announce') {
+    if (data.action === 'announce' && data.peer_id && data.offer) {
       const torrent = seeder.get(infoHash)
       if (!torrent) {
-        debug('unknown torrent (webrtc)')
+        debug('unknown torrent (webrtc)', infoHash, data)
         // this torrent is unknown. Add it.
         handleUnknownTorrent(infoHash, (err, torrent) => {
           if (err) {
@@ -159,7 +159,7 @@ function createWSTrackerConnection () {
   }
 }
 
-if (config.trackerUrl)
+if (config.wsTrackerUrl)
   createWSTrackerConnection()
 
 let trackerConfig
@@ -215,7 +215,7 @@ seeder._tcpPool._onConnection = function (conn) {
     if (torrent) {
       onTorrentFound(torrent)
     } else {
-      debug('unknown torrent (tcp)')
+      debug('unknown torrent (tcp)', infoHash)
       handleUnknownTorrent(infoHash, function (err, torrent) {
         if (err) {
           console.error('failure to handle unknown torrent:', err)
@@ -258,8 +258,11 @@ function handleUnknownTorrent (infoHash, cb) {
 
       debug('creating seeder torrent')
       const parsed = parseTorrent(torrentFile)
-      if (config.trackerUrl)
-        parsed.announce.push(config.trackerUrl) // ensure correct tracker is added (for webrtc/websocket case)
+      parsed.announce = []
+      if (config.udpTrackerUrl)
+        parsed.announce.push(config.udpTrackerUrl)
+      if (config.wsTrackerUrl)
+        parsed.announce.push(config.wsTrackerUrl) // ensure correct tracker is added (for webrtc/websocket case)
 
       startTorrent(seeder, infoHash, parsed, {
         store: storeConstructor,

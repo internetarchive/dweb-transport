@@ -18,7 +18,9 @@ function makePassthroughStore (underlyingTorrent, onUse) {
     if (chunkLength !== underlyingTorrent.pieceLength)
       throw new Error('unexpected chunk length')
 
+    debug('constructor')
     self.chunkLength = chunkLength
+    self.destroyed = false
   }
 
   // map of piece number to array of {opts, cb} objects
@@ -26,12 +28,12 @@ function makePassthroughStore (underlyingTorrent, onUse) {
   const waiting = {}
 
   PassthroughChunkStore.prototype.put = function (index, chunkBuffer, cb) {
-    if (cb)
-      cb(new Error('put called on read-only chunk store'))
+    throw new Error('put called on read-only chunk store')
   }
 
   PassthroughChunkStore.prototype.get = function (index, opts, cb) {
     const self = this
+    if (self.destroyed) return
 
     onUse()
     debug('get', index)
@@ -64,7 +66,9 @@ function makePassthroughStore (underlyingTorrent, onUse) {
 
   PassthroughChunkStore.prototype.close = PassthroughChunkStore.prototype.destroy = function (cb) {
     const self = this
+    if (self.destroyed) return
 
+    self.destroyed = true
     debug('close/destroy')
     underlyingTorrent.destroy(cb)
   }
