@@ -10,6 +10,9 @@ const mkdirp = require('mkdirp')
 const rimraf = require('rimraf')
 const filesizeParser = require('filesize-parser')
 const arrayRemove = require('unordered-array-remove')
+const WebSocketTracker = require('bittorrent-tracker/lib/client/websocket-tracker')
+const parseTorrent = require('parse-torrent')
+const WebSocket = require('simple-websocket')
 
 const makePassthroughStore = require('./passthrough-chunk-store')
 const config = global.SEEDER_CONFIG || require('../seeder-config')
@@ -17,6 +20,8 @@ const config = global.SEEDER_CONFIG || require('../seeder-config')
 const CACHE_PATH = config.cachePath
 if (!CACHE_PATH)
   badConfig('cache path not specified')
+
+const TRACKER_RECONNECT_SECONDS = config.trackerReconnectSeconds || 60
 
 const MAX_CACHE = filesizeParser(config.maxCacheSize || 0)
 const CACHE_CHECK_INTERVAL = config.cacheCheckIntervalSeconds
@@ -56,9 +61,9 @@ function deleteOldest (size) {
 
   debug('doing eviction; torrent list:', lruFetcherTorrents.map(t => t.infoHash))
   const oldest = lruFetcherTorrents.shift()
-  oldest.destroy(function (err) {
+  seeder.remove(oldest.infoHash, function (err) { // this also destroys the fetcher
     if (err) return cacheManagementError(err)
-    debug('destroyed torrent object')
+    debug('destroyed torrent objects')
     trammel(oldest.path, {
       type: 'raw'
     }, function (err, torrentSize) {
@@ -88,10 +93,91 @@ function setCacheTimer () {
 if (MAX_CACHE)
   setCacheTimer()
 
+const socketPool = WebSocketTracker._socketPool
+let trackerSocket
+function createWSTrackerConnection () {
+  const url = config.wsTrackerUrl
+  if (socketPool[url])
+    return
+
+  debug('connecting to websocket traker')
+  const socket = socketPool[url] = new WebSocket(url)
+  socket.consumers = 1
+  trackerSocket = socket
+
+  socket.on('error', remove)
+  socket.on('close', remove)
+  socket.on('data', onData)
+
+  function remove () {
+    debug('disconnecting from websocket server')
+    if (socketPool[url] === socket) {
+      trackerSocket = null
+      delete socketPool[url]
+    }
+
+    socket.removeEventListener('error', remove)
+    socket.removeEventListener('close', remove)
+    socket.removeEventListener('data', onData)
+
+    setTimeout(createWSTrackerConnection, TRACKER_RECONNECT_SECONDS * 1000)
+  }
+
+  function onData (data) {
+    try {
+      data = JSON.parse(data)
+    } catch (err) {
+      return console.warn('bad tracker data:', err)
+    }
+
+    const infoHash = Buffer.from(data.info_hash, 'binary').toString('hex')
+    if (data.action === 'announce' && data.peer_id && data.offer) {
+      const torrent = seeder.get(infoHash)
+      if (!torrent) {
+        debug('unknown torrent (webrtc)', infoHash, data)
+        // this torrent is unknown. Add it.
+        handleUnknownTorrent(infoHash, (err, torrent) => {
+          if (err) {
+            return console.error('failure to handle unknown torrent:', err)
+          }
+
+          const success = torrent.discovery.tracker._trackers.some(tracker => {
+            if (tracker.announceUrl === url && tracker._onSocketDataBound) {
+              // found it! replay data event
+              tracker._onSocketDataBound(data)
+              return true
+            }
+            return false
+          })
+
+          if (!success) {
+            console.error('failed to find tracker connection for newly-created torrent; infoHash:', infoHash)
+          }
+        })
+      }
+    }
+  }
+}
+
+if (config.wsTrackerUrl)
+  createWSTrackerConnection()
+
+let trackerConfig
+if (seederEntry.wrtc === 'wrtc') {
+  trackerConfig = {
+    wrtc: require('wrtc')
+  }
+} else if (seederEntry.wrtc === 'electron-webrtc') {
+  trackerConfig = {
+    wrtc: require('electron-webrtc')()
+  }
+}
+
 var seeder = new WebTorrent({
 	peerId: seederEntry.peerId,
 	torrentPort: seederEntry.torrentPort,
-  dht: false
+  dht: false,
+  tracker: trackerConfig
 })
 
 var fetcher = new WebTorrent({
@@ -127,10 +213,22 @@ seeder._tcpPool._onConnection = function (conn) {
 
     var torrent = self._client.get(infoHash)
     if (torrent) {
-      onTorrentFound(torrent, peer, peerId)
+      onTorrentFound(torrent)
     } else {
-      debug('unknown torrent')
-      handleUnknownTorrent(infoHash, peer, peerId)
+      debug('unknown torrent (tcp)', infoHash)
+      handleUnknownTorrent(infoHash, function (err, torrent) {
+        if (err) {
+          console.error('failure to handle unknown torrent:', err)
+          return peer.destroy(err)
+        }
+        onTorrentFound(torrent)
+      })
+    }
+
+    function onTorrentFound (torrent) {
+      peer.swarm = torrent
+      torrent._addIncomingPeer(peer)
+      peer.onHandshake(torrent.infoHash, peerId)
     }
   }
 
@@ -152,29 +250,26 @@ function setRecentlyUsed (torrent) {
   lruFetcherTorrents.push(torrent)
 }
 
-function onTorrentFound (torrent, peer, peerId) {
-  peer.swarm = torrent
-  torrent._addIncomingPeer(peer)
-  peer.onHandshake(torrent.infoHash, peerId)
-}
-
-function handleUnknownTorrent (infoHash, peer, peerId) {
-  function error(err) {
-    peer.destroy(err)
-  }
-
+function handleUnknownTorrent (infoHash, cb) {
   getTorrentFile(infoHash, function (err, torrentFile) {
-    if (err) return error(err)
+    if (err) return cb(err)
     makeStore(infoHash, torrentFile, function (err, storeConstructor) {
-      if (err) return error(err)
+      if (err) return cb(err)
 
       debug('creating seeder torrent')
-      startTorrent(seeder, infoHash, torrentFile, {
+      const parsed = parseTorrent(torrentFile)
+      parsed.announce = []
+      if (config.udpTrackerUrl)
+        parsed.announce.push(config.udpTrackerUrl)
+      if (config.wsTrackerUrl)
+        parsed.announce.push(config.wsTrackerUrl) // ensure correct tracker is added (for webrtc/websocket case)
+
+      startTorrent(seeder, infoHash, parsed, {
         store: storeConstructor,
         skipVerify: true
       }, function (err, seedingTorrent) {
         debug('starting to seed')
-        onTorrentFound(seedingTorrent, peer, peerId)
+        cb(err, seedingTorrent)
       })
     })
   })

@@ -2,6 +2,7 @@
 
 const test = require('tape')
 const rimraf = require('rimraf')
+const wrtc = require('electron-webrtc')()
 
 // delete previous seed cache
 rimraf.sync('/tmp/archive-torrents') // should match path in seeder-config.json
@@ -60,11 +61,37 @@ test('download a second torrent which should evict the first from the cache', t 
       try {
         // try to access previous torrent directory
         fs.accessSync('/tmp/archive-torrents/22cf567cbca91d3cc0a338aff766f4ba90da21e9')
-        t.fail('pervious torrent still there')
+        t.fail('previous torrent still there')
       } catch (e) {
         t.pass('properly evicted')
       }
     }, 10000) // delay 10 seconds to ensure eviction
+  })
+  torrent.on('error', err => {
+    wt.destroy()
+    t.fail('failed')
+    console.error(err)
+  })
+})
+
+test('download torrent through seeder via WebRTC', t => {
+  t.plan(1)
+  rimraf.sync('/tmp/webtorrent/22cf567cbca91d3cc0a338aff766f4ba90da21e9')
+  const torrentFile = parseTorrent(fs.readFileSync(path.join(__dirname, 'commute.torrent')))
+  // remove all other trackers and web seeds
+  torrentFile.announce = ['ws://localhost:6969']
+  torrentFile.urlList = []
+
+  const wt = new WebTorrent({
+    dht: false,
+    tracker: {
+      wrtc
+    }
+  })
+  const torrent = wt.add(torrentFile)
+  torrent.on('done', () => {
+    wt.destroy()
+    t.pass('succeeded')
   })
   torrent.on('error', err => {
     wt.destroy()
