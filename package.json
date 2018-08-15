@@ -37,7 +37,6 @@
     "babelify": "^8.0.0",
     "chai": "^4.1.2",
     "copy-webpack-plugin": "^4.5.2",
-    "electron-webrtc": "^0.3.0",
     "rimraf": "^2.6.2",
     "tape": "^4.9.1",
     "watchify": "^3.11.0"

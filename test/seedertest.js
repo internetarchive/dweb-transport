@@ -2,7 +2,7 @@
 
 const test = require('tape')
 const rimraf = require('rimraf')
-const wrtc = require('electron-webrtc')()
+const wrtc = require('wrtc')
 
 // delete previous download cache
 rimraf.sync('/tmp/webtorrent/22cf567cbca91d3cc0a338aff766f4ba90da21e9')

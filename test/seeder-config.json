@@ -3,7 +3,7 @@
     {
       "peerId": "2d5757303039382d494c414465783166346c7351",
       "torrentPort": 6881,
-      "wrtc": "electron-webrtc"
+      "wrtc": "wrtc"
     }
   ],
   "wsTrackerUrl": "ws://localhost:6969",
