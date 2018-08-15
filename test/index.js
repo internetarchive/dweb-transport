@@ -2,7 +2,7 @@
 
 const test = require('tape')
 const rimraf = require('rimraf')
-const wrtc = require('electron-webrtc')()
+const wrtc = require('wrtc')
 
 // delete previous seed cache
 rimraf.sync('/tmp/archive-torrents') // should match path in seeder-config.json
