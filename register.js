@@ -5,8 +5,13 @@ var DwebObjects = require('dweb-objects');
 var args = process.argv; // '/usr/local/bin/node', '/usr/local/dweb-archive/register.js', '/ipfs/Q1234'
 
 var verbose = false;
+
+
+THIS ISNT WORKING CURRENTLY - WAS SET TO OLD PLACE (/examples
+it really wants to register details/ to go to archive/archive.html and /ipfs/Q,,,/archive.html
+
 pathname = "/arc/archive.org/examples";
-urls = ["https://dweb.archive.org/examples/"];
+urls = ["https://dweb.me/archive/"];
 
 while (args.length) {
     arg = args.shift();
