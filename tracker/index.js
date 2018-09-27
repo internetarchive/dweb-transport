@@ -1,5 +1,5 @@
 const Server = require('bittorrent-tracker').Server;
-const httptools = require('dweb-transports/httptools')
+const httptools = require('@internetarchive/dweb-transports/httptools')
 const debug = require('debug')('tracker')
 
 //TODO-WEBTORRENT - replace logging here to write to somewhere useful (currently goes to console) OR redirect in calling sript

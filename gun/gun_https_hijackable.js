@@ -8,8 +8,8 @@ const Url = require('url');
 require ('./hijack.js'); // Its possible this has to be before require gun
 const Gun = require('gun');
 require('gun/lib/path.js'); // extend gun with gun.path
-const httptools = require('dweb-transports/httptools.js');
-const errors = require('dweb-transports/Errors.js');
+const httptools = require('@internetarchive/dweb-transports/httptools.js');
+const errors = require('@internetarchive/dweb-transports/Errors.js');
 
 //TODO-GUN put this into a seperate require - not sure "best" Gun-ish way to do this extension
 
