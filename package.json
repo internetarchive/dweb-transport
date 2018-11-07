@@ -7,12 +7,12 @@
   "version": "0.0.4",
   "description": "Javascript library for Internet Archive Decentralized Web project: Transport",
   "dependencies": {
-    "@internetarchive/dweb-archive": "git+https://git@github.com/internetarchive/dweb-archive.git#require",
+    "@internetarchive/dweb-archive": "git+https://git@github.com/internetarchive/dweb-archive.git",
     "@internetarchive/dweb-objects": "git+https://git@github.com/internetarchive/dweb-objects.git",
     "@internetarchive/dweb-transports": "git+https://git@github.com/internetarchive/dweb-transports.git",
     "bittorrent-tracker": "^9.10.1",
     "debug": "^3.2.5",
-    "dweb-archive": "git+https://git@github.com/internetarchive/dweb-archive.git#require",
+    "dweb-archive": "git+https://git@github.com/internetarchive/dweb-archive.git",
     "dweb-objects": "git+https://git@github.com/internetarchive/dweb-objects.git",
     "dweb-serviceworker": "git+https://git@github.com/internetarchive/dweb-serviceworker.git",
     "dweb-transports": "git+https://git@github.com/internetarchive/dweb-transports.git",
@@ -46,7 +46,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/internetarchive/dweb-transport.git"
+    "url": "git+https://git@github.com/internetarchive/dweb-transport.git"
   },
   "scripts": {
     "test": "node test/index.js",
