@@ -4,11 +4,11 @@
       "peerId": "2d5757303039382d494c414465783166346c7351",
       "torrentPort": 6881,
       "wrtc": "wrtc",
-      "ip": "208.70.31.85"
+      "ip": "207.241.227.103"
     }
   ],
-  "wsTrackerUrl": "ws://localhost:6969",
-  "udpTrackerUrl": "udp://localhost:6969",
+  "wsTrackerUrl": "ws://localhost:4247",  // HTTPS should proxy 6969 to 4247
+  "udpTrackerUrl": "udp://localhost:4247",    // HTTPS should proxy 6969 to 4247
   "validateUrl": "https://archive.org/advancedsearch.php?fl=identifier,btih&output=json&rows=1&q=btih:",
   "openTracker": false,
   "cachePath": "/tmp/archive-torrents",
