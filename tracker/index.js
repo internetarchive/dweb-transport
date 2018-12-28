@@ -168,4 +168,4 @@ server.onWebSocketConnection = (socket, opts) => {
 }
 
 // start tracker server listening! Use 0 to listen on a random free port.
-server.listen(4247);  # HTTPS should proxy port 6969 to here
+server.listen(4247);  // HTTPS should proxy port 6969 to here
