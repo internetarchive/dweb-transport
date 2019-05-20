@@ -71,6 +71,7 @@ function _hijackFactory(gun, self, {soul=undefined, path=undefined, url=undefine
                     console.log("GUN.hijack: soul=",soul,"key=", key);
                     function _updateAndForward(data) {
                         if (typeof data !== "undefined") {
+                            //TODO-GUN something like data = SEA.sign(data, keypair, (ack) => {}  << will be different funtion that takes keypath
                             msg.put = {
                                 [soul]: {
                                     _: {
