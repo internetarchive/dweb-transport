@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+console.log("THIS IS OBSOLETE AND WILL BE DELETED SOON SEE https://github.com/internetarchive/dweb-transports/issues/22");
+exit
+
 
 global.DwebTransports = require('dweb-transports'); // Manage all Transports that are loaded
 var DwebObjects = require('dweb-objects');

@@ -23,7 +23,7 @@ There are a number of places where URLs are forwarded, this is an attempt to gat
 * https://{gateway.dweb.me,dweb.me}/ws proxypass localhost:4002 (websockets for IPFS)
 
 
-#### In Naming setup in dweb-objects/domain.js
+#### In Naming setup in dweb-transports/naming.js
 * /arc/archive.org/details -> https://dweb.me/examples/archive.html
 * /arc/archive.org/search -> https://dweb.me/examples/archive.html
 * /arc/archive.org/metadata/foo -> https://gateway.dweb.me/metadata/archiveid/foo

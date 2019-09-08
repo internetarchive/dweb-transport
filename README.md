@@ -11,7 +11,7 @@ It has some legacy material, examples and partially started projects.
     * seeder: Super peer for webtorrent, that knows how to look up btih on IA
     * tracker: Super tracker for webtorrent, always adds the seeder super peer to results.
     * seeder-config.json ties the seeder & tracker together
-* register.js - for registering names in the dweb-objects/Domain system
+* OBSOLETE register.js - for registering names in the dweb-objects/Domain system
 * URL-forwards - documentation on where in the Dweb project urls are forwarded 
 * test: Test code for the seeder/tracker combo
 
