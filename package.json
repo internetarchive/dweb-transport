@@ -8,6 +8,7 @@
   "description": "Javascript library for Internet Archive Decentralized Web project: Transport",
   "dependencies": {
     "@internetarchive/dweb-transports": "git+https://git@github.com/internetarchive/dweb-transports.git",
+    "async": "^3.1.0",
     "bittorrent-tracker": "^9.10.1",
     "debug": "^3.2.5",
     "filesize-parser": "^1.5.0",
