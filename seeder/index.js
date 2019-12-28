@@ -321,7 +321,8 @@ function getTorrentFile (infoHash, cb) {
     return cb(null, cacheEntry)
   }
 
-  var url = 'https://dweb.me/btih/' + infoHash + '?output=torrent'
+  //var url = 'https://dweb.me/btih/' + infoHash + '?output=torrent'
+  var url = config.torrentFromBtihUrl + infoHash
   request({
     url: url,
     encoding: null
