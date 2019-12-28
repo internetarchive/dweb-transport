@@ -18,7 +18,7 @@
     "parse-torrent": "^6.1.2",
     "request": "^2.88.0",
     "trammel": "^2.0.1",
-    "webtorrent": "^0.102.4",
+    "webtorrent": "^0.107.16",
     "wrtc": "^0.1.6"
   },
   "keywords": [],
