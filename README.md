@@ -6,7 +6,6 @@ This is a catch-all repository for the Dweb project.
 
 It has some legacy material, examples and partially started projects.
 
-* gun: Our modified gun client that hijacks queries for .../arc/archive.org/metadata
 * Webtorrent super peer/tracker combo
     * seeder: Super peer for webtorrent, that knows how to look up btih on IA
     * tracker: Super tracker for webtorrent, always adds the seeder super peer to results.

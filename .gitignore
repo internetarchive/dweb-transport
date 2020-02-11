@@ -23,8 +23,6 @@ archive_bundle.js
 bootloader.html
 package-lock.json
 mirror/node_modules
-/gun/data.json
 /data.json
-gun/radata
 /yarn.lock
 
