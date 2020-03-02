@@ -1,18 +1,11 @@
 # dweb-transport
 
-Welcome to the Internet Archive's Decentralized Web (Dweb) libraries. 
+This repo is obsolete - everything has been moved to their own repos, specifically
+www/dweb-webtorrent and www/dweb-gun 
 
-This is a catch-all repository for the Dweb project. 
+Those are in Internet Archive's gitlab so not publicly facing, 
+but I'll happily share them with anyone who wants to see 
+the webtorrent superseeder/lying tracker or gun hijacker. 
 
-It has some legacy material, examples and partially started projects.
+Contact mitra@archive.org or look at earlier versions of this repo.
 
-* Webtorrent super peer/tracker combo
-    * seeder: Super peer for webtorrent, that knows how to look up btih on IA
-    * tracker: Super tracker for webtorrent, always adds the seeder super peer to results.
-    * seeder-config.json ties the seeder & tracker together
-* URL-forwards - documentation on where in the Dweb project urls are forwarded 
-* test: Test code for the seeder/tracker combo
-
-The bulk of the code is now in their own repos... 
-
-See [Dweb document index](https://github.com/internetarchive/dweb-transports/blob/master/DOCUMENTINDEX.md) for a list of the repos that make up the Internet Archive's Dweb project, and an index of other documents. 
